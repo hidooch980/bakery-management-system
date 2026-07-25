@@ -74,11 +74,7 @@ class UserResource extends Resource
                         ->required(fn (string $operation) => $operation === 'create')
                         ->helperText('در حالت ویرایش، خالی بگذارید تا تغییر نکند.'),
 
-                    Forms\Components\TextInput::make('monthly_salary')
-                        ->label('حقوق ماهانه')
-                        ->numeric()
-                        ->minValue(0)
-                        ->suffix(fn () => \App\Support\Money::label())
+                    \App\Filament\Forms\MoneyInput::make('monthly_salary', 'حقوق ماهانه')
                         ->helperText('برای پیش‌پر کردن فرم حقوق استفاده می‌شود.'),
 
                     Forms\Components\Toggle::make('is_active')

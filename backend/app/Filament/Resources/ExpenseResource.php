@@ -45,13 +45,8 @@ class ExpenseResource extends Resource
                         ->required()
                         ->maxLength(255),
 
-                    Forms\Components\TextInput::make('amount')
-                        ->label('مبلغ')
-                        ->numeric()
-                        ->minValue(0)
-                        ->required()
-                        ->suffix(fn () => Money::label())
-                        ->helperText('مبلغ همیشه به تومان ذخیره می‌شود.'),
+                    \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ')
+                        ->required(),
 
                     Forms\Components\DatePicker::make('spent_on')
                         ->label('تاریخ هزینه')

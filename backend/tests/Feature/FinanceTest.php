@@ -251,6 +251,84 @@ class FinanceTest extends TestCase
         $this->assertDatabaseHas('bakeries', ['currency' => 'rial']);
     }
 
+    public function test_money_converts_a_typed_amount_back_to_toman(): void
+    {
+        \App\Models\Bakery::first()->update(['currency' => Money::RIAL]);
+        Money::forgetCache();
+
+        // A Rial shop types 10,000; storage must receive 1,000 Toman.
+        $this->assertSame(1000.0, Money::toToman(10000));
+
+        \App\Models\Bakery::first()->update(['currency' => Money::TOMAN]);
+        Money::forgetCache();
+        $this->assertSame(1000.0, Money::toToman(1000));
+    }
+
+    public function test_money_conversion_round_trips(): void
+    {
+        foreach ([Money::TOMAN, Money::RIAL] as $unit) {
+            \App\Models\Bakery::first()->update(['currency' => $unit]);
+            Money::forgetCache();
+
+            // Whatever the unit, display -> stored -> display must be lossless.
+            $this->assertSame(2500.0, Money::toToman(Money::convert(2500)));
+        }
+    }
+
+    public function test_panel_form_save_does_not_drift_the_stored_amount(): void
+    {
+        \App\Models\Bakery::first()->update(['currency' => Money::RIAL]);
+        Money::forgetCache();
+
+        $expense = Expense::create([
+            'category' => 'rent',
+            'title' => 'اجاره',
+            'amount' => 1000,
+            'spent_on' => now(),
+        ]);
+
+        $this->actingAs($this->userWithRole('admin'));
+        \Filament\Facades\Filament::setCurrentPanel(
+            \Filament\Facades\Filament::getPanel('admin')
+        );
+
+        // Opening the form converts Toman -> Rial and saving converts back.
+        // If either direction were missing or applied twice, the stored value
+        // would drift by a factor of ten on every save.
+        \Livewire\Livewire::test(
+            \App\Filament\Resources\ExpenseResource\Pages\EditExpense::class,
+            ['record' => $expense->getRouteKey()]
+        )
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('1000.00', $expense->fresh()->amount);
+    }
+
+    public function test_panel_expense_form_round_trips_the_displayed_amount(): void
+    {
+        \App\Models\Bakery::first()->update(['currency' => Money::RIAL]);
+        Money::forgetCache();
+
+        $expense = Expense::create([
+            'category' => 'rent',
+            'title' => 'اجاره',
+            'amount' => 1000,
+            'spent_on' => now(),
+        ]);
+
+        $this->actingAs($this->userWithRole('admin'));
+        \Filament\Facades\Filament::setCurrentPanel(
+            \Filament\Facades\Filament::getPanel('admin')
+        );
+
+        // Editing shows the stored Toman back in Rial.
+        \Livewire\Livewire::test(
+            \App\Filament\Resources\ExpenseResource\Pages\EditExpense::class,
+            ['record' => $expense->getRouteKey()]
+        )->assertFormSet(['amount' => 10000.0]);
+    }
+
     public function test_currency_rejects_an_unknown_unit(): void
     {
         $this->actingAs($this->userWithRole('admin'), 'sanctum')

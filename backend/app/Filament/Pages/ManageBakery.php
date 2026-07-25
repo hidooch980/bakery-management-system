@@ -96,12 +96,8 @@ class ManageBakery extends Page implements HasForms
                             ->suffix('کیلوگرم')
                             ->helperText('مثلاً ۰٫۳۸۰'),
 
-                        Forms\Components\TextInput::make('bread_price')
-                            ->label('قیمت هر نان')
-                            ->numeric()
-                            ->minValue(0)
-                            ->suffix('تومان')
-                            ->helperText('همیشه به تومان وارد کنید'),
+                        \App\Filament\Forms\MoneyInput::make('bread_price', 'قیمت هر نان')
+                            ->helperText('برای پیشنهاد مبلغ فروش در اپلیکیشن'),
 
                         Forms\Components\Select::make('currency')
                             ->label('واحد پول نمایشی')

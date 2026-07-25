@@ -51,6 +51,16 @@ class Money
         return number_format(self::convert($toman, $currency)).' '.self::label($currency);
     }
 
+    /** Converts an amount typed in the display unit back to stored Toman. */
+    public static function toToman(float|int|string|null $displayed, ?string $currency = null): float
+    {
+        $amount = (float) ($displayed ?? 0);
+
+        return ($currency ?? self::currency()) === self::RIAL
+            ? $amount / self::RIAL_PER_TOMAN
+            : $amount;
+    }
+
     /** Clears the cached currency after the setting is changed. */
     public static function forgetCache(): void
     {

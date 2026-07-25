@@ -47,7 +47,7 @@ class SalaryPaymentResource extends Resource
                         ->afterStateUpdated(function ($state, Forms\Set $set) {
                             $salary = User::find($state)?->monthly_salary;
                             if ($salary) {
-                                $set('base_amount', (float) $salary);
+                                $set('base_amount', Money::convert($salary));
                             }
                         }),
 
@@ -64,40 +64,30 @@ class SalaryPaymentResource extends Resource
                 ->icon('heroicon-o-calculator')
                 ->columns(3)
                 ->schema([
-                    Forms\Components\TextInput::make('base_amount')
-                        ->label('حقوق پایه')
-                        ->numeric()
-                        ->minValue(0)
+                    \App\Filament\Forms\MoneyInput::make('base_amount', 'حقوق پایه')
                         ->required()
                         ->default(0)
-                        ->live(onBlur: true)
-                        ->suffix(fn () => Money::label()),
+                        ->live(onBlur: true),
 
-                    Forms\Components\TextInput::make('bonus')
-                        ->label('پاداش / اضافه‌کاری')
-                        ->numeric()
-                        ->minValue(0)
+                    \App\Filament\Forms\MoneyInput::make('bonus', 'پاداش / اضافه‌کاری')
                         ->default(0)
-                        ->live(onBlur: true)
-                        ->suffix(fn () => Money::label()),
+                        ->live(onBlur: true),
 
-                    Forms\Components\TextInput::make('deduction')
-                        ->label('کسورات')
-                        ->numeric()
-                        ->minValue(0)
+                    \App\Filament\Forms\MoneyInput::make('deduction', 'کسورات')
                         ->default(0)
-                        ->live(onBlur: true)
-                        ->suffix(fn () => Money::label()),
+                        ->live(onBlur: true),
 
                     Forms\Components\Placeholder::make('net_preview')
                         ->label('خالص پرداختی')
                         ->columnSpanFull()
                         ->content(function (Forms\Get $get) {
+                            // Form state is in the display unit, so build the
+                            // preview there rather than double-converting.
                             $net = (float) $get('base_amount')
                                 + (float) $get('bonus')
                                 - (float) $get('deduction');
 
-                            return Money::format($net);
+                            return number_format($net).' '.Money::label();
                         }),
                 ]),
 

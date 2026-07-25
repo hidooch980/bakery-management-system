@@ -64,11 +64,7 @@ class SaleResource extends Resource
                         ->required()
                         ->native(false),
 
-                    Forms\Components\TextInput::make('amount')
-                        ->label('مبلغ')
-                        ->numeric()
-                        ->minValue(0)
-                        ->suffix(fn () => \App\Support\Money::label()),
+                    \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ'),
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')
