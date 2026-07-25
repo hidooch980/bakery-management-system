@@ -60,7 +60,7 @@ class ConsignmentFlourController extends Controller
                 'partner_phone' => $data['partner_phone'] ?? null,
                 'direction' => $data['direction'],
                 'amount_kg' => $data['amount_kg'],
-                'occurred_on' => Jalali::parse($data['occurred_on'] ?? null) ?? now(),
+                'occurred_on' => Jalali::parseFlexible($data['occurred_on'] ?? null) ?? now(),
                 'note' => $data['note'] ?? null,
             ]);
 

@@ -22,7 +22,7 @@ class ManageBakery extends Page implements HasForms
 
     protected static ?string $title = 'اطلاعات نانوایی';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = -10;
 
     protected static string $view = 'filament.pages.manage-bakery';
 

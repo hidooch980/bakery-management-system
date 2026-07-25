@@ -57,21 +57,11 @@ class ConsignmentFlourResource extends Resource
                         ->required()
                         ->suffix('kg'),
 
-                    Forms\Components\DatePicker::make('occurred_on')
-                        ->label('تاریخ')
-                        ->default(now())
-                        ->required()
-                        ->native(false)
-                        ->live()
-                        ->helperText(fn ($state) => $state ? AppCalendar::date($state) : null),
+                    \App\Filament\Forms\JalaliDateInput::today('occurred_on', 'تاریخ')
+                        ->required(),
 
-                    Forms\Components\DatePicker::make('settled_on')
-                        ->label('تاریخ تسویه')
-                        ->native(false)
-                        ->live()
-                        ->helperText(fn ($state) => $state
-                            ? AppCalendar::date($state)
-                            : 'خالی بگذارید تا در وضعیت «تسویه‌نشده» بماند.'),
+                    \App\Filament\Forms\JalaliDateInput::make('settled_on', 'تاریخ تسویه')
+                        ->helperText('خالی بگذارید تا در وضعیت «تسویه‌نشده» بماند.'),
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')

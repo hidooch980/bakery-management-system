@@ -216,6 +216,40 @@ class FinanceTest extends TestCase
         $this->assertSame('1405/05/03', Jalali::date($carbon));
     }
 
+    public function test_jalali_parser_does_not_mistake_a_gregorian_date_for_jalali(): void
+    {
+        // "2026-07-22" matches the Jalali pattern but its year is Gregorian;
+        // reading it as Jalali would land in the 27th century.
+        $this->assertNull(Jalali::parse('2026-07-22'));
+        $this->assertNull(Jalali::parse('1999/01/01'));
+    }
+
+    public function test_flexible_parser_accepts_both_calendars(): void
+    {
+        $this->assertSame('2026-07-25', Jalali::parseFlexible('1405/05/03')?->toDateString());
+        $this->assertSame('2026-07-22', Jalali::parseFlexible('2026-07-22')?->toDateString());
+        $this->assertSame('2026-07-25', Jalali::parseFlexible('۱۴۰۵/۰۵/۰۳')?->toDateString());
+        $this->assertNull(Jalali::parseFlexible('فردا'));
+        $this->assertNull(Jalali::parseFlexible(null));
+    }
+
+    public function test_reports_accept_a_gregorian_range_from_the_app(): void
+    {
+        // The Flutter app sends ISO dates; they must not be read as Jalali.
+        $this->actingAs($this->userWithRole('admin'), 'sanctum')
+            ->getJson('/api/v1/reports/financial?from=2026-07-01&to=2026-07-31')
+            ->assertOk()
+            ->assertJsonPath('data.from', '2026-07-01')
+            ->assertJsonPath('data.to', '2026-07-31');
+    }
+
+    public function test_jalali_display_is_not_shifted_by_timezone(): void
+    {
+        // A date-only value serialised as UTC must still render as its own day.
+        $this->assertSame('1405/05/03', Jalali::date('2026-07-25'));
+        $this->assertSame('1405/05/03', Jalali::date('2026-07-24T20:30:00.000000Z'));
+    }
+
     public function test_jalali_helper_rejects_nonsense(): void
     {
         $this->assertNull(Jalali::parse('not a date'));

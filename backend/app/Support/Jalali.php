@@ -11,6 +11,10 @@ use Morilog\Jalali\Jalalian;
  */
 class Jalali
 {
+    /** Years at or above this are Gregorian, not Jalali. */
+    private const MAX_JALALI_YEAR = 1700;
+
+
     /** e.g. ۱۴۰۵/۰۵/۰۳ */
     public static function date(Carbon|string|null $value): ?string
     {
@@ -68,6 +72,13 @@ class Jalali
             return null;
         }
 
+        // A Gregorian ISO date such as "2026-07-22" matches the pattern above,
+        // and reading its year as Jalali would land in the 27th century. Real
+        // Jalali years sit well below this, so anything higher is not ours.
+        if ((int) $m[1] >= self::MAX_JALALI_YEAR) {
+            return null;
+        }
+
         try {
             $jalalian = Jalalian::fromFormat('Y/m/d', sprintf('%04d/%02d/%02d', $m[1], $m[2], $m[3]));
         } catch (\Throwable) {
@@ -79,14 +90,42 @@ class Jalali
         return Carbon::instance($jalalian->toCarbon());
     }
 
+    /**
+     * Accepts either a Jalali date ("1405/05/03") or a Gregorian one
+     * ("2026-07-25") and returns a Carbon, so API clients can send whichever
+     * they hold without the two being confused for each other.
+     */
+    public static function parseFlexible(?string $value): ?Carbon
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        if ($jalali = self::parse($value)) {
+            return $jalali;
+        }
+
+        try {
+            return Carbon::parse(self::toLatinDigits(trim($value)));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     /** Start and end of the current Jalali month, as Gregorian timestamps. */
     public static function currentMonthRange(): array
     {
-        $now = Jalalian::now();
+        return self::monthRangeFor(Carbon::now());
+    }
+
+    /** Start and end of the Jalali month containing the given date. */
+    public static function monthRangeFor(Carbon $date): array
+    {
+        $jalali = Jalalian::fromCarbon($date);
 
         return [
-            Carbon::instance($now->getFirstDayOfMonth()->toCarbon())->startOfDay(),
-            Carbon::instance($now->getEndDayOfMonth()->toCarbon())->endOfDay(),
+            Carbon::instance($jalali->getFirstDayOfMonth()->toCarbon())->startOfDay(),
+            Carbon::instance($jalali->getEndDayOfMonth()->toCarbon())->endOfDay(),
         ];
     }
 
@@ -99,6 +138,12 @@ class Jalali
         );
     }
 
+    /**
+     * Values reach us in several shapes — a Carbon, a plain "Y-m-d", or a
+     * UTC ISO string after a Livewire round-trip. Everything is moved to the
+     * app timezone before conversion, otherwise a Tehran midnight serialised
+     * as UTC would render as the previous day.
+     */
     private static function toCarbon(Carbon|string|null $value): ?Carbon
     {
         if ($value === null) {
@@ -106,11 +151,11 @@ class Jalali
         }
 
         if ($value instanceof Carbon) {
-            return $value;
+            return $value->copy()->setTimezone(config('app.timezone'));
         }
 
         try {
-            return Carbon::parse($value);
+            return Carbon::parse($value)->setTimezone(config('app.timezone'));
         } catch (\Throwable) {
             return null;
         }

@@ -19,8 +19,8 @@ class ExpenseController extends Controller
     {
         $expenses = Expense::with('user:id,name')
             ->when($request->query('category'), fn ($q, $c) => $q->where('category', $c))
-            ->when($request->query('from'), fn ($q, $d) => $q->whereDate('spent_on', '>=', Jalali::parse($d) ?? $d))
-            ->when($request->query('to'), fn ($q, $d) => $q->whereDate('spent_on', '<=', Jalali::parse($d) ?? $d))
+            ->when($request->query('from'), fn ($q, $d) => $q->whereDate('spent_on', '>=', Jalali::parseFlexible($d) ?? $d))
+            ->when($request->query('to'), fn ($q, $d) => $q->whereDate('spent_on', '<=', Jalali::parseFlexible($d) ?? $d))
             ->latest('spent_on')
             ->paginate(20)
             ->through(fn (Expense $e) => $this->payload($e));
@@ -44,7 +44,7 @@ class ExpenseController extends Controller
             'title' => $data['title'],
             'amount' => $data['amount'],
             // Accepts either a Jalali date or a Gregorian one; defaults to today.
-            'spent_on' => Jalali::parse($data['spent_on'] ?? null) ?? now(),
+            'spent_on' => Jalali::parseFlexible($data['spent_on'] ?? null) ?? now(),
             'note' => $data['note'] ?? null,
         ]);
 
@@ -62,7 +62,7 @@ class ExpenseController extends Controller
         ]);
 
         if (isset($data['spent_on'])) {
-            $data['spent_on'] = Jalali::parse($data['spent_on']) ?? $expense->spent_on;
+            $data['spent_on'] = Jalali::parseFlexible($data['spent_on']) ?? $expense->spent_on;
         }
 
         $expense->update($data);

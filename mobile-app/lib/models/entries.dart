@@ -50,7 +50,15 @@ class ChaneEntry {
   final String? userName;
   final DateTime? createdAt;
 
-  double get totalWeightKg => normalWeightKg + naninoWeightKg;
+  /// The weight that counts for sales, stock and reporting.
+  ///
+  /// Only the normal chane is real output; nanino is recorded for comparison
+  /// and is deliberately excluded from every calculation.
+  double get weightKg => normalWeightKg;
+
+  /// Both weights added together — for the comparison view only, never for
+  /// sales or stock figures.
+  double get displayTotalWeightKg => normalWeightKg + naninoWeightKg;
 
   bool get isPending => status == 'pending';
 

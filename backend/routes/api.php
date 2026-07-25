@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\DoughEntryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FlourAllocationController;
 use App\Http\Controllers\Api\FlourStockController;
+use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
@@ -114,6 +115,16 @@ Route::prefix('v1')->group(function () {
             Route::delete('/consignment-flour/{consignment}', [ConsignmentFlourController::class, 'destroy']);
         });
 
+        // --- Holidays: everyone reads, admin manages ---
+        Route::get('/holidays', [HolidayController::class, 'index']);
+        Route::get('/holidays/today', [HolidayController::class, 'today']);
+        Route::get('/holidays/types', [HolidayController::class, 'types']);
+        Route::middleware('permission:manage-bakery')->group(function () {
+            Route::post('/holidays', [HolidayController::class, 'store']);
+            Route::put('/holidays/{holiday}', [HolidayController::class, 'update']);
+            Route::delete('/holidays/{holiday}', [HolidayController::class, 'destroy']);
+        });
+
         // --- Admin: bakery settings ---
         Route::put('/bakery', [BakeryController::class, 'update'])
             ->middleware('permission:manage-bakery');
@@ -131,8 +142,10 @@ Route::prefix('v1')->group(function () {
             Route::post('/flour/movements', [FlourStockController::class, 'store']);
         });
 
-        Route::get('/reports/attendance', [ReportController::class, 'attendance'])
-            ->middleware('permission:view-attendance-reports');
+        Route::middleware('permission:view-attendance-reports')->group(function () {
+            Route::get('/reports/attendance', [ReportController::class, 'attendance']);
+            Route::get('/reports/attendance-summary', [ReportController::class, 'attendanceSummary']);
+        });
 
         // Every employee can see their own payslips. Declared before the
         // salaries resource so `/salaries/{salary}` does not swallow "mine".

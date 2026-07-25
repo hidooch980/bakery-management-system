@@ -92,8 +92,10 @@ class BakeryWorkflowTest extends TestCase
                 'spray_flour_kg' => 4.5,
             ])
             ->assertCreated()
-            // 300 x 0.85 normal plus 60 x 1.0 nanino.
-            ->assertJsonPath('data.total_weight_kg', 315);
+            // Only the normal chane counts: 300 x 0.85. The 60 nanino chane
+            // are reported separately and excluded from the total.
+            ->assertJsonPath('data.total_weight_kg', 255)
+            ->assertJsonPath('data.nanino_weight_kg', 60);
 
         $this->assertSame('processed', $doughEntry->fresh()->status);
 
@@ -280,6 +282,61 @@ class BakeryWorkflowTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['normal_chane_weight_kg', 'bread_price']);
+    }
+
+    public function test_every_seeded_role_can_be_assigned_and_has_a_persian_label(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $seeded = \Spatie\Permission\Models\Role::pluck('name')->sort()->values()->all();
+        $assignable = collect(\App\Http\Controllers\Api\UserManagementController::ASSIGNABLE_ROLES)
+            ->sort()->values()->all();
+
+        // A role that exists but is not assignable cannot be given to anyone.
+        $this->assertSame($seeded, $assignable);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/users/roles')
+            ->assertOk();
+
+        foreach ($response->json('data') as $role) {
+            // Clients must never have to show a raw slug like "shater".
+            $this->assertNotSame($role['value'], $role['label'], "Role {$role['value']} has no Persian label.");
+            $this->assertMatchesRegularExpression('/\p{Arabic}/u', $role['label']);
+        }
+    }
+
+    public function test_admin_can_create_a_shater_account(): void
+    {
+        $this->actingAs($this->userWithRole('admin'), 'sanctum')
+            ->postJson('/api/v1/users', [
+                'name' => 'حسن شاطر',
+                'email' => 'shater-test@bakery.test',
+                'password' => 'password123',
+                'role' => 'shater',
+            ])
+            ->assertCreated();
+
+        $this->assertTrue(
+            User::where('email', 'shater-test@bakery.test')->first()->hasRole('shater')
+        );
+    }
+
+    public function test_shater_sees_the_board_but_nothing_else(): void
+    {
+        $shater = $this->userWithRole('shater');
+
+        $this->actingAs($shater, 'sanctum')->getJson('/api/v1/chane-board')->assertOk();
+
+        // The oven operator has no business recording or selling anything.
+        $this->actingAs($shater, 'sanctum')
+            ->postJson('/api/v1/dough-entries', ['bag_count' => 1])->assertForbidden();
+        $this->actingAs($shater, 'sanctum')
+            ->postJson('/api/v1/chane-entries', [])->assertForbidden();
+        $this->actingAs($shater, 'sanctum')
+            ->postJson('/api/v1/sales', [])->assertForbidden();
+        $this->actingAs($shater, 'sanctum')
+            ->getJson('/api/v1/reports/dashboard')->assertForbidden();
     }
 
     public function test_api_error_envelope_is_consistent(): void

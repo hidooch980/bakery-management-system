@@ -18,7 +18,16 @@ class UserManagementController extends Controller
 {
     use ApiResponse;
 
-    public const ASSIGNABLE_ROLES = ['admin', 'dough_maker', 'chane_gir', 'seller'];
+    public const ASSIGNABLE_ROLES = ['admin', 'dough_maker', 'chane_gir', 'shater', 'seller'];
+
+    /** Persian names for the roles, so clients never show a raw slug. */
+    public const ROLE_LABELS = [
+        'admin' => 'مدیر',
+        'dough_maker' => 'خمیرگیر',
+        'chane_gir' => 'چانه‌گیر',
+        'shater' => 'شاطر',
+        'seller' => 'فروشنده',
+    ];
 
     public function index(Request $request): JsonResponse
     {
@@ -106,6 +115,11 @@ class UserManagementController extends Controller
 
     public function roles(): JsonResponse
     {
-        return $this->success(Role::pluck('name'));
+        return $this->success(
+            Role::pluck('name')->map(fn (string $name) => [
+                'value' => $name,
+                'label' => self::ROLE_LABELS[$name] ?? $name,
+            ])->values()
+        );
     }
 }

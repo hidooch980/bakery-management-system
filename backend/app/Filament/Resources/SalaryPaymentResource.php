@@ -51,13 +51,13 @@ class SalaryPaymentResource extends Resource
                             }
                         }),
 
-                    Forms\Components\DatePicker::make('period_start')
-                        ->label('شروع دوره')
-                        ->default(now()->startOfMonth())
+                    \App\Filament\Forms\JalaliDateInput::make('period_start', 'شروع دوره')
                         ->required()
-                        ->native(false)
-                        ->live()
-                        ->helperText(fn ($state) => $state ? 'دوره شمسی: '.Jalali::monthLabel($state) : null),
+                        ->default(fn () => Jalali::currentMonthRange()[0]->toDateString())
+                        ->live(onBlur: true)
+                        ->helperText(fn ($state) => $state && Jalali::parse($state)
+                            ? 'دوره: '.Jalali::monthLabel(Jalali::parse($state))
+                            : 'اول ماه شمسی — مثال: 1405/05/01'),
                 ]),
 
             Forms\Components\Section::make('مبالغ')
@@ -94,13 +94,8 @@ class SalaryPaymentResource extends Resource
             Forms\Components\Section::make('پرداخت')
                 ->columns(2)
                 ->schema([
-                    Forms\Components\DatePicker::make('paid_on')
-                        ->label('تاریخ پرداخت')
-                        ->native(false)
-                        ->live()
-                        ->helperText(fn ($state) => $state
-                            ? 'شمسی: '.Jalali::date($state)
-                            : 'خالی بگذارید تا در وضعیت «پرداخت‌نشده» بماند.'),
+                    \App\Filament\Forms\JalaliDateInput::make('paid_on', 'تاریخ پرداخت')
+                        ->helperText('خالی بگذارید تا در وضعیت «پرداخت‌نشده» بماند.'),
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')

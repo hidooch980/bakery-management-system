@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\DoughFormula;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -22,19 +23,42 @@ class FlourAllocation extends Model
         3 => ['label' => 'دوره سوم (۲۵ تا ۴ ماه بعد)', 'from' => 25, 'to' => 4],
     ];
 
-    protected $fillable = ['month_start', 'month_label', 'total_kg', 'note'];
+    protected $fillable = ['month_start', 'month_label', 'total_bags', 'total_kg', 'note'];
 
     protected function casts(): array
     {
         return [
             'month_start' => 'date',
+            'total_bags' => 'decimal:2',
             'total_kg' => 'decimal:3',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Quotas are issued in sacks; the weight follows from the bag weight
+        // the admin configured, so the two can never disagree.
+        static::saving(function (self $allocation) {
+            if ($allocation->total_bags !== null) {
+                $allocation->total_kg = round(
+                    (float) $allocation->total_bags * DoughFormula::fromBakery()->bagWeightKg,
+                    3
+                );
+            }
+        });
     }
 
     public function periods()
     {
         return $this->hasMany(FlourAllocationPeriod::class)->orderBy('period_number');
+    }
+
+    /** Bags each period is entitled to, derived from its share of the weight. */
+    public function bagsForPeriod(FlourAllocationPeriod $period): float
+    {
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+
+        return $bagWeight > 0 ? round((float) $period->allocated_kg / $bagWeight, 2) : 0.0;
     }
 
     /**

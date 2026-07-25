@@ -32,29 +32,42 @@ class FlourAllocationResource extends Resource
     {
         return $form->schema([
             Forms\Components\Section::make('سهمیه ماهانه')
-                ->description('سهمیه به‌صورت خودکار بین سه دوره تقسیم می‌شود: ۵ تا ۱۴، ۱۵ تا ۲۴، و ۲۵ تا ۴ ماه بعد.')
+                ->description('سهمیه را به کیسه وارد کنید؛ وزن از روی وزن کیسه در تنظیمات محاسبه و بین سه دوره (۵ تا ۱۴، ۱۵ تا ۲۴، ۲۵ تا ۴ ماه بعد) تقسیم می‌شود.')
                 ->columns(2)
                 ->schema([
-                    Forms\Components\DatePicker::make('month_start')
-                        ->label('شروع ماه')
-                        ->default(now()->startOfMonth())
+                    \App\Filament\Forms\JalaliDateInput::make('month_start', 'شروع ماه شمسی')
                         ->required()
-                        ->native(false)
-                        ->live()
-                        ->helperText(fn ($state) => $state
-                            ? 'ماه شمسی: '.Jalali::monthLabel($state)
-                            : null),
+                        ->default(fn () => Jalali::currentMonthRange()[0]->toDateString())
+                        ->live(onBlur: true)
+                        ->helperText(fn ($state) => $state && Jalali::parse($state)
+                            ? 'ماه: '.Jalali::monthLabel(Jalali::parse($state))
+                            : 'اول ماه شمسی — مثال: 1405/05/01'),
 
-                    Forms\Components\TextInput::make('total_kg')
+                    Forms\Components\TextInput::make('total_bags')
                         ->label('کل سهمیه ماه')
                         ->numeric()
                         ->minValue(0)
                         ->required()
-                        ->suffix('kg')
+                        ->suffix('کیسه')
                         ->live(onBlur: true)
-                        ->helperText(fn ($state) => $state
-                            ? 'سهم هر دوره حدود '.number_format((float) $state / 3, 1).' کیلوگرم'
-                            : null),
+                        ->helperText(function ($state) {
+                            $bags = (float) ($state ?: 0);
+
+                            if ($bags <= 0) {
+                                return 'تعداد کیسه را وارد کنید؛ وزن خودکار محاسبه می‌شود.';
+                            }
+
+                            $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+                            $kg = $bags * $bagWeight;
+
+                            return sprintf(
+                                '%s کیسه × %s کیلوگرم = %s کیلوگرم   •   سهم هر دوره حدود %s کیسه',
+                                number_format($bags, 0),
+                                number_format($bagWeight, 1),
+                                number_format($kg, 1),
+                                number_format($bags / 3, 1)
+                            );
+                        }),
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')
@@ -75,10 +88,12 @@ class FlourAllocationResource extends Resource
                     ->color('info')
                     ->sortable(query: fn ($query, $direction) => $query->orderBy('month_start', $direction)),
 
-                Tables\Columns\TextColumn::make('total_kg')
+                Tables\Columns\TextColumn::make('total_bags')
                     ->label('کل سهمیه')
-                    ->numeric(3)
-                    ->suffix(' kg')
+                    ->formatStateUsing(fn ($state) => $state
+                        ? number_format((float) $state, 0).' کیسه'
+                        : '—')
+                    ->description(fn ($record) => number_format((float) $record->total_kg, 1).' کیلوگرم')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('periods_summary')
@@ -89,7 +104,7 @@ class FlourAllocationResource extends Resource
                                 .'/'.number_format((float) $p->allocated_kg, 0))
                             ->implode('   •   ');
                     })
-                    ->description('مصرف / سهمیه هر دوره (kg)'),
+                    ->description('مصرف / سهمیه هر دوره (کیلوگرم)'),
 
                 Tables\Columns\TextColumn::make('current')
                     ->label('دوره جاری')

@@ -117,6 +117,7 @@ class UserResource extends Resource
                         'admin' => 'danger',
                         'dough_maker' => 'warning',
                         'chane_gir' => 'info',
+                        'shater' => 'primary',
                         'seller' => 'success',
                         default => 'gray',
                     }),
@@ -197,6 +198,7 @@ class UserResource extends Resource
             'admin' => 'مدیر',
             'dough_maker' => 'خمیرگیر',
             'chane_gir' => 'چانه‌گیر',
+            'shater' => 'شاطر',
             'seller' => 'فروشنده',
             default => (string) $role,
         };

@@ -80,6 +80,8 @@ class AdminPanelTest extends TestCase
             'consignment create' => ['/admin/consignment-flours/create'],
             'customers' => ['/admin/customers'],
             'customer create' => ['/admin/customers/create'],
+            'holidays' => ['/admin/holidays'],
+            'holiday create' => ['/admin/holidays/create'],
         ];
     }
 

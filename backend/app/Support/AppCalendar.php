@@ -128,6 +128,7 @@ class AppCalendar
         ];
     }
 
+    /** Normalised to the app timezone, for the same reason as Jalali::toCarbon. */
     private static function toCarbon(Carbon|string|null $value): ?Carbon
     {
         if ($value === null) {
@@ -135,11 +136,11 @@ class AppCalendar
         }
 
         if ($value instanceof Carbon) {
-            return $value;
+            return $value->copy()->setTimezone(config('app.timezone'));
         }
 
         try {
-            return Carbon::parse($value);
+            return Carbon::parse($value)->setTimezone(config('app.timezone'));
         } catch (\Throwable) {
             return null;
         }

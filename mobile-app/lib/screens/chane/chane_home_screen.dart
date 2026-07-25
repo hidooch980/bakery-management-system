@@ -301,7 +301,7 @@ class _ChaneHistoryTab extends StatelessWidget {
                             color: scheme.primary,
                           ),
                           _WeightPill(
-                            label: 'نانینو',
+                            label: 'نانینو (نمایشی)',
                             value: entry.naninoWeightKg,
                             color: const Color(0xFF3B82C4),
                           ),
@@ -311,8 +311,8 @@ class _ChaneHistoryTab extends StatelessWidget {
                             color: const Color(0xFFD1495B),
                           ),
                           _WeightPill(
-                            label: 'وزن کل',
-                            value: entry.totalWeightKg,
+                            label: 'وزن ملاک',
+                            value: entry.weightKg,
                             color: const Color(0xFF2E9E6B),
                           ),
                         ],

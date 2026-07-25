@@ -79,8 +79,24 @@ void main() {
       expect(entry.normalWeightKg, 180.50);
       expect(entry.naninoWeightKg, 95.25);
       expect(entry.sprayFlourKg, 6.75);
-      expect(entry.totalWeightKg, closeTo(275.75, 0.001));
       expect(entry.isPending, isTrue);
+    });
+
+    test('the authoritative weight is the normal chane alone', () {
+      final entry = ChaneEntry.fromJson({
+        'id': 3,
+        'dough_entry_id': 1,
+        'chane_count': 420,
+        'normal_weight_kg': '180.50',
+        'nanino_weight_kg': '95.25',
+        'spray_flour_kg': '6.75',
+        'status': 'pending',
+      });
+
+      // Sales, stock and reporting all use this figure...
+      expect(entry.weightKg, 180.50);
+      // ...while nanino only appears in the comparison view.
+      expect(entry.displayTotalWeightKg, closeTo(275.75, 0.001));
     });
 
     test('treats a sold entry as not pending', () {

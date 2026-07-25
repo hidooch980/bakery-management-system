@@ -8,9 +8,11 @@ use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\Expense;
 use App\Models\FlourStockMovement;
+use App\Models\Holiday;
 use App\Models\Sale;
 use App\Models\SalaryPayment;
 use App\Models\User;
+use App\Support\AppCalendar;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Traits\ApiResponse;
@@ -62,6 +64,9 @@ class ReportController extends Controller
             'total_dough_bags' => (int) $dough->sum('bag_count'),
             'total_dough_entries' => $dough->count(),
             'total_chane_count' => (int) $chane->sum('chane_count'),
+            // Normal chane is the production figure; nanino is shown beside it
+            // for comparison but is not part of the total.
+            'total_weight_kg' => round((float) $chane->sum('normal_weight_kg'), 2),
             'total_normal_weight_kg' => round((float) $chane->sum('normal_weight_kg'), 2),
             'total_nanino_weight_kg' => round((float) $chane->sum('nanino_weight_kg'), 2),
             'total_spray_flour_kg' => round((float) $chane->sum('spray_flour_kg'), 2),
@@ -118,7 +123,8 @@ class ReportController extends Controller
         $bags = (int) DoughEntry::whereBetween('created_at', [$from, $to])->sum('bag_count');
         $chane = ChaneEntry::whereBetween('created_at', [$from, $to]);
         $chaneCount = (int) $chane->sum('chane_count');
-        $totalWeight = (float) $chane->sum('normal_weight_kg') + (float) $chane->sum('nanino_weight_kg');
+        // Efficiency measures real output, so nanino is excluded.
+        $totalWeight = (float) $chane->sum('normal_weight_kg');
 
         return $this->success([
             'from' => $from->toDateString(),
@@ -146,6 +152,49 @@ class ReportController extends Controller
             ->paginate(50);
 
         return $this->success($records);
+    }
+
+    /**
+     * Attendance coverage for a period, counting only the days the bakery
+     * was actually open — a closed day is not an absence.
+     */
+    public function attendanceSummary(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        $holidays = Holiday::whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->orderBy('date')
+            ->get();
+
+        // `to` is the end of its day, so compare whole days to avoid a
+        // fractional difference counting as an extra day.
+        $totalDays = (int) $from->copy()->startOfDay()
+            ->diffInDays($to->copy()->startOfDay()) + 1;
+        $workingDays = max($totalDays - $holidays->count(), 0);
+
+        $activeStaff = User::where('is_active', true)->count();
+        $expected = $workingDays * $activeStaff;
+
+        $actual = Attendance::whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->whereNotIn('date', $holidays->pluck('date')->map->toDateString())
+            ->count();
+
+        return $this->success([
+            'from_display' => AppCalendar::date($from),
+            'to_display' => AppCalendar::date($to),
+            'total_days' => $totalDays,
+            'holiday_count' => $holidays->count(),
+            'working_days' => $workingDays,
+            'active_staff' => $activeStaff,
+            'expected_check_ins' => $expected,
+            'actual_check_ins' => $actual,
+            'coverage_percent' => $expected > 0 ? round($actual / $expected * 100, 1) : 0,
+            'holidays' => $holidays->map(fn (Holiday $h) => [
+                'date_display' => $h->date_display,
+                'title' => $h->title,
+                'type_label' => $h->type_label,
+            ]),
+        ]);
     }
 
     /**
@@ -303,15 +352,7 @@ class ReportController extends Controller
             return null;
         }
 
-        if ($jalali = Jalali::parse($value)) {
-            return $jalali;
-        }
-
-        try {
-            return now()->parse($value);
-        } catch (\Throwable) {
-            return null;
-        }
+        return Jalali::parseFlexible($value);
     }
 
     private function flourBalance(): float

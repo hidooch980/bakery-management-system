@@ -32,6 +32,10 @@ class ChaneEntryController extends Controller
 
         // Chane weights come from the admin's dough formula, never from the
         // client, so the shop floor cannot enter a figure that contradicts it.
+        //
+        // Only the normal chane is authoritative: it drives stock, weight and
+        // sales. The nanino figure is recorded for comparison only and is
+        // deliberately kept out of every calculation below.
         $formula = DoughFormula::fromBakery();
         $normalCount = (int) $data['chane_count'];
         $naninoCount = (int) ($data['nanino_chane_count'] ?? 0);
@@ -79,9 +83,10 @@ class ChaneEntryController extends Controller
             }
 
             // Shaping turns dough into chane, so the dough stock drops.
+            // Normal chane only — nanino is a display figure, not real stock.
             InventoryItem::ofKey(InventoryItem::DOUGH)->move(
                 'out',
-                round($normalWeight + ($naninoWeight ?? 0), 3),
+                $normalWeight,
                 'production',
                 $request->user()->id,
                 $entry
@@ -92,7 +97,10 @@ class ChaneEntryController extends Controller
 
         return $this->success([
             'entry' => $entry,
-            'total_weight_kg' => round($entry->normal_weight_kg + $entry->nanino_weight_kg, 2),
+            // The weight that counts is the normal chane; nanino is reported
+            // alongside it purely for comparison.
+            'total_weight_kg' => round((float) $entry->normal_weight_kg, 2),
+            'nanino_weight_kg' => round((float) $entry->nanino_weight_kg, 2),
             'derived_from_formula' => true,
         ], 'ثبت چانه انجام شد.', 201);
     }

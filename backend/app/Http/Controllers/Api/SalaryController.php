@@ -41,7 +41,7 @@ class SalaryController extends Controller
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $periodStart = Jalali::parse($data['period_start']);
+        $periodStart = Jalali::parseFlexible($data['period_start']);
 
         if ($periodStart === null) {
             throw ValidationException::withMessages([
@@ -65,7 +65,7 @@ class SalaryController extends Controller
             'base_amount' => $data['base_amount'],
             'bonus' => $data['bonus'] ?? 0,
             'deduction' => $data['deduction'] ?? 0,
-            'paid_on' => Jalali::parse($data['paid_on'] ?? null),
+            'paid_on' => Jalali::parseFlexible($data['paid_on'] ?? null),
             'note' => $data['note'] ?? null,
         ]);
 
@@ -83,7 +83,7 @@ class SalaryController extends Controller
         ]);
 
         if (array_key_exists('paid_on', $data)) {
-            $data['paid_on'] = Jalali::parse($data['paid_on']);
+            $data['paid_on'] = Jalali::parseFlexible($data['paid_on']);
         }
 
         $salary->update($data);

@@ -48,14 +48,8 @@ class ExpenseResource extends Resource
                     \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ')
                         ->required(),
 
-                    Forms\Components\DatePicker::make('spent_on')
-                        ->label('تاریخ هزینه')
-                        ->default(now())
-                        ->required()
-                        ->native(false)
-                        ->displayFormat('Y/m/d')
-                        ->helperText(fn ($state) => $state ? 'شمسی: '.Jalali::date($state) : null)
-                        ->live(),
+                    \App\Filament\Forms\JalaliDateInput::today('spent_on', 'تاریخ هزینه')
+                        ->required(),
 
                     Forms\Components\Select::make('user_id')
                         ->label('ثبت‌کننده')

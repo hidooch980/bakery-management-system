@@ -35,4 +35,15 @@ class ChaneEntry extends Model
     {
         return $query->where('status', 'pending');
     }
+
+    /**
+     * The weight that counts for stock, sales and reporting.
+     *
+     * Only the normal chane is real output; the nanino figure is recorded
+     * for comparison and must stay out of every calculation.
+     */
+    public function getWeightKgAttribute(): float
+    {
+        return round((float) $this->normal_weight_kg, 3);
+    }
 }

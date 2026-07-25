@@ -134,6 +134,78 @@ class ProductionFormulaTest extends TestCase
             ->assertStatus(422);
     }
 
+    // --------------------------------------- nanino is display-only
+
+    public function test_only_normal_chane_is_deducted_from_dough_stock(): void
+    {
+        $dough = $this->userWithRole('dough_maker');
+        $chane = $this->userWithRole('chane_gir');
+
+        $this->actingAs($dough, 'sanctum')
+            ->postJson('/api/v1/dough-entries', ['bag_count' => 2])
+            ->assertCreated();
+
+        $doughBefore = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
+
+        $this->actingAs($chane, 'sanctum')
+            ->postJson('/api/v1/chane-entries', [
+                'dough_entry_id' => DoughEntry::first()->id,
+                'chane_count' => 100,
+                'nanino_chane_count' => 50,
+                'spray_flour_kg' => 0,
+            ])
+            ->assertCreated();
+
+        // 100 normal chane at 0.85kg. The 50 nanino chane are a display
+        // figure and must not touch stock.
+        $expected = round($doughBefore - 85.0, 3);
+
+        $this->assertSame($expected, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
+    }
+
+    public function test_reported_weight_excludes_nanino(): void
+    {
+        $dough = $this->userWithRole('dough_maker');
+        $chane = $this->userWithRole('chane_gir');
+
+        $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 2]);
+
+        $this->actingAs($chane, 'sanctum')
+            ->postJson('/api/v1/chane-entries', [
+                'dough_entry_id' => DoughEntry::first()->id,
+                'chane_count' => 100,
+                'nanino_chane_count' => 50,
+                'spray_flour_kg' => 0,
+            ])
+            ->assertCreated()
+            // The authoritative weight is the normal chane alone...
+            ->assertJsonPath('data.total_weight_kg', 85)
+            // ...with nanino reported separately for comparison.
+            ->assertJsonPath('data.nanino_weight_kg', 50);
+    }
+
+    public function test_efficiency_report_ignores_nanino(): void
+    {
+        $dough = $this->userWithRole('dough_maker');
+        $chane = $this->userWithRole('chane_gir');
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 2]);
+        $this->actingAs($chane, 'sanctum')->postJson('/api/v1/chane-entries', [
+            'dough_entry_id' => DoughEntry::first()->id,
+            'chane_count' => 100,
+            'nanino_chane_count' => 50,
+            'spray_flour_kg' => 0,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/efficiency')
+            ->assertOk()
+            // 85kg over 2 bags, with nanino excluded.
+            ->assertJsonPath('data.total_weight_kg', 85)
+            ->assertJsonPath('data.weight_per_bag_kg', 42.5);
+    }
+
     // ------------------------------------------------------------ warehouse
 
     public function test_recording_dough_moves_stock_per_the_formula(): void
@@ -239,6 +311,90 @@ class ProductionFormulaTest extends TestCase
         $this->assertSame(40.0, $period->used_kg);
         $this->assertSame(60.0, $period->remaining_kg);
         $this->assertFalse($period->is_over);
+    }
+
+    // ------------------------------------------------ quota entered in bags
+
+    public function test_quota_weight_is_derived_from_the_bag_count(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+
+        // 75 sacks at the configured 40kg bag weight.
+        $this->assertSame('3000.000', $allocation->fresh()->total_kg);
+    }
+
+    public function test_quota_weight_follows_a_change_to_the_bag_weight(): void
+    {
+        Bakery::first()->update(['flour_bag_weight_kg' => 50]);
+
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+
+        $this->assertSame('3750.000', $allocation->fresh()->total_kg);
+    }
+
+    public function test_period_allocation_is_reported_in_bags_too(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+
+        $period = $allocation->periods()->first();
+
+        // 1000kg of the 3000kg quota, at 40kg per sack.
+        $this->assertSame(25.0, $allocation->bagsForPeriod($period));
+    }
+
+    public function test_admin_creates_a_quota_by_bag_count(): void
+    {
+        $this->actingAs($this->userWithRole('admin'), 'sanctum')
+            ->postJson('/api/v1/flour-allocations', [
+                'month_start' => '1405/05/01',
+                'total_bags' => 75,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.total_bags', 75)
+            ->assertJsonPath('data.total_kg', 3000)
+            ->assertJsonPath('data.bag_weight_kg', 40);
+    }
+
+    // ------------------------------------------------- jalali date input
+
+    public function test_panel_date_form_stores_a_jalali_date_as_gregorian(): void
+    {
+        $this->actingAs($this->userWithRole('admin'));
+        \Filament\Facades\Filament::setCurrentPanel(
+            \Filament\Facades\Filament::getPanel('admin')
+        );
+
+        $expense = \App\Models\Expense::create([
+            'category' => 'fuel',
+            'title' => 'سوخت',
+            'amount' => 1000,
+            'spent_on' => '2026-07-25',
+        ]);
+
+        // Opening the form shows the stored Gregorian date in Jalali, and
+        // saving converts it straight back — no drift either way.
+        \Livewire\Livewire::test(
+            \App\Filament\Resources\ExpenseResource\Pages\EditExpense::class,
+            ['record' => $expense->getRouteKey()]
+        )
+            ->assertFormSet(['spent_on' => '1405/05/03'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('2026-07-25', $expense->fresh()->spent_on->toDateString());
     }
 
     // -------------------------------------------------------- multi calendar

@@ -62,7 +62,7 @@ class ChaneComparison extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _Metric(
-                      label: 'چانه عادی',
+                      label: 'چانه عادی (ملاک)',
                       count: board.normalCount,
                       weightKg: board.normalWeightKg,
                       color: _normalColor,
@@ -71,7 +71,7 @@ class ChaneComparison extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _Metric(
-                      label: 'چانه نانینو',
+                      label: 'چانه نانینو (نمایشی)',
                       count: board.naninoCount,
                       weightKg: board.naninoWeightKg,
                       color: _naninoColor,
@@ -97,6 +97,7 @@ class ChaneComparison extends StatelessWidget {
                   Text(
                     'مجموع ${board.totalCount} چانه — '
                     '${board.totalWeightKg.toStringAsFixed(1)} kg',
+                    textAlign: TextAlign.center,
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall

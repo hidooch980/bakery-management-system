@@ -126,13 +126,16 @@ class ChaneEntryResource extends Resource
                     ->label('وزن نانینو')
                     ->numeric(2)
                     ->suffix(' kg')
-                    ->sortable(),
+                    ->sortable()
+                    ->description('نمایشی'),
 
-                Tables\Columns\TextColumn::make('total_weight')
-                    ->label('وزن کل')
-                    ->state(fn (ChaneEntry $record) => number_format($record->normal_weight_kg + $record->nanino_weight_kg, 2).' kg')
+                Tables\Columns\TextColumn::make('weight_kg')
+                    ->label('وزن ملاک')
+                    // Normal chane only — the figure sales and stock use.
+                    ->state(fn (ChaneEntry $record) => number_format($record->weight_kg, 2).' kg')
                     ->badge()
-                    ->color('success'),
+                    ->color('success')
+                    ->description('فقط چانه عادی'),
 
                 Tables\Columns\TextColumn::make('spray_flour_kg')
                     ->label('آرد پاششی')

@@ -41,11 +41,12 @@ class FlourAllocationController extends Controller
     {
         $data = $request->validate([
             'month_start' => ['required', 'string', 'max:20'],
-            'total_kg' => ['required', 'numeric', 'min:0'],
+            // Quotas are issued in sacks; the weight is derived from them.
+            'total_bags' => ['required', 'numeric', 'min:0'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $monthStart = Jalali::parse($data['month_start']);
+        $monthStart = Jalali::parseFlexible($data['month_start']);
 
         if ($monthStart === null) {
             throw ValidationException::withMessages([
@@ -60,7 +61,7 @@ class FlourAllocationController extends Controller
         $allocation = FlourAllocation::create([
             'month_start' => $monthStart,
             'month_label' => Jalali::monthLabel($monthStart),
-            'total_kg' => $data['total_kg'],
+            'total_bags' => $data['total_bags'],
             'note' => $data['note'] ?? null,
         ]);
 
@@ -72,13 +73,13 @@ class FlourAllocationController extends Controller
     public function update(Request $request, FlourAllocation $allocation): JsonResponse
     {
         $data = $request->validate([
-            'total_kg' => ['sometimes', 'numeric', 'min:0'],
+            'total_bags' => ['sometimes', 'numeric', 'min:0'],
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
         $allocation->update($data);
 
-        if (array_key_exists('total_kg', $data)) {
+        if (array_key_exists('total_bags', $data)) {
             $allocation->syncPeriods();
         }
 
@@ -100,7 +101,9 @@ class FlourAllocationController extends Controller
             'id' => $allocation->id,
             'month_start' => $allocation->month_start?->toDateString(),
             'month_label' => $allocation->month_label,
+            'total_bags' => (float) $allocation->total_bags,
             'total_kg' => (float) $allocation->total_kg,
+            'bag_weight_kg' => \App\Support\DoughFormula::fromBakery()->bagWeightKg,
             'note' => $allocation->note,
             'current_period_number' => $current?->period_number,
             'periods' => $allocation->periods->map(fn ($p) => [
@@ -111,6 +114,7 @@ class FlourAllocationController extends Controller
                 'starts_on_display' => AppCalendar::date($p->starts_on),
                 'ends_on_display' => AppCalendar::date($p->ends_on),
                 'allocated_kg' => (float) $p->allocated_kg,
+                'allocated_bags' => $allocation->bagsForPeriod($p),
                 'used_kg' => $p->used_kg,
                 'remaining_kg' => $p->remaining_kg,
                 'usage_percent' => $p->usage_percent,

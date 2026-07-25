@@ -41,12 +41,14 @@ class AdminPanelProvider extends PanelProvider
             ->darkMode(true)
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth('full')
+            // Shop settings sit at the top: the formula, bag weight and
+            // currency there drive every other screen's numbers.
             ->navigationGroups([
+                'تنظیمات',
                 'تولید و فروش',
                 'انبار',
                 'امور مالی',
                 'کارکنان',
-                'تنظیمات',
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
