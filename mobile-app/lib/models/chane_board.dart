@@ -1,3 +1,13 @@
+/// Which shaping system a figure belongs to.
+enum ChaneSystem {
+  normal('چانه عادی'),
+  nanino('چانه نانینو');
+
+  const ChaneSystem(this.label);
+
+  final String label;
+}
+
 /// The production board: what is waiting for the oven, and how today's
 /// output splits between the nanino system and normal shaping.
 class ChaneBoard {
@@ -34,6 +44,23 @@ class ChaneBoard {
   double get normalShare => totalCount > 0 ? normalCount / totalCount : 0;
 
   double get naninoShare => totalCount > 0 ? naninoCount / totalCount : 0;
+
+  /// How many more chane one system produced than the other.
+  int get countDifference => (normalCount - naninoCount).abs();
+
+  double get weightDifferenceKg => (normalWeightKg - naninoWeightKg).abs();
+
+  /// Which system produced more, or null when they are level.
+  ChaneSystem? get leader {
+    if (normalCount == naninoCount) return null;
+
+    return normalCount > naninoCount ? ChaneSystem.normal : ChaneSystem.nanino;
+  }
+
+  /// Normal output as a multiple of nanino output, e.g. 3.0 means three times
+  /// as many. Null when there is no nanino output to compare against.
+  double? get normalToNaninoRatio =>
+      naninoCount > 0 ? normalCount / naninoCount : null;
 
   factory ChaneBoard.fromJson(Map<String, dynamic> json) {
     final waiting = _section(json['waiting']);

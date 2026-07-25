@@ -4,16 +4,18 @@ import '../../utils/formatters.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/bakery.dart';
+import '../../models/chane_board.dart';
 import '../../models/entries.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
 import '../shared/settings_screen.dart';
 
-/// Home screen for the chane gir: work through the pending dough queue and
-/// record the three weights for each batch.
+/// Home screen for the chane gir. One scrolling page: the dough waiting to be
+/// shaped, today's production split, and the entries already recorded.
 class ChaneHomeScreen extends StatefulWidget {
   const ChaneHomeScreen({super.key, required this.api});
 
@@ -23,22 +25,37 @@ class ChaneHomeScreen extends StatefulWidget {
   State<ChaneHomeScreen> createState() => _ChaneHomeScreenState();
 }
 
-class _ChaneHomeScreenState extends State<ChaneHomeScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 2, vsync: this);
+typedef _ChaneData = ({
+  List<DoughEntry> pending,
+  List<ChaneEntry> history,
+  ChaneBoard? board,
+});
 
-  late Future<List<DoughEntry>> _pending;
-  late Future<List<ChaneEntry>> _history;
+class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
+  late Future<_ChaneData> _data;
 
-  /// Reference weights configured by the admin; used to pre-fill the form.
+  /// Chane weights the form derives its read-only figures from.
   Bakery? _bakery;
 
   @override
   void initState() {
     super.initState();
-    _pending = widget.api.pendingDough();
-    _history = widget.api.myChaneHistory();
+    _data = _load();
     _loadBakery();
+  }
+
+  Future<_ChaneData> _load() async {
+    final pending = await widget.api.pendingDough();
+    final history = await widget.api.myChaneHistory();
+
+    ChaneBoard? board;
+    try {
+      board = await widget.api.chaneBoard();
+    } on ApiException {
+      board = null;
+    }
+
+    return (pending: pending, history: history, board: board);
   }
 
   Future<void> _loadBakery() async {
@@ -46,22 +63,11 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen>
       final bakery = await widget.api.bakery();
       if (mounted) setState(() => _bakery = bakery);
     } on ApiException {
-      // Settings are a convenience — the form still works without them.
+      // Without settings the form warns and blocks submission.
     }
   }
 
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
-
-  void _reload() {
-    setState(() {
-      _pending = widget.api.pendingDough();
-      _history = widget.api.myChaneHistory();
-    });
-  }
+  void _reload() => setState(() => _data = _load());
 
   Future<void> _openRecordSheet(DoughEntry dough) async {
     final saved = await showModalBottomSheet<bool>(
@@ -94,21 +100,30 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen>
             ),
           ),
         ],
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: 'خمیرهای در انتظار', icon: Icon(Icons.pending_actions_rounded)),
-            Tab(text: 'ثبت‌های من', icon: Icon(Icons.history_rounded)),
-          ],
-        ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: RefreshIndicator(
+          onRefresh: () async => _reload(),
+          child: FutureBuilder<_ChaneData>(
+            future: _data,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    ErrorBox(message: '${snapshot.error}', onRetry: _reload),
+                  ],
+                );
+              }
+
+              final data = snapshot.data!;
+
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
                 children: [
                   Text(
                     'سلام ${user?.name ?? ''}',
@@ -119,221 +134,224 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen>
                   ),
                   const SizedBox(height: 14),
                   AttendanceCard(api: widget.api),
-                ],
-              ),
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabs,
-                children: [
-                  _PendingDoughTab(
-                    future: _pending,
-                    onReload: _reload,
-                    onSelect: _openRecordSheet,
+
+                  if (data.board != null) ...[
+                    const SizedBox(height: 16),
+                    ChaneComparison(board: data.board!),
+                  ],
+
+                  const SizedBox(height: 22),
+                  _SectionHeader(
+                    title: 'خمیرهای در انتظار',
+                    count: data.pending.length,
+                    icon: Icons.pending_actions_rounded,
                   ),
-                  _ChaneHistoryTab(future: _history, onReload: _reload),
+                  const SizedBox(height: 10),
+                  if (data.pending.isEmpty)
+                    const _InlineEmpty(
+                      icon: Icons.check_circle_outline_rounded,
+                      text: 'همه خمیرها چانه شده‌اند.',
+                    )
+                  else
+                    for (final entry in data.pending) ...[
+                      ActionCard(
+                        title: '${entry.bagCount} کیسه خمیر',
+                        subtitle: [
+                          if (entry.userName != null) entry.userName!,
+                          if (entry.createdAt != null)
+                            JalaliFormat.dateTime(entry.createdAt),
+                        ].join('  •  '),
+                        icon: Icons.inventory_2_rounded,
+                        color: const Color(0xFFE8952D),
+                        onTap: () => _openRecordSheet(entry),
+                        trailing: const Icon(Icons.add_circle_outline_rounded),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+
+                  const SizedBox(height: 16),
+                  _SectionHeader(
+                    title: 'ثبت‌های من',
+                    count: data.history.length,
+                    icon: Icons.history_rounded,
+                  ),
+                  const SizedBox(height: 10),
+                  if (data.history.isEmpty)
+                    const _InlineEmpty(
+                      icon: Icons.history_rounded,
+                      text: 'هنوز چانه‌ای ثبت نکرده‌اید.',
+                    )
+                  else
+                    for (final entry in data.history) ...[
+                      _ChaneTile(entry: entry),
+                      const SizedBox(height: 10),
+                    ],
                 ],
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
 
-class _PendingDoughTab extends StatelessWidget {
-  const _PendingDoughTab({
-    required this.future,
-    required this.onReload,
-    required this.onSelect,
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.count,
+    required this.icon,
   });
 
-  final Future<List<DoughEntry>> future;
-  final VoidCallback onReload;
-  final ValueChanged<DoughEntry> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () async => onReload(),
-      child: FutureBuilder<List<DoughEntry>>(
-        future: future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return ListView(
-              padding: const EdgeInsets.all(20),
-              children: [ErrorBox(message: '${snapshot.error}', onRetry: onReload)],
-            );
-          }
-
-          final entries = snapshot.data ?? const <DoughEntry>[];
-
-          if (entries.isEmpty) {
-            return ListView(
-              children: const [
-                SizedBox(height: 40),
-                EmptyState(
-                  icon: Icons.check_circle_outline_rounded,
-                  title: 'همه خمیرها چانه شده‌اند',
-                  subtitle: 'خمیر جدیدی در انتظار چانه‌گیری نیست.',
-                ),
-              ],
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            itemCount: entries.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-
-              return ActionCard(
-                title: '${entry.bagCount} کیسه خمیر',
-                subtitle: [
-                  if (entry.userName != null) entry.userName!,
-                  if (entry.createdAt != null)
-                    JalaliFormat.dateTime(entry.createdAt!),
-                ].join('  •  '),
-                icon: Icons.inventory_2_rounded,
-                color: const Color(0xFFE8952D),
-                onTap: () => onSelect(entry),
-                trailing: const Icon(Icons.add_circle_outline_rounded),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _ChaneHistoryTab extends StatelessWidget {
-  const _ChaneHistoryTab({required this.future, required this.onReload});
-
-  final Future<List<ChaneEntry>> future;
-  final VoidCallback onReload;
+  final String title;
+  final int count;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return RefreshIndicator(
-      onRefresh: () async => onReload(),
-      child: FutureBuilder<List<ChaneEntry>>(
-        future: future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: scheme.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(width: 8),
+        if (count > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+      ],
+    );
+  }
+}
 
-          if (snapshot.hasError) {
-            return ListView(
-              padding: const EdgeInsets.all(20),
-              children: [ErrorBox(message: '${snapshot.error}', onRetry: onReload)],
-            );
-          }
+class _InlineEmpty extends StatelessWidget {
+  const _InlineEmpty({required this.icon, required this.text});
 
-          final entries = snapshot.data ?? const <ChaneEntry>[];
+  final IconData icon;
+  final String text;
 
-          if (entries.isEmpty) {
-            return ListView(
-              children: const [
-                SizedBox(height: 40),
-                EmptyState(
-                  icon: Icons.history_rounded,
-                  title: 'هنوز چانه‌ای ثبت نکرده‌اید',
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: scheme.onSurfaceVariant, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One recorded chane batch, with its authoritative weight and the nanino
+/// figure shown separately.
+class _ChaneTile extends StatelessWidget {
+  const _ChaneTile({required this.entry});
+
+  final ChaneEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.grain_rounded, color: scheme.primary, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  '${entry.chaneCount} چانه',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                Chip(
+                  label: Text(entry.isPending ? 'در انتظار فروش' : 'فروخته شده'),
+                  visualDensity: VisualDensity.compact,
+                  backgroundColor: (entry.isPending
+                          ? const Color(0xFFE8952D)
+                          : const Color(0xFF2E9E6B))
+                      .withValues(alpha: 0.15),
                 ),
               ],
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            itemCount: entries.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.grain_rounded, color: scheme.primary),
-                          const SizedBox(width: 10),
-                          Text(
-                            '${entry.chaneCount} چانه',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const Spacer(),
-                          Chip(
-                            label: Text(
-                              entry.isPending ? 'در انتظار فروش' : 'فروخته شده',
-                            ),
-                            visualDensity: VisualDensity.compact,
-                            backgroundColor: (entry.isPending
-                                    ? const Color(0xFFE8952D)
-                                    : const Color(0xFF2E9E6B))
-                                .withValues(alpha: 0.15),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _WeightPill(
-                            label: 'عادی',
-                            value: entry.normalWeightKg,
-                            color: scheme.primary,
-                          ),
-                          _WeightPill(
-                            label: 'نانینو (نمایشی)',
-                            value: entry.naninoWeightKg,
-                            color: const Color(0xFF3B82C4),
-                          ),
-                          _WeightPill(
-                            label: 'آرد پاششی',
-                            value: entry.sprayFlourKg,
-                            color: const Color(0xFFD1495B),
-                          ),
-                          _WeightPill(
-                            label: 'وزن ملاک',
-                            value: entry.weightKg,
-                            color: const Color(0xFF2E9E6B),
-                          ),
-                        ],
-                      ),
-                      if (entry.createdAt != null) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          JalaliFormat.dateTime(entry.createdAt!),
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ],
-                  ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _WeightPill(
+                  label: 'وزن ملاک',
+                  value: entry.weightKg,
+                  color: const Color(0xFF2E9E6B),
                 ),
-              );
-            },
-          );
-        },
+                if (entry.naninoWeightKg > 0)
+                  _WeightPill(
+                    label: 'نانینو (نمایشی)',
+                    value: entry.naninoWeightKg,
+                    color: const Color(0xFF3B82C4),
+                  ),
+                _WeightPill(
+                  label: 'آرد پاششی',
+                  value: entry.sprayFlourKg,
+                  color: const Color(0xFFD1495B),
+                ),
+              ],
+            ),
+            if (entry.createdAt != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                JalaliFormat.dateTime(entry.createdAt),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

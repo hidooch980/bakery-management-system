@@ -64,6 +64,47 @@ void main() {
       expect(board.naninoShare, 0);
     });
 
+    test('names the system that produced more', () {
+      final board = ChaneBoard.fromJson(boardJson(normal: 300, nanino: 100));
+
+      expect(board.leader, ChaneSystem.normal);
+      expect(board.countDifference, 200);
+    });
+
+    test('names nanino when it leads', () {
+      final board = ChaneBoard.fromJson(boardJson(normal: 40, nanino: 90));
+
+      expect(board.leader, ChaneSystem.nanino);
+      expect(board.countDifference, 50);
+    });
+
+    test('reports no leader when the two are level', () {
+      final board = ChaneBoard.fromJson(boardJson(normal: 100, nanino: 100));
+
+      expect(board.leader, isNull);
+      expect(board.countDifference, 0);
+    });
+
+    test('expresses normal output as a multiple of nanino', () {
+      final board = ChaneBoard.fromJson(boardJson(normal: 300, nanino: 100));
+
+      expect(board.normalToNaninoRatio, closeTo(3.0, 0.001));
+    });
+
+    test('has no ratio when there is no nanino output to compare', () {
+      final board = ChaneBoard.fromJson(boardJson(normal: 300, nanino: 0));
+
+      expect(board.normalToNaninoRatio, isNull);
+    });
+
+    test('reports the weight difference between the systems', () {
+      final board = ChaneBoard.fromJson(
+        boardJson(normalWeight: 255, naninoWeight: 100),
+      );
+
+      expect(board.weightDifferenceKg, closeTo(155, 0.001));
+    });
+
     test('parses numbers the API sent as strings', () {
       final board = ChaneBoard.fromJson({
         'waiting': {'chane_count': '55', 'batches': '2'},

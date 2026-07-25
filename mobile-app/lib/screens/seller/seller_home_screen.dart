@@ -4,16 +4,19 @@ import '../../utils/formatters.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/bakery.dart';
+import '../../models/chane_board.dart';
 import '../../models/entries.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
 import '../shared/settings_screen.dart';
 
-/// Home screen for the seller: work the pending chane queue and review the
-/// day's own sales.
+/// Home screen for the seller. One scrolling page rather than tabs, so the
+/// day's numbers, the chane waiting to be sold and the sales already made
+/// are all reachable without switching context.
 class SellerHomeScreen extends StatefulWidget {
   const SellerHomeScreen({super.key, required this.api});
 
@@ -23,22 +26,38 @@ class SellerHomeScreen extends StatefulWidget {
   State<SellerHomeScreen> createState() => _SellerHomeScreenState();
 }
 
-class _SellerHomeScreenState extends State<SellerHomeScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 2, vsync: this);
+typedef _SellerData = ({
+  List<ChaneEntry> pending,
+  ({List<Sale> sales, int count, double total}) today,
+  ChaneBoard? board,
+});
 
-  late Future<List<ChaneEntry>> _pending;
-  late Future<({List<Sale> sales, int count, double total})> _today;
+class _SellerHomeScreenState extends State<SellerHomeScreen> {
+  late Future<_SellerData> _data;
 
-  /// Bread price configured by the admin; used to suggest a sale amount.
+  /// Bread price and currency, used to suggest a sale amount.
   Bakery? _bakery;
 
   @override
   void initState() {
     super.initState();
-    _pending = widget.api.pendingChane();
-    _today = widget.api.todaySales();
+    _data = _load();
     _loadBakery();
+  }
+
+  Future<_SellerData> _load() async {
+    final pending = await widget.api.pendingChane();
+    final today = await widget.api.todaySales();
+
+    ChaneBoard? board;
+    try {
+      board = await widget.api.chaneBoard();
+    } on ApiException {
+      // The comparison is informational; the rest of the page still works.
+      board = null;
+    }
+
+    return (pending: pending, today: today, board: board);
   }
 
   Future<void> _loadBakery() async {
@@ -46,22 +65,11 @@ class _SellerHomeScreenState extends State<SellerHomeScreen>
       final bakery = await widget.api.bakery();
       if (mounted) setState(() => _bakery = bakery);
     } on ApiException {
-      // The price is a convenience — the form still works without it.
+      // The price is a convenience, not a requirement.
     }
   }
 
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
-
-  void _reload() {
-    setState(() {
-      _pending = widget.api.pendingChane();
-      _today = widget.api.todaySales();
-    });
-  }
+  void _reload() => setState(() => _data = _load());
 
   Future<void> _openSaleSheet(ChaneEntry chane) async {
     final saved = await showModalBottomSheet<bool>(
@@ -80,6 +88,8 @@ class _SellerHomeScreenState extends State<SellerHomeScreen>
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
+    final scheme = Theme.of(context).colorScheme;
+    final unit = _bakery?.currency ?? Currency.toman;
 
     return Scaffold(
       appBar: AppBar(
@@ -94,21 +104,32 @@ class _SellerHomeScreenState extends State<SellerHomeScreen>
             ),
           ),
         ],
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: 'چانه‌های آماده', icon: Icon(Icons.storefront_rounded)),
-            Tab(text: 'فروش امروز', icon: Icon(Icons.receipt_long_rounded)),
-          ],
-        ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: RefreshIndicator(
+          onRefresh: () async => _reload(),
+          child: FutureBuilder<_SellerData>(
+            future: _data,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (snapshot.hasError) {
+                return ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    ErrorBox(message: '${snapshot.error}', onRetry: _reload),
+                  ],
+                );
+              }
+
+              final data = snapshot.data!;
+              final pending = data.pending;
+              final today = data.today;
+
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
                 children: [
                   Text(
                     'سلام ${user?.name ?? ''}',
@@ -119,192 +140,200 @@ class _SellerHomeScreenState extends State<SellerHomeScreen>
                   ),
                   const SizedBox(height: 14),
                   AttendanceCard(api: widget.api),
-                ],
-              ),
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabs,
-                children: [
-                  _PendingChaneTab(
-                    future: _pending,
-                    onReload: _reload,
-                    onSelect: _openSaleSheet,
+
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: StatTile(
+                          label: 'فروش امروز',
+                          value: '${today.count}',
+                          icon: Icons.receipt_rounded,
+                          color: scheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: StatTile(
+                          label: 'مجموع (${unit.label})',
+                          value: MoneyFormat.plain(today.total, currency: unit),
+                          icon: Icons.payments_rounded,
+                          color: const Color(0xFF2E9E6B),
+                        ),
+                      ),
+                    ],
                   ),
-                  _TodaySalesTab(future: _today, onReload: _reload, bakery: _bakery),
+
+                  if (data.board != null) ...[
+                    const SizedBox(height: 16),
+                    ChaneComparison(board: data.board!),
+                  ],
+
+                  const SizedBox(height: 22),
+                  _SectionHeader(
+                    title: 'چانه‌های آماده فروش',
+                    count: pending.length,
+                    icon: Icons.storefront_rounded,
+                  ),
+                  const SizedBox(height: 10),
+                  if (pending.isEmpty)
+                    const _InlineEmpty(
+                      icon: Icons.done_all_rounded,
+                      text: 'همه چانه‌ها فروخته شده‌اند.',
+                    )
+                  else
+                    for (final entry in pending) ...[
+                      ActionCard(
+                        title: '${entry.chaneCount} چانه',
+                        subtitle: 'وزن: ${entry.weightKg.toStringAsFixed(2)} kg'
+                            '${entry.userName != null ? '  •  ${entry.userName}' : ''}',
+                        icon: Icons.shopping_basket_rounded,
+                        color: const Color(0xFF3B82C4),
+                        onTap: () => _openSaleSheet(entry),
+                        trailing: const Icon(Icons.point_of_sale_rounded),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+
+                  const SizedBox(height: 16),
+                  _SectionHeader(
+                    title: 'فروش‌های امروز',
+                    count: today.sales.length,
+                    icon: Icons.receipt_long_rounded,
+                  ),
+                  const SizedBox(height: 10),
+                  if (today.sales.isEmpty)
+                    const _InlineEmpty(
+                      icon: Icons.receipt_long_outlined,
+                      text: 'امروز هنوز فروشی ثبت نشده است.',
+                    )
+                  else
+                    for (final sale in today.sales) ...[
+                      _SaleTile(sale: sale, unit: unit),
+                      const SizedBox(height: 10),
+                    ],
                 ],
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
 
-class _PendingChaneTab extends StatelessWidget {
-  const _PendingChaneTab({
-    required this.future,
-    required this.onReload,
-    required this.onSelect,
+/// A small titled divider between the page's sections.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.count,
+    required this.icon,
   });
 
-  final Future<List<ChaneEntry>> future;
-  final VoidCallback onReload;
-  final ValueChanged<ChaneEntry> onSelect;
+  final String title;
+  final int count;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () async => onReload(),
-      child: FutureBuilder<List<ChaneEntry>>(
-        future: future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    final scheme = Theme.of(context).colorScheme;
 
-          if (snapshot.hasError) {
-            return ListView(
-              padding: const EdgeInsets.all(20),
-              children: [ErrorBox(message: '${snapshot.error}', onRetry: onReload)],
-            );
-          }
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: scheme.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(width: 8),
+        if (count > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+      ],
+    );
+  }
+}
 
-          final entries = snapshot.data ?? const <ChaneEntry>[];
+/// Compact empty state for a section inside a longer page.
+class _InlineEmpty extends StatelessWidget {
+  const _InlineEmpty({required this.icon, required this.text});
 
-          if (entries.isEmpty) {
-            return ListView(
-              children: const [
-                SizedBox(height: 40),
-                EmptyState(
-                  icon: Icons.done_all_rounded,
-                  title: 'همه چانه‌ها فروخته شده‌اند',
-                  subtitle: 'چانه جدیدی برای فروش موجود نیست.',
-                ),
-              ],
-            );
-          }
+  final IconData icon;
+  final String text;
 
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            itemCount: entries.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final entry = entries[index];
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
 
-              return ActionCard(
-                title: '${entry.chaneCount} چانه',
-                subtitle:
-                    'وزن: ${entry.weightKg.toStringAsFixed(2)} kg'
-                    '${entry.userName != null ? '  •  ${entry.userName}' : ''}',
-                icon: Icons.shopping_basket_rounded,
-                color: const Color(0xFF3B82C4),
-                onTap: () => onSelect(entry),
-                trailing: const Icon(Icons.point_of_sale_rounded),
-              );
-            },
-          );
-        },
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: scheme.onSurfaceVariant, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _TodaySalesTab extends StatelessWidget {
-  const _TodaySalesTab({
-    required this.future,
-    required this.onReload,
-    this.bakery,
-  });
+class _SaleTile extends StatelessWidget {
+  const _SaleTile({required this.sale, required this.unit});
 
-  final Future<({List<Sale> sales, int count, double total})> future;
-  final VoidCallback onReload;
-  final Bakery? bakery;
+  final Sale sale;
+  final Currency unit;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final unit = bakery?.currency ?? Currency.toman;
 
-    return RefreshIndicator(
-      onRefresh: () async => onReload(),
-      child: FutureBuilder<({List<Sale> sales, int count, double total})>(
-        future: future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return ListView(
-              padding: const EdgeInsets.all(20),
-              children: [ErrorBox(message: '${snapshot.error}', onRetry: onReload)],
-            );
-          }
-
-          final data = snapshot.data;
-          final sales = data?.sales ?? const <Sale>[];
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: StatTile(
-                      label: 'تعداد فروش',
-                      value: '${data?.count ?? 0}',
-                      icon: Icons.receipt_rounded,
-                      color: scheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: StatTile(
-                      label: 'مجموع (${unit.label})',
-                      value: MoneyFormat.plain(data?.total ?? 0, currency: unit),
-                      icon: Icons.payments_rounded,
-                      color: const Color(0xFF2E9E6B),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              if (sales.isEmpty)
-                const EmptyState(
-                  icon: Icons.receipt_long_outlined,
-                  title: 'امروز هنوز فروشی ثبت نشده',
-                )
-              else
-                for (final sale in sales) ...[
-                  Card(
-                    child: ListTile(
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      leading: CircleAvatar(
-                        backgroundColor: scheme.primary.withValues(alpha: 0.14),
-                        child: Icon(Icons.sell_rounded,
-                            color: scheme.primary, size: 20),
-                      ),
-                      title: Text(
-                        sale.amount != null
-                            ? MoneyFormat.format(sale.amount, currency: unit)
-                            : 'بدون مبلغ',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: Text(JalaliFormat.time(sale.createdAt)),
-                      trailing: Chip(
-                        label: Text(sale.paymentType.label),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-            ],
-          );
-        },
+    return Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        leading: CircleAvatar(
+          backgroundColor: scheme.primary.withValues(alpha: 0.14),
+          child: Icon(Icons.sell_rounded, color: scheme.primary, size: 20),
+        ),
+        title: Text(
+          sale.amount != null
+              ? MoneyFormat.format(sale.amount, currency: unit)
+              : 'بدون مبلغ',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(JalaliFormat.time(sale.createdAt)),
+        trailing: Chip(
+          label: Text(sale.paymentType.label),
+          visualDensity: VisualDensity.compact,
+        ),
       ),
     );
   }

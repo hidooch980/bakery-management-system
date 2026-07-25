@@ -92,26 +92,75 @@ class ChaneComparison extends StatelessWidget {
                 children: [
                   _Legend(
                     color: _normalColor,
-                    text: 'عادی ${(board.normalShare * 100).toStringAsFixed(0)}٪',
-                  ),
-                  Text(
-                    'مجموع ${board.totalCount} چانه — '
-                    '${board.totalWeightKg.toStringAsFixed(1)} kg',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    text: '${(board.normalShare * 100).toStringAsFixed(0)}٪ عادی',
                   ),
                   _Legend(
                     color: _naninoColor,
-                    text: 'نانینو ${(board.naninoShare * 100).toStringAsFixed(0)}٪',
+                    text: '${(board.naninoShare * 100).toStringAsFixed(0)}٪ نانینو',
                   ),
                 ],
               ),
+              const SizedBox(height: 14),
+              _Verdict(board: board),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// States the comparison in words, so the two numbers above do not have to
+/// be read against each other.
+class _Verdict extends StatelessWidget {
+  const _Verdict({required this.board});
+
+  final ChaneBoard board;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final leader = board.leader;
+
+    final colour = leader == null
+        ? scheme.onSurfaceVariant
+        : (leader == ChaneSystem.normal
+            ? ChaneComparison._normalColor
+            : ChaneComparison._naninoColor);
+
+    final ratio = board.normalToNaninoRatio;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            leader == null
+                ? 'تولید دو سیستم برابر است.'
+                : '${leader.label} ${board.countDifference} عدد بیشتر '
+                    '(${board.weightDifferenceKg.toStringAsFixed(1)} کیلوگرم اختلاف)',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colour,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ratio == null
+                ? 'مجموع ${board.totalCount} چانه'
+                : 'عادی ${ratio.toStringAsFixed(1)} برابر نانینو   •   '
+                    'مجموع ${board.totalCount} چانه',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+          ),
+        ],
       ),
     );
   }
