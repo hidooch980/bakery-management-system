@@ -196,8 +196,7 @@ Authorization: Bearer <TOKEN>     # برای همه مسیرها به‌جز /lo
 {
   "dough_entry_id": 1,
   "chane_count": 420,
-  "normal_weight_kg": 180.5,
-  "nanino_weight_kg": 95.25,
+  "nanino_chane_count": 60,
   "spray_flour_kg": 6.75
 }
 ```
@@ -205,10 +204,12 @@ Authorization: Bearer <TOKEN>     # برای همه مسیرها به‌جز /lo
 | فیلد | نوع | الزامی | توضیح |
 |---|---|---|---|
 | `dough_entry_id` | integer | ✔ | باید خمیر موجود و در وضعیت `pending` باشد |
-| `chane_count` | integer | ✔ | تعداد چانه (۱ تا ۱۰۰٬۰۰۰) |
-| `normal_weight_kg` | decimal | ✔ | وزن چانه عادی (کیلوگرم) |
-| `nanino_weight_kg` | decimal | ✔ | وزن چانه سیستم نانینو (کیلوگرم) |
+| `chane_count` | integer | ✔ | تعداد چانه عادی (۱ تا ۱۰۰٬۰۰۰) |
+| `nanino_chane_count` | integer | ✖ | تعداد چانه نانینو |
 | `spray_flour_kg` | decimal | ✔ | آرد پاششی مصرف‌شده (کیلوگرم) |
+
+> ⚠️ **وزن‌ها پذیرفته نمی‌شوند.** سرور آن‌ها را از فرمول نانوایی محاسبه می‌کند
+> (`تعداد × وزن هر چانه`). اگر وزن چانه در تنظیمات تعریف نشده باشد، پاسخ `422` است.
 
 **پاسخ ۲۰۱:**
 
@@ -225,7 +226,8 @@ Authorization: Bearer <TOKEN>     # برای همه مسیرها به‌جز /lo
 
 **عوارض جانبی (در یک تراکنش):**
 1. خمیر مرتبط به `processed` تغییر می‌کند.
-2. آرد پاششی به‌صورت خودکار از موجودی آرد کسر می‌شود.
+2. آرد پاششی از موجودی آرد کسر می‌شود.
+3. معادل وزن چانه از موجودی خمیر کسر می‌شود.
 
 **خطای ۴۰۹:** `"برای این خمیر قبلاً چانه ثبت شده است."`
 
@@ -321,7 +323,7 @@ Authorization: Bearer <TOKEN>     # برای همه مسیرها به‌جز /lo
 }
 ```
 
-`role` یکی از: `admin`, `dough_maker`, `chane_gir`, `seller`
+`role` یکی از: `admin`, `dough_maker`, `chane_gir`, `shater`, `seller`
 `password` حداقل ۸ کاراکتر.
 
 ### `GET /users/{id}`
@@ -654,3 +656,204 @@ Authorization: Bearer <TOKEN>     # برای همه مسیرها به‌جز /lo
 `PUT /bakery` آن را می‌پذیرد.
 
 مبالغ همیشه به تومان ذخیره می‌شوند؛ ریال یعنی نمایش ده برابر. اپلیکیشن ورودی کاربر را قبل از ارسال به تومان تبدیل می‌کند.
+
+---
+
+## ۱۴. فرمول تولید
+
+`GET /bakery` علاوه بر تنظیمات، فرمول را هم برمی‌گرداند:
+
+```json
+{
+  "data": {
+    "flour_bag_weight_kg": "40.000",
+    "water_ratio": "0.600",
+    "salt_ratio": "0.0150",
+    "dough_loss_ratio": "0.0000",
+    "calendar": "jalali",
+    "calendar_label": "شمسی (هجری خورشیدی)",
+    "formula": {
+      "flour_bag_weight_kg": 40,
+      "normal_chane_weight_kg": 0.85,
+      "per_bag": {
+        "flour_kg": 40,
+        "water_kg": 24,
+        "salt_kg": 0.6,
+        "dough_kg": 64.6,
+        "normal_chane_count": 76
+      }
+    }
+  }
+}
+```
+
+`PUT /bakery` این فیلدها را می‌پذیرد: `flour_bag_weight_kg`, `water_ratio`, `salt_ratio`, `dough_loss_ratio`, `calendar`.
+
+### ⚠️ تغییر در ثبت چانه
+
+`POST /chane-entries` دیگر وزن نمی‌پذیرد:
+
+```json
+{
+  "dough_entry_id": 1,
+  "chane_count": 300,
+  "nanino_chane_count": 60,
+  "spray_flour_kg": 4.5
+}
+```
+
+وزن‌ها سمت سرور از فرمول محاسبه می‌شوند. اگر وزن چانه در تنظیمات تعریف نشده باشد، پاسخ `422` است.
+
+---
+
+## ۱۵. انبار
+
+نیازمند `view-inventory` برای خواندن و `manage-inventory` برای نوشتن.
+
+### `GET /inventory`
+
+```json
+{
+  "data": [
+    { "key": "flour", "name": "آرد", "unit": "kg", "balance": 420.0, "is_low": false },
+    { "key": "salt",  "name": "نمک", "unit": "kg", "balance": 48.8,  "is_low": false },
+    { "key": "dough", "name": "خمیر", "unit": "kg", "balance": 129.2, "is_low": false }
+  ]
+}
+```
+
+موجودی از دفتر گردش محاسبه می‌شود، نه یک ستون ذخیره‌شده.
+
+### `GET /inventory/movements` · `POST /inventory/movements`
+
+```json
+{ "item": "flour", "direction": "in", "quantity": 500, "reason": "purchase" }
+```
+
+`reason` یکی از: `manual`, `purchase`, `production`, `spray`, `waste`, `consignment_in`, `consignment_out`
+
+### `PATCH /inventory/{key}/threshold`
+
+تعیین حد هشدار موجودی.
+
+---
+
+## ۱۶. سهمیه آرد
+
+### `GET /flour-allocations/current`
+
+سهمیه بازه امروز با مصرف هر دوره:
+
+```json
+{
+  "data": {
+    "month_label": "مرداد 1405",
+    "total_kg": 3000,
+    "current_period_number": 1,
+    "periods": [
+      {
+        "number": 1,
+        "label": "دوره اول (۵ تا ۱۴)",
+        "starts_on_display": "1405/05/05",
+        "ends_on_display": "1405/05/14",
+        "allocated_kg": 1000,
+        "used_kg": 420,
+        "remaining_kg": 580,
+        "usage_percent": 42.0,
+        "is_over": false,
+        "is_current": true
+      }
+    ]
+  }
+}
+```
+
+### `POST /flour-allocations`
+
+```json
+{ "month_start": "1405/05/01", "total_kg": 3000 }
+```
+
+سه دوره خودکار ساخته می‌شوند و باقیمانده گرد کردن به دوره سوم می‌رود.
+
+---
+
+## ۱۷. آرد امانی
+
+### `GET /consignment-flour/balance`
+
+```json
+{ "data": { "borrowed_kg": 200, "lent_kg": 50, "net_kg": -150 } }
+```
+
+`net_kg` منفی یعنی به همکار بدهکارید.
+
+### `POST /consignment-flour`
+
+```json
+{ "partner_name": "نانوایی رضایی", "direction": "borrowed", "amount_kg": 200 }
+```
+
+`direction` یکی از `borrowed` (دریافتی) یا `lent` (تحویلی). موجودی انبار خودکار به‌روز می‌شود.
+
+### `PATCH /consignment-flour/{id}/settle`
+
+---
+
+## ۱۸. مشتریان (مدارس و ادارات)
+
+### `GET /customers` 🔒 همه
+
+فروشنده برای انتخاب مشتری هنگام فروش به آن نیاز دارد.
+
+### `POST /customers` 🔒 `manage-customers`
+
+```json
+{ "name": "دبستان شهید بهشتی", "type": "school", "phone": "05433333333" }
+```
+
+`type` یکی از `school`, `office`, `other`.
+
+---
+
+## ۱۹. تابلوی تولید (شاطر)
+
+### `GET /chane-board` 🔒 `view-chane-board`
+
+```json
+{
+  "data": {
+    "waiting": { "chane_count": 420, "batches": 3 },
+    "today": {
+      "normal_count": 300,
+      "nanino_count": 100,
+      "normal_share_percent": 75.0,
+      "nanino_share_percent": 25.0
+    },
+    "queues": { "pending_dough_batches": 2, "pending_dough_bags": 24 }
+  }
+}
+```
+
+شاطر، چانه‌گیر و فروشنده به این مسیر دسترسی دارند.
+
+---
+
+## ۲۰. تغییر در ثبت فروش
+
+`POST /sales` دو فیلد جدید می‌پذیرد:
+
+```json
+{
+  "chane_entry_id": 3,
+  "payment_type": "schools",
+  "bread_count": 250,
+  "customer_id": 4,
+  "amount": 750000
+}
+```
+
+| فیلد | توضیح |
+|---|---|
+| `bread_count` | تعداد نان؛ اگر ارسال نشود، تعداد چانه همان دسته در نظر گرفته می‌شود |
+| `customer_id` | **برای `schools` و `credit` الزامی است** |
