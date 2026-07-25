@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 
 import 'change_password_screen.dart';
+import 'update_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -144,6 +145,17 @@ class SettingsScreen extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (_) => const ChangePasswordScreen(),
                       ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.system_update_rounded),
+                    title: const Text('به‌روزرسانی برنامه'),
+                    subtitle: const Text('بررسی و نصب نسخه جدید'),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const UpdateScreen()),
                     ),
                   ),
                   const Divider(height: 1),

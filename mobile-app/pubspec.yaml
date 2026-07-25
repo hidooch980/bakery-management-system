@@ -22,6 +22,11 @@ dependencies:
   shared_preferences: ^2.3.3
   flutter_secure_storage: ^9.2.2
 
+  # In-app update: read current version, download and open the new APK
+  package_info_plus: ^8.1.2
+  path_provider: ^2.1.5
+  open_filex: ^4.5.0
+
   # UI
   cupertino_icons: ^1.0.8
   shimmer: ^3.0.0

@@ -221,8 +221,27 @@ flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8000/api/v1
 
 ### ساخت APK
 
+**روش ۱ — از طریق GitHub Actions (پیشنهادی)**
+
+نیازی به نصب Android SDK روی سیستم خودتان نیست:
+
+1. به تب [Actions](../../actions) بروید
+2. گردش‌کار **Build & Release APK** را انتخاب کنید
+3. روی **Run workflow** بزنید و آدرس API سرورتان را وارد کنید
+4. برای انتشار در [Releases](../../releases)، فیلد تگ را هم پر کنید (مثلاً `v1.0.0`)
+
+یا با یک تگ گیت، انتشار خودکار انجام می‌شود:
+
 ```bash
-flutter build apk --release --dart-define=API_BASE_URL=http://192.168.1.10:8000/api/v1
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+**روش ۲ — بیلد محلی**
+
+```bash
+flutter build apk --release \
+  --dart-define=API_BASE_URL=http://192.168.1.10:8000/api/v1 \
+  --dart-define=UPDATE_REPO=hidooch980/bakery-management-system
 ```
 
 فایل خروجی: `build/app/outputs/flutter-apk/app-release.apk`
@@ -232,6 +251,26 @@ flutter build apk --release --dart-define=API_BASE_URL=http://192.168.1.10:8000/
 ```bash
 flutter build apk --split-per-abi --release
 ```
+
+---
+
+## 🔄 به‌روزرسانی خودکار اپلیکیشن
+
+اپلیکیشن بدون نیاز به فروشگاه، مستقیماً از **GitHub Releases** به‌روز می‌شود.
+
+**برای کاربر:** تنظیمات ← **به‌روزرسانی برنامه** ← دانلود و نصب
+
+برنامه نسخه نصب‌شده را با آخرین Release مقایسه می‌کند (مقایسه معنایی، پس `1.10.0` از `1.9.0` جدیدتر شناخته می‌شود)، فایل APK را با نمایش درصد پیشرفت دانلود می‌کند و به نصب‌کننده اندروید می‌سپارد.
+
+> کاربر باید یک‌بار اجازه **«نصب برنامه‌های ناشناس»** را برای این برنامه فعال کند.
+
+**برای انتشار نسخه جدید:**
+
+```bash
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+Actions به‌صورت خودکار نسخه را در `pubspec.yaml` هماهنگ می‌کند، تست می‌گیرد، APK می‌سازد و در Releases منتشر می‌کند — و همه کاربران آن را از داخل برنامه می‌بینند.
 
 ---
 
