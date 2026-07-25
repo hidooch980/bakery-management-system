@@ -16,6 +16,11 @@ class Bakery extends Model
         'nanino_chane_weight_kg',
         'bread_price',
         'currency',
+        'flour_bag_weight_kg',
+        'water_ratio',
+        'salt_ratio',
+        'dough_loss_ratio',
+        'calendar',
     ];
 
     protected function casts(): array
@@ -24,6 +29,10 @@ class Bakery extends Model
             'normal_chane_weight_kg' => 'decimal:3',
             'nanino_chane_weight_kg' => 'decimal:3',
             'bread_price' => 'decimal:2',
+            'flour_bag_weight_kg' => 'decimal:3',
+            'water_ratio' => 'decimal:3',
+            'salt_ratio' => 'decimal:4',
+            'dough_loss_ratio' => 'decimal:4',
         ];
     }
 }

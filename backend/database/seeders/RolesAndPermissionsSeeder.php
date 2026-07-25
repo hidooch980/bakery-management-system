@@ -25,6 +25,10 @@ class RolesAndPermissionsSeeder extends Seeder
         'change-password',
         'manage-finance',
         'view-financial-reports',
+        'manage-inventory',
+        'view-inventory',
+        'manage-customers',
+        'view-chane-board',
     ];
 
     public function run(): void
@@ -53,13 +57,26 @@ class RolesAndPermissionsSeeder extends Seeder
             'change-password',
         ]);
 
+        // The shater works the oven and only needs to see how many chane are
+        // waiting, so the role is deliberately read-only.
+        $shater = Role::firstOrCreate(['name' => 'shater', 'guard_name' => 'web']);
+        $shater->syncPermissions([
+            'view-chane-board',
+            'record-attendance',
+            'change-password',
+        ]);
+
         $seller = Role::firstOrCreate(['name' => 'seller', 'guard_name' => 'web']);
         $seller->syncPermissions([
             'view-pending-chane',
             'record-sale',
             'view-own-sales',
+            'view-chane-board',
             'record-attendance',
             'change-password',
         ]);
+
+        // Chane gir also sees the production board.
+        $chaneGir->givePermissionTo('view-chane-board');
     }
 }

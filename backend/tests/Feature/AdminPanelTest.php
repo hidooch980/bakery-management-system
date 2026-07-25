@@ -71,6 +71,15 @@ class AdminPanelTest extends TestCase
             'expense create' => ['/admin/expenses/create'],
             'salaries' => ['/admin/salary-payments'],
             'salary create' => ['/admin/salary-payments/create'],
+            'inventory items' => ['/admin/inventory-items'],
+            'inventory movements' => ['/admin/inventory-movements'],
+            'inventory movement create' => ['/admin/inventory-movements/create'],
+            'flour allocations' => ['/admin/flour-allocations'],
+            'flour allocation create' => ['/admin/flour-allocations/create'],
+            'consignment flour' => ['/admin/consignment-flours'],
+            'consignment create' => ['/admin/consignment-flours/create'],
+            'customers' => ['/admin/customers'],
+            'customer create' => ['/admin/customers/create'],
         ];
     }
 

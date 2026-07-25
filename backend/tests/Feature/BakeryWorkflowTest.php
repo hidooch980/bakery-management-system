@@ -32,6 +32,12 @@ class BakeryWorkflowTest extends TestCase
 
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->seed(BakerySeeder::class);
+
+        // The chane weights the formula derives from are shop settings.
+        \App\Models\Bakery::first()->update([
+            'normal_chane_weight_kg' => 0.85,
+            'nanino_chane_weight_kg' => 1.0,
+        ]);
     }
 
     public function test_login_returns_token_and_roles(): void
@@ -82,12 +88,12 @@ class BakeryWorkflowTest extends TestCase
             ->postJson('/api/v1/chane-entries', [
                 'dough_entry_id' => $doughEntry->id,
                 'chane_count' => 300,
-                'normal_weight_kg' => 120.5,
-                'nanino_weight_kg' => 60.25,
+                'nanino_chane_count' => 60,
                 'spray_flour_kg' => 4.5,
             ])
             ->assertCreated()
-            ->assertJsonPath('data.total_weight_kg', 180.75);
+            // 300 x 0.85 normal plus 60 x 1.0 nanino.
+            ->assertJsonPath('data.total_weight_kg', 315);
 
         $this->assertSame('processed', $doughEntry->fresh()->status);
 
@@ -119,8 +125,6 @@ class BakeryWorkflowTest extends TestCase
         $payload = [
             'dough_entry_id' => DoughEntry::first()->id,
             'chane_count' => 100,
-            'normal_weight_kg' => 10,
-            'nanino_weight_kg' => 5,
             'spray_flour_kg' => 1,
         ];
 

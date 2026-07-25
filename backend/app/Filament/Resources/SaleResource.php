@@ -62,7 +62,24 @@ class SaleResource extends Resource
                         ->label('نوع پرداخت')
                         ->options(self::PAYMENT_LABELS)
                         ->required()
-                        ->native(false),
+                        ->native(false)
+                        ->live(),
+
+                    Forms\Components\TextInput::make('bread_count')
+                        ->label('تعداد نان')
+                        ->numeric()
+                        ->minValue(0)
+                        ->suffix('عدد'),
+
+                    Forms\Components\Select::make('customer_id')
+                        ->label('مدرسه / اداره')
+                        ->relationship('customer', 'name')
+                        ->searchable()
+                        ->preload()
+                        ->native(false)
+                        // Named buyers only matter for school and credit sales.
+                        ->required(fn (Forms\Get $get) => in_array($get('payment_type'), ['schools', 'credit'], true))
+                        ->helperText('برای فروش مدارس و نسیه الزامی است.'),
 
                     \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ'),
 
@@ -91,9 +108,18 @@ class SaleResource extends Resource
                     ->formatStateUsing(fn ($state) => "#{$state}")
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('chaneEntry.chane_count')
-                    ->label('تعداد')
+                Tables\Columns\TextColumn::make('bread_count')
+                    ->label('تعداد نان')
                     ->numeric()
+                    ->badge()
+                    ->color('info')
+                    ->placeholder('—')
+                    ->summarize(Tables\Columns\Summarizers\Sum::make()->label('جمع')),
+
+                Tables\Columns\TextColumn::make('customer.name')
+                    ->label('مشتری')
+                    ->placeholder('—')
+                    ->searchable()
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('payment_type')
@@ -129,6 +155,12 @@ class SaleResource extends Resource
                 Tables\Filters\SelectFilter::make('payment_type')
                     ->label('نوع پرداخت')
                     ->options(self::PAYMENT_LABELS),
+
+                Tables\Filters\SelectFilter::make('customer_id')
+                    ->label('مشتری')
+                    ->relationship('customer', 'name')
+                    ->searchable()
+                    ->preload(),
 
                 Tables\Filters\SelectFilter::make('user_id')
                     ->label('فروشنده')

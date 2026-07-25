@@ -3,10 +3,15 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BakeryController;
+use App\Http\Controllers\Api\ChaneBoardController;
 use App\Http\Controllers\Api\ChaneEntryController;
+use App\Http\Controllers\Api\ConsignmentFlourController;
+use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DoughEntryController;
 use App\Http\Controllers\Api\ExpenseController;
+use App\Http\Controllers\Api\FlourAllocationController;
 use App\Http\Controllers\Api\FlourStockController;
+use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
@@ -67,6 +72,46 @@ Route::prefix('v1')->group(function () {
             Route::get('/users/roles', [UserManagementController::class, 'roles']);
             Route::patch('/users/{user}/toggle-active', [UserManagementController::class, 'toggleActive']);
             Route::apiResource('users', UserManagementController::class);
+        });
+
+        // --- Production board: shater, chane gir and seller ---
+        Route::get('/chane-board', [ChaneBoardController::class, 'show'])
+            ->middleware('permission:view-chane-board');
+
+        // --- Customers: sellers read, admins manage ---
+        Route::get('/customers', [CustomerController::class, 'index']);
+        Route::get('/customers/types', [CustomerController::class, 'types']);
+        Route::middleware('permission:manage-customers')->group(function () {
+            Route::post('/customers', [CustomerController::class, 'store']);
+            Route::put('/customers/{customer}', [CustomerController::class, 'update']);
+            Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
+        });
+
+        // --- Warehouse ---
+        Route::get('/inventory', [InventoryController::class, 'index'])
+            ->middleware('permission:view-inventory');
+        Route::get('/inventory/movements', [InventoryController::class, 'movements'])
+            ->middleware('permission:view-inventory');
+        Route::middleware('permission:manage-inventory')->group(function () {
+            Route::post('/inventory/movements', [InventoryController::class, 'store']);
+            Route::patch('/inventory/{key}/threshold', [InventoryController::class, 'updateThreshold']);
+        });
+
+        // --- Flour quota, split across the three delivery periods ---
+        Route::middleware('permission:view-inventory')->group(function () {
+            Route::get('/flour-allocations/current', [FlourAllocationController::class, 'current']);
+            Route::get('/flour-allocations', [FlourAllocationController::class, 'index']);
+        });
+        Route::middleware('permission:manage-inventory')->group(function () {
+            Route::post('/flour-allocations', [FlourAllocationController::class, 'store']);
+            Route::put('/flour-allocations/{allocation}', [FlourAllocationController::class, 'update']);
+            Route::delete('/flour-allocations/{allocation}', [FlourAllocationController::class, 'destroy']);
+
+            Route::get('/consignment-flour/balance', [ConsignmentFlourController::class, 'balance']);
+            Route::get('/consignment-flour', [ConsignmentFlourController::class, 'index']);
+            Route::post('/consignment-flour', [ConsignmentFlourController::class, 'store']);
+            Route::patch('/consignment-flour/{consignment}/settle', [ConsignmentFlourController::class, 'settle']);
+            Route::delete('/consignment-flour/{consignment}', [ConsignmentFlourController::class, 'destroy']);
         });
 
         // --- Admin: bakery settings ---

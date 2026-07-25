@@ -24,9 +24,17 @@ class SaleController extends Controller
         $data = $request->validate([
             'chane_entry_id' => ['required', 'exists:chane_entries,id'],
             'payment_type' => ['required', 'in:'.implode(',', self::PAYMENT_TYPES)],
+            'bread_count' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'customer_id' => ['nullable', 'exists:customers,id'],
             'amount' => ['nullable', 'numeric', 'min:0'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
+
+        // Sales to schools or offices should name the buyer.
+        if (in_array($data['payment_type'], ['schools', 'credit'], true)
+            && empty($data['customer_id'])) {
+            return $this->error('برای این نوع پرداخت، انتخاب مشتری الزامی است.', 422);
+        }
 
         $chane = ChaneEntry::find($data['chane_entry_id']);
 
@@ -39,6 +47,9 @@ class SaleController extends Controller
                 'chane_entry_id' => $chane->id,
                 'user_id' => $request->user()->id,
                 'payment_type' => $data['payment_type'],
+                // Default to the batch size when the seller did not split it.
+                'bread_count' => $data['bread_count'] ?? $chane->chane_count,
+                'customer_id' => $data['customer_id'] ?? null,
                 'amount' => $data['amount'] ?? null,
                 'note' => $data['note'] ?? null,
             ]);
@@ -58,7 +69,7 @@ class SaleController extends Controller
     {
         $sales = Sale::where('user_id', $request->user()->id)
             ->whereDate('created_at', now()->toDateString())
-            ->with('chaneEntry:id,chane_count')
+            ->with(['chaneEntry:id,chane_count', 'customer:id,name,type'])
             ->latest()
             ->get();
 
@@ -66,8 +77,13 @@ class SaleController extends Controller
             'sales' => $sales,
             'summary' => [
                 'count' => $sales->count(),
+                'bread_count' => (int) $sales->sum('bread_count'),
                 'total_amount' => round((float) $sales->sum('amount'), 2),
-                'by_payment_type' => $sales->groupBy('payment_type')->map->count(),
+                'by_payment_type' => $sales->groupBy('payment_type')->map(fn ($g) => [
+                    'count' => $g->count(),
+                    'bread_count' => (int) $g->sum('bread_count'),
+                    'amount' => round((float) $g->sum('amount'), 2),
+                ]),
             ],
         ]);
     }

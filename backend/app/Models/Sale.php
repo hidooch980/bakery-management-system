@@ -10,6 +10,8 @@ class Sale extends Model
         'chane_entry_id',
         'user_id',
         'payment_type',
+        'bread_count',
+        'customer_id',
         'amount',
         'note',
     ];
@@ -22,5 +24,10 @@ class Sale extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
     }
 }
