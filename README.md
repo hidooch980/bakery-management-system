@@ -282,6 +282,47 @@ flutter build apk --split-per-abi --release
 git tag v1.1.0 && git push origin v1.1.0
 ```
 
+### 🔑 امضای APK (مهم برای به‌روزرسانی)
+
+اندروید فقط اجازه می‌دهد نسخه‌ای روی نسخه قبلی نصب شود که **با همان کلید امضا شده باشد**. اگر نسخه‌ها با کلیدهای متفاوت امضا شوند، هنگام نصب این خطا ظاهر می‌شود:
+
+> `App not installed as package conflicts with an existing package`
+
+به همین دلیل یک کلید ثابت در **GitHub Secrets** نگهداری می‌شود و همه بیلدها با آن امضا می‌شوند:
+
+| Secret | محتوا |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | فایل `.jks` به‌صورت base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | رمز keystore |
+| `ANDROID_KEY_ALIAS` | نام alias کلید |
+| `ANDROID_KEY_PASSWORD` | رمز کلید |
+
+گردش‌کار بعد از بیلد با `apksigner` بررسی می‌کند که APK با کلید debug امضا نشده باشد و در غیر این صورت بیلد را fail می‌کند.
+
+**ساخت کلید جدید (فقط یک‌بار):**
+
+```bash
+keytool -genkeypair -v -keystore bakery-release.jks \
+  -keyalg RSA -keysize 2048 -validity 10950 -alias bakery
+```
+
+سپس در GitHub ثبتش کنید:
+
+```bash
+base64 -w0 bakery-release.jks | gh secret set ANDROID_KEYSTORE_BASE64
+```
+
+> ⚠️ **فایل keystore را گم نکنید.** بدون آن دیگر نمی‌توانید نسخه جدیدی منتشر کنید که روی نصب‌های موجود آپدیت شود — کاربران باید اپ را حذف و دوباره نصب کنند.
+
+**بیلد محلی با امضای release:** فایل `mobile-app/android/key.properties` بسازید (این فایل در `.gitignore` است):
+
+```properties
+storeFile=/absolute/path/to/bakery-release.jks
+storePassword=...
+keyAlias=bakery
+keyPassword=...
+```
+
 Actions به‌صورت خودکار نسخه را در `pubspec.yaml` هماهنگ می‌کند، تست می‌گیرد، APK می‌سازد و در Releases منتشر می‌کند — و همه کاربران آن را از داخل برنامه می‌بینند.
 
 ---

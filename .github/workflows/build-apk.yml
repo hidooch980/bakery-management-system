@@ -71,6 +71,21 @@ jobs:
           sed -i "s/^version: .*/version: ${{ steps.config.outputs.version }}+${{ github.run_number }}/" pubspec.yaml
           grep '^version:' pubspec.yaml
 
+      - name: Restore release keystore
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          # Every release must be signed with the same key, or Android rejects
+          # the update with "package conflicts with an existing package".
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is missing — the APK would be signed with a throwaway debug key and could not be installed as an update."
+            exit 1
+          fi
+
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "keystore=$RUNNER_TEMP/release.jks" >> "$GITHUB_OUTPUT"
+
       - name: Install dependencies
         working-directory: mobile-app
         run: flutter pub get
@@ -85,10 +100,28 @@ jobs:
 
       - name: Build APK
         working-directory: mobile-app
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.keystore }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           flutter build apk --release \
             --dart-define=API_BASE_URL=${{ steps.config.outputs.api_base_url }} \
             --dart-define=UPDATE_REPO=${{ github.repository }}
+
+      - name: Verify the APK is signed with the release key
+        working-directory: mobile-app
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk \
+            | tee /tmp/certs.txt
+
+          # A debug-signed APK would break in-app updates, so fail loudly here.
+          if grep -qi "CN=Android Debug" /tmp/certs.txt; then
+            echo "::error::APK was signed with the debug key — in-app updates would fail."
+            exit 1
+          fi
 
       - name: Rename APK
         id: apk
@@ -126,6 +159,10 @@ jobs:
             ### نصب
             فایل `${{ steps.apk.outputs.name }}` را دانلود و روی گوشی اندروید نصب کنید.
             هنگام نصب، اجازه «نصب برنامه‌های ناشناس» را برای مرورگر یا فایل‌منیجر فعال کنید.
+
+            > اگر خطای `App not installed as package conflicts with an existing package` دیدید،
+            > یعنی نسخه نصب‌شده با کلید دیگری امضا شده است. یک‌بار برنامه را حذف کنید و
+            > دوباره نصب کنید؛ از این نسخه به بعد به‌روزرسانی‌ها بدون حذف انجام می‌شوند.
 
             ### به‌روزرسانی خودکار
             نسخه‌های بعدی از داخل خود برنامه قابل نصب هستند:
