@@ -191,6 +191,116 @@ class FinanceTest extends TestCase
             ->assertJsonPath('data.profit.is_positive', false);
     }
 
+    // ---------------------------------------------------- outstanding debt
+
+    public function test_debt_report_separates_this_month_from_earlier_ones(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $customer = \App\Models\Customer::create(['name' => 'دبستان', 'type' => 'school']);
+
+        $thisMonth = $this->givenCreditSale($admin, $customer, 500_000);
+        $old = $this->givenCreditSale($admin, $customer, 300_000);
+
+        // Push the second sale into an earlier Jalali month.
+        [$monthStart] = \App\Support\Jalali::currentMonthRange();
+        \Illuminate\Support\Facades\DB::table('sales')
+            ->where('id', $old->id)
+            ->update(['created_at' => $monthStart->copy()->subMonth()]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/debts')
+            ->assertOk()
+            ->assertJsonPath('data.total.amount', 800000)
+            ->assertJsonPath('data.this_month.amount', 500000)
+            ->assertJsonPath('data.previous_months.amount', 300000)
+            ->assertJsonPath('data.previous_months.count', 1);
+
+        $this->assertNotNull($thisMonth->id);
+    }
+
+    public function test_settled_debts_leave_the_report(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $customer = \App\Models\Customer::create(['name' => 'اداره', 'type' => 'office']);
+
+        $sale = $this->givenCreditSale($admin, $customer, 200_000);
+
+        $sale->update(['settled_on' => now()]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/debts')
+            ->assertOk()
+            ->assertJsonPath('data.total.amount', 0);
+    }
+
+    public function test_cash_sales_are_never_a_debt(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $dough = \App\Models\DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 1]);
+        $chane = \App\Models\ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $admin->id,
+            'chane_count' => 10,
+            'normal_weight_kg' => 8.5,
+            'nanino_weight_kg' => 0,
+            'spray_flour_kg' => 0,
+        ]);
+
+        \App\Models\Sale::create([
+            'chane_entry_id' => $chane->id,
+            'user_id' => $admin->id,
+            'payment_type' => 'cash',
+            'amount' => 900_000,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/debts')
+            ->assertOk()
+            ->assertJsonPath('data.total.count', 0);
+    }
+
+    public function test_debt_report_groups_by_customer(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $a = \App\Models\Customer::create(['name' => 'مدرسه الف', 'type' => 'school']);
+        $b = \App\Models\Customer::create(['name' => 'مدرسه ب', 'type' => 'school']);
+
+        $this->givenCreditSale($admin, $a, 100_000);
+        $this->givenCreditSale($admin, $a, 250_000);
+        $this->givenCreditSale($admin, $b, 50_000);
+
+        $byCustomer = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/debts')
+            ->assertOk()
+            ->json('data.by_customer');
+
+        // Ordered by size, so the biggest debtor is first.
+        $this->assertSame('مدرسه الف', $byCustomer[0]['customer']);
+        $this->assertSame(350000, $byCustomer[0]['amount']);
+    }
+
+    private function givenCreditSale(User $user, \App\Models\Customer $customer, float $amount): \App\Models\Sale
+    {
+        $dough = \App\Models\DoughEntry::create(['user_id' => $user->id, 'bag_count' => 1]);
+        $chane = \App\Models\ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $user->id,
+            'chane_count' => 10,
+            'normal_weight_kg' => 8.5,
+            'nanino_weight_kg' => 0,
+            'spray_flour_kg' => 0,
+        ]);
+
+        return \App\Models\Sale::create([
+            'chane_entry_id' => $chane->id,
+            'user_id' => $user->id,
+            'payment_type' => 'credit',
+            'customer_id' => $customer->id,
+            'amount' => $amount,
+        ]);
+    }
+
     public function test_financial_reports_are_admin_only(): void
     {
         $this->actingAs($this->userWithRole('seller'), 'sanctum')

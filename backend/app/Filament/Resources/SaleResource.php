@@ -84,6 +84,15 @@ class SaleResource extends Resource
 
                     \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ'),
 
+                    \App\Filament\Forms\JalaliDateInput::make('settled_on', 'تاریخ تسویه')
+                        // Only credit and school sales leave money owed.
+                        ->visible(fn (Forms\Get $get) => in_array(
+                            $get('payment_type'),
+                            \App\Models\Sale::DEBT_TYPES,
+                            true
+                        ))
+                        ->helperText('خالی بگذارید تا در فهرست بدهی‌ها بماند.'),
+
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')
                         ->rows(2)
@@ -147,6 +156,24 @@ class SaleResource extends Resource
                             ->formatStateUsing(fn ($state) => \App\Support\Money::format($state))
                     ),
 
+                Tables\Columns\TextColumn::make('settled_on')
+                    ->label('تسویه')
+                    ->badge()
+                    ->state(function (Sale $record) {
+                        if (! $record->is_debt) {
+                            return 'نقدی';
+                        }
+
+                        return $record->is_settled
+                            ? 'تسویه شد'
+                            : 'بدهکار';
+                    })
+                    ->color(fn ($state) => match ($state) {
+                        'بدهکار' => 'danger',
+                        'تسویه شد' => 'success',
+                        default => 'gray',
+                    }),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('زمان فروش')
                     ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
@@ -169,12 +196,25 @@ class SaleResource extends Resource
                     ->searchable()
                     ->preload(),
 
+                Tables\Filters\Filter::make('outstanding')
+                    ->label('فقط بدهی‌های تسویه‌نشده')
+                    ->query(fn ($query) => $query->outstanding())
+                    ->toggle(),
+
                 Tables\Filters\Filter::make('today')
                     ->label('فقط امروز')
                     ->query(fn ($query) => $query->whereDate('created_at', now()->toDateString()))
                     ->toggle(),
             ])
             ->actions([
+                Tables\Actions\Action::make('settle')
+                    ->label('ثبت تسویه')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->visible(fn (Sale $record) => $record->is_debt && ! $record->is_settled)
+                    ->action(fn (Sale $record) => $record->update(['settled_on' => now()])),
+
                 Tables\Actions\EditAction::make()->label('ویرایش'),
                 Tables\Actions\DeleteAction::make()->label('حذف'),
             ])

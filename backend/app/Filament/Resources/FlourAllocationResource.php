@@ -221,6 +221,26 @@ class FlourAllocationResource extends Resource
                             .number_format((float) $p->allocated_kg, 0))
                         ->implode('   •   ').'  (مصرف/سهمیه kg)'),
 
+                Tables\Columns\TextColumn::make('nanino_balance')
+                    ->label('تراز نانینو')
+                    ->state(function (FlourAllocation $record) {
+                        return $record->periods
+                            ->map(function ($p) {
+                                $balance = $p->nanino_balance_kg;
+                                $sign = $balance >= 0 ? '+' : '−';
+
+                                return sprintf(
+                                    '%d) %s%s',
+                                    $p->period_number,
+                                    $sign,
+                                    number_format(abs($balance), 0),
+                                );
+                            })
+                            ->implode('   •   ');
+                    })
+                    ->description('سهمیه منهای آرد معادل نانینو (kg)')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('current')
                     ->label('دوره جاری')
                     ->state(function (FlourAllocation $record) {

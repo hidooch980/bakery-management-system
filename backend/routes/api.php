@@ -166,6 +166,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/reports/financial', [ReportController::class, 'financial']);
             Route::get('/reports/financial-trend', [ReportController::class, 'financialTrend']);
             Route::get('/reports/payroll', [ReportController::class, 'payroll']);
+            Route::get('/reports/debts', [ReportController::class, 'debts']);
         });
     });
 });

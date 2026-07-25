@@ -131,6 +131,10 @@ class FlourAllocationController extends Controller
                 'remaining_kg' => $p->remaining_kg,
                 'usage_percent' => $p->usage_percent,
                 'is_over' => $p->is_over,
+                // Reconciliation against what the nanino system accounts for.
+                'nanino_chane_count' => $p->nanino_chane_count,
+                'nanino_flour_kg' => $p->nanino_flour_kg,
+                'nanino_balance_kg' => $p->nanino_balance_kg,
                 'is_current' => $current !== null && $current->id === $p->id,
             ]),
         ];

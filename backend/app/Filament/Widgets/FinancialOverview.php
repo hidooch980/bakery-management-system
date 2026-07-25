@@ -37,6 +37,13 @@ class FinancialOverview extends BaseWidget
 
         $unpaid = (float) SalaryPayment::unpaid()->sum('net_amount');
 
+        // Money customers owe us, split by how old the debt is.
+        $debts = Sale::outstanding()->get();
+        $debtTotal = (float) $debts->sum('amount');
+        $oldDebt = (float) $debts
+            ->reject(fn (Sale $s) => $s->created_at->between($from, $to))
+            ->sum('amount');
+
         return [
             Stat::make('درآمد '.Jalali::monthLabel($from), Money::format($income))
                 ->description('مجموع فروش این ماه')
@@ -59,6 +66,13 @@ class FinancialOverview extends BaseWidget
                 ->description(SalaryPayment::unpaid()->count().' مورد در انتظار پرداخت')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color($unpaid > 0 ? 'warning' : 'gray'),
+
+            Stat::make('بدهی پرداخت‌نشده', Money::format($debtTotal))
+                ->description($oldDebt > 0
+                    ? 'از ماه‌های قبل: '.Money::format($oldDebt)
+                    : $debts->count().' فقره نسیه و مدارس')
+                ->descriptionIcon('heroicon-m-exclamation-circle')
+                ->color($oldDebt > 0 ? 'danger' : ($debtTotal > 0 ? 'warning' : 'gray')),
         ];
     }
 }

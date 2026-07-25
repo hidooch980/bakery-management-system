@@ -282,6 +282,61 @@ class ReportController extends Controller
     }
 
     /**
+     * Money owed to the bakery, split into what this Jalali month created and
+     * what was carried in from earlier months — an old debt needs chasing in
+     * a way this month's does not.
+     */
+    public function debts(Request $request): JsonResponse
+    {
+        [$monthStart, $monthEnd] = Jalali::currentMonthRange();
+
+        $outstanding = Sale::outstanding()
+            ->with(['customer:id,name,type', 'user:id,name'])
+            ->orderBy('created_at')
+            ->get();
+
+        $thisMonth = $outstanding->filter(
+            fn (Sale $s) => $s->created_at->between($monthStart, $monthEnd)
+        );
+        $previous = $outstanding->reject(
+            fn (Sale $s) => $s->created_at->between($monthStart, $monthEnd)
+        );
+
+        return $this->success([
+            'currency_label' => Money::label(),
+            'month_label' => Jalali::monthLabel($monthStart),
+            'total' => [
+                'amount' => round((float) $outstanding->sum('amount'), 2),
+                'formatted' => Money::format($outstanding->sum('amount')),
+                'count' => $outstanding->count(),
+            ],
+            'this_month' => [
+                'amount' => round((float) $thisMonth->sum('amount'), 2),
+                'formatted' => Money::format($thisMonth->sum('amount')),
+                'count' => $thisMonth->count(),
+            ],
+            'previous_months' => [
+                'amount' => round((float) $previous->sum('amount'), 2),
+                'formatted' => Money::format($previous->sum('amount')),
+                'count' => $previous->count(),
+                // The oldest debt is the one most worth chasing.
+                'oldest_date' => AppCalendar::date($previous->first()?->created_at),
+            ],
+            'by_customer' => $outstanding
+                ->groupBy(fn (Sale $s) => $s->customer_id ?? 0)
+                ->map(fn ($group) => [
+                    'customer' => $group->first()->customer?->name ?? 'بدون مشتری',
+                    'count' => $group->count(),
+                    'amount' => round((float) $group->sum('amount'), 2),
+                    'formatted' => Money::format($group->sum('amount')),
+                    'oldest_date' => AppCalendar::date($group->first()->created_at),
+                ])
+                ->sortByDesc('amount')
+                ->values(),
+        ]);
+    }
+
+    /**
      * Day-by-day income and expense series, for charting a trend.
      */
     public function financialTrend(Request $request): JsonResponse

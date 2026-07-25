@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Bakery;
+use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\FlourAllocation;
 use App\Models\InventoryItem;
@@ -366,6 +367,72 @@ class ProductionFormulaTest extends TestCase
             ->assertJsonPath('data.total_bags', 75)
             ->assertJsonPath('data.total_kg', 3000)
             ->assertJsonPath('data.bag_weight_kg', 40);
+    }
+
+    // ------------------------------- quota reconciled against nanino output
+
+    public function test_period_reports_the_flour_nanino_accounts_for(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+        $period = $allocation->periods()->first();
+
+        // One bag yields 129.2/2 = 64.6kg of dough, so at 1kg per nanino
+        // chane a bag is worth about 64.6 nanino chane.
+        $dough = DoughEntry::create(['user_id' => $this->userWithRole('admin')->id, 'bag_count' => 1]);
+        $entry = ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $dough->user_id,
+            'chane_count' => 10,
+            'normal_weight_kg' => 8.5,
+            // 64.6kg of nanino chane is exactly one bag's worth of dough.
+            'nanino_weight_kg' => 64.6,
+            'spray_flour_kg' => 0,
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('chane_entries')
+            ->where('id', $entry->id)
+            ->update(['created_at' => $period->starts_on->copy()->addDay()]);
+
+        $period->refresh();
+
+        // 64.6kg of nanino dough came from one 40kg bag.
+        $this->assertEqualsWithDelta(40.0, $period->nanino_flour_kg, 0.5);
+    }
+
+    public function test_period_balances_its_allocation_against_nanino(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+        $period = $allocation->periods()->first();
+
+        // With no nanino output the whole allocation is still unaccounted for.
+        $this->assertSame((float) $period->allocated_kg, $period->nanino_balance_kg);
+    }
+
+    public function test_nanino_reconciliation_is_zero_without_a_nanino_weight(): void
+    {
+        Bakery::first()->update(['nanino_chane_weight_kg' => null]);
+
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+
+        $period = $allocation->periods()->first();
+
+        $this->assertSame(0, $period->nanino_chane_count);
+        $this->assertSame(0.0, $period->nanino_flour_kg);
     }
 
     // -------------------------------------------- carry-over (سنوات)

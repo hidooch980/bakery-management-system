@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\ChaneEntry;
 use App\Models\InventoryItem;
+use App\Support\DoughFormula;
 use Illuminate\Database\Eloquent\Model;
 
 class FlourAllocationPeriod extends Model
@@ -46,6 +48,56 @@ class FlourAllocationPeriod extends Model
                 $this->ends_on->copy()->endOfDay(),
             ])
             ->sum('quantity'), 3);
+    }
+
+    /**
+     * Nanino chane recorded inside this period's window.
+     *
+     * Nanino is a display figure for production, but the quota is reconciled
+     * against it: the flour the nanino system says should have been used is
+     * compared with what the period was actually granted.
+     */
+    public function getNaninoChaneCountAttribute(): int
+    {
+        $formula = DoughFormula::fromBakery();
+
+        if (! $formula->naninoChaneWeightKg) {
+            return 0;
+        }
+
+        $weight = (float) ChaneEntry::whereBetween('created_at', [
+            $this->starts_on->copy()->startOfDay(),
+            $this->ends_on->copy()->endOfDay(),
+        ])->sum('nanino_weight_kg');
+
+        return (int) round($weight / $formula->naninoChaneWeightKg);
+    }
+
+    /**
+     * Flour the nanino output accounts for, working the dough formula
+     * backwards: dough weight divided by what one bag yields.
+     */
+    public function getNaninoFlourKgAttribute(): float
+    {
+        $formula = DoughFormula::fromBakery();
+        $doughPerBag = $formula->doughKg(1);
+
+        if ($doughPerBag <= 0 || ! $formula->naninoChaneWeightKg) {
+            return 0.0;
+        }
+
+        $doughKg = $this->nanino_chane_count * $formula->naninoChaneWeightKg;
+
+        return round($doughKg / $doughPerBag * $formula->bagWeightKg, 3);
+    }
+
+    /**
+     * The reconciliation: allocation minus the flour nanino accounts for.
+     * Positive means the period was granted more than nanino used.
+     */
+    public function getNaninoBalanceKgAttribute(): float
+    {
+        return round((float) $this->allocated_kg - $this->nanino_flour_kg, 3);
     }
 
     public function getRemainingKgAttribute(): float
