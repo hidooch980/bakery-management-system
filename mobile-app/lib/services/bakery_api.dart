@@ -1,3 +1,4 @@
+import '../models/bakery.dart';
 import '../models/entries.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -162,9 +163,11 @@ class BakeryApi {
 
   // -------------------------------------------------------------- bakery
 
-  Future<Map<String, dynamic>?> bakery() async {
+  Future<Bakery?> bakery() async {
     final body = await _client.get('/bakery');
-    return body['data'] as Map<String, dynamic>?;
+    final data = body['data'] as Map<String, dynamic>?;
+
+    return data == null ? null : Bakery.fromJson(data);
   }
 
   /// Laravel paginators nest the rows under `data.data`; plain lists don't.

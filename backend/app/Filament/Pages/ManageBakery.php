@@ -72,6 +72,37 @@ class ManageBakery extends Page implements HasForms
                             ->maxLength(1000)
                             ->columnSpanFull(),
                     ]),
+
+                Forms\Components\Section::make('تعاریف تولید و قیمت')
+                    ->description('این مقادیر در اپلیکیشن برای پیش‌پر کردن وزن‌ها و پیشنهاد مبلغ فروش استفاده می‌شوند.')
+                    ->icon('heroicon-o-calculator')
+                    ->columns(3)
+                    ->schema([
+                        Forms\Components\TextInput::make('normal_chane_weight_kg')
+                            ->label('وزن هر چانه عادی')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->step(0.001)
+                            ->suffix('کیلوگرم')
+                            ->helperText('مثلاً ۰٫۴۳۰'),
+
+                        Forms\Components\TextInput::make('nanino_chane_weight_kg')
+                            ->label('وزن هر چانه نانینو')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->step(0.001)
+                            ->suffix('کیلوگرم')
+                            ->helperText('مثلاً ۰٫۳۸۰'),
+
+                        Forms\Components\TextInput::make('bread_price')
+                            ->label('قیمت هر نان')
+                            ->numeric()
+                            ->minValue(0)
+                            ->suffix('تومان')
+                            ->helperText('برای پیشنهاد مبلغ فروش'),
+                    ]),
             ])
             ->statePath('data');
     }

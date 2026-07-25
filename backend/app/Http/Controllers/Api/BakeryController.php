@@ -29,6 +29,9 @@ class BakeryController extends Controller
             'phone' => ['nullable', 'string', 'max:20'],
             'logo' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'normal_chane_weight_kg' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'nanino_chane_weight_kg' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'bread_price' => ['nullable', 'numeric', 'min:0', 'max:100000000'],
         ]);
 
         $bakery = Bakery::firstOrNew(['id' => 1]);

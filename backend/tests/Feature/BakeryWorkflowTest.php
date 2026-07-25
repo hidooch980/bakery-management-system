@@ -231,6 +231,53 @@ class BakeryWorkflowTest extends TestCase
         ])->assertOk();
     }
 
+    public function test_bakery_settings_are_readable_by_all_staff(): void
+    {
+        \App\Models\Bakery::first()->update([
+            'normal_chane_weight_kg' => 0.430,
+            'nanino_chane_weight_kg' => 0.380,
+            'bread_price' => 3000,
+        ]);
+
+        foreach (['dough_maker', 'chane_gir', 'seller'] as $role) {
+            $this->actingAs($this->userWithRole($role), 'sanctum')
+                ->getJson('/api/v1/bakery')
+                ->assertOk()
+                ->assertJsonPath('data.normal_chane_weight_kg', '0.430')
+                ->assertJsonPath('data.nanino_chane_weight_kg', '0.380')
+                ->assertJsonPath('data.bread_price', '3000.00');
+        }
+    }
+
+    public function test_admin_can_update_bakery_settings(): void
+    {
+        $this->actingAs($this->userWithRole('admin'), 'sanctum')
+            ->putJson('/api/v1/bakery', [
+                'name' => 'نانوایی تست',
+                'normal_chane_weight_kg' => 0.5,
+                'nanino_chane_weight_kg' => 0.45,
+                'bread_price' => 4000,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('bakeries', [
+            'name' => 'نانوایی تست',
+            'bread_price' => 4000,
+        ]);
+    }
+
+    public function test_bakery_settings_reject_invalid_values(): void
+    {
+        $this->actingAs($this->userWithRole('admin'), 'sanctum')
+            ->putJson('/api/v1/bakery', [
+                'name' => 'نانوایی تست',
+                'normal_chane_weight_kg' => -1,
+                'bread_price' => 'رایگان',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['normal_chane_weight_kg', 'bread_price']);
+    }
+
     public function test_api_error_envelope_is_consistent(): void
     {
         $this->getJson('/api/v1/me')

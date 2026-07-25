@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/bakery.dart';
 import '../../models/entries.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
@@ -28,11 +29,24 @@ class _SellerHomeScreenState extends State<SellerHomeScreen>
   late Future<List<ChaneEntry>> _pending;
   late Future<({List<Sale> sales, int count, double total})> _today;
 
+  /// Bread price configured by the admin; used to suggest a sale amount.
+  Bakery? _bakery;
+
   @override
   void initState() {
     super.initState();
     _pending = widget.api.pendingChane();
     _today = widget.api.todaySales();
+    _loadBakery();
+  }
+
+  Future<void> _loadBakery() async {
+    try {
+      final bakery = await widget.api.bakery();
+      if (mounted) setState(() => _bakery = bakery);
+    } on ApiException {
+      // The price is a convenience — the form still works without it.
+    }
   }
 
   @override
@@ -52,7 +66,11 @@ class _SellerHomeScreenState extends State<SellerHomeScreen>
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _RecordSaleSheet(api: widget.api, chane: chane),
+      builder: (_) => _RecordSaleSheet(
+        api: widget.api,
+        chane: chane,
+        bakery: _bakery,
+      ),
     );
 
     if (saved == true) _reload();
@@ -291,10 +309,15 @@ class _TodaySalesTab extends StatelessWidget {
 }
 
 class _RecordSaleSheet extends StatefulWidget {
-  const _RecordSaleSheet({required this.api, required this.chane});
+  const _RecordSaleSheet({
+    required this.api,
+    required this.chane,
+    this.bakery,
+  });
 
   final BakeryApi api;
   final ChaneEntry chane;
+  final Bakery? bakery;
 
   @override
   State<_RecordSaleSheet> createState() => _RecordSaleSheetState();
@@ -309,10 +332,32 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   bool _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+
+    // Pre-fill `chane count × bread price`; the seller can still override it.
+    final price = widget.bakery?.breadPrice;
+    if (price != null && price > 0) {
+      final suggested = widget.chane.chaneCount * price;
+      _amount.text = suggested.toStringAsFixed(0);
+    }
+  }
+
+  @override
   void dispose() {
     _amount.dispose();
     _note.dispose();
     super.dispose();
+  }
+
+  /// Explains where the pre-filled amount came from.
+  String? _priceHint() {
+    final price = widget.bakery?.breadPrice;
+    if (price == null || price <= 0) return null;
+
+    final formatted = NumberFormat.decimalPattern().format(price);
+
+    return '${widget.chane.chaneCount} نان × $formatted تومان';
   }
 
   Future<void> _save() async {
@@ -413,10 +458,11 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                 TextFormField(
                   controller: _amount,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'مبلغ (اختیاری)',
-                    prefixIcon: Icon(Icons.payments_outlined),
+                    prefixIcon: const Icon(Icons.payments_outlined),
                     suffixText: 'تومان',
+                    helperText: _priceHint(),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) return null;

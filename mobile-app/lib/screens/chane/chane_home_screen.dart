@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/bakery.dart';
 import '../../models/entries.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
@@ -28,11 +29,24 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen>
   late Future<List<DoughEntry>> _pending;
   late Future<List<ChaneEntry>> _history;
 
+  /// Reference weights configured by the admin; used to pre-fill the form.
+  Bakery? _bakery;
+
   @override
   void initState() {
     super.initState();
     _pending = widget.api.pendingDough();
     _history = widget.api.myChaneHistory();
+    _loadBakery();
+  }
+
+  Future<void> _loadBakery() async {
+    try {
+      final bakery = await widget.api.bakery();
+      if (mounted) setState(() => _bakery = bakery);
+    } on ApiException {
+      // Settings are a convenience — the form still works without them.
+    }
   }
 
   @override
@@ -52,7 +66,11 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen>
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _RecordChaneSheet(api: widget.api, dough: dough),
+      builder: (_) => _RecordChaneSheet(
+        api: widget.api,
+        dough: dough,
+        bakery: _bakery,
+      ),
     );
 
     if (saved == true) _reload();
@@ -351,10 +369,15 @@ class _WeightPill extends StatelessWidget {
 }
 
 class _RecordChaneSheet extends StatefulWidget {
-  const _RecordChaneSheet({required this.api, required this.dough});
+  const _RecordChaneSheet({
+    required this.api,
+    required this.dough,
+    this.bakery,
+  });
 
   final BakeryApi api;
   final DoughEntry dough;
+  final Bakery? bakery;
 
   @override
   State<_RecordChaneSheet> createState() => _RecordChaneSheetState();
@@ -369,12 +392,38 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
 
   bool _saving = false;
 
+  /// Once the user edits a weight by hand, stop overwriting it from the count.
+  bool _weightsTouched = false;
+
   @override
   void initState() {
     super.initState();
     // Live total as the two chane weights are typed.
     _normal.addListener(_refreshTotal);
     _nanino.addListener(_refreshTotal);
+    _count.addListener(_suggestWeights);
+  }
+
+  /// Fills the two weights from `count × per-chane weight` configured by the
+  /// admin, so the common case needs one number instead of three.
+  void _suggestWeights() {
+    if (_weightsTouched) return;
+
+    final bakery = widget.bakery;
+    if (bakery == null || !bakery.hasChaneWeights) return;
+
+    final count = int.tryParse(_count.text);
+    if (count == null || count <= 0) return;
+
+    final normal = bakery.normalChaneWeightKg;
+    final nanino = bakery.naninoChaneWeightKg;
+
+    if (normal != null && normal > 0) {
+      _normal.text = (count * normal).toStringAsFixed(2);
+    }
+    if (nanino != null && nanino > 0) {
+      _nanino.text = (count * nanino).toStringAsFixed(2);
+    }
   }
 
   @override
@@ -415,6 +464,14 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Shows the configured per-chane weight under the field, so the user can
+  /// see where the pre-filled number came from.
+  String? _perChaneHint(double? perChane) {
+    if (perChane == null || perChane <= 0) return null;
+
+    return 'محاسبه‌شده از ${perChane.toStringAsFixed(3)} کیلوگرم برای هر چانه';
   }
 
   String? _requiredNumber(String? value, {bool allowZero = true}) {
@@ -487,10 +544,12 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
                 TextFormField(
                   controller: _normal,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
+                  onChanged: (_) => _weightsTouched = true,
+                  decoration: InputDecoration(
                     labelText: 'وزن چانه عادی',
-                    prefixIcon: Icon(Icons.scale_rounded),
+                    prefixIcon: const Icon(Icons.scale_rounded),
                     suffixText: 'کیلوگرم',
+                    helperText: _perChaneHint(widget.bakery?.normalChaneWeightKg),
                   ),
                   validator: _requiredNumber,
                 ),
@@ -498,10 +557,12 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
                 TextFormField(
                   controller: _nanino,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
+                  onChanged: (_) => _weightsTouched = true,
+                  decoration: InputDecoration(
                     labelText: 'وزن چانه سیستم نانینو',
-                    prefixIcon: Icon(Icons.precision_manufacturing_rounded),
+                    prefixIcon: const Icon(Icons.precision_manufacturing_rounded),
                     suffixText: 'کیلوگرم',
+                    helperText: _perChaneHint(widget.bakery?.naninoChaneWeightKg),
                   ),
                   validator: _requiredNumber,
                 ),
