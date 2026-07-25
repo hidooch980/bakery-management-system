@@ -528,3 +528,129 @@ Authorization: Bearer <TOKEN>     # برای همه مسیرها به‌جز /lo
 | GET | `/reports/flour` | `view-all-reports` | مدیر |
 | GET | `/reports/efficiency` | `view-all-reports` | مدیر |
 | GET | `/reports/attendance` | `view-attendance-reports` | مدیر |
+
+---
+
+## ۱۰. امور مالی — مدیر
+
+نیازمند دسترسی `manage-finance`.
+
+> تمام تاریخ‌ها **شمسی** پذیرفته و برگردانده می‌شوند (`۱۴۰۵/۰۵/۰۳` — ارقام فارسی یا لاتین).
+> تمام مبالغ **به تومان** ذخیره و ارسال می‌شوند؛ فیلد `*_formatted` مقدار را با واحد تنظیم‌شده نمایش می‌دهد.
+
+### `GET /expenses`
+
+پارامترهای اختیاری: `?category=flour&from=1405/05/01&to=1405/05/31`
+
+### `POST /expenses`
+
+```json
+{
+  "category": "flour",
+  "title": "خرید ۱۰ کیسه آرد",
+  "amount": 5000000,
+  "spent_on": "1405/05/03",
+  "note": "از تعاونی"
+}
+```
+
+**دسته‌بندی‌ها:**
+
+| مقدار | برچسب |
+|---|---|
+| `flour` | خرید آرد |
+| `fuel` | سوخت |
+| `utilities` | آب، برق، گاز |
+| `rent` | اجاره |
+| `maintenance` | تعمیرات |
+| `salary` | حقوق کارکنان |
+| `other` | سایر |
+
+### `PUT /expenses/{id}` · `DELETE /expenses/{id}` · `GET /expenses/categories`
+
+---
+
+## ۱۱. حقوق کارکنان — مدیر
+
+### `GET /salaries`
+
+پارامترهای اختیاری: `?user_id=2&status=unpaid`
+
+### `POST /salaries`
+
+```json
+{
+  "user_id": 2,
+  "period_start": "1405/05/01",
+  "base_amount": 10000000,
+  "bonus": 2000000,
+  "deduction": 500000,
+  "paid_on": "1405/05/28"
+}
+```
+
+> **`net_amount` هرگز از ورودی خوانده نمی‌شود** — همیشه `پایه + پاداش − کسورات` محاسبه می‌شود.
+
+**خطای ۴۰۹:** برای این کارمند در این دوره قبلاً حقوق ثبت شده است.
+
+### `PATCH /salaries/{id}/mark-paid`
+
+ثبت پرداخت با تاریخ امروز. اگر قبلاً پرداخت شده باشد `409` برمی‌گرداند.
+
+### `PUT /salaries/{id}` · `DELETE /salaries/{id}` · `GET /salaries/employees`
+
+### `GET /salaries/mine` 🔒 همه کاربران
+
+فیش‌های حقوقی خود کاربر — بدون نیاز به دسترسی مالی.
+
+---
+
+## ۱۲. گزارش‌های مالی — مدیر
+
+نیازمند `view-financial-reports`. همه `?from=` و `?to=` شمسی می‌پذیرند.
+
+### `GET /reports/financial`
+
+```json
+{
+  "data": {
+    "from_jalali": "1405/05/01",
+    "to_jalali": "1405/05/31",
+    "currency_label": "تومان",
+    "income": { "sales": 45000000, "sales_formatted": "45,000,000 تومان", "sales_count": 120 },
+    "expenses": {
+      "recorded": 12000000,
+      "salaries_paid": 20000000,
+      "total": 32000000,
+      "total_formatted": "32,000,000 تومان",
+      "by_category": [
+        { "category": "flour", "label": "خرید آرد", "amount": 10000000, "count": 3 }
+      ]
+    },
+    "profit": {
+      "amount": 13000000,
+      "formatted": "13,000,000 تومان",
+      "is_positive": true,
+      "margin_percent": 28.9
+    },
+    "outstanding_salaries": { "amount": 5000000, "count": 1 }
+  }
+}
+```
+
+### `GET /reports/financial-trend`
+
+سری روزانه درآمد، هزینه و سود (حداکثر ۱۲۰ روز).
+
+### `GET /reports/payroll`
+
+جمع حقوق دوره به تفکیک کارمند، با تفکیک پرداخت‌شده و پرداخت‌نشده.
+
+---
+
+## ۱۳. واحد پول
+
+`GET /bakery` فیلد `currency` را برمی‌گرداند (`toman` یا `rial`).
+`PUT /bakery` آن را می‌پذیرد.
+
+مبالغ همیشه به تومان ذخیره می‌شوند؛ ریال یعنی نمایش ده برابر. اپلیکیشن ورودی کاربر را قبل از ارسال به تومان تبدیل می‌کند.

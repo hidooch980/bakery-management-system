@@ -68,7 +68,7 @@ class SaleResource extends Resource
                         ->label('مبلغ')
                         ->numeric()
                         ->minValue(0)
-                        ->suffix('تومان'),
+                        ->suffix(fn () => \App\Support\Money::label()),
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')
@@ -115,15 +115,18 @@ class SaleResource extends Resource
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('مبلغ')
-                    ->numeric(0, '.', ',')
-                    ->suffix(' تومان')
+                    ->formatStateUsing(fn ($state) => $state === null ? '—' : \App\Support\Money::format($state))
                     ->placeholder('—')
                     ->sortable()
-                    ->summarize(Tables\Columns\Summarizers\Sum::make()->label('جمع')),
+                    ->summarize(
+                        Tables\Columns\Summarizers\Sum::make()
+                            ->label('جمع')
+                            ->formatStateUsing(fn ($state) => \App\Support\Money::format($state))
+                    ),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('زمان فروش')
-                    ->dateTime('Y-m-d H:i')
+                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
                     ->sortable(),
             ])
             ->filters([

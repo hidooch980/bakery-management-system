@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
+import '../utils/formatters.dart';
 
 import '../services/api_client.dart';
 import '../services/bakery_api.dart';
@@ -112,7 +113,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
                           const SizedBox(height: 4),
                           Text(
                             _checkedIn && _checkedInAt != null
-                                ? 'ساعت ${DateFormat('HH:mm').format(_checkedInAt!)}'
+                                ? 'ساعت ${JalaliFormat.time(_checkedInAt!)}'
                                 : 'برای ثبت ساعت ورود ضربه بزنید',
                             style: Theme.of(context)
                                 .textTheme

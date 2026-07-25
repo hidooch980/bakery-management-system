@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../services/install_permission.dart';
 import '../../services/update_service.dart';
 import '../../widgets/common.dart';
 
@@ -71,9 +72,53 @@ class _UpdateScreenState extends State<UpdateScreen> {
       showMessage(context, 'فایل نصب آماده شد. مراحل نصب را ادامه دهید.');
     } catch (e) {
       if (!mounted) return;
-      showMessage(context, '$e', isError: true);
+      // The usual cause is the missing install-unknown-apps consent, so offer
+      // to open that settings page rather than just reporting a failure.
+      await _showPermissionHelp();
     } finally {
       if (mounted) setState(() => _downloading = false);
+    }
+  }
+
+  Future<void> _showPermissionHelp() async {
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.shield_outlined, size: 32),
+        title: const Text('اجازه نصب لازم است'),
+        content: const Text(
+          'اندروید برای نصب برنامه‌هایی که از فروشگاه نیامده‌اند، یک اجازه '
+          'یک‌باره می‌خواهد.\n\n'
+          'در صفحه‌ای که باز می‌شود، گزینه «اجازه نصب برنامه‌های ناشناس» را '
+          'روشن کنید و سپس برگردید و دوباره روی نصب بزنید.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('بعداً'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.settings_rounded),
+            label: const Text('باز کردن تنظیمات'),
+          ),
+        ],
+      ),
+    );
+
+    if (open != true || !mounted) return;
+
+    final opened = await InstallPermission.openSettings();
+
+    if (!mounted) return;
+
+    if (!opened) {
+      showMessage(
+        context,
+        'تنظیمات باز نشد. از مسیر تنظیمات ← برنامه‌ها ← دسترسی ویژه ← '
+        'نصب برنامه‌های ناشناس، این برنامه را مجاز کنید.',
+        isError: true,
+      );
     }
   }
 
@@ -136,6 +181,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
                 downloading: _downloading,
                 progress: _progress,
                 onInstall: _install,
+                onOpenPermissionSettings: InstallPermission.openSettings,
               ),
           ],
         ),
@@ -150,12 +196,14 @@ class _UpdateAvailableCard extends StatelessWidget {
     required this.downloading,
     required this.progress,
     required this.onInstall,
+    required this.onOpenPermissionSettings,
   });
 
   final AppUpdate update;
   final bool downloading;
   final double progress;
   final VoidCallback onInstall;
+  final VoidCallback onOpenPermissionSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -244,13 +292,14 @@ class _UpdateAvailableCard extends StatelessWidget {
                 label: const Text('دانلود و نصب'),
               ),
             const SizedBox(height: 12),
-            Text(
-              'برای نصب، باید اجازه «نصب برنامه‌های ناشناس» را به این برنامه بدهید.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+            TextButton.icon(
+              onPressed: onOpenPermissionSettings,
+              icon: const Icon(Icons.shield_outlined, size: 18),
+              label: const Text('تنظیم اجازه نصب (یک‌بار لازم است)'),
+              style: TextButton.styleFrom(
+                foregroundColor: scheme.onSurfaceVariant,
+                textStyle: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
           ],
         ),

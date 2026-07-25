@@ -74,6 +74,13 @@ class UserResource extends Resource
                         ->required(fn (string $operation) => $operation === 'create')
                         ->helperText('در حالت ویرایش، خالی بگذارید تا تغییر نکند.'),
 
+                    Forms\Components\TextInput::make('monthly_salary')
+                        ->label('حقوق ماهانه')
+                        ->numeric()
+                        ->minValue(0)
+                        ->suffix(fn () => \App\Support\Money::label())
+                        ->helperText('برای پیش‌پر کردن فرم حقوق استفاده می‌شود.'),
+
                     Forms\Components\Toggle::make('is_active')
                         ->label('حساب فعال')
                         ->default(true)
@@ -126,15 +133,20 @@ class UserResource extends Resource
                     ->trueColor('success')
                     ->falseColor('danger'),
 
+                Tables\Columns\TextColumn::make('monthly_salary')
+                    ->label('حقوق ماهانه')
+                    ->formatStateUsing(fn ($state) => $state ? \App\Support\Money::format($state) : '—')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('last_login_at')
                     ->label('آخرین ورود')
-                    ->dateTime('Y-m-d H:i')
+                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
                     ->placeholder('هرگز')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('تاریخ ساخت')
-                    ->dateTime('Y-m-d')
+                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::date($state))
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])

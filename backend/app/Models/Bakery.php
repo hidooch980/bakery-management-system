@@ -15,6 +15,7 @@ class Bakery extends Model
         'normal_chane_weight_kg',
         'nanino_chane_weight_kg',
         'bread_price',
+        'currency',
     ];
 
     protected function casts(): array

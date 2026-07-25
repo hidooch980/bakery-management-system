@@ -42,7 +42,7 @@ class TodayAttendanceTable extends BaseWidget
 
                 Tables\Columns\TextColumn::make('checked_in_at')
                     ->label('ساعت حضور')
-                    ->dateTime('H:i')
+                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::time($state))
                     ->badge()
                     ->color('success')
                     ->icon('heroicon-m-clock'),

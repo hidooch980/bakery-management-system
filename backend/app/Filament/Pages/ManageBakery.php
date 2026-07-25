@@ -101,7 +101,15 @@ class ManageBakery extends Page implements HasForms
                             ->numeric()
                             ->minValue(0)
                             ->suffix('تومان')
-                            ->helperText('برای پیشنهاد مبلغ فروش'),
+                            ->helperText('همیشه به تومان وارد کنید'),
+
+                        Forms\Components\Select::make('currency')
+                            ->label('واحد پول نمایشی')
+                            ->options(\App\Support\Money::UNITS)
+                            ->default(\App\Support\Money::TOMAN)
+                            ->required()
+                            ->native(false)
+                            ->helperText('مبالغ به تومان ذخیره و با این واحد نمایش داده می‌شوند.'),
                     ]),
             ])
             ->statePath('data');
@@ -112,6 +120,9 @@ class ManageBakery extends Page implements HasForms
         $data = $this->form->getState();
 
         Bakery::firstOrNew(['id' => 1])->fill($data)->save();
+
+        // The formatter caches the unit, so drop it after a settings change.
+        \App\Support\Money::forgetCache();
 
         Notification::make()
             ->title('اطلاعات نانوایی ذخیره شد.')

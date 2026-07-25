@@ -5,8 +5,10 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BakeryController;
 use App\Http\Controllers\Api\ChaneEntryController;
 use App\Http\Controllers\Api\DoughEntryController;
+use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FlourStockController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\UserManagementController;
 use Illuminate\Support\Facades\Route;
@@ -86,5 +88,26 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/reports/attendance', [ReportController::class, 'attendance'])
             ->middleware('permission:view-attendance-reports');
+
+        // Every employee can see their own payslips. Declared before the
+        // salaries resource so `/salaries/{salary}` does not swallow "mine".
+        Route::get('/salaries/mine', [SalaryController::class, 'mine']);
+
+        // --- Admin: finance (expenses & payroll) ---
+        Route::middleware('permission:manage-finance')->group(function () {
+            Route::get('/expenses/categories', [ExpenseController::class, 'categories']);
+            Route::apiResource('expenses', ExpenseController::class)->except(['show']);
+
+            Route::get('/salaries/employees', [SalaryController::class, 'employees']);
+            Route::patch('/salaries/{salary}/mark-paid', [SalaryController::class, 'markPaid']);
+            Route::apiResource('salaries', SalaryController::class)->except(['show']);
+        });
+
+        // --- Admin: financial reports ---
+        Route::middleware('permission:view-financial-reports')->group(function () {
+            Route::get('/reports/financial', [ReportController::class, 'financial']);
+            Route::get('/reports/financial-trend', [ReportController::class, 'financialTrend']);
+            Route::get('/reports/payroll', [ReportController::class, 'payroll']);
+        });
     });
 });

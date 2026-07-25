@@ -43,6 +43,7 @@ class AdminPanelProvider extends PanelProvider
             ->maxContentWidth('full')
             ->navigationGroups([
                 'تولید و فروش',
+                'امور مالی',
                 'کارکنان',
                 'تنظیمات',
             ])

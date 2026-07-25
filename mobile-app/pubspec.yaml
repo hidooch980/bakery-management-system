@@ -33,10 +33,28 @@ dependencies:
   fl_chart: ^0.69.2
   intl: ^0.20.2
 
+  # Jalali (Hijri Shamsi) calendar
+  shamsi_date: ^1.0.4
+
+  # Deep-links to the Android install-permission settings page
+  android_intent_plus: ^5.2.0
+  device_info_plus: ^11.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# Generates every Android density from the bakery loaf artwork, replacing
+# the default Flutter logo.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#C2761A"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true

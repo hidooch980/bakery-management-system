@@ -148,7 +148,7 @@ class ChaneEntryResource extends Resource
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('زمان ثبت')
-                    ->dateTime('Y-m-d H:i')
+                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
                     ->sortable(),
             ])
             ->filters([

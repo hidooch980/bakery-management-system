@@ -23,6 +23,8 @@ class RolesAndPermissionsSeeder extends Seeder
         'view-own-sales',
         'record-attendance',
         'change-password',
+        'manage-finance',
+        'view-financial-reports',
     ];
 
     public function run(): void

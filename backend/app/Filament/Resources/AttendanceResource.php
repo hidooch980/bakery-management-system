@@ -79,12 +79,12 @@ class AttendanceResource extends Resource
 
                 Tables\Columns\TextColumn::make('date')
                     ->label('تاریخ')
-                    ->date('Y-m-d')
+                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::date($state))
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('checked_in_at')
                     ->label('ساعت تیک حضور')
-                    ->dateTime('H:i')
+                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::time($state))
                     ->badge()
                     ->color('success')
                     ->icon('heroicon-m-clock')
@@ -92,7 +92,7 @@ class AttendanceResource extends Resource
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('ثبت در سیستم')
-                    ->dateTime('Y-m-d H:i')
+                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([

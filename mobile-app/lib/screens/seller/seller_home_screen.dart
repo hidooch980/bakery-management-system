@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
+import '../../utils/formatters.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/bakery.dart';
@@ -130,7 +131,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen>
                     onReload: _reload,
                     onSelect: _openSaleSheet,
                   ),
-                  _TodaySalesTab(future: _today, onReload: _reload),
+                  _TodaySalesTab(future: _today, onReload: _reload, bakery: _bakery),
                 ],
               ),
             ),
@@ -211,15 +212,20 @@ class _PendingChaneTab extends StatelessWidget {
 }
 
 class _TodaySalesTab extends StatelessWidget {
-  const _TodaySalesTab({required this.future, required this.onReload});
+  const _TodaySalesTab({
+    required this.future,
+    required this.onReload,
+    this.bakery,
+  });
 
   final Future<({List<Sale> sales, int count, double total})> future;
   final VoidCallback onReload;
+  final Bakery? bakery;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final currency = NumberFormat.decimalPattern();
+    final unit = bakery?.currency ?? Currency.toman;
 
     return RefreshIndicator(
       onRefresh: () async => onReload(),
@@ -256,8 +262,8 @@ class _TodaySalesTab extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: StatTile(
-                      label: 'مجموع مبلغ',
-                      value: currency.format(data?.total ?? 0),
+                      label: 'مجموع (${unit.label})',
+                      value: MoneyFormat.plain(data?.total ?? 0, currency: unit),
                       icon: Icons.payments_rounded,
                       color: const Color(0xFF2E9E6B),
                     ),
@@ -283,15 +289,11 @@ class _TodaySalesTab extends StatelessWidget {
                       ),
                       title: Text(
                         sale.amount != null
-                            ? '${currency.format(sale.amount)} تومان'
+                            ? MoneyFormat.format(sale.amount, currency: unit)
                             : 'بدون مبلغ',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      subtitle: Text(
-                        sale.createdAt != null
-                            ? DateFormat('HH:mm').format(sale.createdAt!)
-                            : '—',
-                      ),
+                      subtitle: Text(JalaliFormat.time(sale.createdAt)),
                       trailing: Chip(
                         label: Text(sale.paymentType.label),
                         visualDensity: VisualDensity.compact,
@@ -336,9 +338,11 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     super.initState();
 
     // Pre-fill `chane count × bread price`; the seller can still override it.
+    // The field shows the configured unit, so a Rial shop sees Rial.
     final price = widget.bakery?.breadPrice;
     if (price != null && price > 0) {
-      final suggested = widget.chane.chaneCount * price;
+      final unit = widget.bakery?.currency ?? Currency.toman;
+      final suggested = widget.chane.chaneCount * price * unit.multiplier;
       _amount.text = suggested.toStringAsFixed(0);
     }
   }
@@ -355,9 +359,9 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     final price = widget.bakery?.breadPrice;
     if (price == null || price <= 0) return null;
 
-    final formatted = NumberFormat.decimalPattern().format(price);
+    final unit = widget.bakery?.currency ?? Currency.toman;
 
-    return '${widget.chane.chaneCount} نان × $formatted تومان';
+    return '${widget.chane.chaneCount} نان × ${MoneyFormat.format(price, currency: unit)}';
   }
 
   Future<void> _save() async {
@@ -371,10 +375,14 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     setState(() => _saving = true);
 
     try {
+      final unit = widget.bakery?.currency ?? Currency.toman;
+      final typed = _amount.text.isEmpty ? null : double.tryParse(_amount.text);
+
       await widget.api.recordSale(
         chaneEntryId: widget.chane.id,
         paymentType: _paymentType!,
-        amount: _amount.text.isEmpty ? null : double.parse(_amount.text),
+        // The API always stores Toman, whatever unit the shop displays.
+        amount: typed == null ? null : MoneyFormat.toToman(typed, currency: unit),
         note: _note.text.trim(),
       );
 
@@ -461,7 +469,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                   decoration: InputDecoration(
                     labelText: 'مبلغ (اختیاری)',
                     prefixIcon: const Icon(Icons.payments_outlined),
-                    suffixText: 'تومان',
+                    suffixText: (widget.bakery?.currency ?? Currency.toman).label,
                     helperText: _priceHint(),
                   ),
                   validator: (value) {

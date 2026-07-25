@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
+import '../../utils/formatters.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/entries.dart';
@@ -174,7 +175,7 @@ class _DoughTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     entry.createdAt != null
-                        ? DateFormat('yyyy/MM/dd — HH:mm').format(entry.createdAt!)
+                        ? JalaliFormat.dateTime(entry.createdAt!)
                         : '—',
                     style: Theme.of(context)
                         .textTheme

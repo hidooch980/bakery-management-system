@@ -20,6 +20,7 @@ class User extends Authenticatable implements FilamentUser
         'email',
         'password',
         'is_active',
+        'monthly_salary',
     ];
 
     protected $hidden = [
@@ -33,6 +34,7 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'monthly_salary' => 'decimal:2',
             'last_login_at' => 'datetime',
         ];
     }
@@ -55,6 +57,11 @@ class User extends Authenticatable implements FilamentUser
     public function attendances()
     {
         return $this->hasMany(Attendance::class);
+    }
+
+    public function salaryPayments()
+    {
+        return $this->hasMany(SalaryPayment::class);
     }
 
     public function canAccessPanel(Panel $panel): bool

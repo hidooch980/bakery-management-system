@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Bakery;
+use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,10 +33,14 @@ class BakeryController extends Controller
             'normal_chane_weight_kg' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'nanino_chane_weight_kg' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'bread_price' => ['nullable', 'numeric', 'min:0', 'max:100000000'],
+            'currency' => ['nullable', 'in:toman,rial'],
         ]);
 
         $bakery = Bakery::firstOrNew(['id' => 1]);
         $bakery->fill($data)->save();
+
+        // The formatter caches the unit, so drop it after a settings change.
+        Money::forgetCache();
 
         return $this->success($bakery, 'اطلاعات نانوایی به‌روزرسانی شد.');
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
+import '../../utils/formatters.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/bakery.dart';
@@ -197,7 +198,7 @@ class _PendingDoughTab extends StatelessWidget {
                 subtitle: [
                   if (entry.userName != null) entry.userName!,
                   if (entry.createdAt != null)
-                    DateFormat('MM/dd — HH:mm').format(entry.createdAt!),
+                    JalaliFormat.dateTime(entry.createdAt!),
                 ].join('  •  '),
                 icon: Icons.inventory_2_rounded,
                 color: const Color(0xFFE8952D),
@@ -319,7 +320,7 @@ class _ChaneHistoryTab extends StatelessWidget {
                       if (entry.createdAt != null) ...[
                         const SizedBox(height: 12),
                         Text(
-                          DateFormat('yyyy/MM/dd — HH:mm').format(entry.createdAt!),
+                          JalaliFormat.dateTime(entry.createdAt!),
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Deep oven gradient so the pale loaf reads clearly at small sizes. -->
+    <linearGradient id="bg" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#E9A227"/>
+      <stop offset="48%" stop-color="#C2761A"/>
+      <stop offset="100%" stop-color="#8A4A0B"/>
+    </linearGradient>
+
+    <linearGradient id="loaf" x1="0.25" y1="0" x2="0.75" y2="1">
+      <stop offset="0%" stop-color="#FFF6E4"/>
+      <stop offset="42%" stop-color="#F6DCAF"/>
+      <stop offset="100%" stop-color="#E0B268"/>
+    </linearGradient>
+
+    <radialGradient id="glow" cx="0.5" cy="0.3" r="0.7">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="soft" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#4A2A06" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="116" fill="url(#glow)"/>
+
+  <!-- Two wheat sprigs, placed clear of the loaf so they stay legible. -->
+  <g opacity="0.3">
+    <g stroke="#FFF1D6" stroke-width="8" stroke-linecap="round" fill="none">
+      <path d="M92 428 C 92 372, 96 340, 104 312"/>
+      <path d="M420 428 C 420 372, 416 340, 408 312"/>
+    </g>
+    <g fill="#FFF1D6">
+      <ellipse cx="90" cy="336" rx="11" ry="21" transform="rotate(-26 90 336)"/>
+      <ellipse cx="116" cy="330" rx="11" ry="21" transform="rotate(26 116 330)"/>
+      <ellipse cx="103" cy="304" rx="10" ry="19"/>
+      <ellipse cx="422" cy="336" rx="11" ry="21" transform="rotate(26 422 336)"/>
+      <ellipse cx="396" cy="330" rx="11" ry="21" transform="rotate(-26 396 330)"/>
+      <ellipse cx="409" cy="304" rx="10" ry="19"/>
+    </g>
+  </g>
+
+  <!-- The loaf -->
+  <g filter="url(#soft)">
+    <ellipse cx="256" cy="248" rx="146" ry="118" fill="url(#loaf)"/>
+
+    <!-- Crust rim, for definition against the background -->
+    <ellipse cx="256" cy="248" rx="146" ry="118" fill="none"
+             stroke="#C98B33" stroke-width="7" opacity="0.55"/>
+
+    <!-- Scoring cuts -->
+    <g stroke="#B0731F" stroke-width="14" stroke-linecap="round" fill="none" opacity="0.85">
+      <path d="M176 206 C 192 232, 192 264, 176 290"/>
+      <path d="M256 190 C 274 224, 274 272, 256 306"/>
+      <path d="M336 206 C 320 232, 320 264, 336 290"/>
+    </g>
+
+    <!-- Sesame seeds -->
+    <g fill="#FFFFFF" opacity="0.95">
+      <ellipse cx="212" cy="172" rx="8" ry="5" transform="rotate(-24 212 172)"/>
+      <ellipse cx="298" cy="176" rx="8" ry="5" transform="rotate(20 298 176)"/>
+      <ellipse cx="256" cy="158" rx="8" ry="5"/>
+      <ellipse cx="158" cy="238" rx="8" ry="5" transform="rotate(-70 158 238)"/>
+      <ellipse cx="354" cy="238" rx="8" ry="5" transform="rotate(70 354 238)"/>
+      <ellipse cx="206" cy="322" rx="8" ry="5" transform="rotate(14 206 322)"/>
+      <ellipse cx="306" cy="322" rx="8" ry="5" transform="rotate(-14 306 322)"/>
+      <ellipse cx="256" cy="338" rx="8" ry="5"/>
+    </g>
+  </g>
+
+  <!-- Peel / shelf under the loaf -->
+  <rect x="140" y="392" width="232" height="22" rx="11" fill="#FFF1D6" opacity="0.42"/>
+</svg>

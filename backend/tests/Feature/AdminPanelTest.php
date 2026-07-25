@@ -67,6 +67,10 @@ class AdminPanelTest extends TestCase
             'attendances' => ['/admin/attendances'],
             'flour stock' => ['/admin/flour-stock-movements'],
             'bakery settings' => ['/admin/manage-bakery'],
+            'expenses' => ['/admin/expenses'],
+            'expense create' => ['/admin/expenses/create'],
+            'salaries' => ['/admin/salary-payments'],
+            'salary create' => ['/admin/salary-payments/create'],
         ];
     }
 

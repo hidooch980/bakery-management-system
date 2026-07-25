@@ -6,9 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
+use App\Models\Expense;
 use App\Models\FlourStockMovement;
 use App\Models\Sale;
+use App\Models\SalaryPayment;
 use App\Models\User;
+use App\Support\Jalali;
+use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -144,17 +148,170 @@ class ReportController extends Controller
         return $this->success($records);
     }
 
+    /**
+     * Income (sales) against expenses (recorded costs + paid salaries),
+     * with the resulting profit.
+     */
+    public function financial(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        $income = (float) Sale::whereBetween('created_at', [$from, $to])->sum('amount');
+
+        $expensesByCategory = Expense::whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
+            ->get()
+            ->groupBy('category')
+            ->map(fn ($group, $category) => [
+                'category' => $category,
+                'label' => Expense::CATEGORIES[$category] ?? $category,
+                'amount' => round((float) $group->sum('amount'), 2),
+                'amount_formatted' => Money::format($group->sum('amount')),
+                'count' => $group->count(),
+            ])
+            ->values();
+
+        $recordedExpenses = (float) Expense::whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
+            ->sum('amount');
+
+        // Salaries are tracked separately so they are not double-counted with
+        // an "expense" row unless the admin also entered one.
+        $paidSalaries = (float) SalaryPayment::paid()
+            ->whereBetween('paid_on', [$from->toDateString(), $to->toDateString()])
+            ->sum('net_amount');
+
+        $unpaidSalaries = (float) SalaryPayment::unpaid()->sum('net_amount');
+
+        $totalExpenses = $recordedExpenses + $paidSalaries;
+        $profit = $income - $totalExpenses;
+
+        return $this->success([
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'from_jalali' => Jalali::date($from),
+            'to_jalali' => Jalali::date($to),
+            'currency' => Money::currency(),
+            'currency_label' => Money::label(),
+            'income' => [
+                'sales' => round($income, 2),
+                'sales_formatted' => Money::format($income),
+                'sales_count' => Sale::whereBetween('created_at', [$from, $to])->count(),
+            ],
+            'expenses' => [
+                'recorded' => round($recordedExpenses, 2),
+                'recorded_formatted' => Money::format($recordedExpenses),
+                'salaries_paid' => round($paidSalaries, 2),
+                'salaries_paid_formatted' => Money::format($paidSalaries),
+                'total' => round($totalExpenses, 2),
+                'total_formatted' => Money::format($totalExpenses),
+                'by_category' => $expensesByCategory,
+            ],
+            'profit' => [
+                'amount' => round($profit, 2),
+                'formatted' => Money::format($profit),
+                'is_positive' => $profit >= 0,
+                'margin_percent' => $income > 0 ? round($profit / $income * 100, 1) : 0,
+            ],
+            'outstanding_salaries' => [
+                'amount' => round($unpaidSalaries, 2),
+                'formatted' => Money::format($unpaidSalaries),
+                'count' => SalaryPayment::unpaid()->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * Day-by-day income and expense series, for charting a trend.
+     */
+    public function financialTrend(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        $days = collect();
+        $cursor = $from->copy()->startOfDay();
+
+        // Guard against an unbounded range blowing up the response.
+        while ($cursor->lte($to) && $days->count() < 120) {
+            $date = $cursor->toDateString();
+
+            $income = (float) Sale::whereDate('created_at', $date)->sum('amount');
+            $expense = (float) Expense::whereDate('spent_on', $date)->sum('amount')
+                + (float) SalaryPayment::paid()->whereDate('paid_on', $date)->sum('net_amount');
+
+            $days->push([
+                'date' => $date,
+                'date_jalali' => Jalali::date($cursor),
+                'income' => round($income, 2),
+                'expense' => round($expense, 2),
+                'profit' => round($income - $expense, 2),
+            ]);
+
+            $cursor->addDay();
+        }
+
+        return $this->success([
+            'currency_label' => Money::label(),
+            'days' => $days,
+        ]);
+    }
+
+    /**
+     * Payroll summary for a period: who is owed what, and what has been paid.
+     */
+    public function payroll(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        $payments = SalaryPayment::with('user:id,name')
+            ->whereBetween('period_start', [$from->toDateString(), $to->toDateString()])
+            ->get();
+
+        return $this->success([
+            'from_jalali' => Jalali::date($from),
+            'to_jalali' => Jalali::date($to),
+            'currency_label' => Money::label(),
+            'total_net' => round((float) $payments->sum('net_amount'), 2),
+            'total_net_formatted' => Money::format($payments->sum('net_amount')),
+            'paid' => round((float) $payments->where('paid_on', '!=', null)->sum('net_amount'), 2),
+            'unpaid' => round((float) $payments->where('paid_on', null)->sum('net_amount'), 2),
+            'by_employee' => $payments->groupBy('user_id')->map(fn ($group) => [
+                'employee' => $group->first()->user?->name,
+                'periods' => $group->count(),
+                'net_amount' => round((float) $group->sum('net_amount'), 2),
+                'net_amount_formatted' => Money::format($group->sum('net_amount')),
+                'unpaid' => round((float) $group->where('paid_on', null)->sum('net_amount'), 2),
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Accepts Jalali (۱۴۰۵/۰۵/۰۳) or Gregorian dates; defaults to today.
+     */
     private function range(Request $request): array
     {
-        $from = $request->query('from')
-            ? now()->parse($request->query('from'))->startOfDay()
-            : now()->startOfDay();
+        $from = $this->parseDate($request->query('from'))?->startOfDay()
+            ?? now()->startOfDay();
 
-        $to = $request->query('to')
-            ? now()->parse($request->query('to'))->endOfDay()
-            : now()->endOfDay();
+        $to = $this->parseDate($request->query('to'))?->endOfDay()
+            ?? now()->endOfDay();
 
         return [$from, $to];
+    }
+
+    private function parseDate(?string $value): ?\Illuminate\Support\Carbon
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        if ($jalali = Jalali::parse($value)) {
+            return $jalali;
+        }
+
+        try {
+            return now()->parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function flourBalance(): float
