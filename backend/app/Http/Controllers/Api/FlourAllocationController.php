@@ -43,6 +43,9 @@ class FlourAllocationController extends Controller
             'month_start' => ['required', 'string', 'max:20'],
             // Quotas are issued in sacks; the weight is derived from them.
             'total_bags' => ['required', 'numeric', 'min:0'],
+            // Flour carried over from earlier periods.
+            'carryover_bags' => ['nullable', 'numeric', 'min:0'],
+            'carryover_note' => ['nullable', 'string', 'max:255'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -62,6 +65,8 @@ class FlourAllocationController extends Controller
             'month_start' => $monthStart,
             'month_label' => Jalali::monthLabel($monthStart),
             'total_bags' => $data['total_bags'],
+            'carryover_bags' => $data['carryover_bags'] ?? 0,
+            'carryover_note' => $data['carryover_note'] ?? null,
             'note' => $data['note'] ?? null,
         ]);
 
@@ -74,6 +79,8 @@ class FlourAllocationController extends Controller
     {
         $data = $request->validate([
             'total_bags' => ['sometimes', 'numeric', 'min:0'],
+            'carryover_bags' => ['sometimes', 'numeric', 'min:0'],
+            'carryover_note' => ['sometimes', 'nullable', 'string', 'max:255'],
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
@@ -103,6 +110,11 @@ class FlourAllocationController extends Controller
             'month_label' => $allocation->month_label,
             'total_bags' => (float) $allocation->total_bags,
             'total_kg' => (float) $allocation->total_kg,
+            'carryover_bags' => (float) $allocation->carryover_bags,
+            'carryover_kg' => (float) $allocation->carryover_kg,
+            'carryover_note' => $allocation->carryover_note,
+            'available_bags' => $allocation->available_bags,
+            'available_kg' => $allocation->available_kg,
             'bag_weight_kg' => \App\Support\DoughFormula::fromBakery()->bagWeightKg,
             'note' => $allocation->note,
             'current_period_number' => $current?->period_number,

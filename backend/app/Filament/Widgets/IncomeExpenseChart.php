@@ -6,11 +6,16 @@ use App\Models\Expense;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Support\Jalali;
+use App\Support\Money;
 use Filament\Widgets\ChartWidget;
 
 class IncomeExpenseChart extends ChartWidget
 {
-    protected static ?string $heading = 'درآمد و هزینه (۱۴ روز اخیر)';
+    public function getHeading(): string
+    {
+        // The axis is drawn in whichever unit the shop displays.
+        return 'درآمد و هزینه (۱۴ روز اخیر) — '.Money::label();
+    }
 
     protected static ?int $sort = 3;
 
@@ -24,9 +29,9 @@ class IncomeExpenseChart extends ChartWidget
             'datasets' => [
                 [
                     'label' => 'درآمد',
-                    'data' => $days->map(fn ($day) => round(
-                        (float) Sale::whereDate('created_at', $day->toDateString())->sum('amount'), 2
-                    ))->toArray(),
+                    'data' => $days->map(fn ($day) => round(Money::convert(
+                        (float) Sale::whereDate('created_at', $day->toDateString())->sum('amount')
+                    ), 2))->toArray(),
                     'borderColor' => '#2E9E6B',
                     'backgroundColor' => 'rgba(46, 158, 107, 0.15)',
                     'fill' => true,
@@ -37,11 +42,10 @@ class IncomeExpenseChart extends ChartWidget
                     'data' => $days->map(function ($day) {
                         $date = $day->toDateString();
 
-                        return round(
+                        return round(Money::convert(
                             (float) Expense::whereDate('spent_on', $date)->sum('amount')
-                            + (float) SalaryPayment::paid()->whereDate('paid_on', $date)->sum('net_amount'),
-                            2
-                        );
+                            + (float) SalaryPayment::paid()->whereDate('paid_on', $date)->sum('net_amount')
+                        ), 2);
                     })->toArray(),
                     'borderColor' => '#D1495B',
                     'backgroundColor' => 'rgba(209, 73, 91, 0.15)',

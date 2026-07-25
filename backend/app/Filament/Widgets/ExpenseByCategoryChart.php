@@ -4,11 +4,15 @@ namespace App\Filament\Widgets;
 
 use App\Models\Expense;
 use App\Support\Jalali;
+use App\Support\Money;
 use Filament\Widgets\ChartWidget;
 
 class ExpenseByCategoryChart extends ChartWidget
 {
-    protected static ?string $heading = 'هزینه‌ها به تفکیک دسته (این ماه)';
+    public function getHeading(): string
+    {
+        return 'هزینه‌ها به تفکیک دسته (این ماه) — '.Money::label();
+    }
 
     protected static ?int $sort = 5;
 
@@ -32,7 +36,7 @@ class ExpenseByCategoryChart extends ChartWidget
             }
 
             $labels[] = $label;
-            $values[] = round($amount, 2);
+            $values[] = round(Money::convert($amount), 2);
         }
 
         return [

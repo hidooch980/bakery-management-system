@@ -257,6 +257,19 @@ class FinanceTest extends TestCase
         $this->assertNull(Jalali::parse(null));
     }
 
+    public function test_jalali_parser_rejects_a_day_the_month_does_not_have(): void
+    {
+        // The library rolls these forward instead of failing, which would
+        // silently move a record to the first of the next month.
+        $this->assertNull(Jalali::parse('1405/07/31'));
+        $this->assertNull(Jalali::parse('1405/12/30'));
+        $this->assertNull(Jalali::parse('1404/12/30'));
+
+        // Days that do exist still parse.
+        $this->assertNotNull(Jalali::parse('1405/06/31'));
+        $this->assertNotNull(Jalali::parse('1405/12/29'));
+    }
+
     public function test_jalali_helper_accepts_persian_digits(): void
     {
         $this->assertSame('1405/05/03', Jalali::date(Jalali::parse('۱۴۰۵/۰۵/۰۳')));

@@ -73,7 +73,8 @@ class SaleResource extends Resource
 
                     Forms\Components\Select::make('customer_id')
                         ->label('مدرسه / اداره')
-                        ->relationship('customer', 'name')
+                        // Partner bakeries are counterparties, not buyers.
+                        ->relationship('customer', 'name', fn ($query) => $query->buyers())
                         ->searchable()
                         ->preload()
                         ->native(false)

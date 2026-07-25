@@ -34,15 +34,32 @@ class ConsignmentFlourResource extends Resource
                 ->description('آردی که از نانوایی همکار گرفته یا به او داده‌اید. جدا از سهمیه محاسبه می‌شود.')
                 ->columns(2)
                 ->schema([
-                    Forms\Components\TextInput::make('partner_name')
-                        ->label('نام همکار / نانوایی')
+                    Forms\Components\Select::make('customer_id')
+                        ->label('همکار / نانوایی')
+                        ->relationship(
+                            'partner',
+                            'name',
+                            fn ($query) => $query->partners()->active()
+                        )
+                        ->searchable()
+                        ->preload()
                         ->required()
-                        ->maxLength(255),
-
-                    Forms\Components\TextInput::make('partner_phone')
-                        ->label('تلفن')
-                        ->tel()
-                        ->maxLength(20),
+                        ->native(false)
+                        // Lets the admin define a new partner without leaving.
+                        ->createOptionForm([
+                            Forms\Components\TextInput::make('name')
+                                ->label('نام همکار / نانوایی')
+                                ->required()
+                                ->maxLength(255),
+                            Forms\Components\TextInput::make('phone')
+                                ->label('تلفن')
+                                ->tel()
+                                ->maxLength(20),
+                        ])
+                        ->createOptionUsing(fn (array $data) => \App\Models\Customer::create(
+                            $data + ['type' => \App\Models\Customer::PARTNER_TYPE, 'is_active' => true]
+                        )->id)
+                        ->helperText('از فهرست انتخاب کنید یا با + همکار جدید تعریف کنید.'),
 
                     Forms\Components\Select::make('direction')
                         ->label('نوع')
@@ -80,8 +97,9 @@ class ConsignmentFlourResource extends Resource
                     ->formatStateUsing(fn ($state) => AppCalendar::date($state))
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('partner_name')
+                Tables\Columns\TextColumn::make('partner.name')
                     ->label('همکار')
+                    ->state(fn (ConsignmentFlour $record) => $record->partner_label)
                     ->searchable()
                     ->weight('bold')
                     ->icon('heroicon-m-building-storefront'),

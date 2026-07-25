@@ -7,6 +7,7 @@ use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\FlourStockMovement;
 use App\Models\Sale;
+use App\Support\Money;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -43,7 +44,7 @@ class BakeryStatsOverview extends BaseWidget
                 ->color('info')
                 ->chart($this->trend(ChaneEntry::class, 'chane_count')),
 
-            Stat::make('فروش امروز', number_format($salesAmount).' تومان')
+            Stat::make('فروش امروز', Money::format($salesAmount))
                 ->description("{$salesCount} فقره فروش")
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success')
@@ -55,7 +56,9 @@ class BakeryStatsOverview extends BaseWidget
                 ->color('primary'),
 
             Stat::make('موجودی آرد', number_format($balance, 2).' kg')
-                ->description($balance > 0 ? 'موجودی مثبت' : 'نیاز به تأمین')
+                ->description($balance > 0
+                    ? number_format($balanceBags, 1).' کیسه'
+                    : 'نیاز به تأمین')
                 ->descriptionIcon($balance > 0 ? 'heroicon-m-check-circle' : 'heroicon-m-exclamation-triangle')
                 ->color($balance > 0 ? 'success' : 'danger'),
 

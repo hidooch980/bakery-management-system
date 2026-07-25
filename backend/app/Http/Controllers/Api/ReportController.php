@@ -48,6 +48,12 @@ class ReportController extends Controller
                 'active' => User::where('is_active', true)->count(),
             ],
             'flour_balance_kg' => $this->flourBalance(),
+            // So a client that shows raw figures still labels them correctly.
+            'currency' => Money::currency(),
+            'currency_label' => Money::label(),
+            'sales_amount_formatted' => Money::format(
+                Sale::whereDate('created_at', $today)->sum('amount')
+            ),
         ]);
     }
 
@@ -82,16 +88,23 @@ class ReportController extends Controller
         return $this->success([
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
+            'currency' => Money::currency(),
+            'currency_label' => Money::label(),
             'count' => $sales->count(),
+            'bread_count' => (int) $sales->sum('bread_count'),
             'total_amount' => round((float) $sales->sum('amount'), 2),
+            'total_amount_formatted' => Money::format($sales->sum('amount')),
             'by_payment_type' => $sales->groupBy('payment_type')->map(fn ($group) => [
                 'count' => $group->count(),
+                'bread_count' => (int) $group->sum('bread_count'),
                 'amount' => round((float) $group->sum('amount'), 2),
+                'amount_formatted' => Money::format($group->sum('amount')),
             ]),
             'by_seller' => $sales->groupBy('user_id')->map(fn ($group) => [
                 'seller' => User::find($group->first()->user_id)?->name,
                 'count' => $group->count(),
                 'amount' => round((float) $group->sum('amount'), 2),
+                'amount_formatted' => Money::format($group->sum('amount')),
             ])->values(),
         ]);
     }

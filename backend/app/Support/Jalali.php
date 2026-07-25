@@ -79,10 +79,19 @@ class Jalali
             return null;
         }
 
+        $normalisedInput = sprintf('%04d/%02d/%02d', $m[1], $m[2], $m[3]);
+
         try {
-            $jalalian = Jalalian::fromFormat('Y/m/d', sprintf('%04d/%02d/%02d', $m[1], $m[2], $m[3]));
+            $jalalian = Jalalian::fromFormat('Y/m/d', $normalisedInput);
         } catch (\Throwable) {
             // Well-formed but not a real date, e.g. 1405/13/40.
+            return null;
+        }
+
+        // The library rolls impossible days forward rather than rejecting
+        // them — 1405/07/31 silently becomes 1405/08/01. Round-tripping the
+        // result catches that, so a day the month does not have is refused.
+        if ($jalalian->format('Y/m/d') !== $normalisedInput) {
             return null;
         }
 

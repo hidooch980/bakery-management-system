@@ -23,7 +23,16 @@ class FlourAllocation extends Model
         3 => ['label' => 'دوره سوم (۲۵ تا ۴ ماه بعد)', 'from' => 25, 'to' => 4],
     ];
 
-    protected $fillable = ['month_start', 'month_label', 'total_bags', 'total_kg', 'note'];
+    protected $fillable = [
+        'month_start',
+        'month_label',
+        'total_bags',
+        'total_kg',
+        'carryover_bags',
+        'carryover_kg',
+        'carryover_note',
+        'note',
+    ];
 
     protected function casts(): array
     {
@@ -31,6 +40,8 @@ class FlourAllocation extends Model
             'month_start' => 'date',
             'total_bags' => 'decimal:2',
             'total_kg' => 'decimal:3',
+            'carryover_bags' => 'decimal:2',
+            'carryover_kg' => 'decimal:3',
         ];
     }
 
@@ -39,18 +50,34 @@ class FlourAllocation extends Model
         // Quotas are issued in sacks; the weight follows from the bag weight
         // the admin configured, so the two can never disagree.
         static::saving(function (self $allocation) {
+            $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+
             if ($allocation->total_bags !== null) {
-                $allocation->total_kg = round(
-                    (float) $allocation->total_bags * DoughFormula::fromBakery()->bagWeightKg,
-                    3
-                );
+                $allocation->total_kg = round((float) $allocation->total_bags * $bagWeight, 3);
             }
+
+            // Carry-over is entered in sacks too, for the same reason.
+            $allocation->carryover_kg = round((float) $allocation->carryover_bags * $bagWeight, 3);
         });
     }
 
     public function periods()
     {
         return $this->hasMany(FlourAllocationPeriod::class)->orderBy('period_number');
+    }
+
+    /**
+     * Everything available this month: the month's own quota plus whatever
+     * was left over from earlier periods.
+     */
+    public function getAvailableBagsAttribute(): float
+    {
+        return round((float) $this->total_bags + (float) $this->carryover_bags, 2);
+    }
+
+    public function getAvailableKgAttribute(): float
+    {
+        return round((float) $this->total_kg + (float) $this->carryover_kg, 3);
     }
 
     /** Bags each period is entitled to, derived from its share of the weight. */
@@ -69,6 +96,9 @@ class FlourAllocation extends Model
     public function syncPeriods(): void
     {
         $monthStart = Carbon::parse($this->month_start);
+
+        // Only the month's own quota is split into periods. Carry-over is a
+        // reserve that can be drawn on at any point, not a per-period ration.
         $total = (float) $this->total_kg;
 
         $share = round($total / 3, 3);

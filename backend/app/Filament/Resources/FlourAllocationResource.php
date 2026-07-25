@@ -35,13 +35,9 @@ class FlourAllocationResource extends Resource
                 ->description('سهمیه را به کیسه وارد کنید؛ وزن از روی وزن کیسه در تنظیمات محاسبه و بین سه دوره (۵ تا ۱۴، ۱۵ تا ۲۴، ۲۵ تا ۴ ماه بعد) تقسیم می‌شود.')
                 ->columns(2)
                 ->schema([
-                    \App\Filament\Forms\JalaliDateInput::make('month_start', 'شروع ماه شمسی')
+                    \App\Filament\Forms\JalaliMonthInput::make('month_start', 'ماه')
                         ->required()
-                        ->default(fn () => Jalali::currentMonthRange()[0]->toDateString())
-                        ->live(onBlur: true)
-                        ->helperText(fn ($state) => $state && Jalali::parse($state)
-                            ? 'ماه: '.Jalali::monthLabel(Jalali::parse($state))
-                            : 'اول ماه شمسی — مثال: 1405/05/01'),
+                        ->live(),
 
                     Forms\Components\TextInput::make('total_bags')
                         ->label('کل سهمیه ماه')
@@ -74,6 +70,100 @@ class FlourAllocationResource extends Resource
                         ->rows(2)
                         ->columnSpanFull(),
                 ]),
+
+            Forms\Components\Section::make('آرد سنوات (مانده از قبل)')
+                ->description('آردی که از دوره‌های گذشته باقی مانده و به سهمیه این ماه اضافه می‌شود. بین دوره‌ها تقسیم نمی‌شود و ذخیره‌ای است که هر زمان قابل برداشت است.')
+                ->icon('heroicon-o-archive-box-arrow-down')
+                ->columns(2)
+                ->collapsed(fn ($record) => (float) ($record?->carryover_bags ?? 0) === 0.0)
+                ->schema([
+                    Forms\Components\TextInput::make('carryover_bags')
+                        ->label('مانده از قبل')
+                        ->numeric()
+                        ->minValue(0)
+                        ->default(0)
+                        ->required()
+                        ->suffix('کیسه')
+                        ->live(onBlur: true)
+                        ->helperText(function ($state) {
+                            $bags = (float) ($state ?: 0);
+
+                            if ($bags <= 0) {
+                                return 'اگر مانده‌ای از قبل ندارید، صفر بگذارید.';
+                            }
+
+                            $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+
+                            return number_format($bags, 1).' کیسه = '
+                                .number_format($bags * $bagWeight, 1).' کیلوگرم';
+                        }),
+
+                    Forms\Components\TextInput::make('carryover_note')
+                        ->label('بابت')
+                        ->maxLength(255)
+                        ->placeholder('مثلاً: مانده سنوات ۱۴۰۴'),
+
+                    Forms\Components\Placeholder::make('available_total')
+                        ->label('کل قابل استفاده این ماه')
+                        ->columnSpanFull()
+                        ->content(function (Forms\Get $get) {
+                            $quota = (float) ($get('total_bags') ?: 0);
+                            $carry = (float) ($get('carryover_bags') ?: 0);
+
+                            if ($quota + $carry <= 0) {
+                                return '—';
+                            }
+
+                            $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+
+                            return sprintf(
+                                'سهمیه %s + سنوات %s = %s کیسه (%s کیلوگرم)',
+                                number_format($quota, 1),
+                                number_format($carry, 1),
+                                number_format($quota + $carry, 1),
+                                number_format(($quota + $carry) * $bagWeight, 1),
+                            );
+                        }),
+                ]),
+
+            Forms\Components\Section::make('دوره‌های تحویل')
+                ->description('سهمیه به‌طور مساوی بین این سه دوره تقسیم می‌شود.')
+                ->icon('heroicon-o-calendar-days')
+                ->schema([
+                    Forms\Components\Placeholder::make('period_windows')
+                        ->hiddenLabel()
+                        ->content(function (Forms\Get $get) {
+                            $month = $get('month_start');
+                            $bags = (float) ($get('total_bags') ?: 0);
+
+                            if (blank($month)) {
+                                return 'ابتدا ماه را انتخاب کنید.';
+                            }
+
+                            $start = \Illuminate\Support\Carbon::parse($month);
+                            $lines = [];
+
+                            foreach (array_keys(FlourAllocation::PERIODS) as $number) {
+                                [$from, $to] = FlourAllocation::periodRange($start, $number);
+
+                                $share = $number === 3
+                                    ? $bags - 2 * round($bags / 3, 2)
+                                    : round($bags / 3, 2);
+
+                                $lines[] = sprintf(
+                                    '%s   —   %s تا %s%s',
+                                    FlourAllocation::PERIODS[$number]['label'],
+                                    Jalali::date($from),
+                                    Jalali::date($to),
+                                    $bags > 0 ? '   —   '.number_format($share, 1).' کیسه' : ''
+                                );
+                            }
+
+                            return new \Illuminate\Support\HtmlString(
+                                '<div style="line-height:2">'.implode('<br>', $lines).'</div>'
+                            );
+                        }),
+                ]),
         ]);
     }
 
@@ -89,22 +179,47 @@ class FlourAllocationResource extends Resource
                     ->sortable(query: fn ($query, $direction) => $query->orderBy('month_start', $direction)),
 
                 Tables\Columns\TextColumn::make('total_bags')
-                    ->label('کل سهمیه')
+                    ->label('سهمیه ماه')
                     ->formatStateUsing(fn ($state) => $state
                         ? number_format((float) $state, 0).' کیسه'
                         : '—')
                     ->description(fn ($record) => number_format((float) $record->total_kg, 1).' کیلوگرم')
                     ->sortable(),
 
+                Tables\Columns\TextColumn::make('carryover_bags')
+                    ->label('سنوات')
+                    ->formatStateUsing(fn ($state) => (float) $state > 0
+                        ? number_format((float) $state, 0).' کیسه'
+                        : '—')
+                    ->description(fn (FlourAllocation $record) => $record->carryover_note)
+                    ->badge()
+                    ->color(fn ($state) => (float) $state > 0 ? 'info' : 'gray'),
+
+                Tables\Columns\TextColumn::make('available_bags')
+                    ->label('کل قابل استفاده')
+                    ->state(fn (FlourAllocation $record) => number_format($record->available_bags, 0).' کیسه')
+                    ->description(fn (FlourAllocation $record) => number_format($record->available_kg, 1).' کیلوگرم')
+                    ->badge()
+                    ->color('success')
+                    ->weight('bold'),
+
                 Tables\Columns\TextColumn::make('periods_summary')
                     ->label('دوره‌ها')
                     ->state(function (FlourAllocation $record) {
                         return $record->periods
-                            ->map(fn ($p) => "{$p->period_number}: ".number_format($p->used_kg, 0)
-                                .'/'.number_format((float) $p->allocated_kg, 0))
-                            ->implode('   •   ');
+                            ->map(fn ($p) => sprintf(
+                                '%d) %s تا %s',
+                                $p->period_number,
+                                Jalali::date($p->starts_on),
+                                Jalali::date($p->ends_on),
+                            ))
+                            ->implode("\n");
                     })
-                    ->description('مصرف / سهمیه هر دوره (کیلوگرم)'),
+                    ->wrap()
+                    ->description(fn (FlourAllocation $record) => $record->periods
+                        ->map(fn ($p) => number_format($p->used_kg, 0).'/'
+                            .number_format((float) $p->allocated_kg, 0))
+                        ->implode('   •   ').'  (مصرف/سهمیه kg)'),
 
                 Tables\Columns\TextColumn::make('current')
                     ->label('دوره جاری')

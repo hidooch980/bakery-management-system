@@ -65,6 +65,9 @@ class InventoryItemResource extends Resource
                     ->label('موجودی فعلی')
                     // Derived from the movement ledger, not a stored column.
                     ->state(fn (InventoryItem $record) => number_format($record->balance, 3).' '.$record->unit)
+                    ->description(fn (InventoryItem $record) => $record->balance_bags !== null
+                        ? number_format($record->balance_bags, 2).' کیسه'
+                        : null)
                     ->badge()
                     ->color(fn (InventoryItem $record) => $record->is_low ? 'danger' : 'success')
                     ->size('lg'),

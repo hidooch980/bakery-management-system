@@ -114,6 +114,143 @@ class HolidayTest extends TestCase
         $this->assertSame(['الف'], $inMordad);
     }
 
+    // ------------------------------------------------ monthly shop closures
+
+    public function test_shop_closure_repeats_into_the_coming_months(): void
+    {
+        $rule = Holiday::create([
+            'date' => Jalali::parse('1405/05/10'),
+            'title' => 'تعطیلی هفتگی نانوایی',
+            'type' => 'shop',
+            'repeats_monthly' => true,
+        ]);
+
+        $created = $rule->generateFutureOccurrences(3);
+
+        $this->assertSame(3, $created);
+
+        $dates = Holiday::where('repeats_from_id', $rule->id)
+            ->orderBy('date')
+            ->get()
+            ->map(fn (Holiday $h) => Jalali::date($h->date))
+            ->all();
+
+        $this->assertSame(['1405/06/10', '1405/07/10', '1405/08/10'], $dates);
+    }
+
+    public function test_only_a_shop_closure_may_repeat(): void
+    {
+        foreach (['official', 'religious'] as $type) {
+            $holiday = Holiday::create([
+                'date' => Jalali::parse('1405/05/1'.($type === 'official' ? '1' : '2')),
+                'title' => 'تعطیل',
+                'type' => $type,
+                'repeats_monthly' => true,
+            ]);
+
+            // Official and religious dates move each year, so repeating them
+            // monthly would invent holidays that do not exist.
+            $this->assertSame(0, $holiday->generateFutureOccurrences(3));
+        }
+    }
+
+    public function test_repeating_skips_months_without_that_day(): void
+    {
+        // The 31st exists only in the first six Jalali months.
+        $rule = Holiday::create([
+            'date' => Jalali::parse('1405/05/31'),
+            'title' => 'تعطیلی نانوایی',
+            'type' => 'shop',
+            'repeats_monthly' => true,
+        ]);
+
+        $rule->generateFutureOccurrences(6);
+
+        $dates = Holiday::where('repeats_from_id', $rule->id)
+            ->orderBy('date')
+            ->get()
+            ->map(fn (Holiday $h) => Jalali::date($h->date))
+            ->all();
+
+        // Only Shahrivar has a 31st in the six months that follow Mordad.
+        $this->assertSame(['1405/06/31'], $dates);
+    }
+
+    public function test_repeating_never_overwrites_an_existing_day(): void
+    {
+        Holiday::create([
+            'date' => Jalali::parse('1405/06/10'),
+            'title' => 'عید',
+            'type' => 'official',
+        ]);
+
+        $rule = Holiday::create([
+            'date' => Jalali::parse('1405/05/10'),
+            'title' => 'تعطیلی نانوایی',
+            'type' => 'shop',
+            'repeats_monthly' => true,
+        ]);
+
+        $rule->generateFutureOccurrences(2);
+
+        // Shahrivar 10 was already taken, so only Mehr was generated.
+        $this->assertSame(1, Holiday::where('repeats_from_id', $rule->id)->count());
+        $this->assertSame(
+            'عید',
+            Holiday::whereDate('date', Jalali::parse('1405/06/10'))->first()->title
+        );
+    }
+
+    public function test_generating_twice_does_not_duplicate(): void
+    {
+        $rule = Holiday::create([
+            'date' => Jalali::parse('1405/05/10'),
+            'title' => 'تعطیلی نانوایی',
+            'type' => 'shop',
+            'repeats_monthly' => true,
+        ]);
+
+        $rule->generateFutureOccurrences(3);
+        $rule->generateFutureOccurrences(3);
+
+        $this->assertSame(3, Holiday::where('repeats_from_id', $rule->id)->count());
+    }
+
+    public function test_generated_occurrences_do_not_themselves_repeat(): void
+    {
+        $rule = Holiday::create([
+            'date' => Jalali::parse('1405/05/10'),
+            'title' => 'تعطیلی نانوایی',
+            'type' => 'shop',
+            'repeats_monthly' => true,
+        ]);
+
+        $rule->generateFutureOccurrences(2);
+
+        $occurrence = Holiday::where('repeats_from_id', $rule->id)->first();
+
+        $this->assertFalse($occurrence->is_rule);
+        $this->assertSame(0, $occurrence->generateFutureOccurrences(3));
+    }
+
+    public function test_deleting_the_rule_removes_its_occurrences(): void
+    {
+        $rule = Holiday::create([
+            'date' => Jalali::parse('1405/05/10'),
+            'title' => 'تعطیلی نانوایی',
+            'type' => 'shop',
+            'repeats_monthly' => true,
+        ]);
+
+        $rule->generateFutureOccurrences(3);
+        $this->assertSame(3, Holiday::where('repeats_from_id', $rule->id)->count());
+
+        $rule->delete();
+
+        // Occurrences must not outlive the rule that created them.
+        $this->assertSame(0, Holiday::whereNotNull('repeats_from_id')->count());
+    }
+
     public function test_attendance_summary_excludes_holidays_from_working_days(): void
     {
         $admin = $this->userWithRole('admin');

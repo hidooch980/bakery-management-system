@@ -19,6 +19,9 @@ class CustomerController extends Controller
         $customers = Customer::query()
             ->when($request->query('type'), fn ($q, $t) => $q->where('type', $t))
             ->when($request->boolean('active_only', true), fn ($q) => $q->active())
+            // Sellers want buyers; the consignment screen wants partners.
+            ->when($request->boolean('buyers_only'), fn ($q) => $q->buyers())
+            ->when($request->boolean('partners_only'), fn ($q) => $q->partners())
             ->orderBy('name')
             ->get()
             ->map(fn (Customer $c) => [

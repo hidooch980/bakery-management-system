@@ -79,6 +79,9 @@ class SaleController extends Controller
                 'count' => $sales->count(),
                 'bread_count' => (int) $sales->sum('bread_count'),
                 'total_amount' => round((float) $sales->sum('amount'), 2),
+                'total_amount_formatted' => \App\Support\Money::format($sales->sum('amount')),
+                'currency' => \App\Support\Money::currency(),
+                'currency_label' => \App\Support\Money::label(),
                 'by_payment_type' => $sales->groupBy('payment_type')->map(fn ($g) => [
                     'count' => $g->count(),
                     'bread_count' => (int) $g->sum('bread_count'),

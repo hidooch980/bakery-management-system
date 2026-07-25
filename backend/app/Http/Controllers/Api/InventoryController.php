@@ -29,6 +29,8 @@ class InventoryController extends Controller
             'name' => $item->name,
             'unit' => $item->unit,
             'balance' => $item->balance,
+            // Null for everything but flour, which is handled in sacks.
+            'balance_bags' => $item->balance_bags,
             'low_threshold' => $item->low_threshold ? (float) $item->low_threshold : null,
             'is_low' => $item->is_low,
         ]);

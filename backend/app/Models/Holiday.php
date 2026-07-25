@@ -15,11 +15,94 @@ class Holiday extends Model
         'shop' => 'تعطیلی نانوایی',
     ];
 
-    protected $fillable = ['date', 'title', 'type', 'note'];
+    protected $fillable = ['date', 'title', 'type', 'note', 'repeats_monthly', 'repeats_from_id'];
+
+    /** Only a shop closure may repeat; the other types move around. */
+    public const REPEATABLE_TYPE = 'shop';
+
+    /** How many months ahead a recurring closure is generated. */
+    public const MONTHS_AHEAD = 12;
 
     protected function casts(): array
     {
-        return ['date' => 'date'];
+        return [
+            'date' => 'date',
+            'repeats_monthly' => 'boolean',
+        ];
+    }
+
+    public function generatedOccurrences()
+    {
+        return $this->hasMany(self::class, 'repeats_from_id');
+    }
+
+    public function source()
+    {
+        return $this->belongsTo(self::class, 'repeats_from_id');
+    }
+
+    /** True for a rule the user created, false for a generated occurrence. */
+    public function getIsRuleAttribute(): bool
+    {
+        return $this->repeats_monthly && $this->repeats_from_id === null;
+    }
+
+    public function canRepeat(): bool
+    {
+        return $this->type === self::REPEATABLE_TYPE;
+    }
+
+    /**
+     * Creates this closure on the same Jalali day of the coming months.
+     *
+     * Days that do not exist in a given month — the 31st of Mehr, or the 30th
+     * of Esfand in a common year — are skipped rather than silently shifted
+     * onto a neighbouring day.
+     *
+     * Returns the number of occurrences created.
+     */
+    public function generateFutureOccurrences(int $months = self::MONTHS_AHEAD): int
+    {
+        if (! $this->repeats_monthly || ! $this->canRepeat() || $this->repeats_from_id !== null) {
+            return 0;
+        }
+
+        [$year, $month, $day] = array_map(
+            'intval',
+            explode('/', Jalali::format($this->date, 'Y/m/d'))
+        );
+
+        $created = 0;
+
+        for ($offset = 1; $offset <= $months; $offset++) {
+            $m = $month + $offset;
+            $y = $year + (int) floor(($m - 1) / 12);
+            $m = (($m - 1) % 12 + 12) % 12 + 1;
+
+            $date = Jalali::parse(sprintf('%04d/%02d/%02d', $y, $m, $day));
+
+            // Jalali::parse returns null for a day that month does not have.
+            if ($date === null) {
+                continue;
+            }
+
+            // Never overwrite a day the admin has already marked.
+            if (static::whereDate('date', $date->toDateString())->exists()) {
+                continue;
+            }
+
+            static::create([
+                'date' => $date,
+                'title' => $this->title,
+                'type' => $this->type,
+                'repeats_monthly' => false,
+                'repeats_from_id' => $this->id,
+            ]);
+
+            $created++;
+        }
+
+        return $created;
     }
 
     public function getTypeLabelAttribute(): string

@@ -53,6 +53,15 @@ class HolidayResource extends Resource
                         ->columnSpanFull()
                         ->placeholder('مثلاً: عید سعید فطر'),
 
+                    Forms\Components\Toggle::make('repeats_monthly')
+                        ->label('تکرار در ماه‌های بعد')
+                        ->inline(false)
+                        ->onColor('success')
+                        // Official and religious dates move; only a shop
+                        // closure falls on the same day each month.
+                        ->visible(fn (Forms\Get $get) => $get('type') === Holiday::REPEATABLE_TYPE)
+                        ->helperText('همین روز در ۱۲ ماه آینده به‌صورت خودکار ثبت می‌شود.'),
+
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')
                         ->rows(2)
@@ -86,6 +95,22 @@ class HolidayResource extends Resource
                         default => 'warning',
                     }),
 
+                Tables\Columns\TextColumn::make('repeats_monthly')
+                    ->label('تکرار')
+                    ->badge()
+                    ->state(function (Holiday $record) {
+                        if ($record->is_rule) {
+                            return 'ماهانه';
+                        }
+
+                        return $record->repeats_from_id ? 'خودکار' : '—';
+                    })
+                    ->color(fn ($state) => match ($state) {
+                        'ماهانه' => 'success',
+                        'خودکار' => 'info',
+                        default => 'gray',
+                    }),
+
                 Tables\Columns\IconColumn::make('is_past')
                     ->label('گذشته')
                     ->state(fn (Holiday $record) => $record->date->isPast())
@@ -109,6 +134,11 @@ class HolidayResource extends Resource
                 Tables\Filters\Filter::make('upcoming')
                     ->label('فقط پیش‌رو')
                     ->query(fn ($query) => $query->upcoming())
+                    ->toggle(),
+
+                Tables\Filters\Filter::make('recurring')
+                    ->label('فقط تکرارشونده‌ها')
+                    ->query(fn ($query) => $query->where('repeats_monthly', true))
                     ->toggle(),
 
                 Tables\Filters\Filter::make('this_month')

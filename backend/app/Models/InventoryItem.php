@@ -37,6 +37,18 @@ class InventoryItem extends Model
         return round($in - $out, 3);
     }
 
+    /** Flour is handled in sacks, so its balance is also useful in bags. */
+    public function getBalanceBagsAttribute(): ?float
+    {
+        if ($this->key !== self::FLOUR) {
+            return null;
+        }
+
+        $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+
+        return $bagWeight > 0 ? round($this->balance / $bagWeight, 2) : null;
+    }
+
     public function getIsLowAttribute(): bool
     {
         return $this->low_threshold !== null

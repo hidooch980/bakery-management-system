@@ -16,6 +16,7 @@ class ConsignmentFlour extends Model
 
     protected $fillable = [
         'user_id',
+        'customer_id',
         'partner_name',
         'partner_phone',
         'direction',
@@ -37,6 +38,17 @@ class ConsignmentFlour extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function partner()
+    {
+        return $this->belongsTo(Customer::class, 'customer_id');
+    }
+
+    /** The defined partner's name, or the free-text one for older rows. */
+    public function getPartnerLabelAttribute(): string
+    {
+        return $this->partner?->name ?? (string) $this->partner_name;
     }
 
     public function scopeOutstanding($query)

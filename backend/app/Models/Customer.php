@@ -9,8 +9,14 @@ class Customer extends Model
     public const TYPES = [
         'school' => 'مدرسه',
         'office' => 'اداره',
+        'partner' => 'همکار / نانوایی',
         'other' => 'سایر',
     ];
+
+    /** Types that buy bread, as opposed to partner bakeries. */
+    public const BUYER_TYPES = ['school', 'office', 'other'];
+
+    public const PARTNER_TYPE = 'partner';
 
     protected $fillable = [
         'name',
@@ -35,6 +41,21 @@ class Customer extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeBuyers($query)
+    {
+        return $query->whereIn('type', self::BUYER_TYPES);
+    }
+
+    public function scopePartners($query)
+    {
+        return $query->where('type', self::PARTNER_TYPE);
+    }
+
+    public function consignments()
+    {
+        return $this->hasMany(ConsignmentFlour::class);
     }
 
     public function getTypeLabelAttribute(): string

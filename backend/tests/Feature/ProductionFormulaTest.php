@@ -368,6 +368,79 @@ class ProductionFormulaTest extends TestCase
             ->assertJsonPath('data.bag_weight_kg', 40);
     }
 
+    // -------------------------------------------- carry-over (سنوات)
+
+    public function test_carryover_weight_is_derived_from_its_bag_count(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+            'carryover_bags' => 20,
+        ]);
+
+        $allocation->refresh();
+
+        $this->assertSame('3000.000', $allocation->total_kg);
+        $this->assertSame('800.000', $allocation->carryover_kg);
+    }
+
+    public function test_available_total_adds_carryover_to_the_month_quota(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+            'carryover_bags' => 20,
+        ]);
+
+        $this->assertSame(95.0, $allocation->available_bags);
+        $this->assertSame(3800.0, $allocation->available_kg);
+    }
+
+    public function test_carryover_is_not_split_across_the_periods(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+            'carryover_bags' => 30,
+        ]);
+        $allocation->syncPeriods();
+
+        // The periods ration the month's own quota only; carry-over is a
+        // reserve drawn on whenever it is needed.
+        $this->assertSame(3000.0, round((float) $allocation->periods()->sum('allocated_kg'), 3));
+    }
+
+    public function test_admin_records_carryover_through_the_api(): void
+    {
+        $this->actingAs($this->userWithRole('admin'), 'sanctum')
+            ->postJson('/api/v1/flour-allocations', [
+                'month_start' => '1405/05/01',
+                'total_bags' => 75,
+                'carryover_bags' => 20,
+                'carryover_note' => 'مانده سنوات ۱۴۰۴',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.carryover_bags', 20)
+            ->assertJsonPath('data.carryover_kg', 800)
+            ->assertJsonPath('data.available_bags', 95)
+            ->assertJsonPath('data.available_kg', 3800);
+    }
+
+    public function test_carryover_defaults_to_zero(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+
+        $this->assertSame(0.0, (float) $allocation->fresh()->carryover_bags);
+        $this->assertSame(75.0, $allocation->available_bags);
+    }
+
     // ------------------------------------------------- jalali date input
 
     public function test_panel_date_form_stores_a_jalali_date_as_gregorian(): void
