@@ -4,6 +4,7 @@ enum UserRole {
   admin,
   doughMaker,
   chaneGir,
+  shater,
   seller,
   unknown;
 
@@ -11,6 +12,7 @@ enum UserRole {
         'admin' => UserRole.admin,
         'dough_maker' => UserRole.doughMaker,
         'chane_gir' => UserRole.chaneGir,
+        'shater' => UserRole.shater,
         'seller' => UserRole.seller,
         _ => UserRole.unknown,
       };
@@ -19,6 +21,7 @@ enum UserRole {
         UserRole.admin => 'مدیر',
         UserRole.doughMaker => 'خمیرگیر',
         UserRole.chaneGir => 'چانه‌گیر',
+        UserRole.shater => 'شاطر',
         UserRole.seller => 'فروشنده',
         UserRole.unknown => 'نامشخص',
       };

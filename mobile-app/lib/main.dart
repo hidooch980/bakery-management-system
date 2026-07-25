@@ -9,7 +9,8 @@ import 'screens/auth/login_screen.dart';
 import 'screens/chane/chane_home_screen.dart';
 import 'screens/dough/dough_home_screen.dart';
 import 'screens/seller/seller_home_screen.dart';
-import 'screens/shared/admin_home_screen.dart';
+import 'screens/admin/admin_home_screen.dart';
+import 'screens/shater/shater_home_screen.dart';
 import 'services/api_client.dart';
 import 'services/bakery_api.dart';
 import 'theme/app_theme.dart';
@@ -80,6 +81,7 @@ class AppGate extends StatelessWidget {
             UserRole.admin => AdminHomeScreen(api: api),
             UserRole.doughMaker => DoughHomeScreen(api: api),
             UserRole.chaneGir => ChaneHomeScreen(api: api),
+            UserRole.shater => ShaterHomeScreen(api: api),
             UserRole.seller => SellerHomeScreen(api: api),
             _ => const _UnknownRoleScreen(),
           },

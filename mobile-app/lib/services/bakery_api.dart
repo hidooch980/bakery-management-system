@@ -1,4 +1,6 @@
 import '../models/bakery.dart';
+import '../models/chane_board.dart';
+import '../models/customer.dart';
 import '../models/entries.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -102,18 +104,18 @@ class BakeryApi {
 
   // --------------------------------------------------------------- chane
 
+  /// Records chane for a dough batch. Weights are derived server-side from
+  /// the admin's dough formula, so only counts are sent.
   Future<double> recordChane({
     required int doughEntryId,
     required int chaneCount,
-    required double normalWeightKg,
-    required double naninoWeightKg,
+    int naninoChaneCount = 0,
     required double sprayFlourKg,
   }) async {
     final body = await _client.post('/chane-entries', {
       'dough_entry_id': doughEntryId,
       'chane_count': chaneCount,
-      'normal_weight_kg': normalWeightKg,
-      'nanino_weight_kg': naninoWeightKg,
+      'nanino_chane_count': naninoChaneCount,
       'spray_flour_kg': sprayFlourKg,
     });
 
@@ -136,15 +138,29 @@ class BakeryApi {
   Future<void> recordSale({
     required int chaneEntryId,
     required PaymentType paymentType,
+    int? breadCount,
+    int? customerId,
     double? amount,
     String? note,
   }) =>
       _client.post('/sales', {
         'chane_entry_id': chaneEntryId,
         'payment_type': paymentType.apiValue,
+        if (breadCount != null) 'bread_count': breadCount,
+        if (customerId != null) 'customer_id': customerId,
         if (amount != null) 'amount': amount,
         if (note != null && note.isNotEmpty) 'note': note,
       });
+
+  /// Schools and offices the admin has defined, for attributing a sale.
+  Future<List<Customer>> customers() async {
+    final body = await _client.get('/customers');
+
+    return (body['data'] as List)
+        .cast<Map<String, dynamic>>()
+        .map(Customer.fromJson)
+        .toList();
+  }
 
   Future<({List<Sale> sales, int count, double total})> todaySales() async {
     final body = await _client.get('/sales/today');
@@ -159,6 +175,63 @@ class BakeryApi {
       count: (summary['count'] as num).toInt(),
       total: double.tryParse('${summary['total_amount']}') ?? 0,
     );
+  }
+
+  // --------------------------------------------------------------- board
+
+  Future<ChaneBoard> chaneBoard() async {
+    final body = await _client.get('/chane-board');
+
+    return ChaneBoard.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  // --------------------------------------------------------------- admin
+
+  /// Admin dashboard counters for today.
+  Future<Map<String, dynamic>> dashboard() async {
+    final body = await _client.get('/reports/dashboard');
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  /// Income against expenses, with profit, for a date range.
+  Future<Map<String, dynamic>> financialReport({String? from, String? to}) async {
+    final body = await _client.get('/reports/financial', query: {
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> productionReport({String? from, String? to}) async {
+    final body = await _client.get('/reports/production', query: {
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  /// Current stock levels for flour, salt and dough.
+  Future<List<Map<String, dynamic>>> inventory() async {
+    final body = await _client.get('/inventory');
+
+    return (body['data'] as List).cast<Map<String, dynamic>>();
+  }
+
+  /// The flour quota for today's delivery period, or null if none is set.
+  Future<Map<String, dynamic>?> currentFlourAllocation() async {
+    final body = await _client.get('/flour-allocations/current');
+
+    return body['data'] as Map<String, dynamic>?;
+  }
+
+  /// Who checked in today, with their times.
+  Future<List<Map<String, dynamic>>> adminAttendanceToday() async {
+    final body = await _client.get('/reports/attendance');
+
+    return _paginated(body);
   }
 
   // -------------------------------------------------------------- bakery

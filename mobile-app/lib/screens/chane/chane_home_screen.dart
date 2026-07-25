@@ -387,59 +387,45 @@ class _RecordChaneSheet extends StatefulWidget {
 class _RecordChaneSheetState extends State<_RecordChaneSheet> {
   final _formKey = GlobalKey<FormState>();
   final _count = TextEditingController();
-  final _normal = TextEditingController();
-  final _nanino = TextEditingController();
+  final _naninoCount = TextEditingController();
   final _spray = TextEditingController();
 
   bool _saving = false;
 
-  /// Once the user edits a weight by hand, stop overwriting it from the count.
-  bool _weightsTouched = false;
-
   @override
   void initState() {
     super.initState();
-    // Live total as the two chane weights are typed.
-    _normal.addListener(_refreshTotal);
-    _nanino.addListener(_refreshTotal);
-    _count.addListener(_suggestWeights);
+    // The weights below are derived, so redraw whenever a count changes.
+    _count.addListener(_refreshTotal);
+    _naninoCount.addListener(_refreshTotal);
   }
 
-  /// Fills the two weights from `count × per-chane weight` configured by the
-  /// admin, so the common case needs one number instead of three.
-  void _suggestWeights() {
-    if (_weightsTouched) return;
+  /// Weight of the normal chane entered so far, from the shop's formula.
+  double get _normalWeight {
+    final perChane = widget.bakery?.normalChaneWeightKg ?? 0;
+    final count = int.tryParse(_count.text) ?? 0;
 
-    final bakery = widget.bakery;
-    if (bakery == null || !bakery.hasChaneWeights) return;
+    return count * perChane;
+  }
 
-    final count = int.tryParse(_count.text);
-    if (count == null || count <= 0) return;
+  double get _naninoWeight {
+    final perChane = widget.bakery?.naninoChaneWeightKg ?? 0;
+    final count = int.tryParse(_naninoCount.text) ?? 0;
 
-    final normal = bakery.normalChaneWeightKg;
-    final nanino = bakery.naninoChaneWeightKg;
-
-    if (normal != null && normal > 0) {
-      _normal.text = (count * normal).toStringAsFixed(2);
-    }
-    if (nanino != null && nanino > 0) {
-      _nanino.text = (count * nanino).toStringAsFixed(2);
-    }
+    return count * perChane;
   }
 
   @override
   void dispose() {
     _count.dispose();
-    _normal.dispose();
-    _nanino.dispose();
+    _naninoCount.dispose();
     _spray.dispose();
     super.dispose();
   }
 
   void _refreshTotal() => setState(() {});
 
-  double get _total =>
-      (double.tryParse(_normal.text) ?? 0) + (double.tryParse(_nanino.text) ?? 0);
+  double get _total => _normalWeight + _naninoWeight;
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -450,8 +436,7 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
       final total = await widget.api.recordChane(
         doughEntryId: widget.dough.id,
         chaneCount: int.parse(_count.text),
-        normalWeightKg: double.parse(_normal.text),
-        naninoWeightKg: double.parse(_nanino.text),
+        naninoChaneCount: int.tryParse(_naninoCount.text) ?? 0,
         sprayFlourKg: double.parse(_spray.text),
       );
 
@@ -465,14 +450,6 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  /// Shows the configured per-chane weight under the field, so the user can
-  /// see where the pre-filled number came from.
-  String? _perChaneHint(double? perChane) {
-    if (perChane == null || perChane <= 0) return null;
-
-    return 'محاسبه‌شده از ${perChane.toStringAsFixed(3)} کیلوگرم برای هر چانه';
   }
 
   String? _requiredNumber(String? value, {bool allowZero = true}) {
@@ -543,31 +520,31 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: _normal,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (_) => _weightsTouched = true,
-                  decoration: InputDecoration(
-                    labelText: 'وزن چانه عادی',
-                    prefixIcon: const Icon(Icons.scale_rounded),
-                    suffixText: 'کیلوگرم',
-                    helperText: _perChaneHint(widget.bakery?.normalChaneWeightKg),
+                  controller: _naninoCount,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'تعداد چانه نانینو (اختیاری)',
+                    prefixIcon: Icon(Icons.precision_manufacturing_rounded),
+                    suffixText: 'عدد',
                   ),
-                  validator: _requiredNumber,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return null;
+                    final parsed = int.tryParse(value);
+                    if (parsed == null || parsed < 0) return 'یک عدد معتبر وارد کنید';
+                    return null;
+                  },
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _nanino,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (_) => _weightsTouched = true,
-                  decoration: InputDecoration(
-                    labelText: 'وزن چانه سیستم نانینو',
-                    prefixIcon: const Icon(Icons.precision_manufacturing_rounded),
-                    suffixText: 'کیلوگرم',
-                    helperText: _perChaneHint(widget.bakery?.naninoChaneWeightKg),
-                  ),
-                  validator: _requiredNumber,
+                const SizedBox(height: 20),
+
+                // Weights come from the admin's dough formula and cannot be
+                // edited here, so they are shown rather than entered.
+                _DerivedWeights(
+                  normalWeight: _normalWeight,
+                  naninoWeight: _naninoWeight,
+                  normalPerChane: widget.bakery?.normalChaneWeightKg,
+                  naninoPerChane: widget.bakery?.naninoChaneWeightKg,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 TextFormField(
                   controller: _spray,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -626,6 +603,145 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Read-only weights derived from the admin's dough formula.
+///
+/// The chane gir enters counts; the weights follow from the recipe, so they
+/// are displayed rather than typed and cannot drift from it.
+class _DerivedWeights extends StatelessWidget {
+  const _DerivedWeights({
+    required this.normalWeight,
+    required this.naninoWeight,
+    this.normalPerChane,
+    this.naninoPerChane,
+  });
+
+  final double normalWeight;
+  final double naninoWeight;
+  final double? normalPerChane;
+  final double? naninoPerChane;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    if ((normalPerChane ?? 0) <= 0) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: scheme.errorContainer.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: scheme.error),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'وزن هر چانه در تنظیمات نانوایی تعریف نشده است. '
+                'تا تعریف نشود، ثبت چانه ممکن نیست.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lock_outline_rounded, size: 16, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Text(
+                'وزن‌های محاسبه‌شده از فرمول',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _WeightRow(
+            label: 'وزن چانه عادی',
+            weight: normalWeight,
+            perChane: normalPerChane,
+            color: const Color(0xFFE8952D),
+          ),
+          if ((naninoPerChane ?? 0) > 0) ...[
+            const SizedBox(height: 10),
+            _WeightRow(
+              label: 'وزن چانه نانینو',
+              weight: naninoWeight,
+              perChane: naninoPerChane,
+              color: const Color(0xFF3B82C4),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WeightRow extends StatelessWidget {
+  const _WeightRow({
+    required this.label,
+    required this.weight,
+    required this.color,
+    this.perChane,
+  });
+
+  final String label;
+  final double weight;
+  final Color color;
+  final double? perChane;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.bodyMedium),
+              if (perChane != null)
+                Text(
+                  'هر چانه ${perChane!.toStringAsFixed(3)} کیلوگرم',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+            ],
+          ),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: Text(
+            '${weight.toStringAsFixed(2)} kg',
+            key: ValueKey(weight),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+          ),
+        ),
+      ],
     );
   }
 }
