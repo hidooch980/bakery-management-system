@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ChaneEntryResource\Pages;
 use App\Models\ChaneEntry;
+use App\Support\DoughFormula;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -50,11 +51,27 @@ class ChaneEntryResource extends Resource
                         ->native(false),
 
                     Forms\Components\TextInput::make('chane_count')
-                        ->label('تعداد چانه')
+                        ->label('تعداد چانه عادی')
                         ->numeric()
                         ->minValue(1)
                         ->required()
-                        ->suffix('عدد'),
+                        ->live(onBlur: true)
+                        ->suffix('عدد')
+                        ->helperText('ملاک فروش، موجودی و گزارش‌ها'),
+
+                    // Not a database column — a separate count purely for the
+                    // nanino display weight below, exactly like the mobile
+                    // app's chane gir screen. Nanino has no count column of
+                    // its own; only the weight it derives to is stored.
+                    Forms\Components\TextInput::make('nanino_chane_count')
+                        ->label('تعداد چانه نانینو')
+                        ->numeric()
+                        ->minValue(0)
+                        ->default(0)
+                        ->live(onBlur: true)
+                        ->suffix('عدد')
+                        ->helperText('نمایشی؛ در موجودی و فروش دخالتی ندارد')
+                        ->dehydrated(false),
 
                     Forms\Components\Select::make('status')
                         ->label('وضعیت')
@@ -65,22 +82,31 @@ class ChaneEntryResource extends Resource
                 ]),
 
             Forms\Components\Section::make('اوزان (کیلوگرم)')
+                ->description('وزن از تعداد چانه × وزن هر چانه در «اطلاعات نانوایی» محاسبه می‌شود — قابل ویرایش دستی نیست، تا هیچ‌گاه با فرمول تولید در تناقض نباشد.')
                 ->icon('heroicon-o-scale')
                 ->columns(3)
                 ->schema([
-                    Forms\Components\TextInput::make('normal_weight_kg')
+                    Forms\Components\Placeholder::make('normal_weight_preview')
                         ->label('وزن چانه عادی')
-                        ->numeric()
-                        ->minValue(0)
-                        ->required()
-                        ->suffix('kg'),
+                        ->content(function (Forms\Get $get) {
+                            $weight = DoughFormula::fromBakery()
+                                ->weightForNormalChane((int) ($get('chane_count') ?: 0));
 
-                    Forms\Components\TextInput::make('nanino_weight_kg')
+                            return $weight === null
+                                ? 'وزن هر چانه عادی در تنظیمات ثبت نشده است'
+                                : number_format($weight, 2).' kg';
+                        }),
+
+                    Forms\Components\Placeholder::make('nanino_weight_preview')
                         ->label('وزن چانه نانینو')
-                        ->numeric()
-                        ->minValue(0)
-                        ->required()
-                        ->suffix('kg'),
+                        ->content(function (Forms\Get $get) {
+                            $weight = DoughFormula::fromBakery()
+                                ->weightForNaninoChane((int) ($get('nanino_chane_count') ?: 0));
+
+                            return $weight === null
+                                ? 'وزن هر چانه نانینو در تنظیمات ثبت نشده است'
+                                : number_format($weight, 2).' kg';
+                        }),
 
                     Forms\Components\TextInput::make('spray_flour_kg')
                         ->label('آرد پاششی مصرفی')
@@ -88,6 +114,36 @@ class ChaneEntryResource extends Resource
                         ->minValue(0)
                         ->required()
                         ->suffix('kg'),
+
+                    Forms\Components\Placeholder::make('comparison_preview')
+                        ->label('مقایسه عادی / نانینو')
+                        ->columnSpanFull()
+                        ->content(function (Forms\Get $get) {
+                            $formula = DoughFormula::fromBakery();
+                            $normalCount = (int) ($get('chane_count') ?: 0);
+                            $naninoCount = (int) ($get('nanino_chane_count') ?: 0);
+
+                            if ($normalCount === 0 && $naninoCount === 0) {
+                                return '—';
+                            }
+
+                            $normalWeight = $formula->weightForNormalChane($normalCount) ?? 0;
+                            $naninoWeight = $formula->weightForNaninoChane($naninoCount) ?? 0;
+                            $total = $normalCount + $naninoCount;
+
+                            $normalShare = $total > 0 ? round($normalCount / $total * 100) : 0;
+                            $naninoShare = $total > 0 ? round($naninoCount / $total * 100) : 0;
+
+                            return sprintf(
+                                'عادی: %d عدد (%s kg) — %d٪   •   نانینو: %d عدد (%s kg) — %d٪',
+                                $normalCount,
+                                number_format($normalWeight, 1),
+                                $normalShare,
+                                $naninoCount,
+                                number_format($naninoWeight, 1),
+                                $naninoShare,
+                            );
+                        }),
                 ]),
         ]);
     }

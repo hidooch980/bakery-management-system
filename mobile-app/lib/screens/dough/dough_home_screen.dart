@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/sync_status_card.dart';
 import '../../widgets/common.dart';
 import '../shared/settings_screen.dart';
 
@@ -81,6 +82,8 @@ class _DoughHomeScreenState extends State<DoughHomeScreen> {
                     ?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 20),
+              SyncStatusCard(api: widget.api),
+              const SizedBox(height: 14),
               AttendanceCard(api: widget.api),
               const SizedBox(height: 24),
               Text(
@@ -237,14 +240,19 @@ class _RecordDoughSheetState extends State<_RecordDoughSheet> {
     setState(() => _saving = true);
 
     try {
-      await widget.api.recordDough(
+      final queued = await widget.api.recordDough(
         bagCount: int.parse(_bagController.text),
         note: _noteController.text.trim(),
       );
 
       if (!mounted) return;
       Navigator.pop(context, true);
-      showMessage(context, 'ثبت خمیر انجام شد.');
+      showMessage(
+        context,
+        queued
+            ? 'اینترنت وصل نیست؛ ثبت خمیر ذخیره شد و با اتصال بعدی ارسال می‌شود.'
+            : 'ثبت خمیر انجام شد.',
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       showMessage(context, e.message, isError: true);

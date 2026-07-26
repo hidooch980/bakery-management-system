@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/sync_status_card.dart';
 import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
@@ -134,7 +135,9 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
                         ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 14),
-                  AttendanceCard(api: widget.api),
+                  SyncStatusCard(api: widget.api),
+              const SizedBox(height: 14),
+              AttendanceCard(api: widget.api),
 
                   const SizedBox(height: 14),
                   WorkStartCard(api: widget.api),
@@ -455,7 +458,7 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
     setState(() => _saving = true);
 
     try {
-      final total = await widget.api.recordChane(
+      final result = await widget.api.recordChane(
         doughEntryId: widget.dough.id,
         chaneCount: int.parse(_count.text),
         naninoChaneCount: int.tryParse(_naninoCount.text) ?? 0,
@@ -464,8 +467,13 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
 
       if (!mounted) return;
       Navigator.pop(context, true);
-      showMessage(context,
-          'ثبت چانه انجام شد. وزن کل: ${total.toStringAsFixed(2)} کیلوگرم');
+      showMessage(
+        context,
+        result.queued
+            ? 'اینترنت وصل نیست؛ ثبت چانه ذخیره شد و با اتصال بعدی ارسال می‌شود.'
+            : 'ثبت چانه انجام شد. وزن کل: '
+                '${result.weightKg!.toStringAsFixed(2)} کیلوگرم',
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       showMessage(context, e.message, isError: true);

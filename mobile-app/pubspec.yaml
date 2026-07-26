@@ -40,6 +40,8 @@ dependencies:
   android_intent_plus: ^5.2.0
   device_info_plus: ^11.2.0
   local_auth: ^3.0.2
+  connectivity_plus: ^7.3.0
+  uuid: ^4.6.0
 
 dev_dependencies:
   flutter_test:

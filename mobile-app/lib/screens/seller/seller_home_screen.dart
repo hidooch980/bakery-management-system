@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/sync_status_card.dart';
 import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
@@ -172,7 +173,9 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                         ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 14),
-                  AttendanceCard(api: widget.api),
+                  SyncStatusCard(api: widget.api),
+              const SizedBox(height: 14),
+              AttendanceCard(api: widget.api),
 
                   const SizedBox(height: 14),
                   WorkStartCard(api: widget.api),
@@ -492,7 +495,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     try {
       final typed = _amount.text.isEmpty ? null : double.tryParse(_amount.text);
 
-      await widget.api.recordSale(
+      final queued = await widget.api.recordSale(
         chaneEntryId: widget.chane.id,
         paymentType: _paymentType!,
         breadCount: _enteredBreadCount,
@@ -503,7 +506,12 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
       if (!mounted) return;
       Navigator.pop(context, true);
-      showMessage(context, 'فروش ثبت شد.');
+      showMessage(
+        context,
+        queued
+            ? 'اینترنت وصل نیست؛ فروش ذخیره شد و با اتصال بعدی ارسال می‌شود.'
+            : 'فروش ثبت شد.',
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       showMessage(context, e.message, isError: true);

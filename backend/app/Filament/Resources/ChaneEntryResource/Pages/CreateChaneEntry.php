@@ -3,12 +3,32 @@
 namespace App\Filament\Resources\ChaneEntryResource\Pages;
 
 use App\Filament\Resources\ChaneEntryResource;
+use App\Support\DoughFormula;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateChaneEntry extends CreateRecord
 {
     protected static string $resource = ChaneEntryResource::class;
+
+    /**
+     * Weight is never typed — it is always the count times the bakery's
+     * configured per-chane weight, the same authority the mobile app's
+     * chane gir screen answers to. nanino_chane_count is a form-only field
+     * (dehydrated(false), no database column of its own); its weight is
+     * derived here rather than trusted from any other source.
+     */
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $formula = DoughFormula::fromBakery();
+
+        $data['normal_weight_kg'] = $formula->weightForNormalChane((int) $data['chane_count']) ?? 0;
+        $data['nanino_weight_kg'] = $formula->weightForNaninoChane(
+            (int) ($this->data['nanino_chane_count'] ?? 0)
+        ) ?? 0;
+
+        return $data;
+    }
 
     // Filament's default sends the admin to the edit page after creating,
     // which — inconsistently applied across the panel — read like a broken

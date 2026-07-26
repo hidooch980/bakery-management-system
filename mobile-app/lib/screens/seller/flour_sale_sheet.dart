@@ -7,6 +7,7 @@ import '../../models/flour_sale.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/common.dart';
 
 /// Sells flour out of the warehouse, by the kilo or by the sack.
 ///
@@ -143,7 +144,7 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
     });
 
     try {
-      await widget.api.recordFlourSale(
+      final result = await widget.api.recordFlourSale(
         unit: _unit,
         quantity: _quantity,
         paymentType: _paymentType,
@@ -152,7 +153,16 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
         note: _noteController.text.trim(),
       );
 
-      if (mounted) Navigator.pop(context, true);
+      if (!mounted) return;
+
+      Navigator.pop(context, true);
+
+      if (result.queued) {
+        showMessage(
+          context,
+          'اینترنت وصل نیست؛ فروش آرد ذخیره شد و با اتصال بعدی ارسال می‌شود.',
+        );
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {

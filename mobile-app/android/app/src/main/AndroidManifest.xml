@@ -5,6 +5,8 @@
     <!-- Fingerprint and face unlock. Not required hardware: the app falls
          back to the password form on a device without a sensor. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <!-- Offline queue: detects reconnection to trigger an automatic sync. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <application
         android:label="مدیریت نانوایی"
         android:name="${applicationName}"

@@ -48,13 +48,18 @@ class _AttendanceCardState extends State<AttendanceCard> {
     setState(() => _submitting = true);
 
     try {
-      final record = await widget.api.checkIn();
+      final result = await widget.api.checkIn();
       if (!mounted) return;
       setState(() {
         _checkedIn = true;
-        _checkedInAt = record.checkedInAt;
+        _checkedInAt = result.record?.checkedInAt ?? DateTime.now();
       });
-      showMessage(context, 'تیک حضور شما ثبت شد.');
+      showMessage(
+        context,
+        result.queued
+            ? 'اینترنت وصل نیست؛ حضور شما ذخیره شد و با اتصال بعدی ثبت می‌شود.'
+            : 'تیک حضور شما ثبت شد.',
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       showMessage(context, e.message, isError: true);

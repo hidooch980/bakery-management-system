@@ -1,13 +1,27 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
+
+import 'offline_queue.dart';
 
 /// Thrown for any non-2xx API response, carrying the backend's Persian message.
 class ApiException implements Exception {
-  ApiException(this.message, {this.statusCode, this.errors});
+  ApiException(
+    this.message, {
+    this.statusCode,
+    this.errors,
+    this.isConnectivityError = false,
+  });
 
   final String message;
   final int? statusCode;
   final Map<String, dynamic>? errors;
+
+  /// True when the request never reached the server at all — no signal, DNS
+  /// failure, timeout — as opposed to the server answering with an error.
+  /// Only this kind of failure is worth queueing for a later retry; a
+  /// validation error or a 409 would just fail again identically.
+  final bool isConnectivityError;
 
   bool get isUnauthorized => statusCode == 401;
 
@@ -55,6 +69,8 @@ class ApiClient {
 
   final Dio _dio;
   final _storage = const FlutterSecureStorage();
+  final _queue = OfflineQueue();
+  static const _uuid = Uuid();
 
   Future<void> saveToken(String token) =>
       _storage.write(key: _tokenKey, value: token);
@@ -76,10 +92,81 @@ class ApiClient {
     return _unwrap(await _send(() => _dio.put(path, data: body)));
   }
 
+  OfflineQueue get queue => _queue;
+
+  /// Same as [post], except a connectivity-level failure — no signal, not a
+  /// validation error from the server — is queued locally instead of
+  /// thrown. The shop floor keeps working; nothing is lost, it is just sent
+  /// once [syncQueue] next succeeds.
+  ///
+  /// [label] is what a "پیش‌نویس‌های ارسال‌نشده" list shows for this entry.
+  /// The returned map always has 'queued': true when the record was saved
+  /// locally rather than sent, so the caller can tell the user which
+  /// happened.
+  Future<Map<String, dynamic>> postOrQueue(
+    String path,
+    Map<String, dynamic> body, {
+    required String label,
+  }) async {
+    try {
+      final response = await post(path, body);
+      return {...response, 'queued': false};
+    } on ApiException catch (e) {
+      if (!e.isConnectivityError) rethrow;
+
+      await _queue.enqueue(QueuedRequest(
+        id: _uuid.v4(),
+        path: path,
+        body: body,
+        label: label,
+        createdAt: DateTime.now(),
+      ));
+
+      return {'success': true, 'queued': true, 'data': body};
+    }
+  }
+
+  /// Resends everything queued, in the order it was recorded. Stops at the
+  /// first connectivity failure (still offline) rather than reordering
+  /// what is left; a real server error drops just that one entry, since
+  /// retrying it unchanged would only fail the same way again.
+  Future<({int sent, int failed, int remaining})> syncQueue() async {
+    var sent = 0;
+    var failed = 0;
+
+    for (final item in await _queue.all()) {
+      try {
+        await post(item.path, item.body);
+        await _queue.remove(item.id);
+        sent++;
+      } on ApiException catch (e) {
+        if (e.isConnectivityError) {
+          break; // Still offline — leave the rest queued for next time.
+        }
+
+        // The server rejected it outright (e.g. stale reference); keeping
+        // it would just fail forever and hide anything queued after it.
+        await _queue.remove(item.id);
+        failed++;
+      }
+    }
+
+    return (sent: sent, failed: failed, remaining: await _queue.count());
+  }
+
   Future<Response<dynamic>> _send(Future<Response<dynamic>> Function() call) async {
     try {
       return await call();
     } on DioException catch (e) {
+      final isConnectivity = switch (e.type) {
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.receiveTimeout ||
+        DioExceptionType.sendTimeout ||
+        DioExceptionType.connectionError =>
+          true,
+        _ => false,
+      };
+
       throw ApiException(
         switch (e.type) {
           DioExceptionType.connectionTimeout ||
@@ -89,6 +176,7 @@ class ApiClient {
             'سرور در دسترس نیست. آدرس سرور را بررسی کنید.',
           _ => 'خطا در ارتباط با سرور.',
         },
+        isConnectivityError: isConnectivity,
       );
     }
   }

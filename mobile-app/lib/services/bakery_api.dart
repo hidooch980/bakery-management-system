@@ -6,6 +6,7 @@ import '../models/flour_sale.dart';
 import '../models/user.dart';
 import '../models/work_start.dart';
 import 'api_client.dart';
+import 'offline_queue.dart';
 
 /// Typed wrapper over every endpoint the mobile app uses.
 class BakeryApi {
@@ -66,9 +67,22 @@ class BakeryApi {
 
   // ---------------------------------------------------------- attendance
 
-  Future<AttendanceRecord> checkIn() async {
-    final body = await _client.post('/attendance/check-in');
-    return AttendanceRecord.fromJson(body['data'] as Map<String, dynamic>);
+  /// Queued for a later sync when there is no signal — a check-in with no
+  /// server-assigned time yet still counts as "I was here", so it must
+  /// never be blocked by connectivity.
+  Future<({AttendanceRecord? record, bool queued})> checkIn() async {
+    final body = await _client.postOrQueue(
+      '/attendance/check-in',
+      const {},
+      label: 'حضور و غیاب',
+    );
+
+    if (body['queued'] == true) return (record: null, queued: true);
+
+    return (
+      record: AttendanceRecord.fromJson(body['data'] as Map<String, dynamic>),
+      queued: false,
+    );
   }
 
   Future<({bool checkedIn, DateTime? at})> attendanceToday() async {
@@ -88,11 +102,21 @@ class BakeryApi {
 
   // --------------------------------------------------------------- dough
 
-  Future<void> recordDough({required int bagCount, String? note}) =>
-      _client.post('/dough-entries', {
+  /// Returns true when there was no signal and the entry was saved to the
+  /// offline queue instead of sent — the caller shows a different message
+  /// but the flow is otherwise identical.
+  Future<bool> recordDough({required int bagCount, String? note}) async {
+    final body = await _client.postOrQueue(
+      '/dough-entries',
+      {
         'bag_count': bagCount,
         if (note != null && note.isNotEmpty) 'note': note,
-      });
+      },
+      label: 'خمیر — $bagCount کیسه',
+    );
+
+    return body['queued'] == true;
+  }
 
   Future<List<DoughEntry>> myDoughHistory() async {
     final body = await _client.get('/dough-entries/my-history');
@@ -108,21 +132,33 @@ class BakeryApi {
 
   /// Records chane for a dough batch. Weights are derived server-side from
   /// the admin's dough formula, so only counts are sent.
-  Future<double> recordChane({
+  ///
+  /// [weightKg] is null when the entry was queued offline: the formula
+  /// lives on the server, so there is no weight to show until it syncs.
+  Future<({double? weightKg, bool queued})> recordChane({
     required int doughEntryId,
     required int chaneCount,
     int naninoChaneCount = 0,
     required double sprayFlourKg,
   }) async {
-    final body = await _client.post('/chane-entries', {
-      'dough_entry_id': doughEntryId,
-      'chane_count': chaneCount,
-      'nanino_chane_count': naninoChaneCount,
-      'spray_flour_kg': sprayFlourKg,
-    });
+    final body = await _client.postOrQueue(
+      '/chane-entries',
+      {
+        'dough_entry_id': doughEntryId,
+        'chane_count': chaneCount,
+        'nanino_chane_count': naninoChaneCount,
+        'spray_flour_kg': sprayFlourKg,
+      },
+      label: 'چانه — $chaneCount عدد',
+    );
+
+    if (body['queued'] == true) return (weightKg: null, queued: true);
 
     final data = body['data'] as Map<String, dynamic>;
-    return double.tryParse('${data['total_weight_kg']}') ?? 0;
+    return (
+      weightKg: double.tryParse('${data['total_weight_kg']}') ?? 0,
+      queued: false,
+    );
   }
 
   Future<List<ChaneEntry>> myChaneHistory() async {
@@ -137,22 +173,32 @@ class BakeryApi {
 
   // --------------------------------------------------------------- sales
 
-  Future<void> recordSale({
+  /// The chane batch being sold was already fetched from the server (the
+  /// seller only ever sees pending chane loaded while online), so its id
+  /// is always real — queueing the sale itself offline is safe.
+  Future<bool> recordSale({
     required int chaneEntryId,
     required PaymentType paymentType,
     int? breadCount,
     int? customerId,
     double? amount,
     String? note,
-  }) =>
-      _client.post('/sales', {
+  }) async {
+    final body = await _client.postOrQueue(
+      '/sales',
+      {
         'chane_entry_id': chaneEntryId,
         'payment_type': paymentType.apiValue,
         if (breadCount != null) 'bread_count': breadCount,
         if (customerId != null) 'customer_id': customerId,
         if (amount != null) 'amount': amount,
         if (note != null && note.isNotEmpty) 'note': note,
-      });
+      },
+      label: 'فروش — چانه #$chaneEntryId',
+    );
+
+    return body['queued'] == true;
+  }
 
   /// Schools and offices the admin has defined, for attributing a sale.
   Future<List<Customer>> customers() async {
@@ -190,7 +236,10 @@ class BakeryApi {
 
   /// Sells flour by the kilo or by the sack. The weight and the total are
   /// worked out server-side, so only the quantity and rate go up.
-  Future<FlourSale> recordFlourSale({
+  /// [sale] is null when queued offline — the warehouse balance check that
+  /// guards this endpoint runs on the server, so a queued sale is only
+  /// checked against stock once it actually syncs.
+  Future<({FlourSale? sale, bool queued})> recordFlourSale({
     required FlourUnit unit,
     required double quantity,
     required PaymentType paymentType,
@@ -198,16 +247,25 @@ class BakeryApi {
     int? customerId,
     String? note,
   }) async {
-    final body = await _client.post('/flour-sales', {
-      'unit': unit.apiValue,
-      'quantity': quantity,
-      'payment_type': paymentType.apiValue,
-      if (unitPrice != null) 'unit_price': unitPrice,
-      if (customerId != null) 'customer_id': customerId,
-      if (note != null && note.isNotEmpty) 'note': note,
-    });
+    final body = await _client.postOrQueue(
+      '/flour-sales',
+      {
+        'unit': unit.apiValue,
+        'quantity': quantity,
+        'payment_type': paymentType.apiValue,
+        if (unitPrice != null) 'unit_price': unitPrice,
+        if (customerId != null) 'customer_id': customerId,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+      label: 'فروش آرد — ${unit.label}',
+    );
 
-    return FlourSale.fromJson(body['data'] as Map<String, dynamic>);
+    if (body['queued'] == true) return (sale: null, queued: true);
+
+    return (
+      sale: FlourSale.fromJson(body['data'] as Map<String, dynamic>),
+      queued: false,
+    );
   }
 
   Future<
@@ -243,16 +301,27 @@ class BakeryApi {
   }
 
   /// Ticks the start of an activity. Lateness is decided server-side against
-  /// the configured deadline, never by the phone's clock.
-  Future<({WorkStartBoard board, bool isLate, String? warning})>
+  /// the configured deadline, never by the phone's clock — so when this is
+  /// queued offline, whether it was late is only known once it syncs.
+  Future<({WorkStartBoard? board, bool isLate, String? warning, bool queued})>
       recordWorkStart(WorkStartType type) async {
-    final body = await _client.post('/work-starts', {'type': type.apiValue});
+    final body = await _client.postOrQueue(
+      '/work-starts',
+      {'type': type.apiValue},
+      label: type.label,
+    );
+
+    if (body['queued'] == true) {
+      return (board: null, isLate: false, warning: null, queued: true);
+    }
+
     final data = body['data'] as Map<String, dynamic>;
 
     return (
       board: WorkStartBoard.fromJson(data['board'] as Map<String, dynamic>),
       isLate: data['is_late'] == true,
       warning: data['warning'] as String?,
+      queued: false,
     );
   }
 
@@ -331,6 +400,18 @@ class BakeryApi {
 
     return data == null ? null : Bakery.fromJson(data);
   }
+
+  // -------------------------------------------------------- offline sync
+
+  /// Entries recorded with no signal, waiting to be sent.
+  Future<List<QueuedRequest>> pendingSync() => _client.queue.all();
+
+  Future<int> pendingSyncCount() => _client.queue.count();
+
+  /// Resends everything queued. Safe to call whenever — with nothing
+  /// queued it is a no-op, and mid-sync it just picks up where it left off.
+  Future<({int sent, int failed, int remaining})> syncPending() =>
+      _client.syncQueue();
 
   /// Laravel paginators nest the rows under `data.data`; plain lists don't.
   List<Map<String, dynamic>> _paginated(Map<String, dynamic> body) {

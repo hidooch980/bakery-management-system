@@ -61,17 +61,26 @@ class _WorkStartCardState extends State<WorkStartCard> {
       if (!mounted) return;
 
       setState(() {
-        _board = result.board;
+        // Queued offline: the board is unknown until it syncs, so the
+        // last-known board stays on screen rather than being blanked.
+        if (result.board != null) _board = result.board;
         _submitting = null;
       });
 
-      // A late tick is reported as an error so it is not mistaken for a
-      // routine confirmation.
-      showMessage(
-        context,
-        result.warning ?? '${item.label} ثبت شد.',
-        isError: result.isLate,
-      );
+      if (result.queued) {
+        showMessage(
+          context,
+          'اینترنت وصل نیست؛ ${item.label} ذخیره شد و با اتصال بعدی ارسال می‌شود.',
+        );
+      } else {
+        // A late tick is reported as an error so it is not mistaken for a
+        // routine confirmation.
+        showMessage(
+          context,
+          result.warning ?? '${item.label} ثبت شد.',
+          isError: result.isLate,
+        );
+      }
 
       widget.onChanged?.call();
     } on ApiException catch (e) {
