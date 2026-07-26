@@ -6,7 +6,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -42,19 +42,20 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth('full')
             // Shop settings sit at the top: the formula, bag weight and
-            // currency there drive every other screen's numbers.
+            // currency there drive every other screen's numbers. Only the
+            // two groups used every day start open; the rest collapse so
+            // the sidebar isn't a long wall of links on first glance.
             ->navigationGroups([
-                'تنظیمات',
-                'تولید و فروش',
-                'انبار',
-                'امور مالی',
-                'کارکنان',
+                NavigationGroup::make('تنظیمات'),
+                NavigationGroup::make('تولید و فروش'),
+                NavigationGroup::make('انبار')->collapsed(),
+                NavigationGroup::make('امور مالی')->collapsed(),
+                NavigationGroup::make('کارکنان')->collapsed(),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            // The curated Dashboard below lives in this same directory, so
+            // discovery picks it up — no need to also register it by hand.
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
-            ->pages([
-                Pages\Dashboard::class,
-            ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 Widgets\AccountWidget::class,

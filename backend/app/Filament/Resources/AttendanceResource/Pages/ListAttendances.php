@@ -16,4 +16,11 @@ class ListAttendances extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            \App\Filament\Widgets\TodayAttendanceTable::class,
+        ];
+    }
 }

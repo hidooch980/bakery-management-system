@@ -14,4 +14,11 @@ class ListWorkStarts extends ListRecords
     {
         return [Actions\CreateAction::make()->label('ثبت دستی')];
     }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            \App\Filament\Widgets\WorkStartTable::class,
+        ];
+    }
 }

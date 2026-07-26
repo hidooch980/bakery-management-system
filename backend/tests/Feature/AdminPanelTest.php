@@ -181,6 +181,15 @@ class AdminPanelTest extends TestCase
         ]);
 
         $this->actingAs($admin)->get('/admin')->assertOk();
+
+        // The widgets exercised above no longer all live on the dashboard —
+        // several moved to the list page of the resource they're actually
+        // about, so this data needs to reach them there instead.
+        $this->actingAs($admin)->get('/admin/sales')->assertOk();
+        $this->actingAs($admin)->get('/admin/expenses')->assertOk();
+        $this->actingAs($admin)->get('/admin/attendances')->assertOk();
+        $this->actingAs($admin)->get('/admin/bank-accounts')->assertOk();
+        $this->actingAs($admin)->get('/admin/work-starts')->assertOk();
     }
 
     public function test_non_admin_staff_cannot_access_panel(): void

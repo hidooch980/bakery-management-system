@@ -14,4 +14,11 @@ class ListBankAccounts extends ListRecords
     {
         return [Actions\CreateAction::make()->label('تعریف حساب')];
     }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            \App\Filament\Widgets\BankBalanceOverview::class,
+        ];
+    }
 }
