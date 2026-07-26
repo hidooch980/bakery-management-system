@@ -96,12 +96,14 @@ class ReportController extends Controller
     }
 
     /**
-     * How many dough entries (batches) and bags were recorded each day in
-     * the range. Capped the same way financialTrend is, so an unbounded
-     * range cannot blow up the response.
+     * What each day in the range produced: the dough kneaded, and the bread
+     * baked from it counting both systems. Capped the same way
+     * financialTrend is, so an unbounded range cannot blow up the response.
      */
     private function dailyDoughCounts($from, $to): array
     {
+        $formula = \App\Support\DoughFormula::fromBakery();
+
         $days = collect();
         $cursor = $from->copy()->startOfDay();
 
@@ -109,12 +111,23 @@ class ReportController extends Controller
             $date = $cursor->toDateString();
 
             $entries = DoughEntry::whereDate('created_at', $date)->get();
+            $chane = ChaneEntry::whereDate('created_at', $date)->get();
+
+            // Nanino is stored as a weight, so the loaf count is derived
+            // the same way every other screen derives it.
+            $normalCount = (int) $chane->sum('chane_count');
+            $naninoCount = $formula->naninoCountForWeight(
+                (float) $chane->sum('nanino_weight_kg')
+            );
 
             $days->push([
                 'date' => $date,
                 'date_display' => \App\Support\Jalali::date($cursor),
                 'dough_entries' => $entries->count(),
                 'dough_bags' => (int) $entries->sum('bag_count'),
+                'normal_chane_count' => $normalCount,
+                'nanino_chane_count' => $naninoCount,
+                'total_bread_count' => $normalCount + $naninoCount,
             ]);
 
             $cursor->addDay();

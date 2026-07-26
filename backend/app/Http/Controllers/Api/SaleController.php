@@ -53,6 +53,15 @@ class SaleController extends Controller
             // typed away.
             $shortfallCount = max(0, $chane->chane_count - $breadCount);
             $breadPrice = (float) (Bakery::first()->bread_price ?? 0);
+            $amount = $data['amount'] ?? null;
+
+            // How far the money taken sits from what this bread should have
+            // cost. Frozen here rather than recomputed, so a later price
+            // change cannot rewrite what a seller already owed. Left null
+            // when there is no price or no amount to compare against.
+            $difference = ($amount === null || $breadPrice <= 0)
+                ? null
+                : round((float) $amount - $breadCount * $breadPrice, 2);
 
             $sale = Sale::create([
                 'chane_entry_id' => $chane->id,
@@ -61,8 +70,9 @@ class SaleController extends Controller
                 'bread_count' => $breadCount,
                 'shortfall_count' => $shortfallCount ?: null,
                 'shortfall_amount' => $shortfallCount > 0 ? round($shortfallCount * $breadPrice, 2) : null,
+                'amount_difference' => $difference,
                 'customer_id' => $data['customer_id'] ?? null,
-                'amount' => $data['amount'] ?? null,
+                'amount' => $amount,
                 'note' => $data['note'] ?? null,
             ]);
 

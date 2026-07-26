@@ -1097,6 +1097,64 @@ class ProductionFormulaTest extends TestCase
         $this->assertSame(5, $todayRow['dough_bags']);
     }
 
+    public function test_the_daily_breakdown_counts_the_bread_baked_including_nanino(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        $dough = DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 3]);
+        ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $admin->id,
+            'chane_count' => 100,
+            'normal_weight_kg' => 85,
+            // Nanino weight is 1.0kg a loaf, so 40kg is 40 loaves.
+            'nanino_weight_kg' => 40,
+            'spray_flour_kg' => 0,
+        ]);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/production')
+            ->assertOk();
+
+        $todayRow = collect($response->json('data.daily'))
+            ->firstWhere('date', now()->toDateString());
+
+        $this->assertSame(100, $todayRow['normal_chane_count']);
+        $this->assertSame(40, $todayRow['nanino_chane_count']);
+        $this->assertSame(140, $todayRow['total_bread_count']);
+    }
+
+    public function test_the_daily_bread_count_is_normal_only_without_a_nanino_weight(): void
+    {
+        Bakery::first()->update(['nanino_chane_weight_kg' => null]);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        $dough = DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 3]);
+        ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $admin->id,
+            'chane_count' => 100,
+            'normal_weight_kg' => 85,
+            'nanino_weight_kg' => 40,
+            'spray_flour_kg' => 0,
+        ]);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/production')
+            ->assertOk();
+
+        $todayRow = collect($response->json('data.daily'))
+            ->firstWhere('date', now()->toDateString());
+
+        // Without a configured weight the nanino weight cannot be turned
+        // into a loaf count, so it is left out rather than guessed at.
+        $this->assertSame(0, $todayRow['nanino_chane_count']);
+        $this->assertSame(100, $todayRow['total_bread_count']);
+    }
+
     public function test_a_day_with_no_dough_still_appears_with_zero_counts(): void
     {
         $admin = User::factory()->create(['is_active' => true]);
