@@ -209,9 +209,27 @@ class ApiCoverageTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_staff_cannot_touch_inventory(): void
+    public function test_a_seller_may_read_inventory_but_not_change_it(): void
     {
-        $this->actingAs($this->userWithRole('seller'), 'sanctum')
+        // The seller sells flour out of the warehouse, so they need to see
+        // what is left — but stock is only adjusted by an admin.
+        $seller = $this->userWithRole('seller');
+
+        $this->actingAs($seller, 'sanctum')
+            ->getJson('/api/v1/inventory')->assertOk();
+
+        $this->actingAs($seller, 'sanctum')
+            ->postJson('/api/v1/inventory/movements', [
+                'item' => 'flour',
+                'direction' => 'in',
+                'quantity' => 100,
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_production_staff_cannot_touch_inventory(): void
+    {
+        $this->actingAs($this->userWithRole('dough_maker'), 'sanctum')
             ->getJson('/api/v1/inventory')->assertForbidden();
     }
 

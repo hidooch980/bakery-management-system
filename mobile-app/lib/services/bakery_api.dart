@@ -2,6 +2,7 @@ import '../models/bakery.dart';
 import '../models/chane_board.dart';
 import '../models/customer.dart';
 import '../models/entries.dart';
+import '../models/flour_sale.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 
@@ -174,6 +175,60 @@ class BakeryApi {
           .toList(),
       count: (summary['count'] as num).toInt(),
       total: double.tryParse('${summary['total_amount']}') ?? 0,
+    );
+  }
+
+  // --------------------------------------------------------- flour sales
+
+  /// The going rates and what is left in the warehouse.
+  Future<FlourSaleOptions> flourSaleOptions() async {
+    final body = await _client.get('/flour-sales/options');
+
+    return FlourSaleOptions.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// Sells flour by the kilo or by the sack. The weight and the total are
+  /// worked out server-side, so only the quantity and rate go up.
+  Future<FlourSale> recordFlourSale({
+    required FlourUnit unit,
+    required double quantity,
+    required PaymentType paymentType,
+    double? unitPrice,
+    int? customerId,
+    String? note,
+  }) async {
+    final body = await _client.post('/flour-sales', {
+      'unit': unit.apiValue,
+      'quantity': quantity,
+      'payment_type': paymentType.apiValue,
+      if (unitPrice != null) 'unit_price': unitPrice,
+      if (customerId != null) 'customer_id': customerId,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+
+    return FlourSale.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<
+      ({
+        List<FlourSale> sales,
+        int count,
+        double totalWeightKg,
+        String totalFormatted,
+      })> todayFlourSales() async {
+    final body = await _client.get('/flour-sales/today');
+    final data = body['data'] as Map<String, dynamic>;
+    final summary = data['summary'] as Map<String, dynamic>;
+
+    return (
+      sales: (data['sales'] as List)
+          .cast<Map<String, dynamic>>()
+          .map(FlourSale.fromJson)
+          .toList(),
+      count: (summary['count'] as num?)?.toInt() ?? 0,
+      totalWeightKg:
+          double.tryParse('${summary['total_weight_kg']}') ?? 0,
+      totalFormatted: summary['total_amount_formatted'] as String? ?? '',
     );
   }
 

@@ -12,7 +12,9 @@ import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
+import '../../models/flour_sale.dart';
 import '../shared/settings_screen.dart';
+import 'flour_sale_sheet.dart';
 
 /// Home screen for the seller. One scrolling page rather than tabs, so the
 /// day's numbers, the chane waiting to be sold and the sales already made
@@ -30,6 +32,12 @@ typedef _SellerData = ({
   List<ChaneEntry> pending,
   ({List<Sale> sales, int count, double total}) today,
   ChaneBoard? board,
+  ({
+    List<FlourSale> sales,
+    int count,
+    double totalWeightKg,
+    String totalFormatted,
+  })? flour,
 });
 
 class _SellerHomeScreenState extends State<SellerHomeScreen> {
@@ -57,7 +65,21 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
       board = null;
     }
 
-    return (pending: pending, today: today, board: board);
+    // Flour selling is a permission the seller may not hold, so a failure
+    // here hides the section rather than breaking the page.
+    ({
+      List<FlourSale> sales,
+      int count,
+      double totalWeightKg,
+      String totalFormatted,
+    })? flour;
+    try {
+      flour = await widget.api.todayFlourSales();
+    } on ApiException {
+      flour = null;
+    }
+
+    return (pending: pending, today: today, board: board, flour: flour);
   }
 
   Future<void> _loadBakery() async {
@@ -80,6 +102,16 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         chane: chane,
         bakery: _bakery,
       ),
+    );
+
+    if (saved == true) _reload();
+  }
+
+  Future<void> _openFlourSaleSheet() async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FlourSaleSheet(api: widget.api, bakery: _bakery),
     );
 
     if (saved == true) _reload();
@@ -194,6 +226,32 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                       ),
                       const SizedBox(height: 10),
                     ],
+
+                  if (data.flour != null) ...[
+                    const SizedBox(height: 22),
+                    _SectionHeader(
+                      title: 'فروش آرد امروز',
+                      count: data.flour!.count,
+                      icon: Icons.inventory_2_rounded,
+                    ),
+                    const SizedBox(height: 10),
+                    ActionCard(
+                      title: 'فروش آرد (کیلویی یا کیسه‌ای)',
+                      subtitle: data.flour!.count == 0
+                          ? 'امروز آردی فروخته نشده است'
+                          : '${data.flour!.count} فروش  •  '
+                              '${data.flour!.totalWeightKg.toStringAsFixed(1)} کیلوگرم  •  '
+                              '${data.flour!.totalFormatted}',
+                      icon: Icons.local_shipping_rounded,
+                      color: const Color(0xFFE8952D),
+                      onTap: _openFlourSaleSheet,
+                      trailing: const Icon(Icons.add_rounded),
+                    ),
+                    for (final sale in data.flour!.sales) ...[
+                      const SizedBox(height: 10),
+                      _FlourSaleTile(sale: sale),
+                    ],
+                  ],
 
                   const SizedBox(height: 16),
                   _SectionHeader(
@@ -535,6 +593,69 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+
+/// One flour sale in the day's list.
+class _FlourSaleTile extends StatelessWidget {
+  const _FlourSaleTile({required this.sale});
+
+  final FlourSale sale;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            sale.unit == FlourUnit.bag
+                ? Icons.shopping_bag_rounded
+                : Icons.scale_rounded,
+            size: 20,
+            color: const Color(0xFFE8952D),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sale.quantityLabel,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  [
+                    sale.paymentType.label,
+                    if (sale.customerName != null) sale.customerName!,
+                  ].join('  •  '),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            sale.amountFormatted,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }

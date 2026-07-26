@@ -2,6 +2,9 @@
     <!-- Talks to the bakery API and downloads update APKs from GitHub Releases. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- Fingerprint and face unlock. Not required hardware: the app falls
+         back to the password form on a device without a sensor. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <application
         android:label="مدیریت نانوایی"
         android:name="${applicationName}"

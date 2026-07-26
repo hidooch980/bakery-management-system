@@ -59,6 +59,17 @@ class ExpenseResource extends Resource
                         ->preload()
                         ->native(false),
 
+                    Forms\Components\Select::make('bank_account_id')
+                        ->label('حساب بانکی')
+                        ->options(fn () => \App\Models\BankAccount::active()
+                            ->pluck('title', 'id'))
+                        ->default(fn () => \App\Models\BankAccount::defaultAccount()?->id)
+                        ->searchable()
+                        ->preload()
+                        ->native(false)
+                        ->placeholder('بدون حساب')
+                        ->helperText('اگر انتخاب شود، مبلغ به گردش همان حساب اضافه می‌شود'),
+
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')
                         ->rows(2)

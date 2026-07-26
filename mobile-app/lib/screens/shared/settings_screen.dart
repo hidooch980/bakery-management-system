@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/biometric_tile.dart';
 
 import 'change_password_screen.dart';
 import 'update_screen.dart';
@@ -136,6 +137,8 @@ class SettingsScreen extends StatelessWidget {
             Card(
               child: Column(
                 children: [
+                  const BiometricTile(),
+                  const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.lock_reset_rounded),
                     title: const Text('تغییر رمز عبور'),

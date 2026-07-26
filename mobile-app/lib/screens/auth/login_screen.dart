@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../services/biometric_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 
@@ -19,10 +20,62 @@ class _LoginScreenState extends State<LoginScreen>
   final _passwordController = TextEditingController();
 
   bool _obscure = true;
+
+  /// Whether to save the login for a fingerprint or face unlock next time.
+  bool _remember = false;
+
+  /// Null until the device has been asked what it supports.
+  BiometricAvailability? _availability;
+  bool _biometricEnabled = false;
+  String _biometricLabel = 'اثر انگشت';
   late final AnimationController _animation = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 700),
   )..forward();
+
+  @override
+  void initState() {
+    super.initState();
+    _prepareBiometrics();
+  }
+
+  Future<void> _prepareBiometrics() async {
+    final auth = context.read<AuthProvider>().biometrics;
+
+    final availability = await auth.availability();
+    final enabled = await auth.isEnabled();
+    final label = await auth.enrolledLabel();
+    final savedLogin = await auth.savedLogin();
+
+    if (!mounted) return;
+
+    setState(() {
+      _availability = availability;
+      _biometricEnabled = enabled;
+      _biometricLabel = label;
+      // Pre-fill the username so only the fingerprint is left to give.
+      if (savedLogin != null) _loginController.text = savedLogin;
+    });
+
+    // Offer the unlock straight away, so the common case is one tap.
+    if (enabled && availability == BiometricAvailability.ready) {
+      await _unlock();
+    }
+  }
+
+  Future<void> _unlock() async {
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.loginWithBiometrics();
+
+    if (!mounted || ok) return;
+
+    // A saved password that no longer works is cleared by the provider, so
+    // reflect that here rather than leaving a button that cannot succeed.
+    final stillEnabled = await auth.biometrics.isEnabled();
+
+    if (!mounted) return;
+    setState(() => _biometricEnabled = stillEnabled);
+  }
 
   @override
   void dispose() {
@@ -41,6 +94,7 @@ class _LoginScreenState extends State<LoginScreen>
     final ok = await auth.login(
       _loginController.text.trim(),
       _passwordController.text,
+      rememberForBiometrics: _remember,
     );
 
     if (!mounted) return;
@@ -151,7 +205,21 @@ class _LoginScreenState extends State<LoginScreen>
                                         ? 'رمز عبور را وارد کنید'
                                         : null,
                               ),
-                              const SizedBox(height: 28),
+                              if (_availability == BiometricAvailability.ready) ...[
+                                const SizedBox(height: 8),
+                                SwitchListTile(
+                                  value: _remember,
+                                  onChanged: (value) =>
+                                      setState(() => _remember = value),
+                                  title: Text('ورود بعدی با $_biometricLabel'),
+                                  subtitle: const Text(
+                                    'رمز به‌صورت رمزنگاری‌شده روی همین دستگاه ذخیره می‌شود',
+                                  ),
+                                  secondary: const Icon(Icons.fingerprint_rounded),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ],
+                              const SizedBox(height: 20),
                               FilledButton.icon(
                                 onPressed: busy ? null : _submit,
                                 icon: busy
@@ -166,6 +234,15 @@ class _LoginScreenState extends State<LoginScreen>
                                     : const Icon(Icons.login_rounded),
                                 label: Text(busy ? 'در حال ورود…' : 'ورود'),
                               ),
+                              if (_biometricEnabled &&
+                                  _availability == BiometricAvailability.ready) ...[
+                                const SizedBox(height: 14),
+                                OutlinedButton.icon(
+                                  onPressed: busy ? null : _unlock,
+                                  icon: const Icon(Icons.fingerprint_rounded),
+                                  label: Text('ورود با $_biometricLabel'),
+                                ),
+                              ],
                               const SizedBox(height: 20),
                               Text(
                                 'حساب کاربری فقط توسط مدیر ساخته می‌شود',

@@ -2,10 +2,10 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Expense;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Support\Jalali;
+use App\Support\Ledger;
 use App\Support\Money;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -23,30 +23,37 @@ class FinancialOverview extends BaseWidget
     {
         [$from, $to] = Jalali::currentMonthRange();
 
-        $income = (float) Sale::whereBetween('created_at', [$from, $to])->sum('amount');
+        // Read through the ledger so bread, flour and miscellaneous income
+        // are counted here exactly as the reports count them.
+        $breakdown = Ledger::incomeBreakdown($from, $to);
+        $income = $breakdown['total'];
 
-        $expenses = (float) Expense::whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
-            ->sum('amount');
-
-        $salaries = (float) SalaryPayment::paid()
-            ->whereBetween('paid_on', [$from->toDateString(), $to->toDateString()])
-            ->sum('net_amount');
+        $expenses = Ledger::recordedExpenses($from, $to);
+        $salaries = Ledger::paidSalaries($from, $to);
 
         $totalExpenses = $expenses + $salaries;
         $profit = $income - $totalExpenses;
 
         $unpaid = (float) SalaryPayment::unpaid()->sum('net_amount');
 
-        // Money customers owe us, split by how old the debt is.
-        $debts = Sale::outstanding()->get();
+        // Money customers owe us, split by how old the debt is. Flour sold
+        // on credit is a debt in exactly the same way bread is.
+        $breadDebts = Sale::outstanding()->get()
+            ->map(fn (Sale $s) => ['amount' => (float) $s->amount, 'on' => $s->created_at]);
+        $flourDebts = \App\Models\FlourSale::outstanding()->get()
+            ->map(fn ($s) => ['amount' => (float) $s->amount, 'on' => $s->sold_on]);
+
+        $debts = $breadDebts->concat($flourDebts);
         $debtTotal = (float) $debts->sum('amount');
         $oldDebt = (float) $debts
-            ->reject(fn (Sale $s) => $s->created_at->between($from, $to))
+            ->reject(fn (array $d) => $d['on']->between($from, $to))
             ->sum('amount');
 
         return [
             Stat::make('درآمد '.Jalali::monthLabel($from), Money::format($income))
-                ->description('مجموع فروش این ماه')
+                ->description('نان '.$breakdown['bread_formatted']
+                    .' • آرد '.$breakdown['flour_formatted']
+                    .' • متفرقه '.$breakdown['other_formatted'])
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
 

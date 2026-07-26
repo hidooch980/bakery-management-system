@@ -82,6 +82,14 @@ class AdminPanelTest extends TestCase
             'customer create' => ['/admin/customers/create'],
             'holidays' => ['/admin/holidays'],
             'holiday create' => ['/admin/holidays/create'],
+            'flour sales' => ['/admin/flour-sales'],
+            'flour sale create' => ['/admin/flour-sales/create'],
+            'incomes' => ['/admin/incomes'],
+            'income create' => ['/admin/incomes/create'],
+            'bakery shares' => ['/admin/bakery-shares'],
+            'bakery share create' => ['/admin/bakery-shares/create'],
+            'bank accounts' => ['/admin/bank-accounts'],
+            'bank account create' => ['/admin/bank-accounts/create'],
         ];
     }
 
@@ -136,6 +144,35 @@ class AdminPanelTest extends TestCase
             'carryover_bags' => 10,
         ]);
         $allocation->syncPeriods();
+
+        // A bank account and a partner, so the two widgets that hide
+        // themselves when empty are actually exercised.
+        $account = \App\Models\BankAccount::create([
+            'title' => 'حساب جاری',
+            'opening_balance' => 5000000,
+            'is_default' => true,
+        ]);
+        $account->record('in', 250000);
+
+        \App\Models\BakeryShare::create(['name' => 'شریک', 'dang' => 6]);
+
+        \App\Models\Income::create([
+            'category' => 'rent',
+            'title' => 'اجاره',
+            'amount' => 200000,
+            'received_on' => now(),
+            'bank_account_id' => $account->id,
+        ]);
+
+        \App\Models\InventoryItem::ofKey('flour')->move('in', 200, 'purchase');
+        \App\Models\FlourSale::create([
+            'user_id' => $admin->id,
+            'unit' => 'bag',
+            'quantity' => 1,
+            'unit_price' => 1200000,
+            'payment_type' => 'cash',
+            'sold_on' => now(),
+        ]);
 
         \App\Models\Attendance::create([
             'user_id' => $admin->id,

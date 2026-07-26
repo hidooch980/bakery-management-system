@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BakeryController;
+use App\Http\Controllers\Api\BakeryShareController;
+use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\ChaneBoardController;
 use App\Http\Controllers\Api\ChaneEntryController;
 use App\Http\Controllers\Api\ConsignmentFlourController;
@@ -10,8 +12,10 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DoughEntryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FlourAllocationController;
+use App\Http\Controllers\Api\FlourSaleController;
 use App\Http\Controllers\Api\FlourStockController;
 use App\Http\Controllers\Api\HolidayController;
+use App\Http\Controllers\Api\IncomeController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
@@ -67,6 +71,14 @@ Route::prefix('v1')->group(function () {
         Route::get('/sales/today', [SaleController::class, 'today'])
             ->middleware('permission:view-own-sales');
         Route::get('/sales/payment-types', [SaleController::class, 'paymentTypes']);
+
+        // --- Seller: flour sold by the kilo or by the sack ---
+        Route::post('/flour-sales', [FlourSaleController::class, 'store'])
+            ->middleware('permission:record-flour-sale');
+        Route::get('/flour-sales/today', [FlourSaleController::class, 'today'])
+            ->middleware('permission:view-own-flour-sales');
+        Route::get('/flour-sales/options', [FlourSaleController::class, 'options'])
+            ->middleware('permission:record-flour-sale');
 
         // --- Admin: staff management ---
         Route::middleware('permission:manage-users')->group(function () {
@@ -159,6 +171,30 @@ Route::prefix('v1')->group(function () {
             Route::get('/salaries/employees', [SalaryController::class, 'employees']);
             Route::patch('/salaries/{salary}/mark-paid', [SalaryController::class, 'markPaid']);
             Route::apiResource('salaries', SalaryController::class)->except(['show']);
+        });
+
+        // --- Admin: miscellaneous income ---
+        Route::middleware('permission:manage-finance')->group(function () {
+            Route::get('/incomes/categories', [IncomeController::class, 'categories']);
+            Route::apiResource('incomes', IncomeController::class)->except(['show']);
+
+            // --- Partner shares (دنگ) and the profit split ---
+            Route::get('/shares/split', [BakeryShareController::class, 'split']);
+            Route::get('/shares/settlements', [BakeryShareController::class, 'settlements']);
+            Route::post('/shares/{share}/settle', [BakeryShareController::class, 'settle']);
+            Route::apiResource('shares', BakeryShareController::class)->except(['show']);
+        });
+
+        // --- Admin: bank accounts and balances ---
+        Route::middleware('permission:manage-finance')->group(function () {
+            Route::post('/bank-accounts/transfer', [BankAccountController::class, 'transfer']);
+            Route::get('/bank-accounts/{account}/transactions', [BankAccountController::class, 'transactions']);
+            Route::post('/bank-accounts/{account}/transactions', [BankAccountController::class, 'record']);
+            // The parameter must be named `account` to match the controller
+            // signature, or implicit binding silently hands over an empty model.
+            Route::apiResource('bank-accounts', BankAccountController::class)
+                ->except(['show'])
+                ->parameters(['bank-accounts' => 'account']);
         });
 
         // --- Admin: financial reports ---

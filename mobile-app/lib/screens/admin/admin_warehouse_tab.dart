@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
 
+import '../../models/flour_sale.dart';
+import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 
-/// Stock levels and the flour quota for the current delivery period.
+typedef _FlourSalesToday = ({
+  List<FlourSale> sales,
+  int count,
+  double totalWeightKg,
+  String totalFormatted,
+});
+
+typedef _WarehouseData = ({
+  List<Map<String, dynamic>> items,
+  Map<String, dynamic>? quota,
+  _FlourSalesToday? flour,
+});
+
+/// Stock levels, today's flour sales, and the quota for the current period.
 class AdminWarehouseTab extends StatefulWidget {
   const AdminWarehouseTab({super.key, required this.api});
 
@@ -15,7 +30,7 @@ class AdminWarehouseTab extends StatefulWidget {
 }
 
 class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
-  late Future<({List<Map<String, dynamic>> items, Map<String, dynamic>? quota})> _data;
+  late Future<_WarehouseData> _data;
 
   @override
   void initState() {
@@ -23,15 +38,25 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
     _data = _load();
   }
 
-  Future<({List<Map<String, dynamic>> items, Map<String, dynamic>? quota})> _load() async {
+  Future<_WarehouseData> _load() async {
     final results = await Future.wait([
       widget.api.inventory(),
       widget.api.currentFlourAllocation(),
     ]);
 
+    // Today's flour sales explain movement in the balance above, but the
+    // rest of the page must still render if the call fails.
+    _FlourSalesToday? flour;
+    try {
+      flour = await widget.api.todayFlourSales();
+    } on ApiException {
+      flour = null;
+    }
+
     return (
       items: results[0] as List<Map<String, dynamic>>,
       quota: results[1] as Map<String, dynamic>?,
+      flour: flour,
     );
   }
 
@@ -41,7 +66,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: () async => _reload(),
-      child: FutureBuilder<({List<Map<String, dynamic>> items, Map<String, dynamic>? quota})>(
+      child: FutureBuilder<_WarehouseData>(
         future: _data,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -57,6 +82,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
 
           final items = snapshot.data!.items;
           final quota = snapshot.data!.quota;
+          final flour = snapshot.data!.flour;
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
@@ -80,6 +106,36 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                   ],
                 ],
               ),
+
+              if (flour != null) ...[
+                const SizedBox(height: 22),
+                AdminSection(
+                  title: 'فروش آرد امروز',
+                  icon: Icons.local_shipping_rounded,
+                  children: [
+                    AdminRow(
+                      label: 'مجموع فروش',
+                      value: flour.count == 0
+                          ? 'موردی ثبت نشده'
+                          : '${flour.totalWeightKg.toStringAsFixed(1)} کیلوگرم'
+                              '  •  ${flour.totalFormatted}',
+                      icon: Icons.inventory_2_rounded,
+                      color: const Color(0xFFE8952D),
+                      emphasise: true,
+                    ),
+                    for (final sale in flour.sales) ...[
+                      const Divider(height: 1),
+                      AdminRow(
+                        label: sale.quantityLabel,
+                        value: sale.amountFormatted,
+                        icon: sale.unit == FlourUnit.bag
+                            ? Icons.shopping_bag_rounded
+                            : Icons.scale_rounded,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
 
               const SizedBox(height: 22),
 

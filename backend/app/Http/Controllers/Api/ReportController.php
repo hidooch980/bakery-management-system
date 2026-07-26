@@ -14,6 +14,7 @@ use App\Models\SalaryPayment;
 use App\Models\User;
 use App\Support\AppCalendar;
 use App\Support\Jalali;
+use App\Support\Ledger;
 use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -218,7 +219,10 @@ class ReportController extends Controller
     {
         [$from, $to] = $this->range($request);
 
-        $income = (float) Sale::whereBetween('created_at', [$from, $to])->sum('amount');
+        // Income is read from the ledger so bread, flour and miscellaneous
+        // receipts are all counted, and counted the same way everywhere.
+        $incomeBreakdown = Ledger::incomeBreakdown($from, $to);
+        $income = $incomeBreakdown['total'];
 
         $expensesByCategory = Expense::whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
             ->get()
@@ -253,11 +257,16 @@ class ReportController extends Controller
             'to_jalali' => Jalali::date($to),
             'currency' => Money::currency(),
             'currency_label' => Money::label(),
-            'income' => [
+            'income' => array_merge($incomeBreakdown, [
+                // Kept for the mobile app, which reads `sales` as the total.
                 'sales' => round($income, 2),
                 'sales_formatted' => Money::format($income),
                 'sales_count' => Sale::whereBetween('created_at', [$from, $to])->count(),
-            ],
+                'flour_sales_count' => \App\Models\FlourSale::whereBetween('sold_on', [
+                    $from->toDateString(), $to->toDateString(),
+                ])->count(),
+            ]),
+            'profit_split' => \App\Models\BakeryShare::splitFor($from, $to),
             'expenses' => [
                 'recorded' => round($recordedExpenses, 2),
                 'recorded_formatted' => Money::format($recordedExpenses),
@@ -350,9 +359,7 @@ class ReportController extends Controller
         while ($cursor->lte($to) && $days->count() < 120) {
             $date = $cursor->toDateString();
 
-            $income = (float) Sale::whereDate('created_at', $date)->sum('amount');
-            $expense = (float) Expense::whereDate('spent_on', $date)->sum('amount')
-                + (float) SalaryPayment::paid()->whereDate('paid_on', $date)->sum('net_amount');
+            [$income, $expense] = Ledger::dailyTotals($cursor);
 
             $days->push([
                 'date' => $date,

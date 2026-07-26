@@ -107,6 +107,12 @@ class ManageBakery extends Page implements HasForms
                             ->suffix('کیلوگرم')
                             ->helperText('پایه فرمول تولید'),
 
+                        \App\Filament\Forms\MoneyInput::make('flour_price_per_kg', 'قیمت هر کیلو آرد')
+                            ->helperText('برای فروش آرد به‌صورت کیلویی'),
+
+                        \App\Filament\Forms\MoneyInput::make('flour_price_per_bag', 'قیمت هر کیسه آرد')
+                            ->helperText('اگر خالی بماند، از قیمت کیلویی × وزن کیسه محاسبه می‌شود'),
+
                     ]),
 
                 Forms\Components\Section::make('فرمول تولید خمیر')

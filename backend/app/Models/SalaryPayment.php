@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\PostsToBankAccount;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
 
 class SalaryPayment extends Model
 {
+    use PostsToBankAccount;
+
     protected $fillable = [
         'user_id',
         'period_start',
@@ -16,6 +19,7 @@ class SalaryPayment extends Model
         'deduction',
         'net_amount',
         'paid_on',
+        'bank_account_id',
         'note',
     ];
 
@@ -49,6 +53,11 @@ class SalaryPayment extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function bankAccount()
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
     public function scopePaid($query)
     {
         return $query->whereNotNull('paid_on');
@@ -62,5 +71,28 @@ class SalaryPayment extends Model
     public function getIsPaidAttribute(): bool
     {
         return $this->paid_on !== null;
+    }
+
+    // ------------------------------------------------- bank posting
+
+    /** Only a salary that has actually been paid moves money. */
+    public function bankPostingAccountId(): ?int
+    {
+        return $this->paid_on === null ? null : $this->bank_account_id;
+    }
+
+    public function bankPostingAmount(): float
+    {
+        return (float) $this->net_amount;
+    }
+
+    public function bankPostingReason(): string
+    {
+        return 'salary';
+    }
+
+    public function bankPostingDate()
+    {
+        return $this->paid_on ?? now();
     }
 }

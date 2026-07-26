@@ -39,12 +39,14 @@ dependencies:
   # Deep-links to the Android install-permission settings page
   android_intent_plus: ^5.2.0
   device_info_plus: ^11.2.0
+  local_auth: ^3.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.4
+  local_auth_platform_interface: ^1.1.0
 
 # Generates every Android density from the bakery loaf artwork, replacing
 # the default Flutter logo.

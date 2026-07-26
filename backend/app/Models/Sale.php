@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\PostsToBankAccount;
 use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
 {
+    use PostsToBankAccount;
+
     protected $fillable = [
         'chane_entry_id',
         'user_id',
@@ -14,6 +17,7 @@ class Sale extends Model
         'customer_id',
         'amount',
         'settled_on',
+        'bank_account_id',
         'note',
     ];
 
@@ -40,6 +44,11 @@ class Sale extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    public function bankAccount()
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
     /** Sales that created a debt and have not been collected yet. */
     public function scopeOutstanding($query)
     {
@@ -55,5 +64,27 @@ class Sale extends Model
     public function getIsSettledAttribute(): bool
     {
         return $this->settled_on !== null;
+    }
+
+    // ------------------------------------------------- bank posting
+
+    public function bankPostingAccountId(): ?int
+    {
+        return $this->bank_account_id;
+    }
+
+    public function bankPostingAmount(): float
+    {
+        return (float) $this->amount;
+    }
+
+    public function bankPostingReason(): string
+    {
+        return 'sale';
+    }
+
+    public function bankPostingDate()
+    {
+        return $this->created_at ?? now();
     }
 }

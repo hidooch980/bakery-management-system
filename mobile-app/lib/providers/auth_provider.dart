@@ -3,13 +3,18 @@ import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
 import '../services/bakery_api.dart';
+import '../services/biometric_service.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthProvider extends ChangeNotifier {
-  AuthProvider(this._api);
+  AuthProvider(this._api, {BiometricService? biometrics})
+      : _biometrics = biometrics ?? BiometricService();
 
   final BakeryApi _api;
+  final BiometricService _biometrics;
+
+  BiometricService get biometrics => _biometrics;
 
   AuthStatus _status = AuthStatus.unknown;
   AppUser? _user;
@@ -45,7 +50,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> login(String login, String password) async {
+  /// Signs in with a password. When [rememberForBiometrics] is set, the
+  /// credentials are saved so the next launch can unlock with a fingerprint
+  /// or face — only ever after the password itself has been accepted.
+  Future<bool> login(
+    String login,
+    String password, {
+    bool rememberForBiometrics = false,
+  }) async {
     _setBusy(true);
     _error = null;
 
@@ -53,6 +65,11 @@ class AuthProvider extends ChangeNotifier {
       final result = await _api.login(login, password);
       _user = result.user;
       _status = AuthStatus.authenticated;
+
+      if (rememberForBiometrics) {
+        await _biometrics.enable(login: login, password: password);
+      }
+
       return true;
     } on ApiException catch (e) {
       _error = e.message;
@@ -62,11 +79,46 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  /// Unlocks with a fingerprint or face using the saved credentials.
+  /// Returns false when the prompt was cancelled or nothing is stored, in
+  /// which case the password form is still there to fall back on.
+  Future<bool> loginWithBiometrics() async {
+    final credentials = await _biometrics.authenticate();
+
+    if (credentials == null) return false;
+
+    final ok = await login(credentials.login, credentials.password);
+
+    // Credentials that no longer work are worse than none: they would fail
+    // silently on every launch. Drop them and make the user type again.
+    if (!ok) await _biometrics.disable();
+
+    return ok;
+  }
+
+  /// Checks a password against the server without changing who is signed in.
+  ///
+  /// Used before saving credentials for biometric unlock. It does issue a
+  /// fresh token, which simply replaces the current one — the session
+  /// continues uninterrupted.
+  Future<bool> verifyPassword(String login, String password) async {
+    try {
+      final result = await _api.login(login, password);
+      _user = result.user;
+      notifyListeners();
+      return true;
+    } on ApiException {
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     _setBusy(true);
 
     try {
       await _api.logout();
+      // A shared device must not keep one employee's saved password.
+      await _biometrics.disable();
     } finally {
       _user = null;
       _status = AuthStatus.unauthenticated;
@@ -81,6 +133,11 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final message = await _api.changePassword(current: current, next: next);
+
+      // The stored password is now wrong, so the shortcut has to be set up
+      // again with the new one.
+      await _biometrics.disable();
+
       _user = null;
       _status = AuthStatus.unauthenticated;
       return message;

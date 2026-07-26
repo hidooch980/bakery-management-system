@@ -103,6 +103,8 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
     final profit = data['profit'] as Map<String, dynamic>? ?? const {};
     final outstanding = data['outstanding_salaries'] as Map<String, dynamic>? ?? const {};
     final byCategory = (expenses['by_category'] as List?) ?? const [];
+    final split = data['profit_split'] as Map<String, dynamic>? ?? const {};
+    final holders = (split['holders'] as List?) ?? const [];
 
     final isPositive = profit['is_positive'] == true;
     final profitColor = isPositive ? const Color(0xFF2E9E6B) : const Color(0xFFD1495B);
@@ -146,16 +148,35 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
         icon: Icons.trending_up_rounded,
         children: [
           AdminRow(
-            label: 'فروش',
-            value: '${income['sales_formatted'] ?? '—'}',
+            label: 'مجموع درآمد',
+            value: '${income['total_formatted'] ?? income['sales_formatted'] ?? '—'}',
             icon: Icons.payments_rounded,
             color: const Color(0xFF2E9E6B),
             emphasise: true,
           ),
           const Divider(height: 1),
           AdminRow(
+            label: 'فروش نان',
+            value: '${income['bread_formatted'] ?? '—'}',
+            icon: Icons.bakery_dining_rounded,
+          ),
+          const Divider(height: 1),
+          AdminRow(
+            label: 'فروش آرد',
+            value: '${income['flour_formatted'] ?? '—'}',
+            icon: Icons.inventory_2_rounded,
+          ),
+          const Divider(height: 1),
+          AdminRow(
+            label: 'درآمد متفرقه',
+            value: '${income['other_formatted'] ?? '—'}',
+            icon: Icons.account_balance_wallet_rounded,
+          ),
+          const Divider(height: 1),
+          AdminRow(
             label: 'تعداد فروش',
-            value: '${income['sales_count'] ?? 0} فقره',
+            value: '${income['sales_count'] ?? 0} نان  •  '
+                '${income['flour_sales_count'] ?? 0} آرد',
             icon: Icons.receipt_long_rounded,
           ),
         ],
@@ -200,6 +221,33 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                 label: '${(byCategory[i] as Map)['label']}',
                 value: '${(byCategory[i] as Map)['amount_formatted']}',
               ),
+            ],
+          ],
+        ),
+      ],
+
+      // Only shown once partners have been registered, so a single-owner
+      // bakery is not given an empty section.
+      if (holders.isNotEmpty) ...[
+        const SizedBox(height: 22),
+        AdminSection(
+          title: 'تقسیم سود بین شرکا (دانگ)',
+          icon: Icons.groups_rounded,
+          children: [
+            for (var i = 0; i < holders.length; i++) ...[
+              if (i > 0) const Divider(height: 1),
+              AdminRow(
+                label: '${(holders[i] as Map)['name']}'
+                    '  •  ${(holders[i] as Map)['dang_label']}',
+                value: '${(holders[i] as Map)['amount_formatted']}',
+                icon: Icons.person_rounded,
+              ),
+              if ('${(holders[i] as Map)['paid']}' != '0')
+                AdminRow(
+                  label: 'پرداخت‌شده / مانده',
+                  value: '${(holders[i] as Map)['paid_formatted']}'
+                      '  •  ${(holders[i] as Map)['remaining_formatted']}',
+                ),
             ],
           ],
         ),
