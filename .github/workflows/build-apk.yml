@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       api_base_url:
-        description: 'آدرس API سرور (مثلاً http://185.97.119.91:8000/api/v1)'
+        description: 'آدرس API سرور (خالی بگذارید تا از متغیر API_BASE_URL مخزن استفاده شود)'
         required: false
-        default: 'http://10.0.2.2:8000/api/v1'
+        default: ''
       release_tag:
         description: 'تگ انتشار (خالی بگذارید تا فقط بیلد شود بدون انتشار)'
         required: false
@@ -47,11 +47,29 @@ jobs:
       - name: Resolve API base URL
         id: config
         run: |
-          # Tag builds have no form input, so fall back to the emulator default.
+          # A tag build has no form input. It must NOT fall back to
+          # 10.0.2.2 — that is the emulator's alias for its host machine and
+          # is unreachable from a real phone, so the APK would install fine
+          # and then fail every request with a connection error.
           URL="${{ github.event.inputs.api_base_url }}"
           if [ -z "$URL" ]; then
-            URL="http://10.0.2.2:8000/api/v1"
+            URL="${{ vars.API_BASE_URL }}"
           fi
+
+          if [ -z "$URL" ]; then
+            echo "::error::No API base URL. Set the API_BASE_URL repository variable, or supply one when running the workflow by hand."
+            exit 1
+          fi
+
+          case "$URL" in
+            *10.0.2.2*|*localhost*|*127.0.0.1*)
+              # These only resolve on the build machine or an emulator.
+              echo "::error::API base URL '$URL' is not reachable from a real device."
+              exit 1
+              ;;
+          esac
+
+          echo "Building against $URL"
           echo "api_base_url=$URL" >> "$GITHUB_OUTPUT"
 
           TAG="${{ github.event.inputs.release_tag }}"
