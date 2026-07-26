@@ -95,7 +95,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                     if (i > 0) const Divider(height: 1),
                     AdminRow(
                       label: '${items[i]['name']}',
-                      value: '${_fmt(items[i]['balance'])} ${items[i]['unit']}',
+                      value: _balanceLabel(items[i]),
                       icon: _iconFor('${items[i]['key']}'),
                       // A low balance is the one thing worth colouring.
                       color: items[i]['is_low'] == true
@@ -190,6 +190,18 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
     final number = value is num ? value : (num.tryParse('$value') ?? 0);
 
     return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
+  }
+
+  /// "۱۰۰ kg  •  ۴ کیسه" — the bag count only shown once the item actually
+  /// has a configured sack size (flour, salt, dough all do; a future item
+  /// added without one just shows the raw weight).
+  static String _balanceLabel(Map<String, dynamic> item) {
+    final weight = '${_fmt(item['balance'])} ${item['unit']}';
+    final bags = item['balance_bags'];
+
+    if (bags == null) return weight;
+
+    return '$weight  •  ${_fmt(bags)} کیسه';
   }
 }
 

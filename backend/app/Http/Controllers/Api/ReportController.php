@@ -31,14 +31,22 @@ class ReportController extends Controller
     public function dashboard(): JsonResponse
     {
         $today = now()->toDateString();
+        $chaneCount = (int) ChaneEntry::whereDate('created_at', $today)->sum('chane_count');
+        $formula = \App\Support\DoughFormula::fromBakery();
+        $naninoEquivalent = $formula->naninoEquivalentForNormalCount($chaneCount);
 
         return $this->success([
             'today' => [
                 'dough_bags' => (int) DoughEntry::whereDate('created_at', $today)->sum('bag_count'),
-                'chane_count' => (int) ChaneEntry::whereDate('created_at', $today)->sum('chane_count'),
+                'chane_count' => $chaneCount,
                 'sales_count' => Sale::whereDate('created_at', $today)->count(),
                 'sales_amount' => round((float) Sale::whereDate('created_at', $today)->sum('amount'), 2),
                 'attendance_count' => Attendance::where('date', $today)->count(),
+                // What-if: today's normal chane, expressed as nanino loaves.
+                'normal_as_nanino_equivalent' => $naninoEquivalent,
+                'normal_as_nanino_announcement' => $naninoEquivalent === null
+                    ? null
+                    : "چانه‌های عادی امروز ({$chaneCount} عدد) معادل {$naninoEquivalent} نان نانینو است.",
             ],
             'queues' => [
                 'pending_dough' => DoughEntry::pending()->count(),

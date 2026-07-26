@@ -110,6 +110,26 @@ class DoughFormula
         return round($count * $this->naninoChaneWeightKg, 3);
     }
 
+    /**
+     * How many nanino loaves the same dough would have produced, had the
+     * normal chane actually baked today been shaped as nanino instead.
+     *
+     *   equivalent = (normal count × normal weight) ÷ nanino weight
+     *
+     * This is a what-if comparison, not a count of anything actually made —
+     * real nanino output is tracked separately, from its own recorded weight.
+     */
+    public function naninoEquivalentForNormalCount(int $normalCount): ?int
+    {
+        if (! $this->normalChaneWeightKg || ! $this->naninoChaneWeightKg) {
+            return null;
+        }
+
+        $weight = $normalCount * $this->normalChaneWeightKg;
+
+        return (int) floor($weight / $this->naninoChaneWeightKg);
+    }
+
     /** Everything a client needs to compute the same figures locally. */
     public function toArray(float $bags = 1): array
     {

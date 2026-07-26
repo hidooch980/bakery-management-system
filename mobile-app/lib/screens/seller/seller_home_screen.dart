@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
 import '../../models/flour_sale.dart';
@@ -172,6 +173,9 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                   ),
                   const SizedBox(height: 14),
                   AttendanceCard(api: widget.api),
+
+                  const SizedBox(height: 14),
+                  WorkStartCard(api: widget.api),
 
                   const SizedBox(height: 16),
                   Row(
@@ -414,41 +418,65 @@ class _RecordSaleSheet extends StatefulWidget {
 
 class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   final _formKey = GlobalKey<FormState>();
+  final _breadCount = TextEditingController();
   final _amount = TextEditingController();
   final _note = TextEditingController();
 
   PaymentType? _paymentType;
   bool _saving = false;
 
+  /// True once the seller has typed their own amount, so entering the bread
+  /// count afterwards does not silently overwrite what they set.
+  bool _amountEditedByHand = false;
+
   @override
   void initState() {
     super.initState();
 
-    // Pre-fill `chane count × bread price`; the seller can still override it.
-    // The field shows the configured unit, so a Rial shop sees Rial.
-    final price = widget.bakery?.breadPrice;
-    if (price != null && price > 0) {
-      final unit = widget.bakery?.currency ?? Currency.toman;
-      final suggested = widget.chane.chaneCount * price * unit.multiplier;
-      _amount.text = suggested.toStringAsFixed(0);
-    }
+    // Defaults to the full batch; the seller can sell fewer.
+    _breadCount.text = '${widget.chane.chaneCount}';
+    _recomputeAmount();
+
+    _breadCount.addListener(() {
+      _recomputeAmount();
+      setState(() {}); // Refreshes the shortfall notice below the field.
+    });
   }
 
   @override
   void dispose() {
+    _breadCount.dispose();
     _amount.dispose();
     _note.dispose();
     super.dispose();
   }
 
-  /// Explains where the pre-filled amount came from.
-  String? _priceHint() {
-    final price = widget.bakery?.breadPrice;
-    if (price == null || price <= 0) return null;
+  double get _unitPrice => widget.bakery?.breadPrice ?? 0;
 
-    final unit = widget.bakery?.currency ?? Currency.toman;
+  Currency get _unit => widget.bakery?.currency ?? Currency.toman;
 
-    return '${widget.chane.chaneCount} نان × ${MoneyFormat.format(price, currency: unit)}';
+  int? get _enteredBreadCount => int.tryParse(_breadCount.text.trim());
+
+  /// How many of this batch are left unsold once this amount is entered.
+  /// Selling the whole batch marks it "sold" regardless, so this is the
+  /// seller's own record of what did not get counted.
+  int? get _shortfall {
+    final entered = _enteredBreadCount;
+    if (entered == null) return null;
+
+    final remainder = widget.chane.chaneCount - entered;
+    return remainder > 0 ? remainder : null;
+  }
+
+  /// Bread count × unit price — recalculated on every keystroke, unless the
+  /// seller has already typed their own amount by hand.
+  void _recomputeAmount() {
+    if (_amountEditedByHand || _unitPrice <= 0) return;
+
+    final count = _enteredBreadCount ?? widget.chane.chaneCount;
+    final suggested = count * _unitPrice * _unit.multiplier;
+
+    _amount.value = _amount.value.copyWith(text: suggested.toStringAsFixed(0));
   }
 
   Future<void> _save() async {
@@ -462,14 +490,14 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     setState(() => _saving = true);
 
     try {
-      final unit = widget.bakery?.currency ?? Currency.toman;
       final typed = _amount.text.isEmpty ? null : double.tryParse(_amount.text);
 
       await widget.api.recordSale(
         chaneEntryId: widget.chane.id,
         paymentType: _paymentType!,
+        breadCount: _enteredBreadCount,
         // The API always stores Toman, whatever unit the shop displays.
-        amount: typed == null ? null : MoneyFormat.toToman(typed, currency: unit),
+        amount: typed == null ? null : MoneyFormat.toToman(typed, currency: _unit),
         note: _note.text.trim(),
       );
 
@@ -528,36 +556,104 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                 ),
                 const SizedBox(height: 22),
                 Text(
+                  'تعداد نان',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _breadCount,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'تعداد',
+                    prefixIcon: const Icon(Icons.bakery_dining_outlined),
+                    suffixText: 'از ${widget.chane.chaneCount} عدد',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'تعداد نان را وارد کنید';
+                    }
+                    final parsed = int.tryParse(value.trim());
+                    if (parsed == null || parsed < 0) {
+                      return 'عددی معتبر وارد کنید';
+                    }
+                    if (parsed > widget.chane.chaneCount) {
+                      return 'از تعداد این چانه بیشتر است';
+                    }
+                    return null;
+                  },
+                ),
+                if (_shortfall != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8952D).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded,
+                            size: 18, color: Color(0xFFE8952D)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'کسری این فروش: $_shortfall عدد از این چانه ثبت نمی‌شود.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: const Color(0xFFE8952D),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 22),
+                Text(
                   'نوع پرداخت',
                   style: Theme.of(context)
                       .textTheme
                       .titleSmall
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    for (final type in PaymentType.values)
-                      ChoiceChip(
-                        label: Text(type.label),
-                        selected: _paymentType == type,
-                        onSelected: (_) => setState(() => _paymentType = type),
-                        labelPadding:
-                            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      ),
-                  ],
+                const SizedBox(height: 8),
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: RadioGroup<PaymentType>(
+                    groupValue: _paymentType,
+                    onChanged: (value) => setState(() => _paymentType = value),
+                    child: Column(
+                      children: [
+                        for (final type in PaymentType.values) ...[
+                          RadioListTile<PaymentType>(
+                            value: type,
+                            title: Text(type.label),
+                            dense: true,
+                          ),
+                          if (type != PaymentType.values.last)
+                            const Divider(height: 1),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _amount,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setState(() => _amountEditedByHand = true),
                   decoration: InputDecoration(
-                    labelText: 'مبلغ (اختیاری)',
+                    labelText: 'مبلغ نهایی',
                     prefixIcon: const Icon(Icons.payments_outlined),
-                    suffixText: (widget.bakery?.currency ?? Currency.toman).label,
-                    helperText: _priceHint(),
+                    suffixText: _unit.label,
+                    helperText: _unitPrice > 0
+                        ? '${_enteredBreadCount ?? widget.chane.chaneCount} نان × '
+                            '${MoneyFormat.format(_unitPrice, currency: _unit)}'
+                        : 'قیمت نان در تنظیمات نانوایی ثبت نشده است',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) return null;

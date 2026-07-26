@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\UserManagementController;
+use App\Http\Controllers\Api\WorkStartController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -86,6 +87,14 @@ Route::prefix('v1')->group(function () {
             Route::patch('/users/{user}/toggle-active', [UserManagementController::class, 'toggleActive']);
             Route::apiResource('users', UserManagementController::class);
         });
+
+        // --- Daily start ticks for shaping and baking ---
+        Route::get('/work-starts/today', [WorkStartController::class, 'today']);
+        Route::post('/work-starts', [WorkStartController::class, 'store'])
+            ->middleware('permission:record-work-start');
+        Route::get('/work-starts/rules', [WorkStartController::class, 'rules']);
+        Route::get('/work-starts/late-report', [WorkStartController::class, 'lateReport'])
+            ->middleware('permission:view-work-start-report');
 
         // --- Production board: shater, chane gir and seller ---
         Route::get('/chane-board', [ChaneBoardController::class, 'show'])

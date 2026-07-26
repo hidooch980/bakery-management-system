@@ -50,6 +50,16 @@ class BakeryController extends Controller
             'water_ratio' => ['nullable', 'numeric', 'min:0', 'max:5'],
             'salt_ratio' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'dough_loss_ratio' => ['nullable', 'numeric', 'min:0', 'max:0.9'],
+            'flour_price_per_kg' => ['nullable', 'numeric', 'min:0'],
+            'flour_price_per_bag' => ['nullable', 'numeric', 'min:0'],
+            'flour_purchase_price_per_kg' => ['nullable', 'numeric', 'min:0'],
+            'flour_transport_by_factory' => ['nullable', 'boolean'],
+            'chane_start_deadline' => ['nullable', 'date_format:H:i'],
+            'baking_start_deadline' => ['nullable', 'date_format:H:i'],
+            'late_free_days' => ['nullable', 'integer', 'min:0'],
+            'late_tier1_last_day' => ['nullable', 'integer', 'min:1'],
+            'late_tier1_amount' => ['nullable', 'numeric', 'min:0'],
+            'late_tier2_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $bakery = Bakery::firstOrNew(['id' => 1]);

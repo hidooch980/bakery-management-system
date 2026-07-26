@@ -555,4 +555,113 @@ class ProductionFormulaTest extends TestCase
 
         $this->assertSame('1448/02/09', AppCalendar::date(\Illuminate\Support\Carbon::parse('2026-07-25')));
     }
+
+    // ------------------------------------------------- nanino equivalence
+
+    public function test_normal_count_converts_to_a_nanino_equivalent(): void
+    {
+        // 100 normal chane at 0.85kg is 85kg of dough — 85 nanino loaves at
+        // 1.0kg each.
+        $formula = DoughFormula::fromBakery();
+
+        $this->assertSame(85, $formula->naninoEquivalentForNormalCount(100));
+    }
+
+    public function test_the_equivalent_floors_a_partial_loaf(): void
+    {
+        Bakery::first()->update(['nanino_chane_weight_kg' => 0.9]);
+
+        // 100 × 0.85 = 85kg; 85 ÷ 0.9 = 94.44 → 94, not 95.
+        $formula = DoughFormula::fromBakery();
+        $this->assertSame(94, $formula->naninoEquivalentForNormalCount(100));
+    }
+
+    public function test_the_equivalent_is_null_without_both_weights(): void
+    {
+        Bakery::first()->update(['nanino_chane_weight_kg' => null]);
+
+        $formula = DoughFormula::fromBakery();
+        $this->assertNull($formula->naninoEquivalentForNormalCount(100));
+    }
+
+    public function test_the_chane_board_announces_the_equivalent(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('seller');
+
+        $dough = DoughEntry::create(['user_id' => $user->id, 'bag_count' => 10]);
+        ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $user->id,
+            'chane_count' => 100,
+            'normal_weight_kg' => 85,
+            'nanino_weight_kg' => 0,
+            'spray_flour_kg' => 0,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/chane-board')
+            ->assertOk()
+            ->assertJsonPath('data.today.normal_as_nanino_equivalent', 85)
+            ->assertJsonPath(
+                'data.today.normal_as_nanino_announcement',
+                'چانه‌های عادی امروز (100 عدد) معادل 85 نان نانینو است.'
+            );
+    }
+
+    public function test_the_admin_dashboard_announces_the_equivalent(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        $dough = DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 10]);
+        ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $admin->id,
+            'chane_count' => 100,
+            'normal_weight_kg' => 85,
+            'nanino_weight_kg' => 0,
+            'spray_flour_kg' => 0,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/dashboard')
+            ->assertOk()
+            ->assertJsonPath('data.today.normal_as_nanino_equivalent', 85);
+    }
+
+    // --------------------------------------------------- salt and dough bags
+
+    public function test_salt_and_dough_have_their_configured_bag_sizes(): void
+    {
+        $this->assertEquals(25.0, (float) InventoryItem::ofKey(InventoryItem::SALT)->bag_weight_kg);
+        $this->assertEquals(10.0, (float) InventoryItem::ofKey(InventoryItem::DOUGH)->bag_weight_kg);
+    }
+
+    public function test_salt_balance_is_reported_in_sacks(): void
+    {
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 75, 'purchase');
+
+        // 75kg at 25kg a sack is 3 sacks.
+        $this->assertEquals(3.0, InventoryItem::ofKey(InventoryItem::SALT)->fresh()->balance_bags);
+    }
+
+    public function test_dough_balance_is_reported_in_its_own_units(): void
+    {
+        InventoryItem::ofKey(InventoryItem::DOUGH)->move('in', 25, 'production');
+
+        // 25kg at 10kg a unit is 2.5 units.
+        $this->assertEquals(2.5, InventoryItem::ofKey(InventoryItem::DOUGH)->fresh()->balance_bags);
+    }
+
+    public function test_flour_still_reads_its_bag_size_from_the_formula(): void
+    {
+        // Flour predates the per-item column and must keep using the
+        // bakery-wide setting, not a null column value.
+        $this->assertNull(InventoryItem::ofKey(InventoryItem::FLOUR)->bag_weight_kg);
+
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 80, 'purchase');
+
+        $this->assertEquals(2.0, InventoryItem::ofKey(InventoryItem::FLOUR)->fresh()->balance_bags);
+    }
 }

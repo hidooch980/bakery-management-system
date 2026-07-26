@@ -31,6 +31,8 @@ class RolesAndPermissionsSeeder extends Seeder
         'view-inventory',
         'manage-customers',
         'view-chane-board',
+        'record-work-start',
+        'view-work-start-report',
     ];
 
     public function run(): void
@@ -52,6 +54,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $chaneGir = Role::firstOrCreate(['name' => 'chane_gir', 'guard_name' => 'web']);
         $chaneGir->syncPermissions([
+            'record-work-start',
             'view-pending-dough',
             'record-chane',
             'view-own-chane-history',
@@ -63,6 +66,7 @@ class RolesAndPermissionsSeeder extends Seeder
         // waiting, so the role is deliberately read-only.
         $shater = Role::firstOrCreate(['name' => 'shater', 'guard_name' => 'web']);
         $shater->syncPermissions([
+            'record-work-start',
             'view-chane-board',
             'record-attendance',
             'change-password',
@@ -70,6 +74,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
         $seller = Role::firstOrCreate(['name' => 'seller', 'guard_name' => 'web']);
         $seller->syncPermissions([
+            'record-work-start',
             'view-pending-chane',
             'record-sale',
             'view-own-sales',

@@ -4,6 +4,7 @@ import '../models/customer.dart';
 import '../models/entries.dart';
 import '../models/flour_sale.dart';
 import '../models/user.dart';
+import '../models/work_start.dart';
 import 'api_client.dart';
 
 /// Typed wrapper over every endpoint the mobile app uses.
@@ -230,6 +231,39 @@ class BakeryApi {
           double.tryParse('${summary['total_weight_kg']}') ?? 0,
       totalFormatted: summary['total_amount_formatted'] as String? ?? '',
     );
+  }
+
+  // ---------------------------------------------------------- work start
+
+  /// Today's start board for shaping and baking.
+  Future<WorkStartBoard> workStartBoard() async {
+    final body = await _client.get('/work-starts/today');
+
+    return WorkStartBoard.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// Ticks the start of an activity. Lateness is decided server-side against
+  /// the configured deadline, never by the phone's clock.
+  Future<({WorkStartBoard board, bool isLate, String? warning})>
+      recordWorkStart(WorkStartType type) async {
+    final body = await _client.post('/work-starts', {'type': type.apiValue});
+    final data = body['data'] as Map<String, dynamic>;
+
+    return (
+      board: WorkStartBoard.fromJson(data['board'] as Map<String, dynamic>),
+      isLate: data['is_late'] == true,
+      warning: data['warning'] as String?,
+    );
+  }
+
+  /// Late starts over a period, for payroll.
+  Future<Map<String, dynamic>> workStartLateReport({String? from, String? to}) async {
+    final body = await _client.get('/work-starts/late-report', query: {
+      if (from != null) 'from': from,
+      if (to != null) 'until': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
   }
 
   // --------------------------------------------------------------- board

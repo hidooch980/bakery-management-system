@@ -40,6 +40,11 @@ class ChaneBoardController extends Controller
 
         $total = $normalToday + $naninoToday;
 
+        // What-if: how many nanino loaves today's normal-shaped dough would
+        // have produced, had it been shaped as nanino instead. Not a count
+        // of anything actually baked — a comparison figure only.
+        $naninoEquivalent = $formula->naninoEquivalentForNormalCount($normalToday);
+
         return $this->success([
             'date_display' => AppCalendar::date(now()),
             'waiting' => [
@@ -56,6 +61,10 @@ class ChaneBoardController extends Controller
                 // Share of output from each system, for the comparison bar.
                 'normal_share_percent' => $total > 0 ? round($normalToday / $total * 100, 1) : 0,
                 'nanino_share_percent' => $total > 0 ? round($naninoToday / $total * 100, 1) : 0,
+                'normal_as_nanino_equivalent' => $naninoEquivalent,
+                'normal_as_nanino_announcement' => $naninoEquivalent === null
+                    ? null
+                    : "چانه‌های عادی امروز ({$normalToday} عدد) معادل {$naninoEquivalent} نان نانینو است.",
             ],
             'queues' => [
                 'pending_dough_batches' => DoughEntry::pending()->count(),

@@ -7,6 +7,7 @@ use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\FlourStockMovement;
 use App\Models\Sale;
+use App\Support\DoughFormula;
 use App\Support\Money;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -30,6 +31,16 @@ class BakeryStatsOverview extends BaseWidget
         $flourIn = (float) FlourStockMovement::where('type', 'in')->sum('amount_kg');
         $flourOut = (float) FlourStockMovement::where('type', 'out')->sum('amount_kg');
         $balance = round($flourIn - $flourOut, 2);
+
+        $formula = DoughFormula::fromBakery();
+        // Bags is a derived display, in step with how the warehouse tab
+        // already reports it (kg ÷ bag weight).
+        $balanceBags = $formula->bagWeightKg > 0
+            ? round($balance / $formula->bagWeightKg, 1)
+            : 0.0;
+
+        // What-if: today's normal chane, expressed as nanino loaves.
+        $naninoEquivalent = $formula->naninoEquivalentForNormalCount($chaneCount);
 
         return [
             Stat::make('خمیر امروز', number_format($doughBags).' کیسه')
@@ -66,6 +77,18 @@ class BakeryStatsOverview extends BaseWidget
                 ->description('خمیر در انتظار / چانه در انتظار فروش')
                 ->descriptionIcon('heroicon-m-queue-list')
                 ->color('gray'),
+
+            // A what-if comparison, not a count of anything actually baked:
+            // how many nanino loaves today's normal-shaped dough would have
+            // produced, had it been shaped as nanino instead.
+            Stat::make('معادل نانینوی چانه عادی', $naninoEquivalent === null
+                ? '—'
+                : number_format($naninoEquivalent).' عدد')
+                ->description($naninoEquivalent === null
+                    ? 'وزن هر دو نوع چانه در تنظیمات ثبت نشده است'
+                    : $chaneCount.' چانه عادی امروز، اگر نانینو شکل می‌گرفت')
+                ->descriptionIcon('heroicon-m-arrows-right-left')
+                ->color('warning'),
         ];
     }
 

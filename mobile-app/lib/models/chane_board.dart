@@ -21,6 +21,8 @@ class ChaneBoard {
     required this.naninoWeightKg,
     required this.pendingDoughBatches,
     required this.pendingDoughBags,
+    this.naninoEquivalent,
+    this.naninoAnnouncement,
   });
 
   final String dateDisplay;
@@ -35,6 +37,13 @@ class ChaneBoard {
 
   final int pendingDoughBatches;
   final int pendingDoughBags;
+
+  /// What-if: how many nanino loaves today's normal chane would be, had it
+  /// been shaped as nanino instead. Null when the two chane weights are not
+  /// both configured. Not a count of anything actually baked.
+  final int? naninoEquivalent;
+
+  final String? naninoAnnouncement;
 
   int get totalCount => normalCount + naninoCount;
 
@@ -77,6 +86,10 @@ class ChaneBoard {
       naninoWeightKg: _double(today['nanino_weight_kg']),
       pendingDoughBatches: _int(queues['pending_dough_batches']),
       pendingDoughBags: _int(queues['pending_dough_bags']),
+      naninoEquivalent: today['normal_as_nanino_equivalent'] == null
+          ? null
+          : _int(today['normal_as_nanino_equivalent']),
+      naninoAnnouncement: today['normal_as_nanino_announcement'] as String?,
     );
   }
 

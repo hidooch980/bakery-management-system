@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
+use App\Support\Jalali;
 use Filament\Widgets\ChartWidget;
 
 class ProductionTrendChart extends ChartWidget
@@ -37,7 +38,10 @@ class ProductionTrendChart extends ChartWidget
                     'tension' => 0.35,
                 ],
             ],
-            'labels' => $days->map(fn ($day) => $day->format('m/d'))->toArray(),
+            // Jalali day/month labels, so the axis matches the rest of the
+            // panel — this used to be raw Gregorian, out of step with every
+            // other date-bearing chart.
+            'labels' => $days->map(fn ($day) => Jalali::format($day, 'm/d'))->toArray(),
         ];
     }
 

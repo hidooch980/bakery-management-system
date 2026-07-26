@@ -98,6 +98,55 @@ class FlourSaleTest extends TestCase
         $this->assertEquals(1_150_000.0, FlourSale::defaultUnitPrice('bag'));
     }
 
+    // ---------------------------------------------- purchase cost settings
+
+    public function test_the_purchase_price_is_distinct_from_the_resale_price(): void
+    {
+        Bakery::first()->update([
+            'flour_price_per_kg' => 30_000,
+            'flour_purchase_price_per_kg' => 22_000,
+        ]);
+
+        // What the mill charges must never be confused with what the
+        // bakery charges a customer reselling flour out of its warehouse.
+        $this->assertEquals(30_000.0, FlourSale::defaultUnitPrice('kg'));
+        $this->assertEquals(
+            22_000.0,
+            (float) Bakery::first()->flour_purchase_price_per_kg
+        );
+    }
+
+    public function test_transport_by_factory_defaults_to_true(): void
+    {
+        $this->assertTrue((bool) Bakery::first()->flour_transport_by_factory);
+    }
+
+    public function test_transport_by_factory_can_be_turned_off(): void
+    {
+        Bakery::first()->update(['flour_transport_by_factory' => false]);
+
+        $this->assertFalse((bool) Bakery::first()->fresh()->flour_transport_by_factory);
+    }
+
+    public function test_admin_updates_the_purchase_cost_settings_through_the_api(): void
+    {
+        $this->actingAs($this->seller(), 'sanctum');
+        $admin = \App\Models\User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        $this->actingAs($admin, 'sanctum')
+            ->putJson('/api/v1/bakery', [
+                'name' => 'نانوایی من',
+                'flour_purchase_price_per_kg' => 21_500,
+                'flour_transport_by_factory' => false,
+            ])
+            ->assertOk();
+
+        $bakery = Bakery::first();
+        $this->assertEquals(21_500.0, (float) $bakery->flour_purchase_price_per_kg);
+        $this->assertFalse((bool) $bakery->flour_transport_by_factory);
+    }
+
     public function test_sack_weight_is_frozen_at_sale_time(): void
     {
         $this->actingAs($this->seller(), 'sanctum')

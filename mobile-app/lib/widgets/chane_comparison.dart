@@ -102,9 +102,58 @@ class ChaneComparison extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               _Verdict(board: board),
+
+              if (board.naninoAnnouncement != null) ...[
+                const SizedBox(height: 10),
+                _NaninoEquivalentBanner(board: board),
+              ],
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A what-if comparison: how many nanino loaves today's normal chane would
+/// be, had it been shaped as nanino instead. Not a count of anything
+/// actually baked — shown so both the seller and the admin see the same
+/// figure everywhere it appears.
+class _NaninoEquivalentBanner extends StatelessWidget {
+  const _NaninoEquivalentBanner({required this.board});
+
+  final ChaneBoard board;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: ChaneComparison._naninoColor.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: ChaneComparison._naninoColor.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.swap_horiz_rounded,
+              size: 18, color: ChaneComparison._naninoColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              board.naninoAnnouncement!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }

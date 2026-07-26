@@ -43,6 +43,19 @@ class InventoryItemResource extends Resource
                         ->required()
                         ->maxLength(20),
 
+                    Forms\Components\TextInput::make('bag_weight_kg')
+                        ->label('وزن هر کیسه/بسته')
+                        ->numeric()
+                        ->minValue(0)
+                        ->suffix('کیلوگرم')
+                        ->visible(fn (?InventoryItem $record) => $record?->key !== InventoryItem::FLOUR)
+                        ->helperText(fn (?InventoryItem $record) => $record?->key === InventoryItem::FLOUR
+                            ? null
+                            : 'برای نمایش موجودی به تعداد کیسه؛ مثلاً نمک ۲۵ کیلویی یا خمیر ۱۰ کیلویی')
+                        ->hint(fn (?InventoryItem $record) => $record?->key === InventoryItem::FLOUR
+                            ? 'وزن کیسه آرد از «اطلاعات نانوایی» خوانده می‌شود'
+                            : null),
+
                     Forms\Components\TextInput::make('low_threshold')
                         ->label('حد هشدار موجودی')
                         ->numeric()

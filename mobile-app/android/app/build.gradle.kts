@@ -37,7 +37,11 @@ android {
         applicationId = "com.bakery.bakery_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // 23 (Android 6.0), not Flutter's default of 24: staff carry older,
+        // low-end phones, and 23 is the lowest androidx.biometric supports —
+        // going lower would silently drop fingerprint/face support instead
+        // of widening compatibility.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -74,6 +78,13 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    // MainActivity extends FlutterFragmentActivity (required by local_auth's
+    // biometric prompt), which is an AppCompatActivity and crashes at launch
+    // without an AppCompat theme on the classpath.
+    implementation("androidx.appcompat:appcompat:1.7.0")
 }
 
 flutter {

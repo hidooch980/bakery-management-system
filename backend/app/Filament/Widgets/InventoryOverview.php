@@ -19,10 +19,15 @@ class InventoryOverview extends BaseWidget
                 $item = InventoryItem::ofKey($key);
                 $bags = $item->balance_bags;
 
+                // Salt and dough now have a bag size too, so the count and
+                // the low-stock warning must both be shown, not just one.
+                $bagsLabel = $bags !== null ? number_format($bags, 1).' کیسه' : null;
+                $statusLabel = $item->is_low ? 'کمتر از حد هشدار' : 'موجودی کافی';
+
                 return Stat::make($item->name, number_format($item->balance, 1).' '.$item->unit)
-                    ->description($bags !== null
-                        ? number_format($bags, 1).' کیسه'
-                        : ($item->is_low ? 'کمتر از حد هشدار' : 'موجودی کافی'))
+                    ->description($bagsLabel !== null
+                        ? ($item->is_low ? "{$bagsLabel} — {$statusLabel}" : $bagsLabel)
+                        : $statusLabel)
                     ->descriptionIcon($item->is_low
                         ? 'heroicon-m-exclamation-triangle'
                         : 'heroicon-m-check-circle')

@@ -16,11 +16,14 @@ class InventoryItem extends Model
         self::DOUGH => 'خمیر',
     ];
 
-    protected $fillable = ['key', 'name', 'unit', 'low_threshold'];
+    protected $fillable = ['key', 'name', 'unit', 'bag_weight_kg', 'low_threshold'];
 
     protected function casts(): array
     {
-        return ['low_threshold' => 'decimal:3'];
+        return [
+            'low_threshold' => 'decimal:3',
+            'bag_weight_kg' => 'decimal:3',
+        ];
     }
 
     public function movements()
@@ -37,14 +40,20 @@ class InventoryItem extends Model
         return round($in - $out, 3);
     }
 
-    /** Flour is handled in sacks, so its balance is also useful in bags. */
+    /**
+     * Every stocked good is handled in fixed-size sacks, so the balance is
+     * also useful expressed as a bag count.
+     *
+     * Flour's size lives on the bakery's production formula rather than on
+     * the item itself — that setting predates this column and every
+     * existing install already has it, so it is kept as the source of
+     * truth for flour rather than duplicated here.
+     */
     public function getBalanceBagsAttribute(): ?float
     {
-        if ($this->key !== self::FLOUR) {
-            return null;
-        }
-
-        $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+        $bagWeight = $this->key === self::FLOUR
+            ? \App\Support\DoughFormula::fromBakery()->bagWeightKg
+            : (float) ($this->bag_weight_kg ?? 0);
 
         return $bagWeight > 0 ? round($this->balance / $bagWeight, 2) : null;
     }

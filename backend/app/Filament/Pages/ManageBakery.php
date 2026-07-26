@@ -113,6 +113,59 @@ class ManageBakery extends Page implements HasForms
                         \App\Filament\Forms\MoneyInput::make('flour_price_per_bag', 'قیمت هر کیسه آرد')
                             ->helperText('اگر خالی بماند، از قیمت کیلویی × وزن کیسه محاسبه می‌شود'),
 
+                        \App\Filament\Forms\MoneyInput::make('flour_purchase_price_per_kg', 'قیمت خرید هر کیلو آرد از کارخانه')
+                            ->helperText('برای محاسبه بهای تمام‌شده؛ جدا از قیمت فروش آرد به مشتری'),
+
+                        Forms\Components\Toggle::make('flour_transport_by_factory')
+                            ->label('حمل توسط کارخانه')
+                            ->default(true)
+                            ->helperText('اگر خاموش باشد، هزینه حمل بر عهده نانوایی است و باید جدا در «هزینه‌ها» ثبت شود'),
+
+                        Forms\Components\TimePicker::make('chane_start_deadline')
+                            ->label('مهلت شروع چانه‌گیری')
+                            ->seconds(false)
+                            ->default('05:40')
+                            ->helperText('ثبت بعد از این ساعت، تأخیر و مشمول کسر حقوق است'),
+
+                        Forms\Components\TimePicker::make('baking_start_deadline')
+                            ->label('مهلت شروع پخت')
+                            ->seconds(false)
+                            ->default('06:00')
+                            ->helperText('ثبت بعد از این ساعت، تأخیر و مشمول کسر حقوق است'),
+
+                    ]),
+
+                Forms\Components\Section::make('قوانین تأخیر و کسر حقوق')
+                    ->description('این قوانین به همه کارکنان در اپلیکیشن اعلام می‌شود. جریمه به‌ازای هر «روز» تأخیر است، نه هر مورد؛ اگر در یک روز هم چانه‌گیری و هم پخت دیر شود، یک بار حساب می‌شود.')
+                    ->icon('heroicon-o-exclamation-triangle')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\TextInput::make('late_free_days')
+                            ->label('تعداد تأخیر بدون جریمه در ماه')
+                            ->numeric()
+                            ->minValue(0)
+                            ->default(3)
+                            ->suffix('روز')
+                            ->helperText('تا این تعداد فقط اخطار داده می‌شود'),
+
+                        Forms\Components\TextInput::make('late_tier1_last_day')
+                            ->label('آخرین روز مشمول نرخ اول')
+                            ->numeric()
+                            ->minValue(1)
+                            ->default(7)
+                            ->suffix('روز')
+                            ->helperText('مثلاً ۷ یعنی روزهای ۴ تا ۷'),
+
+                        \App\Filament\Forms\MoneyInput::make('late_tier1_amount', 'جریمه روزانه — نرخ اول')
+                            ->helperText('برای روزهای بعد از اخطارها'),
+
+                        \App\Filament\Forms\MoneyInput::make('late_tier2_amount', 'جریمه روزانه — نرخ دوم')
+                            ->helperText('برای روزهای بعد از نرخ اول'),
+
+                        Forms\Components\Placeholder::make('late_rules_preview')
+                            ->label('خلاصه قانون')
+                            ->columnSpanFull()
+                            ->content(fn () => \App\Support\LatePenalty::tariff()['summary']),
                     ]),
 
                 Forms\Components\Section::make('فرمول تولید خمیر')

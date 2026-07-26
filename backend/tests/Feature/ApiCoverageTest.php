@@ -171,9 +171,10 @@ class ApiCoverageTest extends TestCase
             ->assertJsonPath('data.total', 1);
     }
 
-    public function test_flour_balance_is_also_reported_in_bags(): void
+    public function test_flour_and_salt_balances_are_also_reported_in_bags(): void
     {
         InventoryItem::ofKey('flour')->move('in', 200, 'purchase');
+        InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
 
         $data = $this->actingAs($this->admin, 'sanctum')
             ->getJson('/api/v1/inventory')
@@ -185,8 +186,8 @@ class ApiCoverageTest extends TestCase
 
         // 200kg at the default 40kg sack.
         $this->assertEqualsWithDelta(5, $flour['balance_bags'], 0.001);
-        // Salt is not handled in sacks, so it has no bag figure.
-        $this->assertNull($salt['balance_bags']);
+        // 75kg at the configured 25kg salt sack.
+        $this->assertEqualsWithDelta(3, $salt['balance_bags'], 0.001);
     }
 
     public function test_inventory_threshold_can_be_set(): void
