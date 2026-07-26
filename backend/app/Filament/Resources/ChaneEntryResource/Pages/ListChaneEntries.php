@@ -16,4 +16,11 @@ class ListChaneEntries extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            \App\Filament\Widgets\ProductionComparisonOverview::class,
+        ];
+    }
 }
