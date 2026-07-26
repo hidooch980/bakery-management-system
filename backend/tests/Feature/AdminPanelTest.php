@@ -85,6 +85,67 @@ class AdminPanelTest extends TestCase
         ];
     }
 
+    public function test_dashboard_renders_with_data_in_every_widget(): void
+    {
+        $admin = $this->admin();
+
+        // This class does not seed the bakery, so create it here.
+        $this->seed(\Database\Seeders\BakerySeeder::class);
+
+        \App\Models\Bakery::first()->update([
+            'normal_chane_weight_kg' => 0.85,
+            'nanino_chane_weight_kg' => 1.0,
+            'currency' => 'rial',
+        ]);
+        \App\Support\Money::forgetCache();
+
+        // Production, stock, a quota, a debt and an attendance record, so no
+        // widget is exercised only against empty tables.
+        $dough = \App\Models\DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 2]);
+        $chane = \App\Models\ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $admin->id,
+            'chane_count' => 100,
+            'normal_weight_kg' => 85,
+            'nanino_weight_kg' => 40,
+            'spray_flour_kg' => 2,
+        ]);
+
+        $customer = \App\Models\Customer::create(['name' => 'دبستان', 'type' => 'school']);
+        \App\Models\Sale::create([
+            'chane_entry_id' => $chane->id,
+            'user_id' => $admin->id,
+            'payment_type' => 'credit',
+            'customer_id' => $customer->id,
+            'amount' => 500000,
+        ]);
+
+        \App\Models\Expense::create([
+            'category' => 'fuel',
+            'title' => 'سوخت',
+            'amount' => 100000,
+            'spent_on' => now(),
+        ]);
+
+        \App\Models\InventoryItem::ofKey('flour')->move('in', 400, 'purchase');
+
+        $allocation = \App\Models\FlourAllocation::create([
+            'month_start' => \App\Support\Jalali::currentMonthRange()[0],
+            'month_label' => 'تست',
+            'total_bags' => 75,
+            'carryover_bags' => 10,
+        ]);
+        $allocation->syncPeriods();
+
+        \App\Models\Attendance::create([
+            'user_id' => $admin->id,
+            'date' => now(),
+            'checked_in_at' => now(),
+        ]);
+
+        $this->actingAs($admin)->get('/admin')->assertOk();
+    }
+
     public function test_non_admin_staff_cannot_access_panel(): void
     {
         foreach (['dough_maker', 'chane_gir', 'seller'] as $role) {

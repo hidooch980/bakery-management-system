@@ -17,7 +17,7 @@ class IncomeExpenseChart extends ChartWidget
         return 'درآمد و هزینه (۱۴ روز اخیر) — '.Money::label();
     }
 
-    protected static ?int $sort = 3;
+    protected static ?int $sort = 6;
 
     protected int|string|array $columnSpan = 'full';
 

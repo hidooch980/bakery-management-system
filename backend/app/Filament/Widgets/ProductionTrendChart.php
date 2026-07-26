@@ -10,7 +10,7 @@ class ProductionTrendChart extends ChartWidget
 {
     protected static ?string $heading = 'روند تولید (۱۴ روز اخیر)';
 
-    protected static ?int $sort = 3;
+    protected static ?int $sort = 5;
 
     protected int|string|array $columnSpan = 'full';
 

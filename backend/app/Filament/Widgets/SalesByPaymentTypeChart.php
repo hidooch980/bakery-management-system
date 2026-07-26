@@ -10,7 +10,7 @@ class SalesByPaymentTypeChart extends ChartWidget
 {
     protected static ?string $heading = 'فروش بر اساس نوع پرداخت (۳۰ روز اخیر)';
 
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 7;
 
     protected function getData(): array
     {

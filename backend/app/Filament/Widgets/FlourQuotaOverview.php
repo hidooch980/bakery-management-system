@@ -1,0 +1,72 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Models\FlourAllocation;
+use App\Support\AppCalendar;
+use App\Support\DoughFormula;
+use Filament\Widgets\StatsOverviewWidget as BaseWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
+
+/**
+ * The flour quota for the period in progress. This is the number the shop
+ * plans around day to day, so it belongs on the dashboard rather than two
+ * clicks away.
+ */
+class FlourQuotaOverview extends BaseWidget
+{
+    protected static ?int $sort = 3;
+
+    protected int|string|array $columnSpan = 'full';
+
+    protected function getStats(): array
+    {
+        $allocation = FlourAllocation::forDate(now());
+        $period = $allocation?->periodFor(now());
+
+        if (! $allocation || ! $period) {
+            return [
+                Stat::make('سهمیه آرد', 'تعریف نشده')
+                    ->description('سهمیه این بازه در بخش انبار ثبت نشده است.')
+                    ->descriptionIcon('heroicon-m-exclamation-triangle')
+                    ->color('gray'),
+            ];
+        }
+
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+        $remainingBags = $bagWeight > 0 ? $period->remaining_kg / $bagWeight : 0;
+
+        return [
+            Stat::make($period->label, number_format((float) $period->allocated_kg, 0).' kg')
+                ->description(AppCalendar::date($period->starts_on).' تا '.AppCalendar::date($period->ends_on))
+                ->descriptionIcon('heroicon-m-calendar-days')
+                ->color('info'),
+
+            Stat::make('مصرف این دوره', number_format($period->used_kg, 0).' kg')
+                ->description($period->usage_percent.'٪ از سهمیه دوره')
+                ->descriptionIcon('heroicon-m-arrow-trending-down')
+                ->color($period->usage_percent > 90 ? 'danger' : ($period->usage_percent > 70 ? 'warning' : 'success')),
+
+            Stat::make('باقی‌مانده دوره', number_format($period->remaining_kg, 0).' kg')
+                ->description($period->is_over
+                    ? 'بیش از سهمیه مصرف شده'
+                    : number_format($remainingBags, 1).' کیسه')
+                ->descriptionIcon($period->is_over ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-circle')
+                ->color($period->is_over ? 'danger' : 'success'),
+
+            Stat::make('تراز نانینو', number_format(abs($period->nanino_balance_kg), 0).' kg')
+                ->description($period->nanino_balance_kg >= 0
+                    ? 'سهمیه بیشتر از مصرف نانینو'
+                    : 'مصرف نانینو بیشتر از سهمیه')
+                ->descriptionIcon('heroicon-m-scale')
+                ->color($period->nanino_balance_kg >= 0 ? 'success' : 'danger'),
+
+            Stat::make('سنوات', number_format((float) $allocation->carryover_kg, 0).' kg')
+                ->description((float) $allocation->carryover_bags > 0
+                    ? number_format((float) $allocation->carryover_bags, 1).' کیسه مانده از قبل'
+                    : 'مانده‌ای از قبل ثبت نشده')
+                ->descriptionIcon('heroicon-m-archive-box')
+                ->color((float) $allocation->carryover_kg > 0 ? 'info' : 'gray'),
+        ];
+    }
+}

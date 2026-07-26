@@ -15,7 +15,7 @@ class TodayAttendanceTable extends BaseWidget
 {
     protected static ?string $heading = 'تیک حضور امروز';
 
-    protected static ?int $sort = 4;
+    protected static ?int $sort = 10;
 
     protected int|string|array $columnSpan = 'full';
 

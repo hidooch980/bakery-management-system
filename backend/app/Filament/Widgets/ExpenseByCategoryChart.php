@@ -14,7 +14,7 @@ class ExpenseByCategoryChart extends ChartWidget
         return 'هزینه‌ها به تفکیک دسته (این ماه) — '.Money::label();
     }
 
-    protected static ?int $sort = 5;
+    protected static ?int $sort = 8;
 
     protected function getData(): array
     {
