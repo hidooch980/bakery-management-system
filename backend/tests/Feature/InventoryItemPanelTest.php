@@ -58,7 +58,7 @@ class InventoryItemPanelTest extends TestCase
         )->html();
 
         $bagsPosition = strpos($html, '3.00 کیسه');
-        $weightPosition = strpos($html, '75.000 kg');
+        $weightPosition = strpos($html, '75.000 کیلوگرم');
 
         $this->assertNotFalse($bagsPosition);
         $this->assertNotFalse($weightPosition);

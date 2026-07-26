@@ -221,7 +221,7 @@ class FlourAllocationResource extends Resource
                     ->description(fn (FlourAllocation $record) => $record->periods
                         ->map(fn ($p) => number_format($p->used_kg, 0).'/'
                             .number_format((float) $p->allocated_kg, 0))
-                        ->implode('   •   ').'  (مصرف/سهمیه kg)'),
+                        ->implode('   •   ').'  (مصرف/سهمیه کیلوگرم)'),
 
                 Tables\Columns\TextColumn::make('nanino_balance')
                     ->label('تراز نانینو')
@@ -240,7 +240,7 @@ class FlourAllocationResource extends Resource
                             })
                             ->implode('   •   ');
                     })
-                    ->description('سهمیه منهای آرد معادل نانینو (kg)')
+                    ->description('سهمیه منهای آرد معادل نانینو (کیلوگرم)')
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('current')

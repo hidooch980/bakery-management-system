@@ -97,7 +97,7 @@ class InventoryItem extends Model
     {
         return static::firstOrCreate(
             ['key' => $key],
-            ['name' => self::DEFAULTS[$key] ?? $key, 'unit' => 'kg']
+            ['name' => self::DEFAULTS[$key] ?? $key, 'unit' => 'کیلوگرم']
         );
     }
 }

@@ -11,7 +11,7 @@ class InsufficientStockException extends RuntimeException
         public readonly string $itemName,
         public readonly float $available,
         public readonly float $requested,
-        public readonly string $unit = 'kg',
+        public readonly string $unit = 'کیلوگرم',
     ) {
         parent::__construct(sprintf(
             'موجودی %s کافی نیست: %s %s در انبار موجود است، %s %s درخواست شده.',

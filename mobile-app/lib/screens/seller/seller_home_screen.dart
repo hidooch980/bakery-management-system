@@ -224,7 +224,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                     for (final entry in pending) ...[
                       ActionCard(
                         title: '${entry.chaneCount} چانه',
-                        subtitle: 'وزن: ${entry.weightKg.toStringAsFixed(2)} kg'
+                        subtitle: 'وزن: ${entry.weightKg.toStringAsFixed(2)} کیلوگرم'
                             '${entry.userName != null ? '  •  ${entry.userName}' : ''}',
                         icon: Icons.shopping_basket_rounded,
                         color: const Color(0xFF3B82C4),
@@ -556,7 +556,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                 const SizedBox(height: 6),
                 Text(
                   'چانه #${widget.chane.id} — ${widget.chane.chaneCount} عدد '
-                  '(${widget.chane.weightKg.toStringAsFixed(2)} kg)',
+                  '(${widget.chane.weightKg.toStringAsFixed(2)} کیلوگرم)',
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium

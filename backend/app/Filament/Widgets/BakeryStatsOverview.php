@@ -67,7 +67,7 @@ class BakeryStatsOverview extends BaseWidget
 
             Stat::make('موجودی آرد', number_format($balanceBags, 1).' کیسه')
                 ->description($balance > 0
-                    ? number_format($balance, 2).' kg'
+                    ? number_format($balance, 2).' کیلوگرم'
                     : 'نیاز به تأمین')
                 ->descriptionIcon($balance > 0 ? 'heroicon-m-check-circle' : 'heroicon-m-exclamation-triangle')
                 ->color($balance > 0 ? 'success' : 'danger'),

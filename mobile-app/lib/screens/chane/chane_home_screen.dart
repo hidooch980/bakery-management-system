@@ -390,7 +390,7 @@ class _WeightPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        '$label: ${value.toStringAsFixed(2)} kg',
+        '$label: ${value.toStringAsFixed(2)} کیلوگرم',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w700,
@@ -609,7 +609,7 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
                       ),
                       const Spacer(),
                       Text(
-                        '${_total.toStringAsFixed(2)} kg',
+                        '${_total.toStringAsFixed(2)} کیلوگرم',
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
@@ -769,7 +769,7 @@ class _WeightRow extends StatelessWidget {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
           child: Text(
-            '${weight.toStringAsFixed(2)} kg',
+            '${weight.toStringAsFixed(2)} کیلوگرم',
             key: ValueKey(weight),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,

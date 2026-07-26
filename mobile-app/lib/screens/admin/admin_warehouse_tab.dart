@@ -164,7 +164,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
         children: [
           AdminRow(
             label: 'کل سهمیه ماه',
-            value: '${_fmt(quota['total_kg'])} kg',
+            value: '${_fmt(quota['total_kg'])} کیلوگرم',
             icon: Icons.scale_rounded,
             emphasise: true,
           ),
@@ -192,7 +192,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
     return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
   }
 
-  /// "۱۰۰ kg  •  ۴ کیسه" — the bag count only shown once the item actually
+  /// "۱۰۰ کیلوگرم  •  ۴ کیسه" — the bag count only shown once the item actually
   /// has a configured sack size (flour, salt, dough all do; a future item
   /// added without one just shows the raw weight).
   /// Bag count leads, weight follows on the same line.
@@ -281,13 +281,13 @@ class _PeriodCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'مصرف ${period['used_kg']} از ${period['allocated_kg']} kg',
+                  'مصرف ${period['used_kg']} از ${period['allocated_kg']} کیلوگرم',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 Text(
                   isOver
                       ? 'بیش از سهمیه'
-                      : 'باقی‌مانده ${period['remaining_kg']} kg',
+                      : 'باقی‌مانده ${period['remaining_kg']} کیلوگرم',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: color,
                         fontWeight: FontWeight.w700,

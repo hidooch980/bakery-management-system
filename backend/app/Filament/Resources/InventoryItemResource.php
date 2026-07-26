@@ -42,7 +42,7 @@ class InventoryItemResource extends Resource
 
                     Forms\Components\TextInput::make('unit')
                         ->label('واحد')
-                        ->default('kg')
+                        ->default('کیلوگرم')
                         ->required()
                         ->maxLength(20),
 

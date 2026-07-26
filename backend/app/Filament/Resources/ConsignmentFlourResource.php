@@ -72,7 +72,7 @@ class ConsignmentFlourResource extends Resource
                         ->numeric()
                         ->minValue(0.001)
                         ->required()
-                        ->suffix('kg'),
+                        ->suffix('کیلوگرم'),
 
                     \App\Filament\Forms\JalaliDateInput::today('occurred_on', 'تاریخ')
                         ->required(),
@@ -113,7 +113,7 @@ class ConsignmentFlourResource extends Resource
                 Tables\Columns\TextColumn::make('amount_kg')
                     ->label('مقدار')
                     ->numeric(3)
-                    ->suffix(' kg')
+                    ->suffix(' کیلوگرم')
                     ->sortable()
                     ->summarize(Tables\Columns\Summarizers\Sum::make()->label('جمع')),
 

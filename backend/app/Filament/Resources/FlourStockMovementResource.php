@@ -55,7 +55,7 @@ class FlourStockMovementResource extends Resource
                         ->numeric()
                         ->minValue(0.01)
                         ->required()
-                        ->suffix('kg'),
+                        ->suffix('کیلوگرم'),
 
                     Forms\Components\Select::make('user_id')
                         ->label('ثبت‌کننده')
@@ -89,7 +89,7 @@ class FlourStockMovementResource extends Resource
                 Tables\Columns\TextColumn::make('amount_kg')
                     ->label('مقدار')
                     ->numeric(2)
-                    ->suffix(' kg')
+                    ->suffix(' کیلوگرم')
                     ->sortable()
                     ->summarize(Tables\Columns\Summarizers\Sum::make()->label('جمع')),
 

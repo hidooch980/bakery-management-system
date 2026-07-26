@@ -51,7 +51,7 @@ class InventoryMovementResource extends Resource
                         ->numeric()
                         ->minValue(0.001)
                         ->required()
-                        ->suffix('kg'),
+                        ->suffix('کیلوگرم'),
 
                     Forms\Components\Select::make('reason')
                         ->label('علت')
@@ -102,7 +102,7 @@ class InventoryMovementResource extends Resource
                 Tables\Columns\TextColumn::make('quantity')
                     ->label('مقدار')
                     ->numeric(3)
-                    ->suffix(' kg')
+                    ->suffix(' کیلوگرم')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('reason')

@@ -94,7 +94,7 @@ class ChaneEntryResource extends Resource
 
                             return $weight === null
                                 ? 'وزن هر چانه عادی در تنظیمات ثبت نشده است'
-                                : number_format($weight, 2).' kg';
+                                : number_format($weight, 2).' کیلوگرم';
                         }),
 
                     Forms\Components\Placeholder::make('nanino_weight_preview')
@@ -105,7 +105,7 @@ class ChaneEntryResource extends Resource
 
                             return $weight === null
                                 ? 'وزن هر چانه نانینو در تنظیمات ثبت نشده است'
-                                : number_format($weight, 2).' kg';
+                                : number_format($weight, 2).' کیلوگرم';
                         }),
 
                     Forms\Components\TextInput::make('spray_flour_kg')
@@ -113,7 +113,7 @@ class ChaneEntryResource extends Resource
                         ->numeric()
                         ->minValue(0)
                         ->required()
-                        ->suffix('kg'),
+                        ->suffix('کیلوگرم'),
 
                     Forms\Components\Placeholder::make('comparison_preview')
                         ->label('مقایسه عادی / نانینو')
@@ -135,7 +135,7 @@ class ChaneEntryResource extends Resource
                             $naninoShare = $total > 0 ? round($naninoCount / $total * 100) : 0;
 
                             return sprintf(
-                                'عادی: %d عدد (%s kg) — %d٪   •   نانینو: %d عدد (%s kg) — %d٪',
+                                'عادی: %d عدد (%s کیلوگرم) — %d٪   •   نانینو: %d عدد (%s کیلوگرم) — %d٪',
                                 $normalCount,
                                 number_format($normalWeight, 1),
                                 $normalShare,
@@ -175,20 +175,20 @@ class ChaneEntryResource extends Resource
                 Tables\Columns\TextColumn::make('normal_weight_kg')
                     ->label('وزن عادی')
                     ->numeric(2)
-                    ->suffix(' kg')
+                    ->suffix(' کیلوگرم')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('nanino_weight_kg')
                     ->label('وزن نانینو')
                     ->numeric(2)
-                    ->suffix(' kg')
+                    ->suffix(' کیلوگرم')
                     ->sortable()
                     ->description('نمایشی'),
 
                 Tables\Columns\TextColumn::make('weight_kg')
                     ->label('وزن ملاک')
                     // Normal chane only — the figure sales and stock use.
-                    ->state(fn (ChaneEntry $record) => number_format($record->weight_kg, 2).' kg')
+                    ->state(fn (ChaneEntry $record) => number_format($record->weight_kg, 2).' کیلوگرم')
                     ->badge()
                     ->color('success')
                     ->description('فقط چانه عادی'),
@@ -196,7 +196,7 @@ class ChaneEntryResource extends Resource
                 Tables\Columns\TextColumn::make('spray_flour_kg')
                     ->label('آرد پاششی')
                     ->numeric(2)
-                    ->suffix(' kg')
+                    ->suffix(' کیلوگرم')
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('status')

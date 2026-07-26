@@ -59,7 +59,7 @@ class FlourQuotaOverview extends BaseWidget
         $remainingBags = $bagWeight > 0 ? $period->remaining_kg / $bagWeight : 0;
 
         return [
-            Stat::make($period->label, number_format((float) $period->allocated_kg, 0).' kg')
+            Stat::make($period->label, number_format((float) $period->allocated_kg, 0).' کیلوگرم')
                 ->description(AppCalendar::date($period->starts_on).' تا '.AppCalendar::date($period->ends_on))
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color('info'),
@@ -73,26 +73,26 @@ class FlourQuotaOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color($period->holiday_days > 0 ? 'warning' : 'gray'),
 
-            Stat::make('مصرف این دوره', number_format($period->used_kg, 0).' kg')
+            Stat::make('مصرف این دوره', number_format($period->used_kg, 0).' کیلوگرم')
                 ->description($period->usage_percent.'٪ از سهمیه دوره')
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color($period->usage_percent > 90 ? 'danger' : ($period->usage_percent > 70 ? 'warning' : 'success')),
 
-            Stat::make('باقی‌مانده دوره', number_format($period->remaining_kg, 0).' kg')
+            Stat::make('باقی‌مانده دوره', number_format($period->remaining_kg, 0).' کیلوگرم')
                 ->description($period->is_over
                     ? 'بیش از سهمیه مصرف شده'
                     : number_format($remainingBags, 1).' کیسه')
                 ->descriptionIcon($period->is_over ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-circle')
                 ->color($period->is_over ? 'danger' : 'success'),
 
-            Stat::make('تراز نانینو', number_format(abs($period->nanino_balance_kg), 0).' kg')
+            Stat::make('تراز نانینو', number_format(abs($period->nanino_balance_kg), 0).' کیلوگرم')
                 ->description($period->nanino_balance_kg >= 0
                     ? 'سهمیه بیشتر از مصرف نانینو'
                     : 'مصرف نانینو بیشتر از سهمیه')
                 ->descriptionIcon('heroicon-m-scale')
                 ->color($period->nanino_balance_kg >= 0 ? 'success' : 'danger'),
 
-            Stat::make('سنوات', number_format((float) $allocation->carryover_kg, 0).' kg')
+            Stat::make('سنوات', number_format((float) $allocation->carryover_kg, 0).' کیلوگرم')
                 ->description((float) $allocation->carryover_bags > 0
                     ? number_format((float) $allocation->carryover_bags, 1).' کیسه مانده از قبل'
                     : 'مانده‌ای از قبل ثبت نشده')
