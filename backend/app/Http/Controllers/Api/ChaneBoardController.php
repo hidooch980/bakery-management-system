@@ -34,9 +34,7 @@ class ChaneBoardController extends Controller
 
         // Nanino count is derived from its weight, since the entry stores the
         // weight rather than a separate count.
-        $naninoToday = $formula->naninoChaneWeightKg
-            ? (int) round($naninoWeight / $formula->naninoChaneWeightKg)
-            : 0;
+        $naninoToday = $formula->naninoCountForWeight($naninoWeight);
 
         $total = $normalToday + $naninoToday;
 

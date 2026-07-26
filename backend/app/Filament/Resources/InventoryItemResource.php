@@ -4,8 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\InventoryItemResource\Pages;
 use App\Models\InventoryItem;
+use App\Support\DoughFormula;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -65,6 +67,14 @@ class InventoryItemResource extends Resource
         ]);
     }
 
+    /** Flour reads its sack size from the production formula; others carry their own. */
+    private static function bagWeightFor(InventoryItem $item): float
+    {
+        return $item->key === InventoryItem::FLOUR
+            ? DoughFormula::fromBakery()->bagWeightKg
+            : (float) ($item->bag_weight_kg ?? 0);
+    }
+
     public static function table(Table $table): Table
     {
         return $table
@@ -106,6 +116,82 @@ class InventoryItemResource extends Resource
                     ->toggleable(),
             ])
             ->actions([
+                Tables\Actions\Action::make('recordStock')
+                    ->label('ثبت موجودی (کیسه‌ای)')
+                    ->icon('heroicon-o-arrows-up-down')
+                    ->color('primary')
+                    ->form(function (InventoryItem $record) {
+                        $bagWeight = self::bagWeightFor($record);
+
+                        return [
+                            Forms\Components\Radio::make('direction')
+                                ->label('نوع')
+                                ->options(['in' => 'ورود (خرید/تولید)', 'out' => 'خروج (مصرف/ضایعات)'])
+                                ->default('in')
+                                ->required()
+                                ->inline(),
+
+                            Forms\Components\TextInput::make('bags')
+                                ->label('تعداد کیسه/واحد')
+                                ->numeric()
+                                ->minValue(0.001)
+                                ->required()
+                                ->live(onBlur: true)
+                                ->suffix($bagWeight > 0
+                                    ? 'هر واحد '.rtrim(rtrim(number_format($bagWeight, 3), '0'), '.').' کیلوگرم'
+                                    : null),
+
+                            Forms\Components\Placeholder::make('computed_kg')
+                                ->label('معادل کیلوگرم')
+                                ->content(function (Forms\Get $get) use ($bagWeight) {
+                                    $bags = (float) ($get('bags') ?: 0);
+
+                                    return number_format($bags * $bagWeight, 3).' کیلوگرم';
+                                }),
+
+                            Forms\Components\Select::make('reason')
+                                ->label('علت')
+                                ->options(\App\Models\InventoryMovement::REASONS)
+                                ->default('manual')
+                                ->required()
+                                ->native(false),
+
+                            Forms\Components\Textarea::make('note')
+                                ->label('توضیحات')
+                                ->rows(2),
+                        ];
+                    })
+                    // A sack size must exist before a bag count means anything —
+                    // this only happens for flour when the formula has no bag
+                    // weight configured yet.
+                    ->disabled(fn (InventoryItem $record) => self::bagWeightFor($record) <= 0)
+                    ->tooltip(fn (InventoryItem $record) => self::bagWeightFor($record) <= 0
+                        ? 'ابتدا وزن کیسه را در تنظیمات این کالا یا اطلاعات نانوایی ثبت کنید'
+                        : null)
+                    ->action(function (InventoryItem $record, array $data) {
+                        $bagWeight = self::bagWeightFor($record);
+                        $kg = round((float) $data['bags'] * $bagWeight, 3);
+
+                        $record->move(
+                            $data['direction'],
+                            $kg,
+                            $data['reason'],
+                            auth()->id(),
+                            null,
+                            $data['note'] ?? null,
+                        );
+
+                        Notification::make()
+                            ->title('موجودی ثبت شد')
+                            ->body('موجودی جدید '.$record->name.': '
+                                .number_format($record->fresh()->balance, 2).' '.$record->unit
+                                .($record->fresh()->balance_bags !== null
+                                    ? '  ('.number_format($record->fresh()->balance_bags, 2).' کیسه)'
+                                    : ''))
+                            ->success()
+                            ->send();
+                    }),
+
                 Tables\Actions\EditAction::make()->label('ویرایش'),
             ])
             ->paginated(false)

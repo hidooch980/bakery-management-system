@@ -630,6 +630,42 @@ class ProductionFormulaTest extends TestCase
             ->assertJsonPath('data.today.normal_as_nanino_equivalent', 85);
     }
 
+    // -------------------------------------------------- real nanino count
+
+    public function test_nanino_count_is_derived_from_its_recorded_weight(): void
+    {
+        // 40kg of nanino output at 1.0kg each is 40 loaves.
+        $this->assertSame(40, DoughFormula::fromBakery()->naninoCountForWeight(40));
+    }
+
+    public function test_nanino_count_is_zero_without_a_configured_weight(): void
+    {
+        Bakery::first()->update(['nanino_chane_weight_kg' => null]);
+
+        $this->assertSame(0, DoughFormula::fromBakery()->naninoCountForWeight(40));
+    }
+
+    public function test_the_production_report_includes_the_period_nanino_count(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        $dough = DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 10]);
+        ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $admin->id,
+            'chane_count' => 100,
+            'normal_weight_kg' => 85,
+            'nanino_weight_kg' => 40,
+            'spray_flour_kg' => 0,
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/production')
+            ->assertOk()
+            ->assertJsonPath('data.total_nanino_count', 40);
+    }
+
     // --------------------------------------------------- salt and dough bags
 
     public function test_salt_and_dough_have_their_configured_bag_sizes(): void

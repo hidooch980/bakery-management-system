@@ -111,6 +111,21 @@ class DoughFormula
     }
 
     /**
+     * The actual nanino count for a recorded weight. ChaneEntry stores only
+     * the nanino weight, not a count, so every place that needs the real
+     * figure (as opposed to the what-if equivalent below) derives it the
+     * same way through here.
+     */
+    public function naninoCountForWeight(float $naninoWeightKg): int
+    {
+        if (! $this->naninoChaneWeightKg) {
+            return 0;
+        }
+
+        return (int) round($naninoWeightKg / $this->naninoChaneWeightKg);
+    }
+
+    /**
      * How many nanino loaves the same dough would have produced, had the
      * normal chane actually baked today been shaped as nanino instead.
      *

@@ -84,6 +84,10 @@ class ReportController extends Controller
             'total_weight_kg' => round((float) $chane->sum('normal_weight_kg'), 2),
             'total_normal_weight_kg' => round((float) $chane->sum('normal_weight_kg'), 2),
             'total_nanino_weight_kg' => round((float) $chane->sum('nanino_weight_kg'), 2),
+            // The real nanino count for the period, derived from its weight —
+            // previously only ever reported for today, nowhere over a range.
+            'total_nanino_count' => \App\Support\DoughFormula::fromBakery()
+                ->naninoCountForWeight((float) $chane->sum('nanino_weight_kg')),
             'total_spray_flour_kg' => round((float) $chane->sum('spray_flour_kg'), 2),
         ]);
     }

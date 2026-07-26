@@ -26,6 +26,18 @@ class FlourStockMovementResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
+    /**
+     * Superseded by InventoryItem/InventoryMovement ("موجودی انبار" و
+     * "گردش انبار" under انبار), which cover flour, salt and dough with
+     * bag sizes and low-stock thresholds. This flour-only ledger stays for
+     * the legacy /flour/movements API route, but showing it in the menu
+     * alongside its replacement is redundant and confusing.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([
