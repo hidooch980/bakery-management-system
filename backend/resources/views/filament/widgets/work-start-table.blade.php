@@ -1,4 +1,9 @@
-@php($board = $this->getBoard())
+@php
+    // The @php(...) shorthand directive compiled without a closing tag in
+    // this Filament/Livewire setup, silently corrupting the rest of the
+    // file into invalid PHP — hence the explicit block form here.
+    $board = $this->getBoard();
+@endphp
 
 <x-filament-widgets::widget>
     <x-filament::section>
@@ -24,6 +29,24 @@
                         'danger' => 'border-danger-500/40 bg-danger-50/60 dark:bg-danger-500/10',
                         default => 'border-gray-200 dark:border-white/10',
                     };
+
+                    // Built as a single string rather than nested @if blocks:
+                    // Livewire's Blade compiler wraps @if/@endif pairs with
+                    // HTML markers for its diffing, and a nested @if sitting
+                    // right before the parent's @elseif confuses that
+                    // wrapping and produces a broken compiled file.
+                    if ($item['started']) {
+                        $status = 'ثبت شد: '.$item['started_at'];
+                        if (! empty($item['started_by'])) {
+                            $status .= ' — '.$item['started_by'];
+                        }
+                    } elseif ($item['is_holiday']) {
+                        $status = 'تعطیل';
+                    } elseif ($item['overdue']) {
+                        $status = 'هنوز ثبت نشده و مهلت گذشته است';
+                    } else {
+                        $status = 'هنوز ثبت نشده — '.$item['minutes_remaining'].' دقیقه تا مهلت';
+                    }
                 @endphp
 
                 <div class="rounded-xl border p-4 {{ $classes }}">
@@ -36,27 +59,13 @@
                     </div>
 
                     <div class="mt-2 text-sm">
-                        @if ($item['started'])
-                            <span class="font-semibold">
-                                ثبت شد: {{ $item['started_at'] }}
-                            </span>
-
-                            @if ($item['started_by'])
-                                <span class="text-gray-500 dark:text-gray-400">
-                                    — {{ $item['started_by'] }}
-                                </span>
-                            @endif
-                        @elseif ($item['is_holiday'])
-                            <span class="text-gray-500 dark:text-gray-400">تعطیل</span>
-                        @elseif ($item['overdue'])
-                            <span class="font-semibold text-danger-600 dark:text-danger-400">
-                                هنوز ثبت نشده و مهلت گذشته است
-                            </span>
-                        @else
-                            <span class="text-gray-500 dark:text-gray-400">
-                                هنوز ثبت نشده — {{ $item['minutes_remaining'] }} دقیقه تا مهلت
-                            </span>
-                        @endif
+                        <span class="{{ match (true) {
+                            $item['started'] => 'font-semibold',
+                            $item['overdue'] => 'font-semibold text-danger-600 dark:text-danger-400',
+                            default => 'text-gray-500 dark:text-gray-400',
+                        } }}">
+                            {{ $status }}
+                        </span>
                     </div>
 
                     @if ($item['warning'])
