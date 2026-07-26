@@ -696,6 +696,102 @@ class ProductionFormulaTest extends TestCase
         $this->assertSame(0.0, $period->nanino_flour_kg);
     }
 
+    // ------------------------- production measured against flour consumed
+
+    /**
+     * Sets up a period, burns $usedBags of flour inside it, and records
+     * $naninoLoaves of nanino output on the same day.
+     */
+    private function periodWithUsageAndOutput(float $usedBags, int $naninoLoaves): \App\Models\FlourAllocationPeriod
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+
+        $period = $allocation->periods()->first();
+        $inside = $period->starts_on->copy()->addDay();
+
+        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $flour->move('in', 10000, 'purchase');
+        $movement = $flour->move('out', $usedBags * 40, 'production');
+        \Illuminate\Support\Facades\DB::table('inventory_movements')
+            ->where('id', $movement->id)->update(['created_at' => $inside]);
+
+        $user = $this->userWithRole('chane_gir');
+        $dough = DoughEntry::create(['user_id' => $user->id, 'bag_count' => 1]);
+        $entry = ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $user->id,
+            'chane_count' => 0,
+            'normal_weight_kg' => 0,
+            // Nanino weight is 1.0kg, so the weight is the loaf count.
+            'nanino_weight_kg' => $naninoLoaves * 1.0,
+            'spray_flour_kg' => 0,
+        ]);
+        \Illuminate\Support\Facades\DB::table('chane_entries')
+            ->where('id', $entry->id)->update(['created_at' => $inside]);
+
+        return $period->refresh();
+    }
+
+    public function test_the_period_expects_nanino_output_from_the_flour_it_consumed(): void
+    {
+        // One bag yields 64.6kg of dough, so 64 nanino loaves at 1.0kg.
+        $period = $this->periodWithUsageAndOutput(usedBags: 1, naninoLoaves: 64);
+
+        $this->assertSame(64, $period->expected_nanino_count);
+        $this->assertSame(64, $period->nanino_chane_count);
+        $this->assertSame(0, $period->nanino_production_gap);
+        $this->assertSame('ok', $period->nanino_production_status);
+    }
+
+    public function test_producing_less_than_the_flour_accounts_for_is_an_error(): void
+    {
+        // A bag of flour went out, but only 10 loaves came back.
+        $period = $this->periodWithUsageAndOutput(usedBags: 1, naninoLoaves: 10);
+
+        $this->assertSame(64, $period->expected_nanino_count);
+        $this->assertSame(-54, $period->nanino_production_gap);
+        $this->assertSame('short', $period->nanino_production_status);
+    }
+
+    public function test_a_small_overshoot_is_not_treated_as_an_error(): void
+    {
+        // 10 loaves over is well inside one bag's 64, so it is tolerated.
+        $period = $this->periodWithUsageAndOutput(usedBags: 1, naninoLoaves: 74);
+
+        $this->assertSame(10, $period->nanino_production_gap);
+        $this->assertSame('ok', $period->nanino_production_status);
+    }
+
+    public function test_producing_more_than_a_bag_over_is_an_error(): void
+    {
+        // 65 loaves over is more than one bag's worth.
+        $period = $this->periodWithUsageAndOutput(usedBags: 1, naninoLoaves: 129);
+
+        $this->assertSame(65, $period->nanino_production_gap);
+        $this->assertGreaterThan(1, $period->nanino_production_gap_bags);
+        $this->assertSame('over', $period->nanino_production_status);
+    }
+
+    public function test_the_comparison_is_unknown_when_no_flour_was_consumed(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+
+        $period = $allocation->periods()->first();
+
+        $this->assertSame(0, $period->expected_nanino_count);
+        $this->assertSame('unknown', $period->nanino_production_status);
+    }
+
     // -------------------------------------------- carry-over (سنوات)
 
     public function test_carryover_weight_is_derived_from_its_bag_count(): void

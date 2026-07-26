@@ -3,12 +3,15 @@
 namespace App\Filament\Pages;
 
 use App\Models\Bakery;
+use App\Models\FlourAllocation;
+use App\Support\DoughFormula;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\HtmlString;
 
 class ManageBakery extends Page implements HasForms
 {
@@ -233,6 +236,48 @@ class ManageBakery extends Page implements HasForms
                                     $naninoCount !== null ? '  یا  حدود '.number_format($naninoCount).' چانه نانینو' : ''
                                 );
                             }),
+
+                        Forms\Components\Placeholder::make('period_preview')
+                            ->label('پیش‌نمایش دوره‌های سهمیه این ماه')
+                            ->columnSpanFull()
+                            // The same formula applied to the quota actually
+                            // registered, so the admin sees what a month of
+                            // flour turns into rather than only one bag.
+                            ->content(function (Forms\Get $get) {
+                                $bag = (float) ($get('flour_bag_weight_kg') ?: 0);
+
+                                if ($bag <= 0) {
+                                    return 'ابتدا وزن کیسه را وارد کنید.';
+                                }
+
+                                $allocation = FlourAllocation::forJalaliMonthOf(now());
+
+                                if (! $allocation) {
+                                    return 'برای این ماه سهمیه‌ای ثبت نشده است.';
+                                }
+
+                                $formula = new DoughFormula(
+                                    bagWeightKg: $bag,
+                                    waterRatio: (float) ($get('water_ratio') ?: 0),
+                                    saltRatio: (float) ($get('salt_ratio') ?: 0),
+                                    lossRatio: (float) ($get('dough_loss_ratio') ?: 0),
+                                    normalChaneWeightKg: ((float) $get('normal_chane_weight_kg')) ?: null,
+                                    naninoChaneWeightKg: ((float) $get('nanino_chane_weight_kg')) ?: null,
+                                );
+
+                                $lines = [];
+                                $totalBags = 0.0;
+
+                                foreach ($allocation->periods as $period) {
+                                    $bags = $allocation->bagsForPeriod($period);
+                                    $totalBags += $bags;
+                                    $lines[] = self::previewLine($period->label, $bags, $formula);
+                                }
+
+                                $lines[] = self::previewLine('سرجمع ماه', $totalBags, $formula);
+
+                                return new HtmlString(implode('<br>', $lines));
+                            }),
                     ]),
 
                 Forms\Components\Section::make('نمایش و واحدها')
@@ -257,6 +302,22 @@ class ManageBakery extends Page implements HasForms
                     ]),
             ])
             ->statePath('data');
+    }
+
+    /** One "N bags → dough → chane" line of the period preview. */
+    private static function previewLine(string $label, float $bags, DoughFormula $formula): string
+    {
+        $normal = $formula->normalChaneCount($bags);
+        $nanino = $formula->naninoChaneCount($bags);
+
+        return sprintf(
+            '<b>%s</b>: %s کیسه  ←  خمیر %s کیلوگرم%s%s',
+            e($label),
+            number_format($bags, 1),
+            number_format($formula->doughKg($bags), 1),
+            $normal !== null ? '  ←  حدود '.number_format($normal).' چانه عادی' : '',
+            $nanino !== null ? '  یا  حدود '.number_format($nanino).' چانه نانینو' : '',
+        );
     }
 
     public function save(): void

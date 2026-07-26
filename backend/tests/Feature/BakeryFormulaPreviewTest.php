@@ -67,4 +67,40 @@ class BakeryFormulaPreviewTest extends TestCase
             // own "یا حدود..." clause is what should disappear here.
             ->assertDontSee('یا  حدود');
     }
+
+    public function test_the_period_preview_covers_each_period_and_the_month_total(): void
+    {
+        $allocation = \App\Models\FlourAllocation::create([
+            'month_start' => \App\Support\Jalali::currentMonthRange()[0],
+            'month_label' => 'تست',
+            'total_bags' => 30,
+        ]);
+        $allocation->syncPeriods();
+
+        $html = Livewire::test(ManageBakery::class)
+            ->fillForm([
+                'flour_bag_weight_kg' => 40,
+                'water_ratio' => 0.6,
+                'salt_ratio' => 0.015,
+                'dough_loss_ratio' => 0,
+                'normal_chane_weight_kg' => 0.85,
+                'nanino_chane_weight_kg' => 1.0,
+            ])
+            ->html();
+
+        $text = preg_replace('/\s+/u', ' ', strip_tags($html));
+
+        // 30 bags split three ways is 10 each: 646kg of dough, 760 normal
+        // chane or 646 nanino. The month total restates all 30 together.
+        $this->assertStringContainsString('10.0 کیسه ← خمیر 646.0 کیلوگرم', $text);
+        $this->assertStringContainsString('حدود 760 چانه عادی یا حدود 646 چانه نانینو', $text);
+        $this->assertStringContainsString('سرجمع ماه: 30.0 کیسه ← خمیر 1,938.0 کیلوگرم', $text);
+    }
+
+    public function test_the_period_preview_says_so_when_no_quota_is_registered(): void
+    {
+        Livewire::test(ManageBakery::class)
+            ->fillForm(['flour_bag_weight_kg' => 40])
+            ->assertSee('برای این ماه سهمیه‌ای ثبت نشده است.');
+    }
 }

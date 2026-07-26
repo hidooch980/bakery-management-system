@@ -20,6 +20,7 @@ class ListSales extends ListRecords
     protected function getHeaderWidgets(): array
     {
         return [
+            \App\Filament\Widgets\SalesByPaymentTypeBreakdown::class,
             \App\Filament\Widgets\SalesByPaymentTypeChart::class,
             \App\Filament\Widgets\OutstandingDebtsTable::class,
         ];

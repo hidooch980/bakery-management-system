@@ -101,6 +101,72 @@ class FlourAllocationPeriod extends Model
         return round((float) $this->allocated_kg - $this->nanino_flour_kg, 3);
     }
 
+    /**
+     * How many nanino loaves the flour actually consumed this period should
+     * have produced, running the formula forwards from the usage figure.
+     */
+    public function getExpectedNaninoCountAttribute(): int
+    {
+        $formula = DoughFormula::fromBakery();
+
+        if ($formula->bagWeightKg <= 0 || ! $formula->naninoChaneWeightKg) {
+            return 0;
+        }
+
+        return (int) ($formula->naninoChaneCount($this->used_kg / $formula->bagWeightKg) ?? 0);
+    }
+
+    /**
+     * Production minus what the consumed flour should have yielded, in
+     * loaves. Negative means the period produced less bread than the flour
+     * it burned through can account for.
+     */
+    public function getNaninoProductionGapAttribute(): int
+    {
+        return $this->nanino_chane_count - $this->expected_nanino_count;
+    }
+
+    /** The same gap in bags, which is how a shortfall is judged. */
+    public function getNaninoProductionGapBagsAttribute(): float
+    {
+        $formula = DoughFormula::fromBakery();
+        $perBag = $formula->naninoChaneCount(1);
+
+        if (! $perBag) {
+            return 0.0;
+        }
+
+        return round($this->nanino_production_gap / $perBag, 2);
+    }
+
+    /**
+     * Producing less bread than the consumed flour accounts for is always
+     * wrong; producing more is only wrong once it passes a whole bag, since
+     * rounding and the handling loss make small overshoots normal.
+     */
+    public function getNaninoProductionStatusAttribute(): string
+    {
+        if ($this->expected_nanino_count <= 0) {
+            return 'unknown';
+        }
+
+        return match (true) {
+            $this->nanino_production_gap < 0 => 'short',
+            $this->nanino_production_gap_bags > 1 => 'over',
+            default => 'ok',
+        };
+    }
+
+    public function getNaninoProductionStatusLabelAttribute(): string
+    {
+        return match ($this->nanino_production_status) {
+            'short' => 'کمتر از مصرف آرد — خطا',
+            'over' => 'بیش از یک کیسه اضافه — خطا',
+            'ok' => 'مطابق مصرف آرد',
+            default => 'قابل محاسبه نیست',
+        };
+    }
+
     public function getRemainingKgAttribute(): float
     {
         return round((float) $this->allocated_kg - $this->used_kg, 3);

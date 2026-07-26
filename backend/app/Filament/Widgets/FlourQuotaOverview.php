@@ -92,6 +92,28 @@ class FlourQuotaOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-scale')
                 ->color($period->nanino_balance_kg >= 0 ? 'success' : 'danger'),
 
+            // Does the bread produced account for the flour burned through?
+            // Producing less is always wrong; a small overshoot is normal,
+            // more than a bag's worth is not.
+            Stat::make(
+                'نان تولیدی دوره',
+                number_format($period->nanino_chane_count).' از '
+                    .number_format($period->expected_nanino_count).' نان'
+            )
+                ->description($period->nanino_production_status_label
+                    .($period->nanino_production_gap !== 0
+                        ? '   •   '.($period->nanino_production_gap > 0 ? '+' : '')
+                            .number_format($period->nanino_production_gap).' نان'
+                        : ''))
+                ->descriptionIcon($period->nanino_production_status === 'ok'
+                    ? 'heroicon-m-check-circle'
+                    : 'heroicon-m-exclamation-triangle')
+                ->color(match ($period->nanino_production_status) {
+                    'ok' => 'success',
+                    'short', 'over' => 'danger',
+                    default => 'gray',
+                }),
+
             Stat::make('سنوات', number_format((float) $allocation->carryover_kg, 0).' کیلوگرم')
                 ->description((float) $allocation->carryover_bags > 0
                     ? number_format((float) $allocation->carryover_bags, 1).' کیسه مانده از قبل'
