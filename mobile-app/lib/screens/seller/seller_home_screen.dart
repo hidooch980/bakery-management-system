@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/bakery.dart';
 import '../../models/chane_board.dart';
 import '../../models/entries.dart';
+import '../../models/work_start.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
@@ -178,7 +179,12 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
               AttendanceCard(api: widget.api),
 
                   const SizedBox(height: 14),
-                  WorkStartCard(api: widget.api),
+                  WorkStartCard(
+                    api: widget.api,
+                    // Shaping start is the chane gir's tick — the seller
+                    // only records the start of baking.
+                    visibleTypes: const {WorkStartType.baking},
+                  ),
 
                   const SizedBox(height: 16),
                   Row(

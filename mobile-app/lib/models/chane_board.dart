@@ -23,6 +23,9 @@ class ChaneBoard {
     required this.pendingDoughBags,
     this.naninoEquivalent,
     this.naninoAnnouncement,
+    this.doughBagsToday = 0,
+    this.doughAsNaninoCount,
+    this.doughAsNaninoAnnouncement,
   });
 
   final String dateDisplay;
@@ -44,6 +47,13 @@ class ChaneBoard {
   final int? naninoEquivalent;
 
   final String? naninoAnnouncement;
+
+  /// Today's kneaded dough, and how many nanino loaves it could make. A
+  /// display figure covering the whole day's raw material — including
+  /// dough not yet shaped — rather than what was actually produced.
+  final int doughBagsToday;
+  final int? doughAsNaninoCount;
+  final String? doughAsNaninoAnnouncement;
 
   int get totalCount => normalCount + naninoCount;
 
@@ -75,6 +85,7 @@ class ChaneBoard {
     final waiting = _section(json['waiting']);
     final today = _section(json['today']);
     final queues = _section(json['queues']);
+    final doughToday = _section(json['dough_today']);
 
     return ChaneBoard(
       dateDisplay: json['date_display'] as String? ?? '',
@@ -90,6 +101,11 @@ class ChaneBoard {
           ? null
           : _int(today['normal_as_nanino_equivalent']),
       naninoAnnouncement: today['normal_as_nanino_announcement'] as String?,
+      doughBagsToday: _int(doughToday['bags']),
+      doughAsNaninoCount: doughToday['as_nanino_count'] == null
+          ? null
+          : _int(doughToday['as_nanino_count']),
+      doughAsNaninoAnnouncement: doughToday['as_nanino_announcement'] as String?,
     );
   }
 

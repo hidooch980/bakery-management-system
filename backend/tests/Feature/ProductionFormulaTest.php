@@ -870,6 +870,58 @@ class ProductionFormulaTest extends TestCase
             );
     }
 
+    public function test_the_chane_board_restates_todays_dough_as_nanino(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('seller');
+
+        // 2 bags yield 129.2kg of dough; at 1.0kg a nanino loaf that is 129.
+        DoughEntry::create(['user_id' => $user->id, 'bag_count' => 2]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/chane-board')
+            ->assertOk()
+            ->assertJsonPath('data.dough_today.bags', 2)
+            ->assertJsonPath('data.dough_today.dough_kg', 129.2)
+            ->assertJsonPath('data.dough_today.as_nanino_count', 129)
+            ->assertJsonPath(
+                'data.dough_today.as_nanino_announcement',
+                'خمیر امروز (2 کیسه) معادل 129 نان نانینو است.'
+            );
+    }
+
+    public function test_the_dough_restatement_counts_dough_not_yet_shaped(): void
+    {
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('seller');
+
+        // Kneaded but never shaped into chane: still counted, because this
+        // figure is about the day's raw material, not its output.
+        DoughEntry::create(['user_id' => $user->id, 'bag_count' => 2]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/chane-board')
+            ->assertOk()
+            ->assertJsonPath('data.today.normal_count', 0)
+            ->assertJsonPath('data.dough_today.as_nanino_count', 129);
+    }
+
+    public function test_the_dough_restatement_is_null_without_a_nanino_weight(): void
+    {
+        Bakery::first()->update(['nanino_chane_weight_kg' => null]);
+
+        $user = User::factory()->create(['is_active' => true]);
+        $user->assignRole('seller');
+
+        DoughEntry::create(['user_id' => $user->id, 'bag_count' => 2]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/chane-board')
+            ->assertOk()
+            ->assertJsonPath('data.dough_today.as_nanino_count', null)
+            ->assertJsonPath('data.dough_today.as_nanino_announcement', null);
+    }
+
     public function test_the_admin_dashboard_announces_the_equivalent(): void
     {
         $admin = User::factory()->create(['is_active' => true]);

@@ -6,7 +6,6 @@ import '../../providers/auth_provider.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
 import '../../widgets/sync_status_card.dart';
-import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
 import '../shared/settings_screen.dart';
@@ -70,9 +69,6 @@ class _ShaterHomeScreenState extends State<ShaterHomeScreen> {
               SyncStatusCard(api: widget.api),
               const SizedBox(height: 14),
               AttendanceCard(api: widget.api),
-
-                  const SizedBox(height: 14),
-                  WorkStartCard(api: widget.api),
               const SizedBox(height: 20),
               FutureBuilder<ChaneBoard>(
                 future: _board,

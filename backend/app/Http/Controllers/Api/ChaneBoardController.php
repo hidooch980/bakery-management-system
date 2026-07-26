@@ -43,6 +43,12 @@ class ChaneBoardController extends Controller
         // of anything actually baked — a comparison figure only.
         $naninoEquivalent = $formula->naninoEquivalentForNormalCount($normalToday);
 
+        // The same question asked of the day's raw material rather than its
+        // output: how many nanino loaves all the dough kneaded today could
+        // make. A display figure — dough not yet shaped is still counted.
+        $doughBagsToday = (float) DoughEntry::whereDate('created_at', $today)->sum('bag_count');
+        $doughAsNanino = $formula->naninoChaneCount($doughBagsToday);
+
         return $this->success([
             'date_display' => AppCalendar::date(now()),
             'waiting' => [
@@ -63,6 +69,14 @@ class ChaneBoardController extends Controller
                 'normal_as_nanino_announcement' => $naninoEquivalent === null
                     ? null
                     : "چانه‌های عادی امروز ({$normalToday} عدد) معادل {$naninoEquivalent} نان نانینو است.",
+            ],
+            'dough_today' => [
+                'bags' => (int) $doughBagsToday,
+                'dough_kg' => $formula->doughKg($doughBagsToday),
+                'as_nanino_count' => $doughAsNanino,
+                'as_nanino_announcement' => $doughAsNanino === null
+                    ? null
+                    : 'خمیر امروز ('.(int) $doughBagsToday." کیسه) معادل {$doughAsNanino} نان نانینو است.",
             ],
             'queues' => [
                 'pending_dough_batches' => DoughEntry::pending()->count(),

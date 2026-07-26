@@ -277,6 +277,52 @@ class WorkStartTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_only_the_seller_can_tick_baking_start(): void
+    {
+        $this->atTime('05:30');
+
+        $this->actingAs($this->staff('shater'), 'sanctum')
+            ->postJson('/api/v1/work-starts', ['type' => 'baking'])
+            ->assertForbidden();
+
+        $this->actingAs($this->staff('chane_gir'), 'sanctum')
+            ->postJson('/api/v1/work-starts', ['type' => 'baking'])
+            ->assertForbidden();
+
+        $this->actingAs($this->staff('seller'), 'sanctum')
+            ->postJson('/api/v1/work-starts', ['type' => 'baking'])
+            ->assertCreated();
+    }
+
+    public function test_only_the_chane_gir_can_tick_shaping_start(): void
+    {
+        $this->atTime('05:30');
+
+        // Holding record-work-start is not enough: the seller has it, but
+        // shaping is not their activity to start.
+        $this->actingAs($this->staff('seller'), 'sanctum')
+            ->postJson('/api/v1/work-starts', ['type' => 'chane'])
+            ->assertForbidden();
+
+        $this->actingAs($this->staff('chane_gir'), 'sanctum')
+            ->postJson('/api/v1/work-starts', ['type' => 'chane'])
+            ->assertCreated();
+    }
+
+    public function test_an_admin_can_still_tick_either_activity(): void
+    {
+        $this->atTime('05:30');
+        $admin = $this->staff('admin');
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/work-starts', ['type' => 'chane'])
+            ->assertCreated();
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/work-starts', ['type' => 'baking'])
+            ->assertCreated();
+    }
+
     public function test_everyone_can_read_the_board(): void
     {
         $this->actingAs($this->staff('dough_maker'), 'sanctum')

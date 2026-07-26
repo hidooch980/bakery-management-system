@@ -27,6 +27,16 @@ class WorkStart extends Model
         self::BAKING => 'شروع پخت',
     ];
 
+    /**
+     * Each activity is ticked by the one person who actually does it —
+     * the chane gir starts shaping, the seller starts baking. Holding
+     * record-work-start is not enough on its own.
+     */
+    public const RECORDED_BY = [
+        self::CHANE => 'chane_gir',
+        self::BAKING => 'seller',
+    ];
+
     /** Used when the bakery has not set its own times. */
     public const DEFAULT_DEADLINES = [
         self::CHANE => '05:40',

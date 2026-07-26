@@ -49,6 +49,20 @@ class WorkStartController extends Controller
             'type' => ['required', 'in:'.implode(',', array_keys(WorkStart::TYPES))],
         ]);
 
+        // Each activity belongs to the person who performs it, so holding
+        // record-work-start is not enough — the shater must not tick the
+        // seller's baking start, nor the seller the chane gir's shaping.
+        // Admin stays able to tick either, matching the panel's manual entry.
+        $owner = WorkStart::RECORDED_BY[$data['type']];
+
+        if (! $request->user()->hasRole([$owner, 'admin'])) {
+            return $this->error(sprintf(
+                'ثبت «%s» فقط برای %s مجاز است.',
+                WorkStart::TYPES[$data['type']],
+                UserManagementController::ROLE_LABELS[$owner] ?? $owner,
+            ), 403);
+        }
+
         $existing = WorkStart::where('type', $data['type'])
             ->whereDate('date', now()->toDateString())
             ->first();

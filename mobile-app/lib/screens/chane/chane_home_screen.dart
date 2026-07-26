@@ -143,8 +143,8 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
                   const SizedBox(height: 14),
                   WorkStartCard(
                     api: widget.api,
-                    // Baking start is the shater's tick, not the chane
-                    // gir's — shown only on the screens that need it.
+                    // Baking start is the seller's tick, not the chane
+                    // gir's — each role sees only the one it records.
                     visibleTypes: const {WorkStartType.chane},
                   ),
 

@@ -63,10 +63,10 @@ class RolesAndPermissionsSeeder extends Seeder
         ]);
 
         // The shater works the oven and only needs to see how many chane are
-        // waiting, so the role is deliberately read-only.
+        // waiting, so the role is deliberately read-only. Baking start is
+        // the seller's call, not the shater's, so no record-work-start here.
         $shater = Role::firstOrCreate(['name' => 'shater', 'guard_name' => 'web']);
         $shater->syncPermissions([
-            'record-work-start',
             'view-chane-board',
             'record-attendance',
             'change-password',
