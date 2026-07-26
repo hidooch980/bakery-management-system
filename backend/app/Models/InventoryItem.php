@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\InsufficientStockException;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryItem extends Model
@@ -73,6 +74,14 @@ class InventoryItem extends Model
         ?Model $source = null,
         ?string $note = null,
     ): InventoryMovement {
+        // The balance is derived from this same ledger, so an "out" bigger
+        // than what's on hand would make it go negative — a physical
+        // impossibility. Every caller (API, panel quick-entry, production
+        // formulas) shares this one check rather than guarding separately.
+        if ($direction === 'out' && $quantity > $this->balance) {
+            throw new InsufficientStockException($this->name, $this->balance, $quantity, $this->unit);
+        }
+
         return $this->movements()->create([
             'user_id' => $userId,
             'direction' => $direction,

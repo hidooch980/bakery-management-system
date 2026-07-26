@@ -14,6 +14,9 @@ class Sale extends Model
         'user_id',
         'payment_type',
         'bread_count',
+        'shortfall_count',
+        'shortfall_amount',
+        'shortfall_settled_on',
         'customer_id',
         'amount',
         'settled_on',
@@ -26,7 +29,11 @@ class Sale extends Model
 
     protected function casts(): array
     {
-        return ['settled_on' => 'date'];
+        return [
+            'settled_on' => 'date',
+            'shortfall_settled_on' => 'date',
+            'shortfall_amount' => 'decimal:2',
+        ];
     }
 
     public function chaneEntry()
@@ -56,6 +63,17 @@ class Sale extends Model
             ->whereNull('settled_on');
     }
 
+    /**
+     * Sales where the seller accounted for fewer loaves than the batch
+     * held — a temporary debt against the seller, separate from the
+     * customer-owed debt above, until it's reconciled or written off.
+     */
+    public function scopeShortfallOutstanding($query)
+    {
+        return $query->where('shortfall_count', '>', 0)
+            ->whereNull('shortfall_settled_on');
+    }
+
     public function getIsDebtAttribute(): bool
     {
         return in_array($this->payment_type, self::DEBT_TYPES, true);
@@ -64,6 +82,11 @@ class Sale extends Model
     public function getIsSettledAttribute(): bool
     {
         return $this->settled_on !== null;
+    }
+
+    public function getHasShortfallAttribute(): bool
+    {
+        return (int) $this->shortfall_count > 0;
     }
 
     // ------------------------------------------------- bank posting

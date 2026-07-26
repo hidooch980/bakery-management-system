@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
 use App\Traits\ApiResponse;
@@ -43,12 +44,23 @@ class SaleController extends Controller
         }
 
         $sale = DB::transaction(function () use ($data, $chane, $request) {
+            // Default to the batch size when the seller did not split it.
+            $breadCount = $data['bread_count'] ?? $chane->chane_count;
+
+            // Whatever the batch held beyond what this sale accounts for is
+            // a temporary debt against the seller — computed from the
+            // batch's own count, never from client input, so it can't be
+            // typed away.
+            $shortfallCount = max(0, $chane->chane_count - $breadCount);
+            $breadPrice = (float) (Bakery::first()->bread_price ?? 0);
+
             $sale = Sale::create([
                 'chane_entry_id' => $chane->id,
                 'user_id' => $request->user()->id,
                 'payment_type' => $data['payment_type'],
-                // Default to the batch size when the seller did not split it.
-                'bread_count' => $data['bread_count'] ?? $chane->chane_count,
+                'bread_count' => $breadCount,
+                'shortfall_count' => $shortfallCount ?: null,
+                'shortfall_amount' => $shortfallCount > 0 ? round($shortfallCount * $breadPrice, 2) : null,
                 'customer_id' => $data['customer_id'] ?? null,
                 'amount' => $data['amount'] ?? null,
                 'note' => $data['note'] ?? null,

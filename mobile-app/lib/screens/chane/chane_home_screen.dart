@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/bakery.dart';
 import '../../models/chane_board.dart';
 import '../../models/entries.dart';
+import '../../models/work_start.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
@@ -140,7 +141,12 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
               AttendanceCard(api: widget.api),
 
                   const SizedBox(height: 14),
-                  WorkStartCard(api: widget.api),
+                  WorkStartCard(
+                    api: widget.api,
+                    // Baking start is the shater's tick, not the chane
+                    // gir's — shown only on the screens that need it.
+                    visibleTypes: const {WorkStartType.chane},
+                  ),
 
                   if (data.board != null) ...[
                     const SizedBox(height: 16),

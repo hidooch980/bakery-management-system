@@ -98,6 +98,9 @@ class ApiCoverageTest extends TestCase
         $dough = $this->userWithRole('dough_maker');
         $chane = $this->userWithRole('chane_gir');
 
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
+
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 1])->assertCreated();
 

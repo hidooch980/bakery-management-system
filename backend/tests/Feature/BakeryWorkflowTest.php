@@ -70,6 +70,9 @@ class BakeryWorkflowTest extends TestCase
         $chane = $this->userWithRole('chane_gir');
         $seller = $this->userWithRole('seller');
 
+        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::SALT)->move('in', 50, 'purchase');
+
         // 1. Dough maker records bags.
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 10])
@@ -120,6 +123,9 @@ class BakeryWorkflowTest extends TestCase
     {
         $dough = $this->userWithRole('dough_maker');
         $chane = $this->userWithRole('chane_gir');
+
+        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::SALT)->move('in', 50, 'purchase');
 
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 5]);

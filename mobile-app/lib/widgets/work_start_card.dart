@@ -11,12 +11,17 @@ import 'common.dart';
 /// Shown in the chane gir's, seller's and shater's cartable — whoever is
 /// first in can tick it.
 class WorkStartCard extends StatefulWidget {
-  const WorkStartCard({super.key, required this.api, this.onChanged});
+  const WorkStartCard({super.key, required this.api, this.onChanged, this.visibleTypes});
 
   final BakeryApi api;
 
   /// Lets the host screen refresh once a tick lands.
   final VoidCallback? onChanged;
+
+  /// Restricts which of the day's activities this card shows — e.g. the
+  /// chane gir's cartable only cares about shaping, not baking, which is
+  /// the shater's tick. Null (the default) shows everything on the board.
+  final Set<WorkStartType>? visibleTypes;
 
   @override
   State<WorkStartCard> createState() => _WorkStartCardState();
@@ -113,6 +118,11 @@ class _WorkStartCardState extends State<WorkStartCard> {
     }
 
     final board = _board!;
+    final items = widget.visibleTypes == null
+        ? board.items
+        : board.items.where((i) => widget.visibleTypes!.contains(i.type)).toList();
+
+    if (items.isEmpty) return const SizedBox.shrink();
 
     return Card(
       child: Padding(
@@ -154,13 +164,13 @@ class _WorkStartCardState extends State<WorkStartCard> {
             ],
 
             const SizedBox(height: 14),
-            for (final item in board.items) ...[
+            for (final item in items) ...[
               _StartRow(
                 item: item,
                 busy: _submitting == item.type,
                 onTick: () => _tick(item),
               ),
-              if (item != board.items.last) const SizedBox(height: 10),
+              if (item != items.last) const SizedBox(height: 10),
             ],
           ],
         ),

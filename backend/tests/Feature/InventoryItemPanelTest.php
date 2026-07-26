@@ -49,6 +49,26 @@ class InventoryItemPanelTest extends TestCase
         $this->assertStringContainsString('3.00 کیسه', $html);
     }
 
+    public function test_the_bag_count_comes_before_the_weight(): void
+    {
+        InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
+
+        $html = Livewire::test(
+            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+        )->html();
+
+        $bagsPosition = strpos($html, '3.00 کیسه');
+        $weightPosition = strpos($html, '75.000 kg');
+
+        $this->assertNotFalse($bagsPosition);
+        $this->assertNotFalse($weightPosition);
+        $this->assertLessThan(
+            $weightPosition,
+            $bagsPosition,
+            'the bag count should be shown before the weight, not after it'
+        );
+    }
+
     public function test_recording_stock_in_bags_creates_the_right_movement(): void
     {
         $salt = InventoryItem::ofKey('salt');
@@ -103,5 +123,23 @@ class InventoryItemPanelTest extends TestCase
 
         // 100kg in, 3 units of 10kg out: 70kg left.
         $this->assertEquals(70.0, $dough->fresh()->balance);
+    }
+
+    public function test_recording_more_stock_out_than_available_is_rejected(): void
+    {
+        $flour = InventoryItem::ofKey('flour');
+        $flour->move('in', 40, 'purchase');
+
+        Livewire::test(
+            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+        )
+            ->callTableAction('recordStock', $flour, data: [
+                'direction' => 'out',
+                'bags' => 5, // 5 * 40kg = 200kg, far more than the 40kg on hand.
+                'reason' => 'shaping',
+            ]);
+
+        // The balance must stay untouched — no partial or negative movement.
+        $this->assertEquals(40.0, $flour->fresh()->balance);
     }
 }

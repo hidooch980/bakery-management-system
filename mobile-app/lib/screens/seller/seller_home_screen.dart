@@ -608,7 +608,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'کسری این فروش: $_shortfall عدد از این چانه ثبت نمی‌شود.',
+                            'کسری این فروش: $_shortfall عدد، به عنوان بدهی موقت ثبت می‌شود.',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: const Color(0xFFE8952D),
                                   fontWeight: FontWeight.w700,

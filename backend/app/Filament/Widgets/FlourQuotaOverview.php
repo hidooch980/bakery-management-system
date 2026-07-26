@@ -25,6 +25,28 @@ class FlourQuotaOverview extends BaseWidget
         $period = $allocation?->periodFor(now());
 
         if (! $allocation || ! $period) {
+            // Days 1–4 of a Jalali month fall outside all three delivery
+            // periods unless the previous month's allocation was entered
+            // too (its third period wraps into them) — so the quota can
+            // genuinely be registered and this still be true. Say which
+            // one actually happened, rather than always blaming the admin
+            // for not entering it.
+            $thisMonth = FlourAllocation::forJalaliMonthOf(now());
+
+            if ($thisMonth) {
+                $firstPeriod = $thisMonth->periods->firstWhere('period_number', 1);
+
+                return [
+                    Stat::make('سهمیه آرد', $thisMonth->month_label)
+                        ->description($firstPeriod
+                            ? 'سهمیه این ماه ثبت شده؛ دوره اول از '
+                                .AppCalendar::date($firstPeriod->starts_on).' شروع می‌شود.'
+                            : 'سهمیه این ماه ثبت شده؛ هنوز دوره‌ای برای امروز نیست.')
+                        ->descriptionIcon('heroicon-m-clock')
+                        ->color('info'),
+                ];
+            }
+
             return [
                 Stat::make('سهمیه آرد', 'تعریف نشده')
                     ->description('سهمیه این بازه در بخش انبار ثبت نشده است.')

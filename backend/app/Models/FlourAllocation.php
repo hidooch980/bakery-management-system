@@ -155,4 +155,24 @@ class FlourAllocation extends Model
         return static::with('periods')->get()
             ->first(fn (self $allocation) => $allocation->periodFor($date) !== null);
     }
+
+    /**
+     * The allocation for the Jalali month a date falls in, regardless of
+     * whether any of its periods actually cover that date.
+     *
+     * Days 1–4 of every Jalali month fall outside all three delivery
+     * periods (5–14, 15–24, 25–next 4) unless the previous month's
+     * allocation was also entered, since its third period wraps into
+     * them. forDate() correctly returns null on one of those days even
+     * though the current month's quota was entered — this exists so a
+     * "no active period" message can still say the quota is there and
+     * say when it starts, rather than implying nothing was recorded.
+     */
+    public static function forJalaliMonthOf(Carbon $date): ?self
+    {
+        $jalaliMonth = Jalali::format($date, 'Y/m');
+
+        return static::with('periods')->get()
+            ->first(fn (self $allocation) => Jalali::format($allocation->month_start, 'Y/m') === $jalaliMonth);
+    }
 }

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\InventoryItemResource\Pages;
+use App\Exceptions\InsufficientStockException;
 use App\Models\InventoryItem;
 use App\Support\DoughFormula;
 use Filament\Forms;
@@ -86,11 +87,19 @@ class InventoryItemResource extends Resource
 
                 Tables\Columns\TextColumn::make('balance')
                     ->label('موجودی فعلی')
-                    // Derived from the movement ledger, not a stored column.
-                    ->state(fn (InventoryItem $record) => number_format($record->balance, 3).' '.$record->unit)
-                    ->description(fn (InventoryItem $record) => $record->balance_bags !== null
-                        ? number_format($record->balance_bags, 2).' کیسه'
-                        : null)
+                    // Bag count leads, weight follows on the same line — not
+                    // stacked as a badge-plus-description, so both read at a
+                    // glance together rather than one being a footnote.
+                    ->state(function (InventoryItem $record) {
+                        $weight = number_format($record->balance, 3).' '.$record->unit;
+
+                        if ($record->balance_bags === null) {
+                            return $weight;
+                        }
+
+                        return number_format($record->balance_bags, 2).' کیسه'
+                            .'   —   '.$weight;
+                    })
                     ->badge()
                     ->color(fn (InventoryItem $record) => $record->is_low ? 'danger' : 'success')
                     ->size('lg'),
@@ -172,14 +181,24 @@ class InventoryItemResource extends Resource
                         $bagWeight = self::bagWeightFor($record);
                         $kg = round((float) $data['bags'] * $bagWeight, 3);
 
-                        $record->move(
-                            $data['direction'],
-                            $kg,
-                            $data['reason'],
-                            auth()->id(),
-                            null,
-                            $data['note'] ?? null,
-                        );
+                        try {
+                            $record->move(
+                                $data['direction'],
+                                $kg,
+                                $data['reason'],
+                                auth()->id(),
+                                null,
+                                $data['note'] ?? null,
+                            );
+                        } catch (InsufficientStockException $e) {
+                            Notification::make()
+                                ->title('ثبت انجام نشد')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
 
                         Notification::make()
                             ->title('موجودی ثبت شد')

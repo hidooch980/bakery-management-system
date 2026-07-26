@@ -7,8 +7,8 @@ use App\Models\Attendance;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\Expense;
-use App\Models\FlourStockMovement;
 use App\Models\Holiday;
+use App\Models\InventoryItem;
 use App\Models\Sale;
 use App\Models\SalaryPayment;
 use App\Models\User;
@@ -89,7 +89,38 @@ class ReportController extends Controller
             'total_nanino_count' => \App\Support\DoughFormula::fromBakery()
                 ->naninoCountForWeight((float) $chane->sum('nanino_weight_kg')),
             'total_spray_flour_kg' => round((float) $chane->sum('spray_flour_kg'), 2),
+            // Day-by-day dough count, so the range total isn't the only
+            // figure available — how many batches were made on which day.
+            'daily' => $this->dailyDoughCounts($from, $to),
         ]);
+    }
+
+    /**
+     * How many dough entries (batches) and bags were recorded each day in
+     * the range. Capped the same way financialTrend is, so an unbounded
+     * range cannot blow up the response.
+     */
+    private function dailyDoughCounts($from, $to): array
+    {
+        $days = collect();
+        $cursor = $from->copy()->startOfDay();
+
+        while ($cursor->lte($to) && $days->count() < 120) {
+            $date = $cursor->toDateString();
+
+            $entries = DoughEntry::whereDate('created_at', $date)->get();
+
+            $days->push([
+                'date' => $date,
+                'date_display' => \App\Support\Jalali::date($cursor),
+                'dough_entries' => $entries->count(),
+                'dough_bags' => (int) $entries->sum('bag_count'),
+            ]);
+
+            $cursor->addDay();
+        }
+
+        return $days->all();
     }
 
     public function sales(Request $request): JsonResponse
@@ -129,10 +160,12 @@ class ReportController extends Controller
         return $this->success([
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
-            'flour_in_kg' => round((float) FlourStockMovement::where('type', 'in')
-                ->whereBetween('created_at', [$from, $to])->sum('amount_kg'), 2),
-            'flour_out_kg' => round((float) FlourStockMovement::where('type', 'out')
-                ->whereBetween('created_at', [$from, $to])->sum('amount_kg'), 2),
+            'flour_in_kg' => round((float) InventoryItem::ofKey(InventoryItem::FLOUR)->movements()
+                ->where('direction', 'in')
+                ->whereBetween('created_at', [$from, $to])->sum('quantity'), 2),
+            'flour_out_kg' => round((float) InventoryItem::ofKey(InventoryItem::FLOUR)->movements()
+                ->where('direction', 'out')
+                ->whereBetween('created_at', [$from, $to])->sum('quantity'), 2),
             'spray_flour_kg' => round((float) ChaneEntry::whereBetween('created_at', [$from, $to])
                 ->sum('spray_flour_kg'), 2),
             'current_balance_kg' => $this->flourBalance(),
@@ -444,9 +477,6 @@ class ReportController extends Controller
 
     private function flourBalance(): float
     {
-        $in = (float) FlourStockMovement::where('type', 'in')->sum('amount_kg');
-        $out = (float) FlourStockMovement::where('type', 'out')->sum('amount_kg');
-
-        return round($in - $out, 2);
+        return InventoryItem::ofKey(InventoryItem::FLOUR)->balance;
     }
 }

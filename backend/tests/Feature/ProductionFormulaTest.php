@@ -97,6 +97,9 @@ class ProductionFormulaTest extends TestCase
         $dough = $this->userWithRole('dough_maker');
         $chane = $this->userWithRole('chane_gir');
 
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
+
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 2])
             ->assertCreated();
@@ -124,6 +127,9 @@ class ProductionFormulaTest extends TestCase
         $dough = $this->userWithRole('dough_maker');
         $chane = $this->userWithRole('chane_gir');
 
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
+
         $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 1]);
 
         $this->actingAs($chane, 'sanctum')
@@ -137,13 +143,17 @@ class ProductionFormulaTest extends TestCase
 
     // --------------------------------------- nanino is display-only
 
-    public function test_only_normal_chane_is_deducted_from_dough_stock(): void
+    public function test_both_normal_and_nanino_weight_are_deducted_from_dough_stock(): void
     {
         $dough = $this->userWithRole('dough_maker');
         $chane = $this->userWithRole('chane_gir');
 
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
+
         $this->actingAs($dough, 'sanctum')
-            ->postJson('/api/v1/dough-entries', ['bag_count' => 2])
+            // 3 bags to cover both the normal and nanino weight shaped below.
+            ->postJson('/api/v1/dough-entries', ['bag_count' => 3])
             ->assertCreated();
 
         $doughBefore = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
@@ -157,11 +167,69 @@ class ProductionFormulaTest extends TestCase
             ])
             ->assertCreated();
 
-        // 100 normal chane at 0.85kg. The 50 nanino chane are a display
-        // figure and must not touch stock.
-        $expected = round($doughBefore - 85.0, 3);
+        // Nanino is a display figure for sales and reports, but the dough
+        // shaped into it is physically gone — 100 normal at 0.85kg plus 50
+        // nanino at 1.0kg both come out of stock.
+        $expected = round($doughBefore - 85.0 - 50.0, 3);
 
         $this->assertSame($expected, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
+    }
+
+    public function test_a_batch_shaped_almost_entirely_into_nanino_still_consumes_its_dough(): void
+    {
+        $dough = $this->userWithRole('dough_maker');
+        $chane = $this->userWithRole('chane_gir');
+
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
+
+        $this->actingAs($dough, 'sanctum')
+            ->postJson('/api/v1/dough-entries', ['bag_count' => 5])
+            ->assertCreated();
+
+        $doughBefore = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
+
+        // 64 nanino loaves at the configured 1.0kg is 64kg of dough — that
+        // dough must leave stock even though nanino itself is never sold.
+        $this->actingAs($chane, 'sanctum')
+            ->postJson('/api/v1/chane-entries', [
+                'dough_entry_id' => DoughEntry::first()->id,
+                'chane_count' => 1,
+                'nanino_chane_count' => 64,
+                'spray_flour_kg' => 0,
+            ])
+            ->assertCreated();
+
+        $expected = round($doughBefore - 0.85 - 64.0, 3);
+
+        $this->assertSame($expected, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
+    }
+
+    public function test_sales_and_report_figures_still_ignore_nanino(): void
+    {
+        $dough = $this->userWithRole('dough_maker');
+        $chane = $this->userWithRole('chane_gir');
+
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
+
+        $this->actingAs($dough, 'sanctum')
+            ->postJson('/api/v1/dough-entries', ['bag_count' => 3])
+            ->assertCreated();
+
+        $this->actingAs($chane, 'sanctum')
+            ->postJson('/api/v1/chane-entries', [
+                'dough_entry_id' => DoughEntry::first()->id,
+                'chane_count' => 100,
+                'nanino_chane_count' => 50,
+                'spray_flour_kg' => 0,
+            ])
+            ->assertCreated();
+
+        // Only the dough-stock deduction changed. The figure that drives
+        // sales, weight_kg and every report is still normal-only.
+        $entry = ChaneEntry::first();
+        $this->assertSame(85.0, (float) $entry->weight_kg);
     }
 
     public function test_reported_weight_excludes_nanino(): void
@@ -169,7 +237,10 @@ class ProductionFormulaTest extends TestCase
         $dough = $this->userWithRole('dough_maker');
         $chane = $this->userWithRole('chane_gir');
 
-        $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 2]);
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
+
+        $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 3]);
 
         $this->actingAs($chane, 'sanctum')
             ->postJson('/api/v1/chane-entries', [
@@ -191,11 +262,17 @@ class ProductionFormulaTest extends TestCase
         $chane = $this->userWithRole('chane_gir');
         $admin = $this->userWithRole('admin');
 
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
+
         $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 2]);
+        // Kept low enough (with the 100 normal chane) to fit the 129.2kg of
+        // dough 2 bags actually yield — bag_count stays at 2 here because
+        // weight_per_bag_kg below is asserted against it.
         $this->actingAs($chane, 'sanctum')->postJson('/api/v1/chane-entries', [
             'dough_entry_id' => DoughEntry::first()->id,
             'chane_count' => 100,
-            'nanino_chane_count' => 50,
+            'nanino_chane_count' => 20,
             'spray_flour_kg' => 0,
         ]);
 
@@ -366,6 +443,71 @@ class ProductionFormulaTest extends TestCase
         $this->assertEqualsWithDelta(300.0 / 9, $first->daily_pace_kg, 0.01);
     }
 
+    public function test_a_registered_month_with_no_active_period_yet_is_reported_correctly(): void
+    {
+        // Days 1–4 of a Jalali month fall outside all three delivery
+        // periods (5–14, 15–24, 25–next 4) unless the previous month's
+        // allocation was also entered — a fresh install's first month has
+        // no such predecessor, so this is the expected state on day 4.
+        \Illuminate\Support\Carbon::setTestNow(Jalali::parse('1405/05/04'));
+
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_kg' => 3000,
+        ]);
+        $allocation->syncPeriods();
+
+        // forDate correctly finds nothing — today has no active period.
+        $this->assertNull(FlourAllocation::forDate(now()));
+
+        // But the month's own allocation must still be found, so the
+        // dashboard can say "registered, starts on the 5th" instead of
+        // "not registered at all".
+        $found = FlourAllocation::forJalaliMonthOf(now());
+        $this->assertNotNull($found);
+        $this->assertSame($allocation->id, $found->id);
+
+        \Illuminate\Support\Carbon::setTestNow();
+    }
+
+    public function test_the_dashboard_explains_the_gap_rather_than_calling_it_undefined(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow(Jalali::parse('1405/05/04'));
+
+        FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_kg' => 3000,
+        ])->syncPeriods();
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        \Filament\Facades\Filament::setCurrentPanel(
+            \Filament\Facades\Filament::getPanel('admin')
+        );
+
+        $html = \Livewire\Livewire::actingAs($admin)->test(
+            \App\Filament\Widgets\FlourQuotaOverview::class
+        )->html();
+
+        $this->assertStringContainsString('سهمیه این ماه ثبت شده', $html);
+        $this->assertStringNotContainsString('در بخش انبار ثبت نشده است', $html);
+
+        \Illuminate\Support\Carbon::setTestNow();
+    }
+
+    public function test_no_allocation_at_all_is_still_reported_as_undefined(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow(Jalali::parse('1405/05/04'));
+
+        $this->assertNull(FlourAllocation::forDate(now()));
+        $this->assertNull(FlourAllocation::forJalaliMonthOf(now()));
+
+        \Illuminate\Support\Carbon::setTestNow();
+    }
+
     public function test_the_panel_shows_working_days_for_each_period(): void
     {
         \App\Models\Holiday::create([
@@ -420,6 +562,7 @@ class ProductionFormulaTest extends TestCase
 
         // Consume flour inside the first period's window.
         $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $flour->move('in', 100, 'purchase');
         $movement = $flour->move('out', 40, 'production');
         \Illuminate\Support\Facades\DB::table('inventory_movements')
             ->where('id', $movement->id)
@@ -782,6 +925,42 @@ class ProductionFormulaTest extends TestCase
             ->getJson('/api/v1/reports/production')
             ->assertOk()
             ->assertJsonPath('data.total_nanino_count', 40);
+    }
+
+    public function test_the_production_report_breaks_dough_down_by_day(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 3]);
+        DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 2]);
+
+        $today = now()->toDateString();
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/production')
+            ->assertOk();
+
+        $daily = collect($response->json('data.daily'));
+        $todayRow = $daily->firstWhere('date', $today);
+
+        $this->assertNotNull($todayRow, 'today should appear in the daily breakdown');
+        $this->assertSame(2, $todayRow['dough_entries']);
+        $this->assertSame(5, $todayRow['dough_bags']);
+    }
+
+    public function test_a_day_with_no_dough_still_appears_with_zero_counts(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        $from = now()->subDays(2)->toDateString();
+        $to = now()->toDateString();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson("/api/v1/reports/production?from={$from}&to={$to}")
+            ->assertOk()
+            ->assertJsonCount(3, 'data.daily');
     }
 
     // --------------------------------------------------- salt and dough bags

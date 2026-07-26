@@ -156,6 +156,20 @@ class SaleResource extends Resource
                             ->formatStateUsing(fn ($state) => \App\Support\Money::format($state))
                     ),
 
+                Tables\Columns\TextColumn::make('shortfall_count')
+                    ->label('بدهی موقت (نان)')
+                    ->numeric()
+                    ->placeholder('—')
+                    ->badge()
+                    ->color(fn (Sale $record) => $record->has_shortfall
+                        ? ($record->shortfall_settled_on ? 'success' : 'danger')
+                        : 'gray')
+                    ->description(fn (Sale $record) => $record->has_shortfall
+                        ? \App\Support\Money::format($record->shortfall_amount)
+                        .($record->shortfall_settled_on ? ' — تسویه شد' : '')
+                        : null)
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('settled_on')
                     ->label('تسویه')
                     ->badge()
@@ -214,6 +228,15 @@ class SaleResource extends Resource
                     ->requiresConfirmation()
                     ->visible(fn (Sale $record) => $record->is_debt && ! $record->is_settled)
                     ->action(fn (Sale $record) => $record->update(['settled_on' => now()])),
+
+                Tables\Actions\Action::make('settleShortfall')
+                    ->label('تسویه کسری')
+                    ->icon('heroicon-o-check-badge')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalDescription('کسری این فروش تسویه یا مطابق تصمیم مدیریت راه‌حل‌یابی شده است؟')
+                    ->visible(fn (Sale $record) => $record->has_shortfall && ! $record->shortfall_settled_on)
+                    ->action(fn (Sale $record) => $record->update(['shortfall_settled_on' => now()])),
 
                 Tables\Actions\EditAction::make()->label('ویرایش'),
                 Tables\Actions\DeleteAction::make()->label('حذف'),

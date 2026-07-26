@@ -195,13 +195,14 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
   /// "۱۰۰ kg  •  ۴ کیسه" — the bag count only shown once the item actually
   /// has a configured sack size (flour, salt, dough all do; a future item
   /// added without one just shows the raw weight).
+  /// Bag count leads, weight follows on the same line.
   static String _balanceLabel(Map<String, dynamic> item) {
     final weight = '${_fmt(item['balance'])} ${item['unit']}';
     final bags = item['balance_bags'];
 
     if (bags == null) return weight;
 
-    return '$weight  •  ${_fmt(bags)} کیسه';
+    return '${_fmt(bags)} کیسه  •  $weight';
   }
 }
 

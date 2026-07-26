@@ -18,16 +18,18 @@ class InventoryOverview extends BaseWidget
             ->map(function (string $key) {
                 $item = InventoryItem::ofKey($key);
                 $bags = $item->balance_bags;
+                $weightLabel = number_format($item->balance, 1).' '.$item->unit;
 
-                // Salt and dough now have a bag size too, so the count and
-                // the low-stock warning must both be shown, not just one.
-                $bagsLabel = $bags !== null ? number_format($bags, 1).' کیسه' : null;
+                // Bag count leads, weight sits next to it — not buried in
+                // the description under the weight, as it read before.
+                $value = $bags !== null
+                    ? number_format($bags, 1).' کیسه   —   '.$weightLabel
+                    : $weightLabel;
+
                 $statusLabel = $item->is_low ? 'کمتر از حد هشدار' : 'موجودی کافی';
 
-                return Stat::make($item->name, number_format($item->balance, 1).' '.$item->unit)
-                    ->description($bagsLabel !== null
-                        ? ($item->is_low ? "{$bagsLabel} — {$statusLabel}" : $bagsLabel)
-                        : $statusLabel)
+                return Stat::make($item->name, $value)
+                    ->description($statusLabel)
                     ->descriptionIcon($item->is_low
                         ? 'heroicon-m-exclamation-triangle'
                         : 'heroicon-m-check-circle')
