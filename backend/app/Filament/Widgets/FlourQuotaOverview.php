@@ -42,6 +42,15 @@ class FlourQuotaOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color('info'),
 
+            // Only dates registered as a holiday count as closed — there is
+            // no standing weekly closure to assume.
+            Stat::make('روزهای کاری دوره', $period->working_days.' از '.$period->total_days.' روز')
+                ->description($period->holiday_days > 0
+                    ? $period->holiday_days.' روز تعطیل ثبت‌شده کم شده'
+                    : 'تعطیلی ثبت‌شده‌ای در این دوره نیست')
+                ->descriptionIcon('heroicon-m-calendar-days')
+                ->color($period->holiday_days > 0 ? 'warning' : 'gray'),
+
             Stat::make('مصرف این دوره', number_format($period->used_kg, 0).' kg')
                 ->description($period->usage_percent.'٪ از سهمیه دوره')
                 ->descriptionIcon('heroicon-m-arrow-trending-down')

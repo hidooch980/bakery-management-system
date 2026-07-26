@@ -6,6 +6,7 @@ use App\Models\ChaneEntry;
 use App\Models\InventoryItem;
 use App\Support\DoughFormula;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 class FlourAllocationPeriod extends Model
 {
@@ -115,5 +116,40 @@ class FlourAllocationPeriod extends Model
     public function getIsOverAttribute(): bool
     {
         return $this->remaining_kg < 0;
+    }
+
+    /** Calendar length of the period, both ends inclusive. */
+    public function getTotalDaysAttribute(): int
+    {
+        return (int) $this->starts_on->diffInDays($this->ends_on) + 1;
+    }
+
+    /**
+     * Days the shop actually operates in this period.
+     *
+     * There is no standing weekly closure (no "every Friday") — only the
+     * dates someone has explicitly registered as a holiday count, whether
+     * entered once or generated from a monthly-recurring rule (e.g. the
+     * 15th and 25th of every month).
+     */
+    public function getHolidayDaysAttribute(): int
+    {
+        return Holiday::whereBetween('date', [
+            $this->starts_on->toDateString(),
+            $this->ends_on->toDateString(),
+        ])->count();
+    }
+
+    public function getWorkingDaysAttribute(): int
+    {
+        return max(0, $this->total_days - $this->holiday_days);
+    }
+
+    /** Average kilograms allocated per working day, for pacing the quota. */
+    public function getDailyPaceKgAttribute(): float
+    {
+        return $this->working_days > 0
+            ? round((float) $this->allocated_kg / $this->working_days, 3)
+            : 0.0;
     }
 }

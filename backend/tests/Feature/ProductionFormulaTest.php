@@ -276,6 +276,124 @@ class ProductionFormulaTest extends TestCase
         $this->assertSame('1405/06/04', Jalali::date($periods[2]->ends_on));
     }
 
+    public function test_a_period_with_no_registered_holiday_is_all_working_days(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_kg' => 3000,
+        ]);
+        $allocation->syncPeriods();
+
+        $first = $allocation->periods()->first();
+
+        // 5th to the 14th, inclusive, is 10 calendar days.
+        $this->assertSame(10, $first->total_days);
+        $this->assertSame(0, $first->holiday_days);
+        $this->assertSame(10, $first->working_days);
+    }
+
+    public function test_registered_holidays_are_subtracted_from_working_days(): void
+    {
+        // There is no standing "every Friday" closure — only dates someone
+        // actually registered, such as a monthly-recurring 15th and 25th.
+        \App\Models\Holiday::create([
+            'date' => Jalali::parse('1405/05/15'),
+            'title' => 'تعطیل ماهانه',
+            'type' => 'shop',
+        ]);
+        \App\Models\Holiday::create([
+            'date' => Jalali::parse('1405/05/20'),
+            'title' => 'تعطیل رسمی',
+            'type' => 'official',
+        ]);
+
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_kg' => 3000,
+        ]);
+        $allocation->syncPeriods();
+
+        // Second period is the 15th to the 24th: 10 days, 2 registered.
+        $second = $allocation->periods()->get()[1];
+
+        $this->assertSame(10, $second->total_days);
+        $this->assertSame(2, $second->holiday_days);
+        $this->assertSame(8, $second->working_days);
+    }
+
+    public function test_a_holiday_outside_the_period_does_not_count_against_it(): void
+    {
+        \App\Models\Holiday::create([
+            'date' => Jalali::parse('1405/05/01'),
+            'title' => 'تعطیل خارج از دوره',
+            'type' => 'shop',
+        ]);
+
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_kg' => 3000,
+        ]);
+        $allocation->syncPeriods();
+
+        $first = $allocation->periods()->first();
+
+        $this->assertSame(0, $first->holiday_days);
+        $this->assertSame(10, $first->working_days);
+    }
+
+    public function test_the_daily_pace_is_based_on_working_days_not_calendar_days(): void
+    {
+        \App\Models\Holiday::create([
+            'date' => Jalali::parse('1405/05/10'),
+            'title' => 'تعطیل',
+            'type' => 'shop',
+        ]);
+
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_kg' => 900,
+        ]);
+        $allocation->syncPeriods();
+
+        $first = $allocation->periods()->first();
+
+        // 300kg over 9 working days (one of the 10 calendar days is closed).
+        $this->assertSame(9, $first->working_days);
+        $this->assertEqualsWithDelta(300.0 / 9, $first->daily_pace_kg, 0.01);
+    }
+
+    public function test_the_panel_shows_working_days_for_each_period(): void
+    {
+        \App\Models\Holiday::create([
+            'date' => Jalali::parse('1405/05/15'),
+            'title' => 'تعطیل ماهانه',
+            'type' => 'shop',
+        ]);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_kg' => 3000,
+        ])->syncPeriods();
+
+        \Filament\Facades\Filament::setCurrentPanel(
+            \Filament\Facades\Filament::getPanel('admin')
+        );
+
+        $html = \Livewire\Livewire::actingAs($admin)->test(
+            \App\Filament\Resources\FlourAllocationResource\Pages\ListFlourAllocations::class
+        )->html();
+
+        $this->assertStringContainsString('روز کاری', $html);
+    }
+
     public function test_quota_remainder_lands_on_the_last_period(): void
     {
         $allocation = FlourAllocation::create([

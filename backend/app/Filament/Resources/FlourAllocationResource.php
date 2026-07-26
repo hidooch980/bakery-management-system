@@ -208,10 +208,12 @@ class FlourAllocationResource extends Resource
                     ->state(function (FlourAllocation $record) {
                         return $record->periods
                             ->map(fn ($p) => sprintf(
-                                '%d) %s تا %s',
+                                '%d) %s تا %s  (%d روز کاری از %d)',
                                 $p->period_number,
                                 Jalali::date($p->starts_on),
                                 Jalali::date($p->ends_on),
+                                $p->working_days,
+                                $p->total_days,
                             ))
                             ->implode("\n");
                     })
