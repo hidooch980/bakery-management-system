@@ -108,16 +108,38 @@ class ProductionComparisonTest extends TestCase
         $this->assertStringContainsString('+4.0', $this->widgetText());
     }
 
-    public function test_nanino_is_counted_and_shown_as_a_share_of_the_day(): void
+    public function test_the_nanino_equivalent_restates_todays_normal_chane(): void
     {
-        // 152 normal plus 48kg of nanino at 1.0kg a loaf is 48 loaves,
-        // which is 24% of the 200 baked today.
+        // 152 chane at 0.85kg is 129.2kg of dough, which at 1.0kg a nanino
+        // loaf is 129 — the comparison figure, not a count of anything made.
+        $this->produce(bags: 2, chaneCount: 152);
+
+        $text = $this->widgetText();
+
+        $this->assertStringContainsString('معادل نانینو 129 عدد', $text);
+        $this->assertStringContainsString('اگر نانینو شکل می‌گرفت', $text);
+    }
+
+    public function test_the_equivalent_stands_even_when_no_nanino_was_shaped(): void
+    {
+        // The old reading showed a bare "0 عدد • 0٪" here, which said
+        // nothing about how the two systems compare.
+        $this->produce(bags: 2, chaneCount: 152, naninoWeight: 0);
+
+        $text = $this->widgetText();
+
+        $this->assertStringContainsString('معادل نانینو 129 عدد', $text);
+        $this->assertStringNotContainsString('معادل نانینو 0 عدد', $text);
+    }
+
+    public function test_nanino_actually_shaped_is_named_alongside_the_equivalent(): void
+    {
         $this->produce(bags: 2, chaneCount: 152, naninoWeight: 48);
 
         $text = $this->widgetText();
 
-        $this->assertStringContainsString('چانه نانینو امروز 48 عدد', $text);
-        $this->assertStringContainsString('24٪ از تولید امروز', $text);
+        $this->assertStringContainsString('معادل نانینو 129 عدد', $text);
+        $this->assertStringContainsString('نانینوی واقعی: 48 عدد', $text);
     }
 
     public function test_a_day_with_no_dough_reports_no_yield_rather_than_zero(): void
@@ -138,5 +160,16 @@ class ProductionComparisonTest extends TestCase
             'وزن چانه عادی در تنظیمات ثبت نشده است',
             $this->widgetText()
         );
+    }
+
+    public function test_the_equivalent_needs_both_chane_weights(): void
+    {
+        Bakery::first()->update(['nanino_chane_weight_kg' => null]);
+        $this->produce(bags: 2, chaneCount: 152);
+
+        $text = $this->widgetText();
+
+        $this->assertStringContainsString('معادل نانینو —', $text);
+        $this->assertStringContainsString('وزن هر دو نوع چانه در تنظیمات ثبت نشده است', $text);
     }
 }

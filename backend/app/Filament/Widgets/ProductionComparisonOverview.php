@@ -36,6 +36,9 @@ class ProductionComparisonOverview extends BaseWidget
         $expectedPerBag = $formula->normalChaneCount(1);
         $actualPerBag = $bags > 0 ? round($normalCount / $bags, 1) : null;
 
+        // What today's normal chane would have been, shaped as nanino.
+        $equivalent = $formula->naninoEquivalentForNormalCount($normalCount);
+
         return [
             Stat::make('چانه تولیدی امروز', number_format($normalCount).' عدد')
                 ->description($bags > 0
@@ -51,13 +54,38 @@ class ProductionComparisonOverview extends BaseWidget
                 ->descriptionIcon($this->yieldIcon($actualPerBag, $expectedPerBag))
                 ->color($this->yieldColor($actualPerBag, $expectedPerBag)),
 
-            Stat::make('چانه نانینو امروز', number_format($naninoCount).' عدد')
-                ->description($normalCount + $naninoCount > 0
-                    ? round($naninoCount / ($normalCount + $naninoCount) * 100, 1).'٪ از تولید امروز'
-                    : 'تولیدی برای امروز ثبت نشده')
-                ->descriptionIcon('heroicon-m-sparkles')
+            // The comparison figure: today's normal chane restated as nanino
+            // loaves. Showing the nanino actually recorded would read as a
+            // bare zero on any day nothing was shaped that way, which says
+            // nothing about how the two systems compare.
+            Stat::make('معادل نانینو', $equivalent === null
+                ? '—'
+                : number_format($equivalent).' عدد')
+                ->description($this->naninoDescription($equivalent, $naninoCount, $normalCount))
+                ->descriptionIcon('heroicon-m-arrows-right-left')
                 ->color('warning'),
         ];
+    }
+
+    /**
+     * The equivalent on its own is a what-if, so it is worth saying which
+     * it is — and naming the nanino actually shaped when there was any.
+     */
+    private function naninoDescription(?int $equivalent, int $actualNanino, int $normalCount): string
+    {
+        if ($equivalent === null) {
+            return 'وزن هر دو نوع چانه در تنظیمات ثبت نشده است';
+        }
+
+        if ($normalCount === 0) {
+            return 'چانه‌ای برای امروز ثبت نشده';
+        }
+
+        $prefix = number_format($normalCount).' چانه عادی امروز، اگر نانینو شکل می‌گرفت';
+
+        return $actualNanino > 0
+            ? $prefix.'   •   نانینوی واقعی: '.number_format($actualNanino).' عدد'
+            : $prefix;
     }
 
     private function yieldDescription(?float $actual, ?int $expected): string
