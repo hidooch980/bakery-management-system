@@ -94,6 +94,7 @@ class ManageBakery extends Page implements HasForms
                             ->maxValue(100)
                             ->step(0.001)
                             ->suffix('کیلوگرم')
+                            ->live(onBlur: true)
                             ->helperText('مثلاً ۰٫۳۸۰'),
 
                         \App\Filament\Forms\MoneyInput::make('bread_price', 'قیمت هر نان')
@@ -212,6 +213,7 @@ class ManageBakery extends Page implements HasForms
                                 $salt = (float) ($get('salt_ratio') ?: 0);
                                 $loss = (float) ($get('dough_loss_ratio') ?: 0);
                                 $normal = (float) ($get('normal_chane_weight_kg') ?: 0);
+                                $nanino = (float) ($get('nanino_chane_weight_kg') ?: 0);
 
                                 if ($bag <= 0) {
                                     return 'ابتدا وزن کیسه را وارد کنید.';
@@ -219,14 +221,16 @@ class ManageBakery extends Page implements HasForms
 
                                 $dough = ($bag + $bag * $water + $bag * $salt) * (1 - $loss);
                                 $count = $normal > 0 ? floor($dough / $normal) : null;
+                                $naninoCount = $nanino > 0 ? floor($dough / $nanino) : null;
 
                                 return sprintf(
-                                    'آرد %s + آب %s + نمک %s  ←  خمیر %s کیلوگرم%s',
+                                    'آرد %s + آب %s + نمک %s  ←  خمیر %s کیلوگرم%s%s',
                                     number_format($bag, 1),
                                     number_format($bag * $water, 1),
                                     number_format($bag * $salt, 2),
                                     number_format($dough, 2),
-                                    $count !== null ? '  ←  حدود '.number_format($count).' چانه عادی' : ''
+                                    $count !== null ? '  ←  حدود '.number_format($count).' چانه عادی' : '',
+                                    $naninoCount !== null ? '  یا  حدود '.number_format($naninoCount).' چانه نانینو' : ''
                                 );
                             }),
                     ]),
