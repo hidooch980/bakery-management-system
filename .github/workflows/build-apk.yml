@@ -86,7 +86,10 @@ jobs:
         working-directory: mobile-app
         run: |
           # The in-app updater compares this against the GitHub release tag.
-          sed -i "s/^version: .*/version: ${{ steps.config.outputs.version }}+${{ github.run_number }}/" pubspec.yaml
+          # Offset past the abi*1000 codes the withdrawn per-ABI builds used
+          # (up to 3000+), so phones holding one can still be updated.
+          BUILD_NUMBER=$(( 10000 + ${{ github.run_number }} ))
+          sed -i "s/^version: .*/version: ${{ steps.config.outputs.version }}+$BUILD_NUMBER/" pubspec.yaml
           grep '^version:' pubspec.yaml
 
       - name: Restore release keystore
@@ -124,14 +127,12 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          # One APK covering every CPU. Per-ABI splits were tried and
+          # withdrawn: Flutter gives each split a versionCode of
+          # abi * 1000 + base, so a phone that installed the arm64 file
+          # could never install a universal one again — Android reads the
+          # lower versionCode as a downgrade and refuses it.
           flutter build apk --release \
-            --dart-define=API_BASE_URL=${{ steps.config.outputs.api_base_url }} \
-            --dart-define=UPDATE_REPO=${{ github.repository }}
-
-          # Also build one APK per CPU, roughly a third the size. Entry-level
-          # phones ship with little free storage, and a 57MB universal APK
-          # needs several times that free to install.
-          flutter build apk --release --split-per-abi \
             --dart-define=API_BASE_URL=${{ steps.config.outputs.api_base_url }} \
             --dart-define=UPDATE_REPO=${{ github.repository }}
 
@@ -152,20 +153,11 @@ jobs:
         id: apk
         working-directory: mobile-app
         run: |
-          OUT=build/app/outputs/flutter-apk
+          SRC=build/app/outputs/flutter-apk/app-release.apk
           TAG="${{ steps.config.outputs.release_tag }}"
-
           NAME="bakery-app${TAG:+-$TAG}.apk"
-          cp "$OUT/app-release.apk" "$NAME"
-
-          # The per-CPU builds. arm64 covers phones from about 2016 on;
-          # armeabi-v7a is the fallback for older and low-end hardware.
-          for ABI in arm64-v8a armeabi-v7a; do
-            SPLIT="$OUT/app-$ABI-release.apk"
-            [ -f "$SPLIT" ] && cp "$SPLIT" "bakery-app${TAG:+-$TAG}-$ABI.apk"
-          done
-
-          ls -lh bakery-app*.apk
+          cp "$SRC" "$NAME"
+          ls -lh "$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "path=mobile-app/$NAME" >> "$GITHUB_OUTPUT"
 
@@ -182,7 +174,7 @@ jobs:
         with:
           tag_name: ${{ steps.config.outputs.release_tag }}
           name: نسخه ${{ steps.config.outputs.release_tag }}
-          files: mobile-app/bakery-app*.apk
+          files: ${{ steps.apk.outputs.path }}
           generate_release_notes: true
           body: |
             ## 📱 اپلیکیشن مدیریت نانوایی
@@ -205,18 +197,14 @@ jobs:
             ### نصب
             **حداقل اندروید ۷ (Nougat) لازم است.**
 
-            **کدام فایل را دانلود کنم؟**
-
-            | فایل | مناسب برای |
-            |---|---|
-            | `...-arm64-v8a.apk` | تقریباً همه گوشی‌های امروزی — **این را اول امتحان کنید** |
-            | `...-armeabi-v7a.apk` | گوشی‌های قدیمی‌تر و ارزان‌قیمت |
-            | `${{ steps.apk.outputs.name }}` | همه‌کاره؛ اگر دو تای بالا نصب نشدند |
-
-            دو فایل اول حدود یک‌سوم حجم دارند. روی گوشی‌هایی که حافظه‌شان کم است
-            (مثل مدل‌های One UI Core سامسونگ) همین تفاوت می‌تواند تعیین‌کننده باشد.
+            یک فایل برای همه گوشی‌ها: `${{ steps.apk.outputs.name }}`
 
             هنگام نصب، اجازه «نصب برنامه‌های ناشناس» را برای مرورگر یا فایل‌منیجر فعال کنید.
+
+            > **اگر نسخه v4.12.0 یا v4.13.0 را با فایل `-arm64-v8a` یا `-armeabi-v7a` نصب کرده‌اید:**
+            > آن دو نسخه به اشتباه با چند فایل جداگانه منتشر شدند و کد نسخه‌شان بالاتر از
+            > حد معمول بود. یک‌بار برنامه را حذف کنید و این فایل را نصب کنید؛ از این پس
+            > همیشه یک فایل واحد منتشر می‌شود و به‌روزرسانی بدون حذف انجام می‌شود.
 
             > **اگر پیام «Blocked by Play Protect» یا «برنامه مسدود شد» دیدید:**
             > روی «More details» و سپس «Install anyway» بزنید. این پیام برای همه
