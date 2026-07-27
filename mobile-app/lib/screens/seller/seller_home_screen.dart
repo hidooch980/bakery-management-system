@@ -433,9 +433,11 @@ class _RecordSaleSheet extends StatefulWidget {
 class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   final _note = TextEditingController();
 
-  /// Loaves entered against each payment type. A type stays out of the map
-  /// until it is actually used, so the summary only names what was paid.
-  final Map<PaymentType, int> _counts = {};
+  /// One field per payment type. A sale can run to hundreds of loaves,
+  /// so the count is typed rather than stepped.
+  final Map<PaymentType, TextEditingController> _fields = {
+    for (final type in PaymentType.values) type: TextEditingController(),
+  };
 
   /// Buyer per payment type, needed for نسیه and مدارس.
   final Map<PaymentType, int?> _customers = {};
@@ -449,7 +451,13 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
     // The common case is the whole batch paid in cash, so start there and
     // let the seller move loaves onto other rows as needed.
-    _counts[PaymentType.cash] = widget.chane.chaneCount;
+    _fields[PaymentType.cash]!.text = '${widget.chane.chaneCount}';
+
+    // Every keystroke moves the running total and the banner above it.
+    for (final field in _fields.values) {
+      field.addListener(() => setState(() {}));
+    }
+
     _loadCustomers();
   }
 
@@ -464,6 +472,9 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
   @override
   void dispose() {
+    for (final field in _fields.values) {
+      field.dispose();
+    }
     _note.dispose();
     super.dispose();
   }
@@ -472,35 +483,32 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
   Currency get _unit => widget.bakery?.currency ?? Currency.toman;
 
-  int get _totalCount =>
-      _counts.values.fold(0, (sum, count) => sum + count);
+  int get _totalCount => PaymentType.values
+      .fold(0, (sum, type) => sum + _countFor(type));
 
-  double get _totalAmount => _totalCount * _unitPrice * _unit.multiplier;
+  /// In Toman, the unit everything is stored in. MoneyFormat converts
+  /// to the shop's display unit when it renders — doing it here too
+  /// showed every figure ten times over on a Rial shop.
+  double get _totalAmount => _totalCount * _unitPrice;
 
   /// Loaves of the batch not yet placed on any payment row. Recorded as a
   /// temporary debt against the seller, so it is worth showing plainly.
   int get _unassigned => widget.chane.chaneCount - _totalCount;
 
-  int _countFor(PaymentType type) => _counts[type] ?? 0;
-
-  void _setCount(PaymentType type, int value) {
-    setState(() {
-      final clamped = value.clamp(0, widget.chane.chaneCount + 100000);
-
-      if (clamped == 0) {
-        _counts.remove(type);
-        _customers.remove(type);
-      } else {
-        _counts[type] = clamped;
-      }
-    });
-  }
+  int _countFor(PaymentType type) =>
+      int.tryParse(_fields[type]!.text.trim()) ?? 0;
 
   /// Puts every loaf still unassigned onto this row — the usual gesture
   /// when one payment type covers the rest of the batch.
   void _fill(PaymentType type) {
-    if (_unassigned > 0) _setCount(type, _countFor(type) + _unassigned);
+    if (_unassigned <= 0) return;
+
+    _fields[type]!.text = '${_countFor(type) + _unassigned}';
   }
+
+  /// Payment types actually used, so the summary names only what was paid.
+  Iterable<PaymentType> get _usedTypes =>
+      PaymentType.values.where((type) => _countFor(type) > 0);
 
   String? _blockingProblem() {
     if (_totalCount == 0) return 'برای حداقل یک نوع پرداخت تعداد نان وارد کنید.';
@@ -509,7 +517,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
       return 'مجموع تعداد نان از ${widget.chane.chaneCount} عدد این چانه بیشتر است.';
     }
 
-    for (final type in _counts.keys) {
+    for (final type in _usedTypes) {
       if (type.needsCustomer && _customers[type] == null) {
         return 'برای «${type.label}» مشتری را انتخاب کنید.';
       }
@@ -529,16 +537,14 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     setState(() => _saving = true);
 
     try {
-      final payments = _counts.entries
-          .map((entry) => SalePaymentLine(
-                paymentType: entry.key,
-                breadCount: entry.value,
-                // The API always stores Toman, whatever the shop displays.
-                amount: MoneyFormat.toToman(
-                  entry.value * _unitPrice * _unit.multiplier,
-                  currency: _unit,
-                ),
-                customerId: _customers[entry.key],
+      final payments = _usedTypes
+          .map((type) => SalePaymentLine(
+                paymentType: type,
+                breadCount: _countFor(type),
+                // The API always stores Toman, whatever the shop displays,
+                // and the bread price is already in it.
+                amount: _countFor(type) * _unitPrice,
+                customerId: _customers[type],
               ))
           .toList();
 
@@ -622,14 +628,15 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
               for (final type in PaymentType.values)
                 _PaymentRow(
+                  key: ValueKey(type),
                   type: type,
+                  controller: _fields[type]!,
                   count: _countFor(type),
                   unitPrice: _unitPrice,
                   unit: _unit,
                   customers: _customerOptions,
                   selectedCustomer: _customers[type],
                   canFill: _unassigned > 0,
-                  onChanged: (value) => _setCount(type, value),
                   onFill: () => _fill(type),
                   onCustomerChanged: (id) =>
                       setState(() => _customers[type] = id),
@@ -731,28 +738,33 @@ class _RemainingBanner extends StatelessWidget {
 /// One payment type with its loaf count, a stepper either side, and the
 /// money it comes to. Tapping the row's + button sweeps up whatever is
 /// left of the batch, which is the usual case.
+/// One payment type with its loaf count typed in, and the money it comes
+/// to. A sale can run to hundreds of loaves, so the count is entered
+/// rather than stepped; the button beside it sweeps up whatever is left of
+/// the batch, which is the usual case.
 class _PaymentRow extends StatelessWidget {
   const _PaymentRow({
+    super.key,
     required this.type,
+    required this.controller,
     required this.count,
     required this.unitPrice,
     required this.unit,
     required this.customers,
     required this.selectedCustomer,
     required this.canFill,
-    required this.onChanged,
     required this.onFill,
     required this.onCustomerChanged,
   });
 
   final PaymentType type;
+  final TextEditingController controller;
   final int count;
   final double unitPrice;
   final Currency unit;
   final List<Customer> customers;
   final int? selectedCustomer;
   final bool canFill;
-  final ValueChanged<int> onChanged;
   final VoidCallback onFill;
   final ValueChanged<int?> onCustomerChanged;
 
@@ -760,7 +772,10 @@ class _PaymentRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final active = count > 0;
-    final amount = count * unitPrice * unit.multiplier;
+
+    // Toman, the unit everything is stored in. MoneyFormat converts to the
+    // shop's display unit when it renders.
+    final amount = count * unitPrice;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -777,6 +792,7 @@ class _PaymentRow extends StatelessWidget {
       child: Column(
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Column(
@@ -798,28 +814,26 @@ class _PaymentRow extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: count > 0 ? () => onChanged(count - 1) : null,
-                icon: const Icon(Icons.remove_circle_outline_rounded),
-                visualDensity: VisualDensity.compact,
-                tooltip: 'یکی کمتر',
-              ),
               SizedBox(
-                width: 52,
-                child: Text(
-                  '$count',
+                width: 92,
+                child: TextFormField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: active ? scheme.primary : scheme.onSurfaceVariant,
-                      ),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    hintText: '۰',
+                    suffixText: 'نان',
+                  ),
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.isEmpty) return null;
+
+                    final parsed = int.tryParse(text);
+                    if (parsed == null || parsed < 0) return 'عدد';
+                    return null;
+                  },
                 ),
-              ),
-              IconButton(
-                onPressed: () => onChanged(count + 1),
-                icon: const Icon(Icons.add_circle_outline_rounded),
-                visualDensity: VisualDensity.compact,
-                tooltip: 'یکی بیشتر',
               ),
               IconButton(
                 onPressed: canFill ? onFill : null,
@@ -858,7 +872,6 @@ class _PaymentRow extends StatelessWidget {
   }
 }
 
-/// The batch total, which is what the seller actually hands over.
 class _TotalRow extends StatelessWidget {
   const _TotalRow({
     required this.count,

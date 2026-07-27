@@ -42,13 +42,26 @@ class FlourAllocationPeriod extends Model
             return 0.0;
         }
 
-        return round((float) $flour->movements()
+        $window = [
+            $this->starts_on->copy()->startOfDay(),
+            $this->ends_on->copy()->endOfDay(),
+        ];
+
+        $out = (float) $flour->movements()
             ->where('direction', 'out')
-            ->whereBetween('created_at', [
-                $this->starts_on->copy()->startOfDay(),
-                $this->ends_on->copy()->endOfDay(),
-            ])
-            ->sum('quantity'), 3);
+            ->whereBetween('created_at', $window)
+            ->sum('quantity');
+
+        // Flour given back when an entry was deleted was never really
+        // consumed. Counting it would push the period towards its quota
+        // for work that no longer exists — and only reversals are netted
+        // off, since an ordinary purchase is not a refund of usage.
+        $reversed = (float) $flour->movements()
+            ->whereIn('reason', ['production_reversal', 'flour_sale_reversal'])
+            ->whereBetween('created_at', $window)
+            ->sum('quantity');
+
+        return round(max(0, $out - $reversed), 3);
     }
 
     /**

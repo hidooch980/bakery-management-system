@@ -75,6 +75,12 @@ class ChaneComparison extends StatelessWidget {
                       count: board.naninoCount,
                       weightKg: board.naninoWeightKg,
                       color: _naninoColor,
+                      // Most days nothing is shaped as nanino, so the real
+                      // count alone reads as a bare zero. The equivalent
+                      // says what today's chane would have been instead.
+                      footnote: board.naninoEquivalent == null
+                          ? null
+                          : 'معادل امروز: ${board.naninoEquivalent} عدد',
                     ),
                   ),
                 ],
@@ -234,12 +240,16 @@ class _Metric extends StatelessWidget {
     required this.count,
     required this.weightKg,
     required this.color,
+    this.footnote,
   });
 
   final String label;
   final int count;
   final double weightKg;
   final Color color;
+
+  /// A what-if line under the figure, not a count of anything baked.
+  final String? footnote;
 
   @override
   Widget build(BuildContext context) {
@@ -275,6 +285,16 @@ class _Metric extends StatelessWidget {
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
           ),
+          if (footnote != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              footnote!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: color.withValues(alpha: 0.85),
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
         ],
       ),
     );

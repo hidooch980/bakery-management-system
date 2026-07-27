@@ -1281,4 +1281,60 @@ class ProductionFormulaTest extends TestCase
 
         $this->assertEquals(2.0, InventoryItem::ofKey(InventoryItem::FLOUR)->fresh()->balance_bags);
     }
+
+    public function test_flour_given_back_by_a_deletion_is_not_counted_as_used(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+
+        $period = $allocation->periods()->first();
+        $inside = $period->starts_on->copy()->addDay();
+
+        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $flour->move('in', 1000, 'purchase');
+
+        $used = $flour->move('out', 100, 'production');
+        $back = $flour->move('in', 40, 'production_reversal');
+
+        foreach ([$used, $back] as $movement) {
+            \Illuminate\Support\Facades\DB::table('inventory_movements')
+                ->where('id', $movement->id)->update(['created_at' => $inside]);
+        }
+
+        // 100 went out but 40 came back when an entry was deleted, so the
+        // period consumed 60 — counting the full 100 would push it towards
+        // its quota for work that no longer exists.
+        $this->assertSame(60.0, $period->refresh()->used_kg);
+    }
+
+    public function test_a_purchase_does_not_reduce_the_periods_usage(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+
+        $period = $allocation->periods()->first();
+        $inside = $period->starts_on->copy()->addDay();
+
+        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $flour->move('in', 1000, 'purchase');
+
+        $used = $flour->move('out', 100, 'production');
+        $bought = $flour->move('in', 500, 'purchase');
+
+        foreach ([$used, $bought] as $movement) {
+            \Illuminate\Support\Facades\DB::table('inventory_movements')
+                ->where('id', $movement->id)->update(['created_at' => $inside]);
+        }
+
+        // Buying more flour is not a refund of what was already consumed.
+        $this->assertSame(100.0, $period->refresh()->used_kg);
+    }
 }
