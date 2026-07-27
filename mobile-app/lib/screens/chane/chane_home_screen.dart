@@ -417,13 +417,12 @@ class _RecordChaneSheet extends StatefulWidget {
 
 class _RecordChaneSheetState extends State<_RecordChaneSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _naninoCount = TextEditingController();
-  final _spray = TextEditingController();
+  final _spray = TextEditingController(text: '0');
 
-  /// Chane counted into each tray, in the order they were filled. The shop
-  /// counts a tray at a time, so this is the real record; the batch total
-  /// is just their sum.
-  final List<int> _trays = [];
+  /// One field per tray, in the order they were filled. Chane is counted
+  /// into trays on the bench, so this is the real record; the batch total
+  /// is only their sum.
+  final List<TextEditingController> _trays = [];
 
   bool _saving = false;
 
@@ -432,22 +431,24 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
     super.initState();
 
     // Start on the first tray, already filled to the shop's tray size.
-    _trays.add(_trayStep);
-    _naninoCount.addListener(_refreshTotal);
+    _addTray();
   }
 
   @override
   void dispose() {
-    _naninoCount.dispose();
+    for (final controller in _trays) {
+      controller.dispose();
+    }
     _spray.dispose();
     super.dispose();
   }
 
-  void _refreshTotal() => setState(() {});
-
   int get _trayStep => widget.bakery?.trayStep ?? 1;
 
-  int get _count => _trays.fold(0, (sum, tray) => sum + tray);
+  int get _count => _trays.fold(
+        0,
+        (sum, tray) => sum + (int.tryParse(tray.text.trim()) ?? 0),
+      );
 
   /// Roughly what this dough should yield, so a miscount shows up here
   /// rather than in a report at the end of the month.
@@ -457,39 +458,49 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
   double get _normalWeight =>
       _count * (widget.bakery?.normalChaneWeightKg ?? 0);
 
-  double get _naninoWeight {
-    final perChane = widget.bakery?.naninoChaneWeightKg ?? 0;
+  void _addTray() {
+    final controller = TextEditingController(text: '$_trayStep');
 
-    return (int.tryParse(_naninoCount.text) ?? 0) * perChane;
+    // Every keystroke moves the running total and the expected-yield
+    // notice, so both have to redraw as the count is typed.
+    controller.addListener(() => setState(() {}));
+
+    setState(() => _trays.add(controller));
   }
 
-  double get _total => _normalWeight + _naninoWeight;
-
-  void _addTray() => setState(() => _trays.add(_trayStep));
-
-  void _removeTray(int index) => setState(() => _trays.removeAt(index));
-
-  void _setTray(int index, int value) {
-    setState(() => _trays[index] = value.clamp(1, 10000));
+  void _removeTray(int index) {
+    final controller = _trays.removeAt(index);
+    controller.dispose();
+    setState(() {});
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      // The form is long enough that a field error can sit off-screen,
+      // which reads as the button doing nothing at all.
+      showMessage(context, 'یکی از فیلدها را کامل کنید.', isError: true);
+      return;
+    }
 
     if (_count < 1) {
-      showMessage(context, 'حداقل یک تشتک با تعداد معتبر ثبت کنید.', isError: true);
+      showMessage(context, 'حداقل یک تشتک با تعداد معتبر ثبت کنید.',
+          isError: true);
       return;
     }
 
     setState(() => _saving = true);
 
     try {
+      final trays = _trays
+          .map((c) => int.tryParse(c.text.trim()) ?? 0)
+          .where((count) => count > 0)
+          .toList();
+
       final result = await widget.api.recordChane(
         doughEntryId: widget.dough.id,
         chaneCount: _count,
-        naninoChaneCount: int.tryParse(_naninoCount.text) ?? 0,
-        sprayFlourKg: double.parse(_spray.text),
-        trays: List<int>.from(_trays),
+        sprayFlourKg: double.tryParse(_spray.text.trim()) ?? 0,
+        trays: trays,
       );
 
       if (!mounted) return;
@@ -507,14 +518,6 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  String? _requiredNumber(String? value, {bool allowZero = true}) {
-    final parsed = double.tryParse(value ?? '');
-    if (parsed == null) return 'یک عدد معتبر وارد کنید';
-    if (parsed < 0) return 'مقدار نمی‌تواند منفی باشد';
-    if (!allowZero && parsed == 0) return 'مقدار باید بیشتر از صفر باشد';
-    return null;
   }
 
   @override
@@ -590,11 +593,11 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
 
                 for (var i = 0; i < _trays.length; i++)
                   _TrayRow(
+                    key: ObjectKey(_trays[i]),
                     index: i,
-                    count: _trays[i],
+                    controller: _trays[i],
                     // The batch must keep at least one tray to mean anything.
                     canRemove: _trays.length > 1,
-                    onChanged: (value) => _setTray(i, value),
                     onRemove: () => _removeTray(i),
                   ),
 
@@ -609,30 +612,11 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
                 _TrayTotal(trayCount: _trays.length, chaneCount: _count),
 
                 const SizedBox(height: 20),
-                TextFormField(
-                  controller: _naninoCount,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'تعداد چانه نانینو (اختیاری)',
-                    prefixIcon: Icon(Icons.precision_manufacturing_rounded),
-                    suffixText: 'عدد',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return null;
-                    final parsed = int.tryParse(value);
-                    if (parsed == null || parsed < 0) return 'یک عدد معتبر وارد کنید';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Weights come from the admin's dough formula and cannot be
-                // edited here, so they are shown rather than entered.
+                // Weight comes from the admin's dough formula and cannot be
+                // edited here, so it is shown rather than entered.
                 _DerivedWeights(
                   normalWeight: _normalWeight,
-                  naninoWeight: _naninoWeight,
                   normalPerChane: widget.bakery?.normalChaneWeightKg,
-                  naninoPerChane: widget.bakery?.naninoChaneWeightKg,
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
@@ -642,38 +626,16 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
                     labelText: 'وزن آرد پاششی مصرف‌شده',
                     prefixIcon: Icon(Icons.grass_rounded),
                     suffixText: 'کیلوگرم',
+                    // Starts at zero so a batch that used none can be filed
+                    // without the field blocking the whole form.
+                    helperText: 'اگر آرد پاششی مصرف نشده، صفر بماند',
                   ),
-                  validator: _requiredNumber,
-                ),
-                const SizedBox(height: 20),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.summarize_rounded, color: scheme.primary),
-                      const SizedBox(width: 12),
-                      Text(
-                        'وزن کل چانه‌های تولیدشده',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${_total.toStringAsFixed(2)} کیلوگرم',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: scheme.primary,
-                            ),
-                      ),
-                    ],
-                  ),
+                  validator: (value) {
+                    final parsed = double.tryParse(value?.trim() ?? '');
+                    if (parsed == null) return 'یک عدد معتبر وارد کنید';
+                    if (parsed < 0) return 'مقدار نمی‌تواند منفی باشد';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
@@ -697,8 +659,6 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
   }
 }
 
-/// Roughly what this dough should yield, so the chane gir sees a miscount
-/// while the trays are still in front of them.
 class _ExpectedBanner extends StatelessWidget {
   const _ExpectedBanner({required this.expected, required this.actual});
 
@@ -745,19 +705,21 @@ class _ExpectedBanner extends StatelessWidget {
 }
 
 /// One tray with a stepper either side of its count.
+/// One tray, with its count typed rather than stepped. Trays hold dozens of
+/// chane and the last one is trimmed to whatever was left, so tapping a
+/// plus button thirty times was never the right gesture.
 class _TrayRow extends StatelessWidget {
   const _TrayRow({
+    super.key,
     required this.index,
-    required this.count,
+    required this.controller,
     required this.canRemove,
-    required this.onChanged,
     required this.onRemove,
   });
 
   final int index;
-  final int count;
+  final TextEditingController controller;
   final bool canRemove;
-  final ValueChanged<int> onChanged;
   final VoidCallback onRemove;
 
   static const _ordinals = [
@@ -771,53 +733,32 @@ class _TrayRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Text(
-              _label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-          IconButton(
-            onPressed: count > 1 ? () => onChanged(count - 1) : null,
-            icon: const Icon(Icons.remove_circle_outline_rounded),
-            visualDensity: VisualDensity.compact,
-            tooltip: 'یکی کمتر',
-          ),
-          SizedBox(
-            width: 46,
-            child: Text(
-              '$count',
+            child: TextFormField(
+              controller: controller,
+              keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: scheme.primary,
-                  ),
+              decoration: InputDecoration(
+                labelText: _label,
+                isDense: true,
+                suffixText: 'عدد',
+              ),
+              validator: (value) {
+                final parsed = int.tryParse(value?.trim() ?? '');
+                if (parsed == null) return 'عدد وارد کنید';
+                if (parsed < 1) return 'بیشتر از صفر';
+                return null;
+              },
             ),
-          ),
-          IconButton(
-            onPressed: () => onChanged(count + 1),
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            visualDensity: VisualDensity.compact,
-            tooltip: 'یکی بیشتر',
           ),
           IconButton(
             onPressed: canRemove ? onRemove : null,
             icon: const Icon(Icons.delete_outline_rounded),
-            visualDensity: VisualDensity.compact,
             tooltip: 'حذف تشتک',
           ),
         ],
@@ -826,7 +767,6 @@ class _TrayRow extends StatelessWidget {
   }
 }
 
-/// The running total, which is what actually gets recorded.
 class _TrayTotal extends StatelessWidget {
   const _TrayTotal({required this.trayCount, required this.chaneCount});
 
@@ -873,137 +813,50 @@ class _TrayTotal extends StatelessWidget {
 ///
 /// The chane gir enters counts; the weights follow from the recipe, so they
 /// are displayed rather than typed and cannot drift from it.
+/// The batch weight, worked out from the shop's formula rather than typed,
+/// so the floor cannot enter a figure that contradicts it.
 class _DerivedWeights extends StatelessWidget {
   const _DerivedWeights({
     required this.normalWeight,
-    required this.naninoWeight,
-    this.normalPerChane,
-    this.naninoPerChane,
+    required this.normalPerChane,
   });
 
   final double normalWeight;
-  final double naninoWeight;
   final double? normalPerChane;
-  final double? naninoPerChane;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
-    if ((normalPerChane ?? 0) <= 0) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: scheme.errorContainer.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: scheme.error),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'وزن هر چانه در تنظیمات نانوایی تعریف نشده است. '
-                'تا تعریف نشود، ثبت چانه ممکن نیست.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    final hasFormula = (normalPerChane ?? 0) > 0;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(Icons.lock_outline_rounded, size: 16, color: scheme.onSurfaceVariant),
-              const SizedBox(width: 8),
-              Text(
-                'وزن‌های محاسبه‌شده از فرمول',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _WeightRow(
-            label: 'وزن چانه عادی',
-            weight: normalWeight,
-            perChane: normalPerChane,
-            color: const Color(0xFFE8952D),
-          ),
-          if ((naninoPerChane ?? 0) > 0) ...[
-            const SizedBox(height: 10),
-            _WeightRow(
-              label: 'وزن چانه نانینو',
-              weight: naninoWeight,
-              perChane: naninoPerChane,
-              color: const Color(0xFF3B82C4),
+          Icon(Icons.scale_rounded, size: 20, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              hasFormula
+                  ? 'وزن این چانه‌ها'
+                  : 'وزن چانه در تنظیمات نانوایی ثبت نشده است',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
-          ],
+          ),
+          if (hasFormula)
+            Text(
+              '${normalWeight.toStringAsFixed(2)} کیلوگرم',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: scheme.primary,
+                  ),
+            ),
         ],
       ),
-    );
-  }
-}
-
-class _WeightRow extends StatelessWidget {
-  const _WeightRow({
-    required this.label,
-    required this.weight,
-    required this.color,
-    this.perChane,
-  });
-
-  final String label;
-  final double weight;
-  final Color color;
-  final double? perChane;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.bodyMedium),
-              if (perChane != null)
-                Text(
-                  'هر چانه ${perChane!.toStringAsFixed(3)} کیلوگرم',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                ),
-            ],
-          ),
-        ),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: Text(
-            '${weight.toStringAsFixed(2)} کیلوگرم',
-            key: ValueKey(weight),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                ),
-          ),
-        ),
-      ],
     );
   }
 }
