@@ -58,17 +58,66 @@ class SaleResource extends Resource
                         ->required()
                         ->native(false),
 
+                    // A batch is often settled in more than one way, so the
+                    // panel takes a line per payment type — the same shape
+                    // the seller's screen uses. Each line becomes its own
+                    // sale row, so reports that group by type are unchanged.
+                    Forms\Components\Repeater::make('payments')
+                        ->label('پرداخت‌ها')
+                        ->columnSpanFull()
+                        ->addActionLabel('افزودن نوع پرداخت')
+                        ->defaultItems(1)
+                        ->visibleOn('create')
+                        ->columns(2)
+                        ->schema([
+                            Forms\Components\Select::make('payment_type')
+                                ->label('نوع پرداخت')
+                                ->options(self::PAYMENT_LABELS)
+                                ->default('cash')
+                                ->required()
+                                ->native(false)
+                                ->live(),
+
+                            Forms\Components\TextInput::make('bread_count')
+                                ->label('تعداد نان')
+                                ->numeric()
+                                ->minValue(1)
+                                ->required()
+                                ->suffix('عدد'),
+
+                            \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ'),
+
+                            Forms\Components\Select::make('customer_id')
+                                ->label('مدرسه / اداره')
+                                ->options(fn () => \App\Models\Customer::query()
+                                    ->buyers()->pluck('name', 'id'))
+                                ->searchable()
+                                ->native(false)
+                                // Only school and credit lines owe a name.
+                                ->required(fn (Forms\Get $get) => in_array(
+                                    $get('payment_type'), ['schools', 'credit'], true
+                                ))
+                                ->visible(fn (Forms\Get $get) => in_array(
+                                    $get('payment_type'), ['schools', 'credit'], true
+                                )),
+                        ])
+                        ->dehydrated(false),
+
+                    // Editing works on one recorded line at a time, since
+                    // that is what a sale row is once it has been written.
                     Forms\Components\Select::make('payment_type')
                         ->label('نوع پرداخت')
                         ->options(self::PAYMENT_LABELS)
                         ->required()
                         ->native(false)
+                        ->visibleOn('edit')
                         ->live(),
 
                     Forms\Components\TextInput::make('bread_count')
                         ->label('تعداد نان')
                         ->numeric()
                         ->minValue(0)
+                        ->visibleOn('edit')
                         ->suffix('عدد'),
 
                     Forms\Components\Select::make('customer_id')
@@ -78,11 +127,12 @@ class SaleResource extends Resource
                         ->searchable()
                         ->preload()
                         ->native(false)
+                        ->visibleOn('edit')
                         // Named buyers only matter for school and credit sales.
                         ->required(fn (Forms\Get $get) => in_array($get('payment_type'), ['schools', 'credit'], true))
                         ->helperText('برای فروش مدارس و نسیه الزامی است.'),
 
-                    \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ'),
+                    \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ')->visibleOn('edit'),
 
                     \App\Filament\Forms\JalaliDateInput::make('settled_on', 'تاریخ تسویه')
                         // Only credit and school sales leave money owed.

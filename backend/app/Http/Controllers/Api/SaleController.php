@@ -7,6 +7,7 @@ use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
 use App\Support\Money;
+use App\Support\SaleRecorder;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -56,72 +57,11 @@ class SaleController extends Controller
 
         $lines = $this->paymentLines($data, $chane);
 
-        // Sales to schools or offices should name the buyer.
-        foreach ($lines as $line) {
-            if (in_array($line['payment_type'], ['schools', 'credit'], true)
-                && empty($line['customer_id'])) {
-                return $this->error('برای این نوع پرداخت، انتخاب مشتری الزامی است.', 422);
-            }
+        if ($problem = SaleRecorder::problemWith($chane, $lines)) {
+            return $this->error($problem, 422);
         }
 
-        $totalBread = array_sum(array_column($lines, 'bread_count'));
-
-        if ($totalBread > $chane->chane_count) {
-            return $this->error(
-                'مجموع تعداد نان ('.number_format($totalBread).') از تعداد چانه این دسته ('
-                .number_format($chane->chane_count).') بیشتر است.',
-                422
-            );
-        }
-
-        $sales = DB::transaction(function () use ($lines, $chane, $request, $totalBread) {
-            $breadPrice = (float) (Bakery::first()->bread_price ?? 0);
-
-            // Whatever the batch held beyond everything sold from it is a
-            // temporary debt against the seller — computed from the batch's
-            // own count, never from client input, so it can't be typed
-            // away. Counted once for the batch rather than once per line.
-            $shortfallCount = max(0, $chane->chane_count - $totalBread);
-            $shortfallApplied = false;
-
-            $created = [];
-
-            foreach ($lines as $line) {
-                $amount = $line['amount'];
-
-                // How far the money taken sits from what this bread should
-                // have cost. Frozen here rather than recomputed, so a later
-                // price change cannot rewrite what a seller already owed.
-                $difference = ($amount === null || $breadPrice <= 0)
-                    ? null
-                    : round((float) $amount - $line['bread_count'] * $breadPrice, 2);
-
-                $created[] = Sale::create([
-                    'chane_entry_id' => $chane->id,
-                    'user_id' => $request->user()->id,
-                    'payment_type' => $line['payment_type'],
-                    'bread_count' => $line['bread_count'],
-                    // The batch's shortfall belongs to the batch, so it
-                    // rides on the first line only and is never doubled.
-                    'shortfall_count' => (! $shortfallApplied && $shortfallCount > 0)
-                        ? $shortfallCount
-                        : null,
-                    'shortfall_amount' => (! $shortfallApplied && $shortfallCount > 0)
-                        ? round($shortfallCount * $breadPrice, 2)
-                        : null,
-                    'amount_difference' => $difference,
-                    'customer_id' => $line['customer_id'],
-                    'amount' => $amount,
-                    'note' => $line['note'],
-                ]);
-
-                $shortfallApplied = true;
-            }
-
-            $chane->update(['status' => 'sold']);
-
-            return $created;
-        });
+        $sales = SaleRecorder::record($chane, $lines, $request->user()->id);
 
         // One line still answers with that single sale, so nothing that
         // already reads data.id or data.amount has to change.
