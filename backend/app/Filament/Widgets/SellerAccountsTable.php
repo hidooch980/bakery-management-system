@@ -29,6 +29,10 @@ class SellerAccountsTable extends BaseWidget
 
     public function table(Table $table): Table
     {
+        // Cleared per render: stale rows here would show an account that
+        // has already been settled.
+        self::$cache = [];
+
         return $table
             ->query(
                 User::query()->whereHas('sales', fn ($q) => $q->sellerAccountOutstanding())
@@ -124,6 +128,9 @@ class SellerAccountsTable extends BaseWidget
 
                         \App\Support\SellerSettlement::settle($record);
 
+                        // The account just changed, so the cached rows are stale.
+                        unset(self::$cache[$record->id]);
+
                         Notification::make()
                             ->title('حساب '.$record->name.' تسویه شد')
                             ->body('مبلغ '.Money::format($amount).' تسویه شد.')
@@ -136,10 +143,19 @@ class SellerAccountsTable extends BaseWidget
             ->paginated([5, 10, 25]);
     }
 
+    /**
+     * Held for the length of the request. Every column asks the same
+     * question of the same seller, so without this a five-seller table
+     * ran the query dozens of times to render one screen.
+     *
+     * @var array<int, \Illuminate\Support\Collection<int, Sale>>
+     */
+    private static array $cache = [];
+
     /** @return \Illuminate\Support\Collection<int, Sale> */
     private static function outstandingFor(User $seller): \Illuminate\Support\Collection
     {
-        return Sale::query()
+        return self::$cache[$seller->id] ??= Sale::query()
             ->where('user_id', $seller->id)
             ->sellerAccountOutstanding()
             ->get();
