@@ -70,7 +70,7 @@ class ChaneEntryResource extends Resource
                         ->default(0)
                         ->live(onBlur: true)
                         ->suffix('عدد')
-                        ->helperText('نمایشی؛ در موجودی و فروش دخالتی ندارد')
+                        ->helperText('در فروش و گزارش‌ها دخالتی ندارد، اما خمیر مصرفی آن از انبار کم می‌شود')
                         ->dehydrated(false),
 
                     Forms\Components\Select::make('status')

@@ -200,6 +200,27 @@ class BakeryApi {
     return body['queued'] == true;
   }
 
+  /// Records one batch paid for in several ways at once — part cash, part
+  /// card — as a single request, so the batch is closed once and any
+  /// shortfall is counted once rather than per line.
+  Future<bool> recordSplitSale({
+    required int chaneEntryId,
+    required List<SalePaymentLine> payments,
+    String? note,
+  }) async {
+    final body = await _client.postOrQueue(
+      '/sales',
+      {
+        'chane_entry_id': chaneEntryId,
+        'payments': payments.map((line) => line.toJson()).toList(),
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+      label: 'فروش — چانه #$chaneEntryId',
+    );
+
+    return body['queued'] == true;
+  }
+
   /// Schools and offices the admin has defined, for attributing a sale.
   Future<List<Customer>> customers() async {
     final body = await _client.get('/customers');

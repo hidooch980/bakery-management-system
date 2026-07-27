@@ -94,6 +94,33 @@ enum PaymentType {
         (t) => t.apiValue == value,
         orElse: () => PaymentType.other,
       );
+
+  /// Types the shop must know the buyer for before it can record the sale.
+  bool get needsCustomer =>
+      this == PaymentType.credit || this == PaymentType.schools;
+}
+
+/// One way a batch was paid for: how many loaves went out under this
+/// payment type, and the money taken for them.
+class SalePaymentLine {
+  const SalePaymentLine({
+    required this.paymentType,
+    required this.breadCount,
+    this.amount,
+    this.customerId,
+  });
+
+  final PaymentType paymentType;
+  final int breadCount;
+  final double? amount;
+  final int? customerId;
+
+  Map<String, dynamic> toJson() => {
+        'payment_type': paymentType.apiValue,
+        'bread_count': breadCount,
+        if (amount != null) 'amount': amount,
+        if (customerId != null) 'customer_id': customerId,
+      };
 }
 
 class Sale {
