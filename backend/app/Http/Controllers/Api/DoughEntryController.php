@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
 use App\Support\DoughFormula;
+use App\Support\ProductionRecorder;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,28 +28,7 @@ class DoughEntryController extends Controller
         $formula = DoughFormula::fromBakery();
         $bags = (int) $data['bag_count'];
 
-        $entry = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $request, $formula, $bags) {
-            $entry = DoughEntry::create([
-                'user_id' => $request->user()->id,
-                'bag_count' => $bags,
-                'note' => $data['note'] ?? null,
-                'status' => 'pending',
-            ]);
-
-            // Kneading consumes flour and salt and produces dough, so the
-            // warehouse follows the formula automatically.
-            InventoryItem::ofKey(InventoryItem::FLOUR)->move(
-                'out', $formula->flourKg($bags), 'production', $request->user()->id, $entry
-            );
-            InventoryItem::ofKey(InventoryItem::SALT)->move(
-                'out', $formula->saltKg($bags), 'production', $request->user()->id, $entry
-            );
-            InventoryItem::ofKey(InventoryItem::DOUGH)->move(
-                'in', $formula->doughKg($bags), 'production', $request->user()->id, $entry
-            );
-
-            return $entry;
-        });
+        $entry = ProductionRecorder::dough($bags, $request->user()->id, $data['note'] ?? null);
 
         return $this->success([
             'entry' => $entry,

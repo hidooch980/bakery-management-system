@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
+use App\Models\InventoryItem;
+use App\Support\ProductionRecorder;
 use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -40,7 +42,12 @@ class ChaneEntryPanelTest extends TestCase
         $this->actingAs($admin);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        $this->dough = DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 10]);
+        // Shaping spends real dough now, whichever screen records it, so
+        // the batch has to exist in the warehouse for the panel to draw on.
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 200, 'purchase');
+
+        $this->dough = ProductionRecorder::dough(10, $admin->id);
     }
 
     private DoughEntry $dough;

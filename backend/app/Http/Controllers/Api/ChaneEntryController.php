@@ -8,6 +8,7 @@ use App\Models\DoughEntry;
 use App\Models\FlourStockMovement;
 use App\Models\InventoryItem;
 use App\Support\DoughFormula;
+use App\Support\ProductionRecorder;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,49 +74,16 @@ class ChaneEntryController extends Controller
             return $this->error('برای این خمیر قبلاً چانه ثبت شده است.', 409);
         }
 
-        $entry = DB::transaction(function () use ($data, $dough, $request, $normalCount, $normalWeight, $naninoWeight, $trays, $trayCount) {
-            $entry = ChaneEntry::create([
-                'dough_entry_id' => $dough->id,
-                'user_id' => $request->user()->id,
-                'chane_count' => $normalCount,
-                'tray_count' => $trayCount,
-                'tray_counts' => $trays,
-                'normal_weight_kg' => $normalWeight,
-                'nanino_weight_kg' => $naninoWeight ?? 0,
-                'spray_flour_kg' => $data['spray_flour_kg'],
-                'status' => 'pending',
-            ]);
-
-            $dough->update(['status' => 'processed']);
-
-            if ($data['spray_flour_kg'] > 0) {
-                FlourStockMovement::create([
-                    'user_id' => $request->user()->id,
-                    'type' => 'out',
-                    'amount_kg' => $data['spray_flour_kg'],
-                    'note' => "آرد پاششی چانه #{$entry->id}",
-                ]);
-
-                InventoryItem::ofKey(InventoryItem::FLOUR)->move(
-                    'out', (float) $data['spray_flour_kg'], 'spray', $request->user()->id, $entry
-                );
-            }
-
-            // Shaping turns dough into chane, so the dough stock drops —
-            // by the full dough weight actually shaped, normal and nanino
-            // together. A batch shaped entirely into nanino still consumes
-            // real dough; deducting only the normal share would leave that
-            // dough looking untouched in stock when it is physically gone.
-            InventoryItem::ofKey(InventoryItem::DOUGH)->move(
-                'out',
-                $normalWeight + ($naninoWeight ?? 0),
-                'production',
-                $request->user()->id,
-                $entry
-            );
-
-            return $entry;
-        });
+        $entry = ProductionRecorder::chane(
+            dough: $dough,
+            userId: $request->user()->id,
+            normalWeightKg: (float) $normalWeight,
+            naninoWeightKg: (float) ($naninoWeight ?? 0),
+            sprayFlourKg: (float) $data['spray_flour_kg'],
+            chaneCount: $normalCount,
+            trayCount: $trayCount,
+            trayCounts: $trays,
+        );
 
         return $this->success([
             'entry' => $entry,
