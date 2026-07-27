@@ -3,6 +3,7 @@ import '../models/chane_board.dart';
 import '../models/customer.dart';
 import '../models/entries.dart';
 import '../models/flour_sale.dart';
+import '../models/ledger_entry.dart';
 import '../models/seller_account.dart';
 import '../models/user.dart';
 import '../models/work_start.dart';
@@ -384,6 +385,112 @@ class BakeryApi {
     final body = await _client.get('/reports/dashboard');
 
     return body['data'] as Map<String, dynamic>;
+  }
+
+
+  // ----------------------------------------------- admin: money and stock
+
+  /// Categories an expense can be filed under, as the shop defines them.
+  Future<List<LedgerCategory>> expenseCategories() async {
+    final body = await _client.get('/expenses/categories');
+
+    return (body['data'] as List)
+        .cast<Map<String, dynamic>>()
+        .map(LedgerCategory.fromJson)
+        .toList();
+  }
+
+  Future<List<LedgerCategory>> incomeCategories() async {
+    final body = await _client.get('/incomes/categories');
+
+    return (body['data'] as List)
+        .cast<Map<String, dynamic>>()
+        .map(LedgerCategory.fromJson)
+        .toList();
+  }
+
+  /// Records money paid out. Queued when offline, like every other entry,
+  /// so the admin can record a purchase standing at the supplier.
+  Future<bool> recordExpense({
+    required String category,
+    required String title,
+    required double amount,
+    String? note,
+  }) async {
+    final body = await _client.postOrQueue(
+      '/expenses',
+      {
+        'category': category,
+        'title': title,
+        'amount': amount,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+      label: 'هزینه — $title',
+    );
+
+    return body['queued'] == true;
+  }
+
+  Future<bool> recordIncome({
+    required String category,
+    required String title,
+    required double amount,
+    String? note,
+  }) async {
+    final body = await _client.postOrQueue(
+      '/incomes',
+      {
+        'category': category,
+        'title': title,
+        'amount': amount,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+      label: 'درآمد — $title',
+    );
+
+    return body['queued'] == true;
+  }
+
+  /// Flour bought into the warehouse, recorded in sacks rather than kilos
+  /// because that is how it arrives.
+  Future<bool> recordFlourIntake({
+    required double bags,
+    String? note,
+  }) async {
+    final body = await _client.postOrQueue(
+      '/inventory/movements',
+      {
+        'item': 'flour',
+        'direction': 'in',
+        'bags': bags,
+        'reason': 'purchase',
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+      label: 'ورود آرد — $bags کیسه',
+    );
+
+    return body['queued'] == true;
+  }
+
+  /// Flour lent to or borrowed from another bakery.
+  Future<bool> recordConsignmentFlour({
+    required String partnerName,
+    required String direction,
+    required double amountKg,
+    String? note,
+  }) async {
+    final body = await _client.postOrQueue(
+      '/consignment-flour',
+      {
+        'partner_name': partnerName,
+        'direction': direction,
+        'amount_kg': amountKg,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+      label: 'آرد امانی — $partnerName',
+    );
+
+    return body['queued'] == true;
   }
 
   /// Income against expenses, with profit, for a date range.

@@ -7,6 +7,7 @@ import '../../utils/formatters.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
+import 'admin_record_sheet.dart';
 
 /// Today at a glance: production, sales, attendance and the work queues.
 class AdminOverviewTab extends StatefulWidget {
@@ -78,6 +79,11 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                     ),
               ),
               const SizedBox(height: 16),
+
+              // The four things an admin records away from a desk, so the
+              // web panel is not needed to keep the books straight.
+              _QuickRecordRow(api: widget.api, bakery: widget.bakery, onSaved: _reload),
+              const SizedBox(height: 18),
 
               Row(
                 children: [
@@ -181,5 +187,103 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
     if (value is num) return value;
 
     return num.tryParse('$value') ?? 0;
+  }
+}
+
+
+/// Shortcut buttons onto the record sheet, one per thing the admin logs.
+class _QuickRecordRow extends StatelessWidget {
+  const _QuickRecordRow({
+    required this.api,
+    required this.bakery,
+    required this.onSaved,
+  });
+
+  final BakeryApi api;
+  final Bakery? bakery;
+  final VoidCallback onSaved;
+
+  Future<void> _open(BuildContext context, AdminRecordKind kind) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => AdminRecordSheet(api: api, kind: kind, bakery: bakery),
+    );
+
+    if (saved == true) onSaved();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'ثبت سریع',
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        // Two per row: four across is too narrow to read on a phone.
+        for (var i = 0; i < AdminRecordKind.values.length; i += 2)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                for (final kind in AdminRecordKind.values.skip(i).take(2)) ...[
+                  Expanded(
+                    child: _QuickRecordButton(
+                      kind: kind,
+                      onTap: () => _open(context, kind),
+                    ),
+                  ),
+                  if (kind != AdminRecordKind.values.skip(i).take(2).last)
+                    const SizedBox(width: 8),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _QuickRecordButton extends StatelessWidget {
+  const _QuickRecordButton({required this.kind, required this.onTap});
+
+  final AdminRecordKind kind;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: kind.color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kind.color.withValues(alpha: 0.30)),
+        ),
+        child: Row(
+          children: [
+            Icon(kind.icon, size: 20, color: kind.color),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                kind.label,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: kind.color,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -68,12 +68,31 @@ class InventoryController extends Controller
         $data = $request->validate([
             'item' => ['required', Rule::in(array_keys(InventoryItem::DEFAULTS))],
             'direction' => ['required', 'in:in,out'],
-            'quantity' => ['required', 'numeric', 'min:0.001'],
+            'quantity' => ['required_without:bags', 'numeric', 'min:0.001'],
+            // Flour arrives in sacks, so the app counts sacks. The weight
+            // of one is a shop setting, so the conversion belongs here
+            // rather than in a client that could hold a stale figure.
+            'bags' => ['nullable', 'numeric', 'min:0.001'],
             'reason' => ['nullable', Rule::in(array_keys(InventoryMovement::REASONS))],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
         $item = InventoryItem::ofKey($data['item']);
+
+        if (isset($data['bags'])) {
+            $bagWeight = $item->key === InventoryItem::FLOUR
+                ? \App\Support\DoughFormula::fromBakery()->bagWeightKg
+                : (float) ($item->bag_weight_kg ?? 0);
+
+            if ($bagWeight <= 0) {
+                return $this->error(
+                    'وزن هر کیسه '.$item->name.' در تنظیمات ثبت نشده است.',
+                    422
+                );
+            }
+
+            $data['quantity'] = round((float) $data['bags'] * $bagWeight, 3);
+        }
 
         $movement = $item->move(
             $data['direction'],
