@@ -14,6 +14,10 @@ class InventoryMovement extends Model
         'waste' => 'ضایعات',
         'consignment_in' => 'دریافت امانی',
         'consignment_out' => 'تحویل امانی',
+        // Written when a production entry or flour sale is deleted, so the
+        // stock it moved comes back with the reason visible in the ledger.
+        'production_reversal' => 'ابطال ثبت تولید',
+        'flour_sale_reversal' => 'ابطال فروش آرد',
     ];
 
     protected $fillable = [

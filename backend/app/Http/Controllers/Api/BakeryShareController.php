@@ -96,6 +96,23 @@ class BakeryShareController extends Controller
 
         [$from, $to] = $this->range($request);
 
+        // Settling the same stretch twice pays a partner twice and posts
+        // the money out of the bank account twice, so an overlap with a
+        // settlement already on file has to be refused. Salary payments
+        // and consignment flour are guarded the same way.
+        $clash = ShareSettlement::where('bakery_share_id', $share->id)
+            ->where('period_start', '<=', $to->toDateString())
+            ->where('period_end', '>=', $from->toDateString())
+            ->first();
+
+        if ($clash) {
+            return $this->error(
+                'برای این بازه قبلاً تسویه ثبت شده است ('
+                .$clash->period_label.' — '.$clash->amount_formatted.').',
+                409
+            );
+        }
+
         $amount = isset($data['amount'])
             ? Money::toToman($data['amount'])
             : $share->profitShare($from, $to);

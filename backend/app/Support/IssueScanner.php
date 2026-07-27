@@ -34,6 +34,7 @@ class IssueScanner
             ...$this->lowStock(),
             ...$this->productionShortfall(),
             ...$this->quotaOverrun(),
+            ...$this->negativeBankBalance(),
             ...$this->sellerAccounts(),
             ...$this->unsettledShortfalls(),
             ...$this->stalePending(),
@@ -227,6 +228,39 @@ class IssueScanner
                 suggestion: 'اگر آرد امانی یا سنوات دارید ثبت کنید تا تراز درست شود.',
                 url: '/admin/flour-allocations',
                 urlLabel: 'مدیریت سهمیه',
+            );
+        }
+
+        return $issues;
+    }
+
+    /**
+     * A bank or cash account showing less than nothing. Unlike stock this
+     * is not impossible — an account can be overdrawn — but in a shop it
+     * nearly always means a deposit was never entered.
+     *
+     * No automatic fix: inventing a deposit would hide the missing one.
+     */
+    private function negativeBankBalance(): array
+    {
+        $issues = [];
+
+        foreach (\App\Models\BankAccount::all() as $account) {
+            if ($account->balance >= 0) {
+                continue;
+            }
+
+            $issues[] = new SystemIssue(
+                key: "negative-bank-{$account->id}",
+                severity: SystemIssue::WARNING,
+                title: "موجودی «{$account->title}» منفی است",
+                detail: 'مانده این حساب '.Money::format($account->balance).' است.',
+                cause: 'برداشتی ثبت شده اما واریز متناظرش وارد نشده،'
+                    .' یا مبلغی اشتباه ثبت شده است.',
+                suggestion: 'گردش حساب را با دفتر واقعی مقایسه کنید.'
+                    .' اگر واریزی جا مانده، آن را با تاریخ خودش ثبت کنید.',
+                url: '/admin/bank-accounts',
+                urlLabel: 'مشاهده حساب‌ها',
             );
         }
 

@@ -21,6 +21,11 @@ class BakerySeeder extends Seeder
                 'normal_chane_weight_kg' => 0.430,
                 'nanino_chane_weight_kg' => 0.380,
                 'bread_price' => 3000,
+                // Seeds each new tray on the chane gir's screen. Left unset
+                // it falls back to one, so counting a tray of thirty means
+                // thirty taps — a default that is merely wrong beats one
+                // that makes the screen unusable.
+                'chane_per_tray' => 30,
             ]
         );
     }
