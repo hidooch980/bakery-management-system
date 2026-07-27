@@ -301,9 +301,92 @@ class _UpdateAvailableCard extends StatelessWidget {
                 textStyle: Theme.of(context).textTheme.bodySmall,
               ),
             ),
+
+            // Copies installed before the signing key was fixed cannot be
+            // updated over — Android refuses to replace an app with one
+            // signed differently. Uninstalling first is the only way, and
+            // the failure message Android shows does not say so.
+            const SizedBox(height: 4),
+            const _InstallFailedHint(),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Why an install can fail with "برنامه نصب نشد" even when everything else
+/// is right — and the one thing that fixes it.
+///
+/// Copies of v1.0.0 and v1.1.0 were built before the release signing key
+/// existed, so Android treats the new build as a different app and refuses
+/// to replace them. Its own error message says nothing about signatures,
+/// which leaves people retrying the same download.
+class _InstallFailedHint extends StatefulWidget {
+  const _InstallFailedHint();
+
+  @override
+  State<_InstallFailedHint> createState() => _InstallFailedHintState();
+}
+
+class _InstallFailedHintState extends State<_InstallFailedHint> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextButton.icon(
+          onPressed: () => setState(() => _open = !_open),
+          icon: Icon(
+            _open
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.help_outline_rounded,
+            size: 18,
+          ),
+          label: const Text('نصب نشد؟'),
+          style: TextButton.styleFrom(
+            foregroundColor: scheme.onSurfaceVariant,
+            textStyle: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        if (_open)
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'اگر پیام «برنامه نصب نشد» می‌بینید:',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'نسخه‌های خیلی قدیمی این برنامه با کلید دیگری ساخته شده '
+                  'بودند و اندروید اجازه نمی‌دهد روی آن‌ها نصب شود.\n\n'
+                  '۱. همین برنامه را از گوشی حذف کنید\n'
+                  '۲. دوباره فایل را نصب کنید\n\n'
+                  'اطلاعات شما روی سرور است و از بین نمی‌رود؛ فقط باید '
+                  'دوباره وارد شوید.',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: scheme.onSurfaceVariant, height: 1.6),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

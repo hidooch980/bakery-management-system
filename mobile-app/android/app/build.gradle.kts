@@ -37,11 +37,14 @@ android {
         applicationId = "com.bakery.bakery_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // 23 (Android 6.0), not Flutter's default of 24: staff carry older,
-        // low-end phones, and 23 is the lowest androidx.biometric supports —
-        // going lower would silently drop fingerprint/face support instead
-        // of widening compatibility.
-        minSdk = 23
+        // 24 (Android 7.0). This was 23 to reach older staff phones, but
+        // shared_preferences and local_auth both require 24 and Gradle
+        // takes the highest — so the built APK already needed 24 while the
+        // file claimed 23, which made install failures hard to explain.
+        //
+        // Lowering it again means pinning those two plugins to older
+        // releases; Flutter itself refuses to build below 23 either way.
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
