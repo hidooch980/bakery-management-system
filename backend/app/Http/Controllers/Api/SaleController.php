@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
+use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -193,5 +194,54 @@ class SaleController extends Controller
     public function paymentTypes(): JsonResponse
     {
         return $this->success(self::PAYMENT_TYPES);
+    }
+
+    /**
+     * The seller's own temporary account, so they can see what they are
+     * answerable for rather than finding out at the end of the month.
+     *
+     * Read-only on purpose: a seller clearing their own debt would defeat
+     * the point of recording it. Settling stays with the admin.
+     */
+    public function myAccount(Request $request): JsonResponse
+    {
+        $sales = Sale::query()
+            ->where('user_id', $request->user()->id)
+            ->sellerAccountOutstanding()
+            ->with('customer:id,name')
+            ->latest()
+            ->get();
+
+        $cash = round($sales->sum(fn (Sale $s) => $s->cash_held), 2);
+        $difference = round($sales->sum(fn (Sale $s) => $s->open_difference), 2);
+        $shortfall = round($sales->sum(fn (Sale $s) => $s->open_shortfall), 2);
+        $credit = round($sales->sum(fn (Sale $s) => $s->open_credit), 2);
+        $total = round($sales->sum(fn (Sale $s) => $s->seller_account_amount), 2);
+
+        return $this->success([
+            'cash' => $cash,
+            'cash_formatted' => Money::format($cash),
+            'difference' => $difference,
+            'difference_formatted' => Money::format($difference),
+            'shortfall' => $shortfall,
+            'shortfall_formatted' => Money::format($shortfall),
+            'shortfall_count' => (int) $sales->sum(
+                fn (Sale $s) => $s->open_shortfall > 0 ? $s->shortfall_count : 0
+            ),
+            'credit' => $credit,
+            'credit_formatted' => Money::format($credit),
+            'total' => $total,
+            'total_formatted' => Money::format($total),
+            'currency' => Money::currency(),
+            'currency_label' => Money::label(),
+            'entries' => $sales->count(),
+            'credit_sales' => $sales->where('open_credit', '>', 0)->map(fn (Sale $s) => [
+                'id' => $s->id,
+                'customer' => $s->customer?->name,
+                'bread_count' => (int) $s->bread_count,
+                'amount_formatted' => Money::format((float) $s->amount),
+                'date_display' => \App\Support\AppCalendar::date($s->created_at),
+            ])->values(),
+        ]);
     }
 }

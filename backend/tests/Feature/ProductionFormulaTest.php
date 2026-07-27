@@ -777,6 +777,84 @@ class ProductionFormulaTest extends TestCase
         $this->assertSame('over', $period->nanino_production_status);
     }
 
+    public function test_normal_chane_counts_towards_the_period_production(): void
+    {
+        // A shop that shapes everything the normal way used to read as
+        // having lost every bag of flour it consumed, because only nanino
+        // was counted on the production side of the comparison.
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+
+        $period = $allocation->periods()->first();
+        $inside = $period->starts_on->copy()->addDay();
+
+        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $flour->move('in', 10000, 'purchase');
+        $movement = $flour->move('out', 40, 'production');
+        \Illuminate\Support\Facades\DB::table('inventory_movements')
+            ->where('id', $movement->id)->update(['created_at' => $inside]);
+
+        $user = $this->userWithRole('chane_gir');
+        $dough = DoughEntry::create(['user_id' => $user->id, 'bag_count' => 1]);
+        $entry = ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $user->id,
+            // One bag yields 64.6kg of dough, all shaped as normal chane.
+            'chane_count' => 76,
+            'normal_weight_kg' => 64.6,
+            'nanino_weight_kg' => 0,
+            'spray_flour_kg' => 0,
+        ]);
+        \Illuminate\Support\Facades\DB::table('chane_entries')
+            ->where('id', $entry->id)->update(['created_at' => $inside]);
+
+        $period->refresh();
+
+        // 64.6kg of dough at 1.0kg a nanino loaf is 64 — exactly what one
+        // bag of flour should give, so nothing is missing.
+        $this->assertSame(64, $period->produced_nanino_equivalent);
+        $this->assertSame(64, $period->expected_nanino_count);
+        $this->assertSame('ok', $period->nanino_production_status);
+    }
+
+    public function test_a_period_without_usage_says_which_figure_is_missing(): void
+    {
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+
+        $period = $allocation->periods()->first();
+
+        $this->assertSame(
+            'مصرف آردی برای این دوره ثبت نشده',
+            $period->nanino_production_status_label
+        );
+    }
+
+    public function test_a_missing_nanino_weight_is_named_as_the_reason(): void
+    {
+        Bakery::first()->update(['nanino_chane_weight_kg' => null]);
+
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/05/01'),
+            'month_label' => 'مرداد 1405',
+            'total_bags' => 75,
+        ]);
+        $allocation->syncPeriods();
+
+        $this->assertSame(
+            'وزن چانه نانینو در تنظیمات ثبت نشده',
+            $allocation->periods()->first()->nanino_production_status_label
+        );
+    }
+
     public function test_the_comparison_is_unknown_when_no_flour_was_consumed(): void
     {
         $allocation = FlourAllocation::create([

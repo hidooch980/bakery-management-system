@@ -103,17 +103,36 @@ class Sale extends Model
     // ------------------------------------------- the seller's own account
 
     /**
-     * Sales still sitting on a seller's temporary account: cash they are
-     * holding, or a sale whose money did not match the bread it moved.
-     * Either way it is unsettled until the seller accounts for it.
+     * Sales still sitting on a seller's temporary account. Four things can
+     * put one there, and a sale may carry more than one at once:
+     *
+     *   - cash they are still holding
+     *   - money that did not match the bread it moved
+     *   - bread the batch held that no payment line accounted for
+     *   - credit they handed out, until the customer pays
+     *
+     * The first three the seller settles themselves; credit clears when the
+     * customer settles, which is why they are tracked by separate dates.
      */
     public function scopeSellerAccountOutstanding($query)
     {
-        return $query->whereNull('cash_settled_on')
-            ->where(function ($q) {
-                $q->whereIn('payment_type', self::CASH_TYPES)
-                    ->orWhere('amount_difference', '!=', 0);
-            });
+        return $query->where(function ($q) {
+            $q->where(function ($cash) {
+                $cash->whereNull('cash_settled_on')
+                    ->where(function ($inner) {
+                        $inner->whereIn('payment_type', self::CASH_TYPES)
+                            ->orWhere('amount_difference', '!=', 0);
+                    });
+            })
+                ->orWhere(function ($short) {
+                    $short->whereNull('shortfall_settled_on')
+                        ->where('shortfall_count', '>', 0);
+                })
+                ->orWhere(function ($credit) {
+                    $credit->whereNull('settled_on')
+                        ->whereIn('payment_type', self::DEBT_TYPES);
+                });
+        });
     }
 
     public function getIsCashAttribute(): bool
@@ -124,17 +143,50 @@ class Sale extends Model
     /** Cash the seller is holding for this sale, before any discrepancy. */
     public function getCashHeldAttribute(): float
     {
-        return $this->is_cash ? (float) $this->amount : 0.0;
+        return $this->is_cash && $this->cash_settled_on === null
+            ? (float) $this->amount
+            : 0.0;
+    }
+
+    /** The money gap, while it is still unsettled. */
+    public function getOpenDifferenceAttribute(): float
+    {
+        return $this->cash_settled_on === null
+            ? (float) $this->amount_difference
+            : 0.0;
+    }
+
+    /** Value of the bread this batch held but nobody paid for. */
+    public function getOpenShortfallAttribute(): float
+    {
+        return $this->has_shortfall && $this->shortfall_settled_on === null
+            ? (float) $this->shortfall_amount
+            : 0.0;
+    }
+
+    /** Credit handed out and not yet collected from the customer. */
+    public function getOpenCreditAttribute(): float
+    {
+        return $this->is_debt && ! $this->is_settled ? (float) $this->amount : 0.0;
     }
 
     /**
-     * What this sale puts on the seller's account: the cash they hold, less
-     * any shortfall in what they handed over. A sale that took less money
-     * than its bread was worth leaves the seller owing the difference.
+     * What this sale puts on the seller's account. Cash in hand, credit
+     * still to collect and bread nobody paid for all count against them;
+     * a sale that took less money than its bread was worth adds the gap.
+     *
+     * Nothing is counted twice: the shortfall is bread no payment line
+     * covered, and a sale is either cash or credit, never both.
      */
     public function getSellerAccountAmountAttribute(): float
     {
-        return round($this->cash_held - (float) $this->amount_difference, 2);
+        return round(
+            $this->cash_held
+            + $this->open_credit
+            + $this->open_shortfall
+            - $this->open_difference,
+            2
+        );
     }
 
     public function getIsSellerAccountSettledAttribute(): bool

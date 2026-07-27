@@ -97,8 +97,10 @@ class FlourQuotaOverview extends BaseWidget
             // more than a bag's worth is not.
             Stat::make(
                 'نان تولیدی دوره',
-                number_format($period->nanino_chane_count).' از '
-                    .number_format($period->expected_nanino_count).' نان'
+                $period->nanino_production_status === 'unknown'
+                    ? '—'
+                    : number_format($period->produced_nanino_equivalent).' از '
+                        .number_format($period->expected_nanino_count).' نان'
             )
                 ->description($period->nanino_production_status_label
                     .($period->nanino_production_gap !== 0

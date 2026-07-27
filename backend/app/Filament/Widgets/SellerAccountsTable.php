@@ -11,9 +11,13 @@ use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 
 /**
- * Each seller's temporary account: the cash they are still holding plus any
- * gap between the money they recorded and what the bread was worth. It is
- * their debt until they settle it, which is what "تسویه حساب" clears.
+ * Each seller's temporary account — everything they are answerable for
+ * until it is cleared: cash in hand, a money gap, bread nobody paid for,
+ * and credit they handed out.
+ *
+ * The settle action covers only the first three. Credit is the customer's
+ * debt to pay, so it clears from the customer's side rather than by the
+ * seller handing over money they never took.
  */
 class SellerAccountsTable extends BaseWidget
 {
@@ -35,25 +39,64 @@ class SellerAccountsTable extends BaseWidget
                     ->weight('bold')
                     ->icon('heroicon-m-user'),
 
-                Tables\Columns\TextColumn::make('cash_held')
-                    ->label('پول نقد نزد فروشنده')
+                Tables\Columns\TextColumn::make('cash')
+                    ->label('پول نقد')
                     ->state(fn (User $record) => Money::format(
-                        self::outstandingFor($record)->sum(fn (Sale $s) => $s->cash_held)
+                        self::sumFor($record, fn (Sale $s) => $s->cash_held)
                     ))
                     ->color('warning'),
 
                 Tables\Columns\TextColumn::make('difference')
                     ->label('اختلاف مالی')
                     ->state(function (User $record) {
-                        $difference = self::outstandingFor($record)
-                            ->sum(fn (Sale $s) => (float) $s->amount_difference);
+                        $gap = self::sumFor($record, fn (Sale $s) => $s->open_difference);
 
-                        return ($difference > 0 ? '+' : '').Money::format($difference);
+                        return ($gap > 0 ? '+' : '').Money::format($gap);
                     })
-                    ->color(fn (User $record) => self::outstandingFor($record)
-                        ->sum(fn (Sale $s) => (float) $s->amount_difference) == 0
-                            ? 'gray'
-                            : 'danger'),
+                    ->color(fn (User $record) => self::sumFor(
+                        $record,
+                        fn (Sale $s) => $s->open_difference
+                    ) == 0 ? 'gray' : 'danger'),
+
+                Tables\Columns\TextColumn::make('shortfall')
+                    ->label('کسری نان')
+                    ->state(function (User $record) {
+                        $sales = self::outstandingFor($record)
+                            ->filter(fn (Sale $s) => $s->open_shortfall > 0);
+
+                        if ($sales->isEmpty()) {
+                            return '—';
+                        }
+
+                        return number_format((int) $sales->sum('shortfall_count')).' نان'
+                            .'   —   '.Money::format($sales->sum(fn (Sale $s) => $s->open_shortfall));
+                    })
+                    ->color(fn (User $record) => self::sumFor(
+                        $record,
+                        fn (Sale $s) => $s->open_shortfall
+                    ) > 0 ? 'danger' : 'gray'),
+
+                Tables\Columns\TextColumn::make('credit')
+                    ->label('نسیه وصول‌نشده')
+                    ->state(function (User $record) {
+                        $sales = self::outstandingFor($record)
+                            ->filter(fn (Sale $s) => $s->open_credit > 0);
+
+                        if ($sales->isEmpty()) {
+                            return '—';
+                        }
+
+                        return Money::format($sales->sum(fn (Sale $s) => $s->open_credit))
+                            .'   ('.$sales->count().' فقره)';
+                    })
+                    ->description(fn (User $record) => self::sumFor(
+                        $record,
+                        fn (Sale $s) => $s->open_credit
+                    ) > 0 ? 'با پرداخت مشتری تسویه می‌شود' : null)
+                    ->color(fn (User $record) => self::sumFor(
+                        $record,
+                        fn (Sale $s) => $s->open_credit
+                    ) > 0 ? 'warning' : 'gray'),
 
                 Tables\Columns\TextColumn::make('total')
                     ->label('جمع بدهی موقت')
@@ -61,10 +104,6 @@ class SellerAccountsTable extends BaseWidget
                     ->weight('bold')
                     ->badge()
                     ->color('danger'),
-
-                Tables\Columns\TextColumn::make('sales_count')
-                    ->label('فقره تسویه‌نشده')
-                    ->state(fn (User $record) => self::outstandingFor($record)->count()),
             ])
             ->actions([
                 Tables\Actions\Action::make('settleSellerAccount')
@@ -74,19 +113,36 @@ class SellerAccountsTable extends BaseWidget
                     ->requiresConfirmation()
                     ->modalHeading('تسویه حساب فروشنده')
                     ->modalDescription(fn (User $record) => 'مبلغ '
-                        .Money::format(self::totalFor($record))
-                        .' از '.$record->name.' دریافت شد؟')
+                        .Money::format(self::settleableFor($record))
+                        .' شامل پول نقد، اختلاف مالی و کسری نان از '.$record->name.' دریافت شد؟'
+                        .(self::sumFor($record, fn (Sale $s) => $s->open_credit) > 0
+                            ? ' نسیه وصول‌نشده در حساب می‌ماند تا مشتری پرداخت کند.'
+                            : ''))
+                    ->modalSubmitActionLabel('تسویه شد')
                     ->action(function (User $record) {
-                        $total = self::totalFor($record);
+                        $amount = self::settleableFor($record);
+
+                        // Only what the seller settles themselves. A
+                        // customer's unpaid credit is not cleared by the
+                        // seller handing over money they never collected.
+                        Sale::query()
+                            ->where('user_id', $record->id)
+                            ->whereNull('cash_settled_on')
+                            ->where(function ($q) {
+                                $q->whereIn('payment_type', Sale::CASH_TYPES)
+                                    ->orWhere('amount_difference', '!=', 0);
+                            })
+                            ->update(['cash_settled_on' => now()]);
 
                         Sale::query()
                             ->where('user_id', $record->id)
-                            ->sellerAccountOutstanding()
-                            ->update(['cash_settled_on' => now()]);
+                            ->whereNull('shortfall_settled_on')
+                            ->where('shortfall_count', '>', 0)
+                            ->update(['shortfall_settled_on' => now()]);
 
                         Notification::make()
                             ->title('حساب '.$record->name.' تسویه شد')
-                            ->body('مبلغ '.Money::format($total).' تسویه شد.')
+                            ->body('مبلغ '.Money::format($amount).' تسویه شد.')
                             ->success()
                             ->send();
                     }),
@@ -105,10 +161,21 @@ class SellerAccountsTable extends BaseWidget
             ->get();
     }
 
+    private static function sumFor(User $seller, callable $value): float
+    {
+        return round(self::outstandingFor($seller)->sum($value), 2);
+    }
+
     private static function totalFor(User $seller): float
     {
+        return self::sumFor($seller, fn (Sale $s) => $s->seller_account_amount);
+    }
+
+    /** The part of the account the seller can hand over today. */
+    private static function settleableFor(User $seller): float
+    {
         return round(
-            self::outstandingFor($seller)->sum(fn (Sale $s) => $s->seller_account_amount),
+            self::totalFor($seller) - self::sumFor($seller, fn (Sale $s) => $s->open_credit),
             2
         );
     }

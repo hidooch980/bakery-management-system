@@ -12,6 +12,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/seller_account_card.dart';
 import '../../widgets/sync_status_card.dart';
 import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
@@ -209,6 +210,9 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                       ),
                     ],
                   ),
+
+                  const SizedBox(height: 14),
+                  SellerAccountCard(api: widget.api),
 
                   if (data.board != null) ...[
                     const SizedBox(height: 16),

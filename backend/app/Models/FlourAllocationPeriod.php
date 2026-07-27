@@ -117,13 +117,41 @@ class FlourAllocationPeriod extends Model
     }
 
     /**
+     * Everything shaped in this period, restated in nanino loaves.
+     *
+     * Both systems draw on the same dough, so the comparison below has to
+     * count both. Measuring only the nanino actually shaped would mark a
+     * shop that works entirely in normal chane as losing every bag of
+     * flour it used.
+     */
+    public function getProducedNaninoEquivalentAttribute(): int
+    {
+        $formula = DoughFormula::fromBakery();
+
+        if (! $formula->naninoChaneWeightKg) {
+            return 0;
+        }
+
+        $doughKg = (float) ChaneEntry::whereBetween('created_at', [
+            $this->starts_on->copy()->startOfDay(),
+            $this->ends_on->copy()->endOfDay(),
+        ])->sum('normal_weight_kg')
+            + (float) ChaneEntry::whereBetween('created_at', [
+                $this->starts_on->copy()->startOfDay(),
+                $this->ends_on->copy()->endOfDay(),
+            ])->sum('nanino_weight_kg');
+
+        return (int) floor($doughKg / $formula->naninoChaneWeightKg);
+    }
+
+    /**
      * Production minus what the consumed flour should have yielded, in
      * loaves. Negative means the period produced less bread than the flour
      * it burned through can account for.
      */
     public function getNaninoProductionGapAttribute(): int
     {
-        return $this->nanino_chane_count - $this->expected_nanino_count;
+        return $this->produced_nanino_equivalent - $this->expected_nanino_count;
     }
 
     /** The same gap in bags, which is how a shortfall is judged. */
@@ -159,11 +187,19 @@ class FlourAllocationPeriod extends Model
 
     public function getNaninoProductionStatusLabelAttribute(): string
     {
+        if ($this->nanino_production_status === 'unknown') {
+            // Say which of the two is missing, so it is clear whether this
+            // is a setting to fill in or simply a period nobody has
+            // started working yet.
+            return DoughFormula::fromBakery()->naninoChaneWeightKg
+                ? 'مصرف آردی برای این دوره ثبت نشده'
+                : 'وزن چانه نانینو در تنظیمات ثبت نشده';
+        }
+
         return match ($this->nanino_production_status) {
             'short' => 'کمتر از مصرف آرد — خطا',
             'over' => 'بیش از یک کیسه اضافه — خطا',
-            'ok' => 'مطابق مصرف آرد',
-            default => 'قابل محاسبه نیست',
+            default => 'مطابق مصرف آرد',
         };
     }
 

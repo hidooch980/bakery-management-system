@@ -72,6 +72,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/sales/today', [SaleController::class, 'today'])
             ->middleware('permission:view-own-sales');
         Route::get('/sales/payment-types', [SaleController::class, 'paymentTypes']);
+        Route::get('/sales/my-account', [SaleController::class, 'myAccount'])
+            ->middleware('permission:view-own-sales');
 
         // --- Seller: flour sold by the kilo or by the sack ---
         Route::post('/flour-sales', [FlourSaleController::class, 'store'])

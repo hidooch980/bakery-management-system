@@ -3,6 +3,7 @@ import '../models/chane_board.dart';
 import '../models/customer.dart';
 import '../models/entries.dart';
 import '../models/flour_sale.dart';
+import '../models/seller_account.dart';
 import '../models/user.dart';
 import '../models/work_start.dart';
 import 'api_client.dart';
@@ -234,6 +235,13 @@ class BakeryApi {
         .cast<Map<String, dynamic>>()
         .map(Customer.fromJson)
         .toList();
+  }
+
+  /// The seller's own temporary account — what they still answer for.
+  Future<SellerAccount> myAccount() async {
+    final body = await _client.get('/sales/my-account');
+
+    return SellerAccount.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   Future<({List<Sale> sales, int count, double total})> todaySales() async {
