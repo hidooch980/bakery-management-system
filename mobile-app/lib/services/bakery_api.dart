@@ -5,6 +5,7 @@ import '../models/entries.dart';
 import '../models/flour_sale.dart';
 import '../models/ledger_entry.dart';
 import '../models/seller_account.dart';
+import '../models/settlement_request.dart';
 import '../models/user.dart';
 import '../models/work_start.dart';
 import 'api_client.dart';
@@ -243,6 +244,35 @@ class BakeryApi {
     final body = await _client.get('/sales/my-account');
 
     return SellerAccount.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// Asks the admin to confirm the seller has handed their account over.
+  /// The account only clears once the admin agrees, so this returns the
+  /// request rather than a settled balance.
+  Future<SettlementRequest> requestSettlement({String? note}) async {
+    final body = await _client.post('/settlement-requests', {
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+
+    return SettlementRequest.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// The seller's own settlement requests: the one awaiting an answer, if
+  /// any, and what happened to the ones before it.
+  Future<({SettlementRequest? pending, List<SettlementRequest> history})>
+      settlementRequests() async {
+    final body = await _client.get('/settlement-requests');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return (
+      pending: data['pending'] == null
+          ? null
+          : SettlementRequest.fromJson(data['pending'] as Map<String, dynamic>),
+      history: ((data['history'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(SettlementRequest.fromJson)
+          .toList(),
+    );
   }
 
   Future<({List<Sale> sales, int count, double total})> todaySales() async {

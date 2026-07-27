@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../models/seller_account.dart';
+import '../models/settlement_request.dart';
 import '../services/api_client.dart';
+import 'common.dart';
 import '../services/bakery_api.dart';
 
 /// What the seller still answers for, shown to them rather than only to the
@@ -21,7 +23,10 @@ class SellerAccountCard extends StatefulWidget {
 
 class _SellerAccountCardState extends State<SellerAccountCard> {
   SellerAccount? _account;
+  SettlementRequest? _pending;
+  SettlementRequest? _lastRejected;
   bool _expanded = false;
+  bool _sending = false;
 
   @override
   void initState() {
@@ -32,9 +37,39 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
   Future<void> _load() async {
     try {
       final account = await widget.api.myAccount();
-      if (mounted) setState(() => _account = account);
+      final requests = await widget.api.settlementRequests();
+
+      if (!mounted) return;
+
+      setState(() {
+        _account = account;
+        _pending = requests.pending;
+        // A rejection is worth showing until the seller acts on it, so
+        // they know why the account did not clear.
+        _lastRejected = requests.history
+            .where((r) => r.isRejected)
+            .cast<SettlementRequest?>()
+            .firstWhere((r) => true, orElse: () => null);
+      });
     } on ApiException {
       // The rest of the day's work does not depend on this card.
+    }
+  }
+
+  Future<void> _requestSettlement() async {
+    setState(() => _sending = true);
+
+    try {
+      await widget.api.requestSettlement();
+
+      if (!mounted) return;
+      showMessage(context, 'درخواست تسویه ثبت شد و در انتظار تأیید مدیر است.');
+      await _load();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showMessage(context, e.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _sending = false);
     }
   }
 
@@ -43,7 +78,9 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
     final account = _account;
 
     // Nothing owed is worth saying nothing about — the card stays away.
-    if (account == null || account.isClear) return const SizedBox.shrink();
+    if (account == null || (account.isClear && _pending == null)) {
+      return const SizedBox.shrink();
+    }
 
     final scheme = Theme.of(context).colorScheme;
     const warn = Color(0xFFE8952D);
@@ -162,13 +199,38 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
                 ),
           ],
 
-          const SizedBox(height: 4),
-          Text(
-            'تسویه با مدیر انجام می‌شود.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-          ),
+          const SizedBox(height: 8),
+          if (_pending != null)
+            _PendingNotice(request: _pending!)
+          else ...[
+            if (_lastRejected?.rejectionReason != null) ...[
+              _RejectionNotice(reason: _lastRejected!.rejectionReason!),
+              const SizedBox(height: 8),
+            ],
+            FilledButton.icon(
+              // Credit is the customer's to pay, so it is not part of what
+              // the seller can hand over — the server refuses a request
+              // that would only cover that.
+              onPressed: _sending ? null : _requestSettlement,
+              icon: _sending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.handshake_rounded, size: 18),
+              label: Text(_sending ? 'در حال ارسال…' : 'درخواست تسویه حساب'),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'پس از تأیید مدیر، حساب شما تسویه می‌شود.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
         ],
       ),
     );
@@ -212,6 +274,93 @@ class _AccountLine extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: color,
                 ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// Shown while the admin has not answered yet, so the seller does not send
+/// the same request twice wondering whether it went through.
+class _PendingNotice extends StatelessWidget {
+  const _PendingNotice({required this.request});
+
+  final SettlementRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    const pending = Color(0xFF3B82C4);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: pending.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: pending.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.hourglass_top_rounded, size: 18, color: pending),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'درخواست تسویه ${request.amountFormatted} در انتظار تأیید مدیر',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: pending,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                if (request.requestedOnDisplay != null)
+                  Text(
+                    request.requestedOnDisplay!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Why the last request did not go through — without it the seller only
+/// sees that the account never cleared.
+class _RejectionNotice extends StatelessWidget {
+  const _RejectionNotice({required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    const rejected = Color(0xFFD1495B);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: rejected.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded, size: 18, color: rejected),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'درخواست قبلی رد شد: $reason',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: rejected,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
           ),
         ],
       ),

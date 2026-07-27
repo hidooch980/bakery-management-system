@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
+use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\WorkStartController;
 use Illuminate\Support\Facades\Route;
@@ -74,6 +75,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/sales/payment-types', [SaleController::class, 'paymentTypes']);
         Route::get('/sales/my-account', [SaleController::class, 'myAccount'])
             ->middleware('permission:view-own-sales');
+
+        // The seller asks to settle; the admin confirms it in the panel.
+        Route::middleware('permission:view-own-sales')->group(function () {
+            Route::get('/settlement-requests', [SettlementRequestController::class, 'index']);
+            Route::post('/settlement-requests', [SettlementRequestController::class, 'store']);
+        });
 
         // --- Seller: flour sold by the kilo or by the sack ---
         Route::post('/flour-sales', [FlourSaleController::class, 'store'])

@@ -122,23 +122,7 @@ class SellerAccountsTable extends BaseWidget
                     ->action(function (User $record) {
                         $amount = self::settleableFor($record);
 
-                        // Only what the seller settles themselves. A
-                        // customer's unpaid credit is not cleared by the
-                        // seller handing over money they never collected.
-                        Sale::query()
-                            ->where('user_id', $record->id)
-                            ->whereNull('cash_settled_on')
-                            ->where(function ($q) {
-                                $q->whereIn('payment_type', Sale::CASH_TYPES)
-                                    ->orWhere('amount_difference', '!=', 0);
-                            })
-                            ->update(['cash_settled_on' => now()]);
-
-                        Sale::query()
-                            ->where('user_id', $record->id)
-                            ->whereNull('shortfall_settled_on')
-                            ->where('shortfall_count', '>', 0)
-                            ->update(['shortfall_settled_on' => now()]);
+                        \App\Support\SellerSettlement::settle($record);
 
                         Notification::make()
                             ->title('حساب '.$record->name.' تسویه شد')
