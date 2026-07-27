@@ -26,25 +26,11 @@ class ChaneEntry extends Model
     protected static function booted(): void
     {
         // Shaping consumed dough and spray flour, so deleting the entry
-        // has to give both back and free the batch to be shaped again —
+        // gives both back and frees the batch to be shaped again —
         // otherwise the dough stays spent and the batch stays stuck as
         // processed with nothing to show for it.
         static::deleted(function (self $entry) {
-            $doughKg = (float) $entry->normal_weight_kg + (float) $entry->nanino_weight_kg;
-
-            if ($doughKg > 0) {
-                InventoryItem::ofKey(InventoryItem::DOUGH)->move(
-                    'in', $doughKg, 'production_reversal',
-                    $entry->user_id, null, 'ابطال ثبت چانه',
-                );
-            }
-
-            if ((float) $entry->spray_flour_kg > 0) {
-                InventoryItem::ofKey(InventoryItem::FLOUR)->move(
-                    'in', (float) $entry->spray_flour_kg, 'production_reversal',
-                    $entry->user_id, null, 'ابطال آرد پاششی چانه',
-                );
-            }
+            \App\Support\StockReversal::of($entry, 'ابطال ثبت چانه');
 
             $entry->doughEntry?->update(['status' => 'pending']);
         });

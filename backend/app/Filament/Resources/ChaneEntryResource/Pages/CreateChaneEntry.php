@@ -22,7 +22,19 @@ class CreateChaneEntry extends CreateRecord
     {
         $formula = DoughFormula::fromBakery();
 
-        $data['normal_weight_kg'] = $formula->weightForNormalChane((int) $data['chane_count']) ?? 0;
+        // Chane is counted out a tray at a time, so the batch total is the
+        // sum of those trays rather than a figure typed on its own — the
+        // count can then never disagree with the trays behind it.
+        $trays = collect($this->data['trays'] ?? [])
+            ->map(fn ($tray) => (int) ($tray['count'] ?? 0))
+            ->filter(fn (int $count) => $count > 0)
+            ->values();
+
+        $data['chane_count'] = $trays->sum();
+        $data['tray_count'] = $trays->isEmpty() ? null : $trays->count();
+        $data['tray_counts'] = $trays->isEmpty() ? null : $trays->all();
+
+        $data['normal_weight_kg'] = $formula->weightForNormalChane($data['chane_count']) ?? 0;
         $data['nanino_weight_kg'] = $formula->weightForNaninoChane(
             (int) ($this->data['nanino_chane_count'] ?? 0)
         ) ?? 0;

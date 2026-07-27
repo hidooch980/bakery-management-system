@@ -27,6 +27,21 @@ class ChaneEntryResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    /** Chane across every tray entered — the batch total, never typed. */
+    public static function trayTotal(mixed $trays): int
+    {
+        return collect(is_array($trays) ? $trays : [])
+            ->sum(fn ($tray) => (int) ($tray['count'] ?? 0));
+    }
+
+    private static function ordinal(int $position): string
+    {
+        return [
+            1 => 'اول', 2 => 'دوم', 3 => 'سوم', 4 => 'چهارم', 5 => 'پنجم',
+            6 => 'ششم', 7 => 'هفتم', 8 => 'هشتم', 9 => 'نهم', 10 => 'دهم',
+        ][$position] ?? (string) $position;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([
@@ -50,14 +65,42 @@ class ChaneEntryResource extends Resource
                         ->required()
                         ->native(false),
 
-                    Forms\Components\TextInput::make('chane_count')
+                    // Chane is counted out a tray at a time on the bench, so
+                    // the panel takes it the same way the chane gir's screen
+                    // does. The total below is their sum, never typed.
+                    Forms\Components\Repeater::make('trays')
+                        ->label('تشتک‌ها')
+                        ->columnSpanFull()
+                        ->addActionLabel('افزودن تشتک')
+                        ->defaultItems(1)
+                        ->live()
+                        ->itemLabel(fn (array $state, $component): string => 'تشتک '
+                            .self::ordinal((int) array_search(
+                                $state,
+                                array_values($component->getState()),
+                                true
+                            ) + 1))
+                        ->schema([
+                            Forms\Components\TextInput::make('count')
+                                ->label('تعداد چانه')
+                                ->numeric()
+                                ->minValue(1)
+                                ->required()
+                                ->live(onBlur: true)
+                                ->default(fn () => \App\Models\Bakery::first()?->chane_per_tray ?: null)
+                                ->suffix('عدد'),
+                        ])
+                        ->dehydrated(false),
+
+                    Forms\Components\Placeholder::make('chane_count_total')
                         ->label('تعداد چانه عادی')
-                        ->numeric()
-                        ->minValue(1)
-                        ->required()
-                        ->live(onBlur: true)
-                        ->suffix('عدد')
-                        ->helperText('ملاک فروش، موجودی و گزارش‌ها'),
+                        ->content(function (Forms\Get $get) {
+                            $total = self::trayTotal($get('trays'));
+
+                            return $total > 0
+                                ? number_format($total).' عدد  —  ملاک فروش، موجودی و گزارش‌ها'
+                                : 'تعداد تشتک‌ها را وارد کنید';
+                        }),
 
                     // Not a database column — a separate count purely for the
                     // nanino display weight below, exactly like the mobile
@@ -90,7 +133,7 @@ class ChaneEntryResource extends Resource
                         ->label('وزن چانه عادی')
                         ->content(function (Forms\Get $get) {
                             $weight = DoughFormula::fromBakery()
-                                ->weightForNormalChane((int) ($get('chane_count') ?: 0));
+                                ->weightForNormalChane(self::trayTotal($get('trays')));
 
                             return $weight === null
                                 ? 'وزن هر چانه عادی در تنظیمات ثبت نشده است'
@@ -120,7 +163,7 @@ class ChaneEntryResource extends Resource
                         ->columnSpanFull()
                         ->content(function (Forms\Get $get) {
                             $formula = DoughFormula::fromBakery();
-                            $normalCount = (int) ($get('chane_count') ?: 0);
+                            $normalCount = self::trayTotal($get('trays'));
                             $naninoCount = (int) ($get('nanino_chane_count') ?: 0);
 
                             if ($normalCount === 0 && $naninoCount === 0) {

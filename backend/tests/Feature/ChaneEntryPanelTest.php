@@ -53,7 +53,8 @@ class ChaneEntryPanelTest extends TestCase
             ->fillForm([
                 'dough_entry_id' => $this->dough->id,
                 'user_id' => $admin->id,
-                'chane_count' => 100,
+                // Counted out as two full trays and a part one.
+                'trays' => [['count' => 40], ['count' => 40], ['count' => 20]],
                 'nanino_chane_count' => 40,
                 'spray_flour_kg' => 2,
             ])
@@ -111,7 +112,10 @@ class ChaneEntryPanelTest extends TestCase
         Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\EditChaneEntry::class, [
             'record' => $entry->getRouteKey(),
         ])
-            ->fillForm(['chane_count' => 200, 'nanino_chane_count' => 10])
+            ->fillForm([
+                'trays' => [['count' => 200]],
+                'nanino_chane_count' => 10,
+            ])
             ->call('save')
             ->assertHasNoFormErrors();
 
@@ -119,5 +123,50 @@ class ChaneEntryPanelTest extends TestCase
 
         $this->assertEquals(170.0, (float) $entry->normal_weight_kg);
         $this->assertEquals(10.0, (float) $entry->nanino_weight_kg);
+    }
+
+    public function test_the_panel_stores_how_the_batch_was_counted_out(): void
+    {
+        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)
+            ->fillForm([
+                'dough_entry_id' => $this->dough->id,
+                'user_id' => $this->dough->user_id,
+                'trays' => [['count' => 30], ['count' => 30], ['count' => 18]],
+                'spray_flour_kg' => 0,
+                'status' => 'pending',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $entry = ChaneEntry::first();
+
+        // The total is the sum of the trays, never a figure typed on its own.
+        $this->assertSame(78, $entry->chane_count);
+        $this->assertSame(3, $entry->tray_count);
+        $this->assertSame([30, 30, 18], $entry->tray_counts);
+    }
+
+    public function test_a_batch_recorded_before_trays_opens_as_one_tray(): void
+    {
+        $entry = ChaneEntry::create([
+            'dough_entry_id' => $this->dough->id,
+            'user_id' => $this->dough->user_id,
+            'chane_count' => 100,
+            'normal_weight_kg' => 85,
+            'nanino_weight_kg' => 0,
+            'spray_flour_kg' => 0,
+        ]);
+
+        // An older record has no trays stored; the form must not open
+        // empty, so it shows the whole count as a single tray. Repeater
+        // state is keyed by generated ids, so read the counts out of it.
+        $state = Livewire::test(
+            \App\Filament\Resources\ChaneEntryResource\Pages\EditChaneEntry::class,
+            ['record' => $entry->id]
+        )->get('data.trays');
+
+        $counts = collect($state)->pluck('count')->values()->all();
+
+        $this->assertSame([100], array_map('intval', $counts));
     }
 }

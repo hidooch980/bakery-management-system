@@ -30,6 +30,15 @@ class EditChaneEntry extends EditRecord
             ? (int) round((float) ($data['nanino_weight_kg'] ?? 0) / $naninoWeightKg)
             : 0;
 
+        // Show the trays it was counted into. A batch recorded before trays
+        // existed has none stored, so it opens as a single tray holding the
+        // whole count rather than an empty form.
+        $data['trays'] = collect($data['tray_counts'] ?? [])
+            ->map(fn ($count) => ['count' => (int) $count])
+            ->whenEmpty(fn () => collect([['count' => (int) ($data['chane_count'] ?? 0)]]))
+            ->values()
+            ->all();
+
         return $data;
     }
 
@@ -38,7 +47,16 @@ class EditChaneEntry extends EditRecord
     {
         $formula = DoughFormula::fromBakery();
 
-        $data['normal_weight_kg'] = $formula->weightForNormalChane((int) $data['chane_count']) ?? 0;
+        $trays = collect($this->data['trays'] ?? [])
+            ->map(fn ($tray) => (int) ($tray['count'] ?? 0))
+            ->filter(fn (int $count) => $count > 0)
+            ->values();
+
+        $data['chane_count'] = $trays->sum();
+        $data['tray_count'] = $trays->isEmpty() ? null : $trays->count();
+        $data['tray_counts'] = $trays->isEmpty() ? null : $trays->all();
+
+        $data['normal_weight_kg'] = $formula->weightForNormalChane($data['chane_count']) ?? 0;
         $data['nanino_weight_kg'] = $formula->weightForNaninoChane(
             (int) ($this->data['nanino_chane_count'] ?? 0)
         ) ?? 0;

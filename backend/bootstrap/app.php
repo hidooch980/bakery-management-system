@@ -65,6 +65,19 @@ return Application::configure(basePath: dirname(__DIR__))
                     'errors' => null,
                 ], 422);
             }
+
+            // Running out of stock is an ordinary thing on a shop floor, so
+            // the panel says so in words. Left unhandled it reached Laravel
+            // as a Server Error page — which gives whoever hit it nothing
+            // to act on and looks like the system broke.
+            \Filament\Notifications\Notification::make()
+                ->title('موجودی کافی نیست')
+                ->body($e->getMessage())
+                ->danger()
+                ->persistent()
+                ->send();
+
+            return back();
         });
 
         $exceptions->render(function (ModelNotFoundException|NotFoundHttpException $e, Request $request) {
