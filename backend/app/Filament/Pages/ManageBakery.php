@@ -100,6 +100,14 @@ class ManageBakery extends Page implements HasForms
                             ->live(onBlur: true)
                             ->helperText('مثلاً ۰٫۳۸۰'),
 
+                        Forms\Components\TextInput::make('chane_per_tray')
+                            ->label('تعداد چانه در هر تشتک')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(10000)
+                            ->suffix('عدد')
+                            ->helperText('چانه‌گیر تشتک‌به‌تشتک ثبت می‌کند؛ این عدد پیش‌فرض هر تشتک است و تشتک آخر معمولاً کمتر می‌شود.'),
+
                         \App\Filament\Forms\MoneyInput::make('bread_price', 'قیمت هر نان')
                             ->helperText('برای پیشنهاد مبلغ فروش در اپلیکیشن'),
 

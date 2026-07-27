@@ -14,6 +14,7 @@ class Bakery extends Model
         'description',
         'normal_chane_weight_kg',
         'nanino_chane_weight_kg',
+        'chane_per_tray',
         'bread_price',
         'flour_price_per_kg',
         'flour_price_per_bag',

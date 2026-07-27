@@ -25,10 +25,23 @@ class ChaneEntryController extends Controller
     {
         $data = $request->validate([
             'dough_entry_id' => ['required', 'exists:dough_entries,id'],
-            'chane_count' => ['required', 'integer', 'min:1', 'max:100000'],
+            'chane_count' => ['required_without:trays', 'integer', 'min:1', 'max:100000'],
             'nanino_chane_count' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'spray_flour_kg' => ['required', 'numeric', 'min:0', 'max:100000'],
+
+            // Chane is counted out a tray at a time, so the app sends one
+            // count per tray. The older single chane_count is still
+            // accepted, so a copy of the app that has not updated keeps
+            // working.
+            'trays' => ['nullable', 'array', 'min:1', 'max:200'],
+            'trays.*' => ['required', 'integer', 'min:1', 'max:10000'],
         ]);
+
+        // The batch total is the sum of the trays, worked out here rather
+        // than trusted from the client, so the count can never disagree
+        // with the trays it is supposed to be made of.
+        $trays = $data['trays'] ?? null;
+        $trayCount = $trays === null ? null : count($trays);
 
         // Chane weights come from the admin's dough formula, never from the
         // client, so the shop floor cannot enter a figure that contradicts it.
@@ -39,7 +52,9 @@ class ChaneEntryController extends Controller
         // it into normal chane does, so the dough-stock deduction below is
         // the one place nanino's weight is not just a display number.
         $formula = DoughFormula::fromBakery();
-        $normalCount = (int) $data['chane_count'];
+        $normalCount = $trays === null
+            ? (int) $data['chane_count']
+            : array_sum($trays);
         $naninoCount = (int) ($data['nanino_chane_count'] ?? 0);
 
         $normalWeight = $formula->weightForNormalChane($normalCount);
@@ -58,11 +73,13 @@ class ChaneEntryController extends Controller
             return $this->error('برای این خمیر قبلاً چانه ثبت شده است.', 409);
         }
 
-        $entry = DB::transaction(function () use ($data, $dough, $request, $normalCount, $normalWeight, $naninoWeight) {
+        $entry = DB::transaction(function () use ($data, $dough, $request, $normalCount, $normalWeight, $naninoWeight, $trays, $trayCount) {
             $entry = ChaneEntry::create([
                 'dough_entry_id' => $dough->id,
                 'user_id' => $request->user()->id,
                 'chane_count' => $normalCount,
+                'tray_count' => $trayCount,
+                'tray_counts' => $trays,
                 'normal_weight_kg' => $normalWeight,
                 'nanino_weight_kg' => $naninoWeight ?? 0,
                 'spray_flour_kg' => $data['spray_flour_kg'],

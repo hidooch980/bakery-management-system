@@ -417,38 +417,27 @@ class _RecordChaneSheet extends StatefulWidget {
 
 class _RecordChaneSheetState extends State<_RecordChaneSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _count = TextEditingController();
   final _naninoCount = TextEditingController();
   final _spray = TextEditingController();
+
+  /// Chane counted into each tray, in the order they were filled. The shop
+  /// counts a tray at a time, so this is the real record; the batch total
+  /// is just their sum.
+  final List<int> _trays = [];
 
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    // The weights below are derived, so redraw whenever a count changes.
-    _count.addListener(_refreshTotal);
+
+    // Start on the first tray, already filled to the shop's tray size.
+    _trays.add(_trayStep);
     _naninoCount.addListener(_refreshTotal);
-  }
-
-  /// Weight of the normal chane entered so far, from the shop's formula.
-  double get _normalWeight {
-    final perChane = widget.bakery?.normalChaneWeightKg ?? 0;
-    final count = int.tryParse(_count.text) ?? 0;
-
-    return count * perChane;
-  }
-
-  double get _naninoWeight {
-    final perChane = widget.bakery?.naninoChaneWeightKg ?? 0;
-    final count = int.tryParse(_naninoCount.text) ?? 0;
-
-    return count * perChane;
   }
 
   @override
   void dispose() {
-    _count.dispose();
     _naninoCount.dispose();
     _spray.dispose();
     super.dispose();
@@ -456,19 +445,51 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
 
   void _refreshTotal() => setState(() {});
 
+  int get _trayStep => widget.bakery?.trayStep ?? 1;
+
+  int get _count => _trays.fold(0, (sum, tray) => sum + tray);
+
+  /// Roughly what this dough should yield, so a miscount shows up here
+  /// rather than in a report at the end of the month.
+  int? get _expectedCount =>
+      widget.bakery?.expectedChaneFor(widget.dough.bagCount);
+
+  double get _normalWeight =>
+      _count * (widget.bakery?.normalChaneWeightKg ?? 0);
+
+  double get _naninoWeight {
+    final perChane = widget.bakery?.naninoChaneWeightKg ?? 0;
+
+    return (int.tryParse(_naninoCount.text) ?? 0) * perChane;
+  }
+
   double get _total => _normalWeight + _naninoWeight;
+
+  void _addTray() => setState(() => _trays.add(_trayStep));
+
+  void _removeTray(int index) => setState(() => _trays.removeAt(index));
+
+  void _setTray(int index, int value) {
+    setState(() => _trays[index] = value.clamp(1, 10000));
+  }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_count < 1) {
+      showMessage(context, 'حداقل یک تشتک با تعداد معتبر ثبت کنید.', isError: true);
+      return;
+    }
 
     setState(() => _saving = true);
 
     try {
       final result = await widget.api.recordChane(
         doughEntryId: widget.dough.id,
-        chaneCount: int.parse(_count.text),
+        chaneCount: _count,
         naninoChaneCount: int.tryParse(_naninoCount.text) ?? 0,
         sprayFlourKg: double.parse(_spray.text),
+        trays: List<int>.from(_trays),
       );
 
       if (!mounted) return;
@@ -499,6 +520,7 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final expected = _expectedCount;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -537,24 +559,56 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
                       .bodyMedium
                       ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
-                const SizedBox(height: 22),
-                TextFormField(
-                  controller: _count,
-                  keyboardType: TextInputType.number,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'تعداد چانه',
-                    prefixIcon: Icon(Icons.grain_rounded),
-                    suffixText: 'عدد',
-                  ),
-                  validator: (value) {
-                    final parsed = int.tryParse(value ?? '');
-                    if (parsed == null) return 'یک عدد معتبر وارد کنید';
-                    if (parsed < 1) return 'تعداد باید حداقل ۱ باشد';
-                    return null;
-                  },
+
+                if (expected != null) ...[
+                  const SizedBox(height: 16),
+                  _ExpectedBanner(expected: expected, actual: _count),
+                ],
+
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Text(
+                      'تشتک‌ها',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    if (_trayStep > 1)
+                      Text(
+                        'هر تشتک $_trayStep عدد',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
+
+                for (var i = 0; i < _trays.length; i++)
+                  _TrayRow(
+                    index: i,
+                    count: _trays[i],
+                    // The batch must keep at least one tray to mean anything.
+                    canRemove: _trays.length > 1,
+                    onChanged: (value) => _setTray(i, value),
+                    onRemove: () => _removeTray(i),
+                  ),
+
+                const SizedBox(height: 4),
+                OutlinedButton.icon(
+                  onPressed: _addTray,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('افزودن تشتک'),
+                ),
+
+                const SizedBox(height: 14),
+                _TrayTotal(trayCount: _trays.length, chaneCount: _count),
+
+                const SizedBox(height: 20),
                 TextFormField(
                   controller: _naninoCount,
                   keyboardType: TextInputType.number,
@@ -638,6 +692,178 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Roughly what this dough should yield, so the chane gir sees a miscount
+/// while the trays are still in front of them.
+class _ExpectedBanner extends StatelessWidget {
+  const _ExpectedBanner({required this.expected, required this.actual});
+
+  final int expected;
+  final int actual;
+
+  @override
+  Widget build(BuildContext context) {
+    // Counting is never exact, so only a real gap is worth flagging.
+    final short = expected - actual;
+    final isShort = short > expected * 0.05;
+
+    final color = isShort ? const Color(0xFFD1495B) : const Color(0xFFE8952D);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isShort ? Icons.warning_amber_rounded : Icons.info_outline_rounded,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              isShort
+                  ? 'انتظار حدود $expected چانه — فعلاً $short عدد کمتر ثبت شده.'
+                  : 'انتظار از این خمیر: حدود $expected چانه',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One tray with a stepper either side of its count.
+class _TrayRow extends StatelessWidget {
+  const _TrayRow({
+    required this.index,
+    required this.count,
+    required this.canRemove,
+    required this.onChanged,
+    required this.onRemove,
+  });
+
+  final int index;
+  final int count;
+  final bool canRemove;
+  final ValueChanged<int> onChanged;
+  final VoidCallback onRemove;
+
+  static const _ordinals = [
+    'اول', 'دوم', 'سوم', 'چهارم', 'پنجم', 'ششم', 'هفتم', 'هشتم',
+    'نهم', 'دهم', 'یازدهم', 'دوازدهم',
+  ];
+
+  String get _label => index < _ordinals.length
+      ? 'تشتک ${_ordinals[index]}'
+      : 'تشتک ${index + 1}';
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          IconButton(
+            onPressed: count > 1 ? () => onChanged(count - 1) : null,
+            icon: const Icon(Icons.remove_circle_outline_rounded),
+            visualDensity: VisualDensity.compact,
+            tooltip: 'یکی کمتر',
+          ),
+          SizedBox(
+            width: 46,
+            child: Text(
+              '$count',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: scheme.primary,
+                  ),
+            ),
+          ),
+          IconButton(
+            onPressed: () => onChanged(count + 1),
+            icon: const Icon(Icons.add_circle_outline_rounded),
+            visualDensity: VisualDensity.compact,
+            tooltip: 'یکی بیشتر',
+          ),
+          IconButton(
+            onPressed: canRemove ? onRemove : null,
+            icon: const Icon(Icons.delete_outline_rounded),
+            visualDensity: VisualDensity.compact,
+            tooltip: 'حذف تشتک',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The running total, which is what actually gets recorded.
+class _TrayTotal extends StatelessWidget {
+  const _TrayTotal({required this.trayCount, required this.chaneCount});
+
+  final int trayCount;
+  final int chaneCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.layers_rounded, color: scheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$trayCount تشتک',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          Text(
+            '$chaneCount چانه',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: scheme.primary,
+                ),
+          ),
+        ],
       ),
     );
   }

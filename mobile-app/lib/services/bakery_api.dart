@@ -135,11 +135,15 @@ class BakeryApi {
   ///
   /// [weightKg] is null when the entry was queued offline: the formula
   /// lives on the server, so there is no weight to show until it syncs.
+  /// Records a batch of chane. Pass [trays] when it was counted out tray by
+  /// tray, which is how the shop floor works; the server adds them up
+  /// itself so the total can never disagree with the trays behind it.
   Future<({double? weightKg, bool queued})> recordChane({
     required int doughEntryId,
     required int chaneCount,
     int naninoChaneCount = 0,
     required double sprayFlourKg,
+    List<int>? trays,
   }) async {
     final body = await _client.postOrQueue(
       '/chane-entries',
@@ -148,6 +152,7 @@ class BakeryApi {
         'chane_count': chaneCount,
         'nanino_chane_count': naninoChaneCount,
         'spray_flour_kg': sprayFlourKg,
+        if (trays != null && trays.isNotEmpty) 'trays': trays,
       },
       label: 'چانه — $chaneCount عدد',
     );

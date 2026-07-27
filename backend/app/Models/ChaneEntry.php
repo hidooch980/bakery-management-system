@@ -10,11 +10,26 @@ class ChaneEntry extends Model
         'dough_entry_id',
         'user_id',
         'chane_count',
+        'tray_count',
+        'tray_counts',
         'normal_weight_kg',
         'nanino_weight_kg',
         'spray_flour_kg',
         'status',
     ];
+
+    protected function casts(): array
+    {
+        return ['tray_counts' => 'array'];
+    }
+
+    /** "۳۰ + ۳۰ + ۱۲" — how the batch was actually counted out. */
+    public function getTrayBreakdownAttribute(): ?string
+    {
+        return empty($this->tray_counts)
+            ? null
+            : implode(' + ', $this->tray_counts);
+    }
 
     public function doughEntry()
     {

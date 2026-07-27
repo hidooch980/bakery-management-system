@@ -170,6 +170,11 @@ class ChaneEntryResource extends Resource
                     ->numeric()
                     ->badge()
                     ->color('info')
+                    // How the batch was counted out, when it was recorded
+                    // tray by tray rather than as one figure.
+                    ->description(fn (ChaneEntry $record) => $record->tray_count
+                        ? $record->tray_count.' تشتک: '.$record->tray_breakdown
+                        : null)
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('normal_weight_kg')

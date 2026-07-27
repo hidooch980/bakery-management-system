@@ -43,6 +43,7 @@ class BakeryController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
             'normal_chane_weight_kg' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'nanino_chane_weight_kg' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'chane_per_tray' => ['nullable', 'integer', 'min:1', 'max:10000'],
             'bread_price' => ['nullable', 'numeric', 'min:0', 'max:100000000'],
             'currency' => ['nullable', 'in:toman,rial'],
             'calendar' => ['nullable', 'in:jalali,hijri,gregorian'],
