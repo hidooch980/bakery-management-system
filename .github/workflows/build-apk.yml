@@ -128,6 +128,13 @@ jobs:
             --dart-define=API_BASE_URL=${{ steps.config.outputs.api_base_url }} \
             --dart-define=UPDATE_REPO=${{ github.repository }}
 
+          # Also build one APK per CPU, roughly a third the size. Entry-level
+          # phones ship with little free storage, and a 57MB universal APK
+          # needs several times that free to install.
+          flutter build apk --release --split-per-abi \
+            --dart-define=API_BASE_URL=${{ steps.config.outputs.api_base_url }} \
+            --dart-define=UPDATE_REPO=${{ github.repository }}
+
       - name: Verify the APK is signed with the release key
         working-directory: mobile-app
         run: |
@@ -145,11 +152,20 @@ jobs:
         id: apk
         working-directory: mobile-app
         run: |
-          SRC=build/app/outputs/flutter-apk/app-release.apk
+          OUT=build/app/outputs/flutter-apk
           TAG="${{ steps.config.outputs.release_tag }}"
+
           NAME="bakery-app${TAG:+-$TAG}.apk"
-          cp "$SRC" "$NAME"
-          ls -lh "$NAME"
+          cp "$OUT/app-release.apk" "$NAME"
+
+          # The per-CPU builds. arm64 covers phones from about 2016 on;
+          # armeabi-v7a is the fallback for older and low-end hardware.
+          for ABI in arm64-v8a armeabi-v7a; do
+            SPLIT="$OUT/app-$ABI-release.apk"
+            [ -f "$SPLIT" ] && cp "$SPLIT" "bakery-app${TAG:+-$TAG}-$ABI.apk"
+          done
+
+          ls -lh bakery-app*.apk
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "path=mobile-app/$NAME" >> "$GITHUB_OUTPUT"
 
@@ -166,7 +182,7 @@ jobs:
         with:
           tag_name: ${{ steps.config.outputs.release_tag }}
           name: نسخه ${{ steps.config.outputs.release_tag }}
-          files: ${{ steps.apk.outputs.path }}
+          files: mobile-app/bakery-app*.apk
           generate_release_notes: true
           body: |
             ## 📱 اپلیکیشن مدیریت نانوایی
@@ -189,8 +205,22 @@ jobs:
             ### نصب
             **حداقل اندروید ۷ (Nougat) لازم است.**
 
-            فایل `${{ steps.apk.outputs.name }}` را دانلود و روی گوشی اندروید نصب کنید.
+            **کدام فایل را دانلود کنم؟**
+
+            | فایل | مناسب برای |
+            |---|---|
+            | `...-arm64-v8a.apk` | تقریباً همه گوشی‌های امروزی — **این را اول امتحان کنید** |
+            | `...-armeabi-v7a.apk` | گوشی‌های قدیمی‌تر و ارزان‌قیمت |
+            | `${{ steps.apk.outputs.name }}` | همه‌کاره؛ اگر دو تای بالا نصب نشدند |
+
+            دو فایل اول حدود یک‌سوم حجم دارند. روی گوشی‌هایی که حافظه‌شان کم است
+            (مثل مدل‌های One UI Core سامسونگ) همین تفاوت می‌تواند تعیین‌کننده باشد.
+
             هنگام نصب، اجازه «نصب برنامه‌های ناشناس» را برای مرورگر یا فایل‌منیجر فعال کنید.
+
+            > **اگر پیام «Blocked by Play Protect» یا «برنامه مسدود شد» دیدید:**
+            > روی «More details» و سپس «Install anyway» بزنید. این پیام برای همه
+            > برنامه‌هایی که از گوگل‌پلی نیامده‌اند ظاهر می‌شود و ربطی به سالم بودن فایل ندارد.
 
             ### به‌روزرسانی خودکار
             نسخه‌های بعدی از داخل خود برنامه قابل نصب هستند:
