@@ -4,6 +4,8 @@ import '../../models/bakery.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
+import 'customer_debts_section.dart';
+import 'seller_debts_section.dart';
 
 /// Income against expenses, with the resulting profit, for a chosen range.
 class AdminFinanceTab extends StatefulWidget {
@@ -90,6 +92,15 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                 ErrorBox(message: '${snapshot.error}', onRetry: _reload)
               else
                 ..._buildReport(context, snapshot.data!),
+
+              // What the sellers still hold sits under the report: it is
+              // money the shop has earned but not yet taken in.
+              const SizedBox(height: 22),
+              SellerDebtsSection(api: widget.api),
+
+              // Money the shop has earned but the buyer has not paid yet.
+              const SizedBox(height: 22),
+              CustomerDebtsSection(api: widget.api),
             ],
           );
         },

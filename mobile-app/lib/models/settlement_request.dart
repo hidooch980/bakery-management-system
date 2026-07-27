@@ -11,6 +11,8 @@ class SettlementRequest {
     this.rejectionReason,
     this.requestedOnDisplay,
     this.confirmedBy,
+    this.paidCashFormatted,
+    this.paidCardFormatted,
   });
 
   final int id;
@@ -24,6 +26,12 @@ class SettlementRequest {
   final String? rejectionReason;
   final String? requestedOnDisplay;
   final String? confirmedBy;
+
+  /// How the seller says they handed the money over. Cash reaches the
+  /// admin by hand; the card share has already gone to the bank, so the
+  /// two are declared separately rather than as one total.
+  final String? paidCashFormatted;
+  final String? paidCardFormatted;
 
   bool get isPending => status == 'pending';
 
@@ -39,5 +47,7 @@ class SettlementRequest {
         rejectionReason: json['rejection_reason'] as String?,
         requestedOnDisplay: json['requested_on_display'] as String?,
         confirmedBy: json['confirmed_by'] as String?,
+        paidCashFormatted: json['paid_cash_formatted'] as String?,
+        paidCardFormatted: json['paid_card_formatted'] as String?,
       );
 }

@@ -65,7 +65,12 @@ class InventoryBagIntakeTest extends TestCase
         $this->assertSame(100.0, InventoryItem::ofKey('flour')->balance);
     }
 
-    public function test_salt_uses_its_own_sack_size(): void
+    /**
+     * Salt sacks come in no fixed size, so a bag count would be guesswork.
+     * It is weighed instead, and a bag entry is refused rather than
+     * silently converted at some invented figure.
+     */
+    public function test_salt_is_recorded_by_weight_not_by_sacks(): void
     {
         $this->actingAs($this->admin, 'sanctum')
             ->postJson('/api/v1/inventory/movements', [
@@ -74,9 +79,17 @@ class InventoryBagIntakeTest extends TestCase
                 'bags' => 3,
                 'reason' => 'purchase',
             ])
+            ->assertStatus(422);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/v1/inventory/movements', [
+                'item' => 'salt',
+                'direction' => 'in',
+                'quantity' => 75,
+                'reason' => 'purchase',
+            ])
             ->assertCreated();
 
-        // Salt is seeded at 25kg a sack, not the flour figure.
         $this->assertSame(75.0, InventoryItem::ofKey('salt')->balance);
     }
 

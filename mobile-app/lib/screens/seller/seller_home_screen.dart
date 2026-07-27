@@ -489,7 +489,9 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   /// In Toman, the unit everything is stored in. MoneyFormat converts
   /// to the shop's display unit when it renders — doing it here too
   /// showed every figure ten times over on a Rial shop.
-  double get _totalAmount => _totalCount * _unitPrice;
+  double get _totalAmount => _usedTypes
+      .where((type) => !type.isGiveaway)
+      .fold(0.0, (sum, type) => sum + _countFor(type) * _unitPrice);
 
   /// Loaves of the batch not yet placed on any payment row. Recorded as a
   /// temporary debt against the seller, so it is worth showing plainly.
@@ -542,8 +544,10 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                 paymentType: type,
                 breadCount: _countFor(type),
                 // The API always stores Toman, whatever the shop displays,
-                // and the bread price is already in it.
-                amount: _countFor(type) * _unitPrice,
+                // and the bread price is already in it. Bread given away
+                // is sent with no amount rather than a zero, which would
+                // read as money that went missing.
+                amount: type.isGiveaway ? null : _countFor(type) * _unitPrice,
                 customerId: _customers[type],
               ))
           .toList();
@@ -775,7 +779,7 @@ class _PaymentRow extends StatelessWidget {
 
     // Toman, the unit everything is stored in. MoneyFormat converts to the
     // shop's display unit when it renders.
-    final amount = count * unitPrice;
+    final amount = type.isGiveaway ? 0.0 : count * unitPrice;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -804,7 +808,14 @@ class _PaymentRow extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                     ),
-                    if (active && unitPrice > 0)
+                    if (active && type.isGiveaway)
+                      Text(
+                        'بدون دریافت وجه',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                      )
+                    else if (active && unitPrice > 0)
                       Text(
                         MoneyFormat.format(amount, currency: unit),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(

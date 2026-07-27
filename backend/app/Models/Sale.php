@@ -30,6 +30,13 @@ class Sale extends Model
     public const DEBT_TYPES = ['credit', 'schools'];
 
     /**
+     * Bread given away. No money is expected, so these lines are left out
+     * of the money-gap check — counting them would put the price of every
+     * loaf donated onto the seller as a debt.
+     */
+    public const GIVEAWAY_TYPES = ['charity'];
+
+    /**
      * Payment types where the seller physically holds the money until they
      * hand it over. Card payments reach the bank on their own, and credit
      * and school sales are the customer's debt, not the seller's.

@@ -18,6 +18,8 @@ class SellerAccount {
     required this.total,
     required this.totalFormatted,
     required this.entries,
+    required this.settleable,
+    required this.settleableFormatted,
     this.creditSales = const [],
   });
 
@@ -39,6 +41,12 @@ class SellerAccount {
   final String totalFormatted;
 
   final int entries;
+
+  /// The part of the account the seller can hand over now. Credit is
+  /// excluded — that money is still with the customer.
+  final double settleable;
+  final String settleableFormatted;
+
   final List<SellerCreditSale> creditSales;
 
   bool get isClear => total == 0;
@@ -62,6 +70,8 @@ class SellerAccount {
         total: _double(json['total']),
         totalFormatted: '${json['total_formatted'] ?? ''}',
         entries: _int(json['entries']),
+        settleable: _double(json['settleable']),
+        settleableFormatted: '${json['settleable_formatted'] ?? ''}',
         creditSales: ((json['credit_sales'] as List?) ?? const [])
             .whereType<Map>()
             .map((e) => SellerCreditSale.fromJson(

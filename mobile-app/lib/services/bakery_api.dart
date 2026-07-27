@@ -249,9 +249,15 @@ class BakeryApi {
   /// Asks the admin to confirm the seller has handed their account over.
   /// The account only clears once the admin agrees, so this returns the
   /// request rather than a settled balance.
-  Future<SettlementRequest> requestSettlement({String? note}) async {
+  Future<SettlementRequest> requestSettlement({
+    String? note,
+    double? paidCash,
+    double? paidCard,
+  }) async {
     final body = await _client.post('/settlement-requests', {
       if (note != null && note.isNotEmpty) 'note': note,
+      if (paidCash != null) 'paid_cash': paidCash,
+      if (paidCard != null) 'paid_card': paidCard,
     });
 
     return SettlementRequest.fromJson(body['data'] as Map<String, dynamic>);
@@ -274,6 +280,55 @@ class BakeryApi {
           .toList(),
     );
   }
+
+  // ------------------------------------------ admin: seller accounts
+
+  /// What every seller still owes, and who has asked to settle.
+  Future<List<Map<String, dynamic>>> sellerAccounts() async {
+    final body = await _client.get('/seller-accounts');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return ((data['sellers'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((e) => e.map((k, v) => MapEntry('$k', v)))
+        .toList();
+  }
+
+  Future<void> confirmSettlement(int requestId, {int? bankAccountId}) =>
+      _client.post('/settlement-requests/$requestId/confirm', {
+        if (bankAccountId != null) 'bank_account_id': bankAccountId,
+      });
+
+  Future<void> rejectSettlement(int requestId, String reason) =>
+      _client.post('/settlement-requests/$requestId/reject', {
+        'reason': reason,
+      });
+
+  /// Settles a seller who handed the money over in person, without having
+  /// sent a request from their own app.
+  Future<void> settleSeller(int sellerId) =>
+      _client.post('/seller-accounts/$sellerId/settle', const {});
+
+  // -------------------------------------- admin: school and office debts
+
+  /// What each school or office still owes, longest-waiting first.
+  Future<({List<Map<String, dynamic>> customers, String totalFormatted, int overdueCount})>
+      customerDebts() async {
+    final body = await _client.get('/customer-debts');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return (
+      customers: ((data['customers'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => e.map((k, v) => MapEntry('$k', v)))
+          .toList(),
+      totalFormatted: '${data['total_formatted'] ?? ''}',
+      overdueCount: (data['overdue_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Future<void> settleCustomerDebt(int customerId) =>
+      _client.post('/customer-debts/$customerId/settle', const {});
 
   Future<({List<Sale> sales, int count, double total})> todaySales() async {
     final body = await _client.get('/sales/today');

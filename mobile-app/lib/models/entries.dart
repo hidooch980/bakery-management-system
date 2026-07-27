@@ -82,6 +82,7 @@ enum PaymentType {
   credit('credit', 'نسیه'),
   home('home', 'منزل'),
   schools('schools', 'مدارس'),
+  charity('charity', 'خیرات و کمک'),
   other('other', 'سایر');
 
   const PaymentType(this.apiValue, this.label);
@@ -98,6 +99,11 @@ enum PaymentType {
   /// Types the shop must know the buyer for before it can record the sale.
   bool get needsCustomer =>
       this == PaymentType.credit || this == PaymentType.schools;
+
+  /// Bread given away — to a mosque, a religious school or anyone in need.
+  /// No money is expected, so the sheet asks for no amount and the seller
+  /// is not left owing the price of what was donated.
+  bool get isGiveaway => this == PaymentType.charity;
 }
 
 /// One way a batch was paid for: how many loaves went out under this

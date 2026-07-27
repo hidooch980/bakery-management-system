@@ -22,6 +22,10 @@ class SettlementRequestController extends Controller
     {
         $data = $request->validate([
             'note' => ['nullable', 'string', 'max:500'],
+            // Cash and card settle the same debt but land in different
+            // places, so the seller says how much went by each.
+            'paid_cash' => ['nullable', 'numeric', 'min:0'],
+            'paid_card' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $seller = $request->user();
@@ -46,6 +50,14 @@ class SettlementRequestController extends Controller
             'difference_amount' => $owed['difference'],
             'shortfall_amount' => $owed['shortfall'],
             'note' => $data['note'] ?? null,
+            // Defaults to all of it in cash, which is the common case and
+            // what an older copy of the app sends.
+            'paid_cash' => isset($data['paid_cash'])
+                ? Money::toToman($data['paid_cash'])
+                : ($data['paid_card'] ?? null ? 0 : $owed['total']),
+            'paid_card' => isset($data['paid_card'])
+                ? Money::toToman($data['paid_card'])
+                : 0,
         ]);
 
         return $this->success(
@@ -84,6 +96,10 @@ class SettlementRequestController extends Controller
                 default => 'pending',
             },
             'status_label' => $request->status_label,
+            'paid_cash' => Money::convert((float) $request->paid_cash),
+            'paid_cash_formatted' => Money::format((float) $request->paid_cash),
+            'paid_card' => Money::convert((float) $request->paid_card),
+            'paid_card_formatted' => Money::format((float) $request->paid_card),
             'note' => $request->note,
             'rejection_reason' => $request->rejection_reason,
             'requested_on_display' => $request->requested_on_display,

@@ -126,7 +126,11 @@ class InventoryItemResource extends Resource
             ])
             ->actions([
                 Tables\Actions\Action::make('recordStock')
-                    ->label('ثبت موجودی (کیسه‌ای)')
+                    // Salt and dough are weighed, not bagged, so the form
+                    // asks them for kilograms and the label follows suit.
+                    ->label(fn (InventoryItem $record) => self::bagWeightFor($record) > 0
+                        ? 'ثبت موجودی (کیسه‌ای)'
+                        : 'ثبت موجودی (کیلویی)')
                     ->icon('heroicon-o-arrows-up-down')
                     ->color('primary')
                     ->form(function (InventoryItem $record) {
@@ -145,18 +149,26 @@ class InventoryItemResource extends Resource
                                 ->numeric()
                                 ->minValue(0.001)
                                 ->required()
+                                ->visible($bagWeight > 0)
                                 ->live(onBlur: true)
-                                ->suffix($bagWeight > 0
-                                    ? 'هر واحد '.rtrim(rtrim(number_format($bagWeight, 3), '0'), '.').' کیلوگرم'
-                                    : null),
+                                ->suffix('هر واحد '.rtrim(rtrim(number_format(max($bagWeight, 0), 3), '0'), '.').' کیلوگرم'),
 
                             Forms\Components\Placeholder::make('computed_kg')
                                 ->label('معادل کیلوگرم')
+                                ->visible($bagWeight > 0)
                                 ->content(function (Forms\Get $get) use ($bagWeight) {
                                     $bags = (float) ($get('bags') ?: 0);
 
                                     return number_format($bags * $bagWeight, 3).' کیلوگرم';
                                 }),
+
+                            Forms\Components\TextInput::make('quantity')
+                                ->label('مقدار')
+                                ->numeric()
+                                ->minValue(0.001)
+                                ->required()
+                                ->visible($bagWeight <= 0)
+                                ->suffix('کیلوگرم'),
 
                             Forms\Components\Select::make('reason')
                                 ->label('علت')
@@ -170,16 +182,11 @@ class InventoryItemResource extends Resource
                                 ->rows(2),
                         ];
                     })
-                    // A sack size must exist before a bag count means anything —
-                    // this only happens for flour when the formula has no bag
-                    // weight configured yet.
-                    ->disabled(fn (InventoryItem $record) => self::bagWeightFor($record) <= 0)
-                    ->tooltip(fn (InventoryItem $record) => self::bagWeightFor($record) <= 0
-                        ? 'ابتدا وزن کیسه را در تنظیمات این کالا یا اطلاعات نانوایی ثبت کنید'
-                        : null)
                     ->action(function (InventoryItem $record, array $data) {
                         $bagWeight = self::bagWeightFor($record);
-                        $kg = round((float) $data['bags'] * $bagWeight, 3);
+                        $kg = $bagWeight > 0
+                            ? round((float) $data['bags'] * $bagWeight, 3)
+                            : round((float) $data['quantity'], 3);
 
                         try {
                             $record->move(

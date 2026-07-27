@@ -65,15 +65,39 @@ class SellerSettlement
         });
     }
 
-    /** Confirms a request and settles the account in one step. */
-    public static function confirm(SettlementRequest $request, User $admin): void
-    {
-        DB::transaction(function () use ($request, $admin) {
+    /**
+     * Confirms a request and settles the account in one step.
+     *
+     * The card share is posted into a bank account, because that money
+     * really did arrive there — cash stays in the till and is not a bank
+     * movement, so only the card part is recorded against an account.
+     */
+    public static function confirm(
+        SettlementRequest $request,
+        User $admin,
+        ?\App\Models\BankAccount $account = null,
+    ): void {
+        DB::transaction(function () use ($request, $admin, $account) {
             self::settle($request->user);
+
+            $card = (float) $request->paid_card;
+            $account ??= \App\Models\BankAccount::where('is_default', true)->first();
+
+            if ($card > 0 && $account) {
+                $account->record(
+                    'in',
+                    $card,
+                    'sale',
+                    $admin->id,
+                    $request,
+                    'تسویه کارتخوان — '.$request->user->name,
+                );
+            }
 
             $request->update([
                 'confirmed_at' => now(),
                 'confirmed_by' => $admin->id,
+                'bank_account_id' => $card > 0 ? $account?->id : null,
             ]);
         });
     }

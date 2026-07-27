@@ -23,6 +23,9 @@ class SettlementRequest extends Model
         'cash_amount',
         'difference_amount',
         'shortfall_amount',
+        'paid_cash',
+        'paid_card',
+        'bank_account_id',
         'note',
         'confirmed_at',
         'confirmed_by',
@@ -37,6 +40,8 @@ class SettlementRequest extends Model
             'cash_amount' => 'decimal:2',
             'difference_amount' => 'decimal:2',
             'shortfall_amount' => 'decimal:2',
+            'paid_cash' => 'decimal:2',
+            'paid_card' => 'decimal:2',
             'confirmed_at' => 'datetime',
             'rejected_at' => 'datetime',
         ];
@@ -45,6 +50,11 @@ class SettlementRequest extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function bankAccount()
+    {
+        return $this->belongsTo(BankAccount::class);
     }
 
     public function confirmedBy()

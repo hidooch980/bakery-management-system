@@ -49,7 +49,11 @@ class SaleRecorder
                 // How far the money taken sits from what this bread should
                 // have cost. Frozen here rather than recomputed, so a later
                 // price change cannot rewrite what a seller already owed.
-                $difference = ($amount === null || $breadPrice <= 0)
+                // Bread given away is expected to bring in nothing, so it
+                // is not a gap the seller has to answer for.
+                $isGiveaway = in_array($line['payment_type'], Sale::GIVEAWAY_TYPES, true);
+
+                $difference = ($isGiveaway || $amount === null || $breadPrice <= 0)
                     ? null
                     : round((float) $amount - $line['bread_count'] * $breadPrice, 2);
 

@@ -39,26 +39,26 @@ class InventoryItemPanelTest extends TestCase
 
     public function test_the_bag_count_is_visible_next_to_the_weight(): void
     {
-        InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
+        InventoryItem::ofKey('flour')->move('in', 120, 'purchase');
 
         $html = Livewire::test(
             \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
         )->html();
 
-        // 75kg at the configured 25kg salt sack is 3 sacks.
+        // 120kg at the bakery's 40kg sack is 3 sacks.
         $this->assertStringContainsString('3.00 کیسه', $html);
     }
 
     public function test_the_bag_count_comes_before_the_weight(): void
     {
-        InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
+        InventoryItem::ofKey('flour')->move('in', 120, 'purchase');
 
         $html = Livewire::test(
             \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
         )->html();
 
         $bagsPosition = strpos($html, '3.00 کیسه');
-        $weightPosition = strpos($html, '75.000 کیلوگرم');
+        $weightPosition = strpos($html, '120.000 کیلوگرم');
 
         $this->assertNotFalse($bagsPosition);
         $this->assertNotFalse($weightPosition);
@@ -71,6 +71,29 @@ class InventoryItemPanelTest extends TestCase
 
     public function test_recording_stock_in_bags_creates_the_right_movement(): void
     {
+        $flour = InventoryItem::ofKey('flour');
+
+        Livewire::test(
+            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+        )
+            ->callTableAction('recordStock', $flour, data: [
+                'direction' => 'in',
+                'bags' => 2,
+                'reason' => 'purchase',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        // 2 sacks at the bakery's 40kg is 80kg — never entered by hand.
+        $this->assertEquals(80.0, $flour->fresh()->balance);
+        $this->assertEquals(2.0, $flour->fresh()->balance_bags);
+    }
+
+    /**
+     * Salt and dough are weighed rather than bagged, so their entry form
+     * asks for kilograms directly instead of a sack count.
+     */
+    public function test_salt_is_recorded_in_kilograms(): void
+    {
         $salt = InventoryItem::ofKey('salt');
 
         Livewire::test(
@@ -78,14 +101,13 @@ class InventoryItemPanelTest extends TestCase
         )
             ->callTableAction('recordStock', $salt, data: [
                 'direction' => 'in',
-                'bags' => 2,
+                'quantity' => 75,
                 'reason' => 'purchase',
             ])
             ->assertHasNoTableActionErrors();
 
-        // 2 sacks at 25kg is 50kg — never entered by hand.
-        $this->assertEquals(50.0, $salt->fresh()->balance);
-        $this->assertEquals(2.0, $salt->fresh()->balance_bags);
+        $this->assertEquals(75.0, $salt->fresh()->balance);
+        $this->assertNull($salt->fresh()->balance_bags);
     }
 
     public function test_recording_stock_for_flour_uses_the_formula_bag_weight(): void
@@ -116,12 +138,12 @@ class InventoryItemPanelTest extends TestCase
         )
             ->callTableAction('recordStock', $dough, data: [
                 'direction' => 'out',
-                'bags' => 3,
+                'quantity' => 30,
                 'reason' => 'shaping',
             ])
             ->assertHasNoTableActionErrors();
 
-        // 100kg in, 3 units of 10kg out: 70kg left.
+        // 100kg in, 30kg out: 70kg left.
         $this->assertEquals(70.0, $dough->fresh()->balance);
     }
 

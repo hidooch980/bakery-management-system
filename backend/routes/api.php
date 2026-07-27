@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ChaneBoardController;
 use App\Http\Controllers\Api\ChaneEntryController;
 use App\Http\Controllers\Api\ConsignmentFlourController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\CustomerDebtController;
 use App\Http\Controllers\Api\DoughEntryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FlourAllocationController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
+use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\WorkStartController;
@@ -195,6 +197,16 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:manage-finance')->group(function () {
             Route::get('/incomes/categories', [IncomeController::class, 'categories']);
             Route::apiResource('incomes', IncomeController::class)->except(['show']);
+
+            // --- Seller accounts: what each seller still owes ---
+            Route::get('/seller-accounts', [SellerAccountController::class, 'index']);
+            Route::post('/seller-accounts/{seller}/settle', [SellerAccountController::class, 'settle']);
+            Route::post('/settlement-requests/{settlement}/confirm', [SellerAccountController::class, 'confirm']);
+            Route::post('/settlement-requests/{settlement}/reject', [SellerAccountController::class, 'reject']);
+
+            // --- What the schools and offices still owe ---
+            Route::get('/customer-debts', [CustomerDebtController::class, 'index']);
+            Route::post('/customer-debts/{customer}/settle', [CustomerDebtController::class, 'settle']);
 
             // --- Partner shares (دنگ) and the profit split ---
             Route::get('/shares/split', [BakeryShareController::class, 'split']);

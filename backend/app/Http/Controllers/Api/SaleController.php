@@ -17,7 +17,11 @@ class SaleController extends Controller
 {
     use ApiResponse;
 
-    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'other'];
+    // 'charity' is bread given away — to a mosque, a religious school or
+    // anyone in need. It moves real bread but brings in no money, so it
+    // is a payment type of its own rather than a sale recorded at zero,
+    // which would read as a shortfall the seller has to answer for.
+    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'charity', 'other'];
 
     /**
      * Seller records the sale of a pending chane batch.
@@ -172,6 +176,11 @@ class SaleController extends Controller
             'credit_formatted' => Money::format($credit),
             'total' => $total,
             'total_formatted' => Money::format($total),
+            // What the seller can hand over today. Credit is the customer's
+            // to pay, so it is on the account but not settleable, and the
+            // app needs the difference to prefill its settlement form.
+            'settleable' => round($cash + $shortfall - $difference, 2),
+            'settleable_formatted' => Money::format($cash + $shortfall - $difference),
             'currency' => Money::currency(),
             'currency_label' => Money::label(),
             'entries' => $sales->count(),

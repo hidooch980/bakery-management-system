@@ -57,10 +57,22 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
   }
 
   Future<void> _requestSettlement() async {
+    // Cash and card clear the same debt but land in different places, so
+    // the seller says how the handover was split before it is sent.
+    final split = await showDialog<({double cash, double card})>(
+      context: context,
+      builder: (_) => _SettlementSplitDialog(account: _account!),
+    );
+
+    if (split == null || !mounted) return;
+
     setState(() => _sending = true);
 
     try {
-      await widget.api.requestSettlement();
+      await widget.api.requestSettlement(
+        paidCash: split.cash,
+        paidCard: split.card,
+      );
 
       if (!mounted) return;
       showMessage(context, 'درخواست تسویه ثبت شد و در انتظار تأیید مدیر است.');
@@ -224,7 +236,8 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
             ),
             const SizedBox(height: 6),
             Text(
-              'پس از تأیید مدیر، حساب شما تسویه می‌شود.',
+              'پس از تأیید مدیر، حساب شما تسویه می‌شود.'
+              '\nنسیه‌ها با پرداخت مشتری تسویه می‌شوند و در این مبلغ نیستند.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
@@ -364,6 +377,109 @@ class _RejectionNotice extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+/// Asks the seller how the handover was split between cash and card. Both
+/// clear the same debt, but the card share has already reached the bank
+/// while the cash comes over by hand, so the admin needs them apart.
+class _SettlementSplitDialog extends StatefulWidget {
+  const _SettlementSplitDialog({required this.account});
+
+  final SellerAccount account;
+
+  @override
+  State<_SettlementSplitDialog> createState() => _SettlementSplitDialogState();
+}
+
+class _SettlementSplitDialogState extends State<_SettlementSplitDialog> {
+  late final TextEditingController _cash = TextEditingController(
+    // The usual case is the whole amount in cash, so the seller only
+    // types when part of it went through the card reader.
+    text: widget.account.settleable > 0
+        ? widget.account.settleable.toStringAsFixed(0)
+        : '',
+  );
+  final TextEditingController _card = TextEditingController();
+
+  @override
+  void dispose() {
+    _cash.dispose();
+    _card.dispose();
+    super.dispose();
+  }
+
+  double get _cashValue => double.tryParse(_cash.text.trim()) ?? 0;
+
+  double get _cardValue => double.tryParse(_card.text.trim()) ?? 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final entered = _cashValue + _cardValue;
+    final owed = widget.account.settleable;
+    final mismatch = (entered - owed).abs() > 0.5;
+
+    return AlertDialog(
+      title: const Text('تسویه حساب'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'مبلغ قابل تسویه: ${widget.account.settleableFormatted}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _cash,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'تحویل نقدی',
+              prefixIcon: Icon(Icons.payments_rounded),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _card,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'پرداخت با کارتخوان',
+              prefixIcon: Icon(Icons.credit_card_rounded),
+            ),
+          ),
+          if (mismatch) ...[
+            const SizedBox(height: 10),
+            Text(
+              'مجموع دو مبلغ با حساب شما برابر نیست.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.error,
+                  ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('انصراف'),
+        ),
+        FilledButton(
+          onPressed: entered <= 0
+              ? null
+              : () => Navigator.pop(
+                    context,
+                    (cash: _cashValue, card: _cardValue),
+                  ),
+          child: const Text('ارسال درخواست'),
+        ),
+      ],
     );
   }
 }

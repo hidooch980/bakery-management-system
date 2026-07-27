@@ -1249,26 +1249,35 @@ class ProductionFormulaTest extends TestCase
 
     // --------------------------------------------------- salt and dough bags
 
-    public function test_salt_and_dough_have_their_configured_bag_sizes(): void
+    /**
+     * Salt arrives in sacks of no fixed size and dough is never bagged at
+     * all, so counting either in bags invented a number nobody weighs.
+     * Both are kept in kilograms only.
+     */
+    public function test_salt_and_dough_are_kept_in_kilograms_only(): void
     {
-        $this->assertEquals(25.0, (float) InventoryItem::ofKey(InventoryItem::SALT)->bag_weight_kg);
-        $this->assertEquals(10.0, (float) InventoryItem::ofKey(InventoryItem::DOUGH)->bag_weight_kg);
+        $this->assertNull(InventoryItem::ofKey(InventoryItem::SALT)->bag_weight_kg);
+        $this->assertNull(InventoryItem::ofKey(InventoryItem::DOUGH)->bag_weight_kg);
     }
 
-    public function test_salt_balance_is_reported_in_sacks(): void
+    public function test_salt_balance_is_not_reported_in_sacks(): void
     {
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 75, 'purchase');
 
-        // 75kg at 25kg a sack is 3 sacks.
-        $this->assertEquals(3.0, InventoryItem::ofKey(InventoryItem::SALT)->fresh()->balance_bags);
+        $salt = InventoryItem::ofKey(InventoryItem::SALT)->fresh();
+
+        $this->assertSame(75.0, $salt->balance);
+        $this->assertNull($salt->balance_bags);
     }
 
-    public function test_dough_balance_is_reported_in_its_own_units(): void
+    public function test_dough_balance_is_not_reported_in_bags(): void
     {
         InventoryItem::ofKey(InventoryItem::DOUGH)->move('in', 25, 'production');
 
-        // 25kg at 10kg a unit is 2.5 units.
-        $this->assertEquals(2.5, InventoryItem::ofKey(InventoryItem::DOUGH)->fresh()->balance_bags);
+        $dough = InventoryItem::ofKey(InventoryItem::DOUGH)->fresh();
+
+        $this->assertSame(25.0, $dough->balance);
+        $this->assertNull($dough->balance_bags);
     }
 
     public function test_flour_still_reads_its_bag_size_from_the_formula(): void

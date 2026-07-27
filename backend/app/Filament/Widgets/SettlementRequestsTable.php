@@ -65,6 +65,23 @@ class SettlementRequestsTable extends BaseWidget
                     ->badge()
                     ->color('warning'),
 
+                Tables\Columns\TextColumn::make('paid_cash')
+                    ->label('تحویل نقدی')
+                    ->formatStateUsing(fn ($state) => (float) $state > 0
+                        ? Money::format((float) $state)
+                        : '—')
+                    ->color(fn ($state) => (float) $state > 0 ? 'success' : 'gray'),
+
+                Tables\Columns\TextColumn::make('paid_card')
+                    ->label('تحویل کارتخوان')
+                    ->formatStateUsing(fn ($state) => (float) $state > 0
+                        ? Money::format((float) $state)
+                        : '—')
+                    ->description(fn (SettlementRequest $record) => (float) $record->paid_card > 0
+                        ? 'به حساب بانکی واریز می‌شود'
+                        : null)
+                    ->color(fn ($state) => (float) $state > 0 ? 'info' : 'gray'),
+
                 Tables\Columns\TextColumn::make('note')
                     ->label('توضیح فروشنده')
                     ->placeholder('—')
@@ -81,8 +98,24 @@ class SettlementRequestsTable extends BaseWidget
                     ->modalDescription(fn (SettlementRequest $record) => 'مبلغ '
                         .$record->amount_formatted.' از '.$record->user->name
                         .' دریافت شد؟ نسیه وصول‌نشده در حساب او باقی می‌ماند.')
-                    ->action(function (SettlementRequest $record) {
-                        SellerSettlement::confirm($record, auth()->user());
+                    ->form(fn (SettlementRequest $record) => (float) $record->paid_card > 0
+                        ? [
+                            Forms\Components\Select::make('bank_account_id')
+                                ->label('واریز کارتخوان به حساب')
+                                ->options(\App\Models\BankAccount::pluck('title', 'id'))
+                                ->default(\App\Models\BankAccount::where('is_default', true)->value('id'))
+                                ->required()
+                                ->native(false),
+                        ]
+                        : [])
+                    ->action(function (SettlementRequest $record, array $data) {
+                        SellerSettlement::confirm(
+                            $record,
+                            auth()->user(),
+                            isset($data['bank_account_id'])
+                                ? \App\Models\BankAccount::find($data['bank_account_id'])
+                                : null,
+                        );
 
                         Notification::make()
                             ->title('حساب '.$record->user->name.' تسویه شد')

@@ -118,7 +118,17 @@ void main() {
     test('covers every payment method the backend accepts', () {
       expect(
         PaymentType.values.map((t) => t.apiValue).toSet(),
-        {'cash', 'card', 'credit', 'home', 'schools', 'other'},
+        {'cash', 'card', 'credit', 'home', 'schools', 'charity', 'other'},
+      );
+    });
+
+    test('only charity is bread given away', () {
+      // A giveaway asks for no money, so it must not be treated as a sale
+      // that came up short.
+      expect(PaymentType.charity.isGiveaway, isTrue);
+      expect(
+        PaymentType.values.where((t) => t.isGiveaway),
+        [PaymentType.charity],
       );
     });
 
