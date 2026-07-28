@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SellerAccountController;
+use App\Http\Controllers\Api\SellerCollectionController;
 use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\WorkStartController;
@@ -81,6 +82,11 @@ Route::prefix('v1')->group(function () {
 
         // The seller asks to settle; the admin confirms it in the panel.
         Route::middleware('permission:view-own-sales')->group(function () {
+            // What the schools, offices and dormitories owe this seller,
+            // and the money they hand back.
+            Route::get('/my-collections', [SellerCollectionController::class, 'index']);
+            Route::post('/my-collections/{customer}/collect', [SellerCollectionController::class, 'collect']);
+
             Route::get('/settlement-requests', [SettlementRequestController::class, 'index']);
             Route::post('/settlement-requests', [SettlementRequestController::class, 'store']);
         });

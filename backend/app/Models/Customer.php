@@ -9,12 +9,13 @@ class Customer extends Model
     public const TYPES = [
         'school' => 'مدرسه',
         'office' => 'اداره',
+        'dormitory' => 'خوابگاه',
         'partner' => 'همکار / نانوایی',
         'other' => 'سایر',
     ];
 
     /** Types that buy bread, as opposed to partner bakeries. */
-    public const BUYER_TYPES = ['school', 'office', 'other'];
+    public const BUYER_TYPES = ['school', 'office', 'dormitory', 'other'];
 
     public const PARTNER_TYPE = 'partner';
 

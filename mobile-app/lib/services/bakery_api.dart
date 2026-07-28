@@ -246,6 +246,27 @@ class BakeryApi {
     return SellerAccount.fromJson(body['data'] as Map<String, dynamic>);
   }
 
+  // ------------------------------- seller: schools, offices, dormitories
+
+  /// What the buyers who run an account owe this seller.
+  Future<({List<Map<String, dynamic>> customers, String totalFormatted})>
+      myCollections() async {
+    final body = await _client.get('/my-collections');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return (
+      customers: ((data['customers'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => e.map((k, v) => MapEntry('$k', v)))
+          .toList(),
+      totalFormatted: '${data['total_formatted'] ?? ''}',
+    );
+  }
+
+  /// Records money a buyer handed back, oldest invoice first.
+  Future<void> collectFromCustomer(int customerId, double amount) =>
+      _client.post('/my-collections/$customerId/collect', {'amount': amount});
+
   /// Asks the admin to confirm the seller has handed their account over.
   /// The account only clears once the admin agrees, so this returns the
   /// request rather than a settled balance.
@@ -253,11 +274,20 @@ class BakeryApi {
     String? note,
     double? paidCash,
     double? paidCard,
+    Map<PaymentType, double>? payments,
   }) async {
     final body = await _client.post('/settlement-requests', {
       if (note != null && note.isNotEmpty) 'note': note,
       if (paidCash != null) 'paid_cash': paidCash,
       if (paidCard != null) 'paid_card': paidCard,
+      // An amount per payment type, so the admin counts what the seller
+      // counted out rather than one lump sum.
+      if (payments != null && payments.isNotEmpty)
+        'payments': [
+          for (final entry in payments.entries)
+            if (entry.value > 0)
+              {'payment_type': entry.key.apiValue, 'amount': entry.value},
+        ],
     });
 
     return SettlementRequest.fromJson(body['data'] as Map<String, dynamic>);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/entries.dart';
 import '../models/seller_account.dart';
 import '../models/settlement_request.dart';
 import '../services/api_client.dart';
@@ -59,7 +60,7 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
   Future<void> _requestSettlement() async {
     // Cash and card clear the same debt but land in different places, so
     // the seller says how the handover was split before it is sent.
-    final split = await showDialog<({double cash, double card})>(
+    final split = await showDialog<Map<PaymentType, double>>(
       context: context,
       builder: (_) => _SettlementSplitDialog(account: _account!),
     );
@@ -69,10 +70,7 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
     setState(() => _sending = true);
 
     try {
-      await widget.api.requestSettlement(
-        paidCash: split.cash,
-        paidCard: split.card,
-      );
+      await widget.api.requestSettlement(payments: split);
 
       if (!mounted) return;
       showMessage(context, 'درخواست تسویه ثبت شد و در انتظار تأیید مدیر است.');
@@ -382,9 +380,11 @@ class _RejectionNotice extends StatelessWidget {
 }
 
 
-/// Asks the seller how the handover was split between cash and card. Both
-/// clear the same debt, but the card share has already reached the bank
-/// while the cash comes over by hand, so the admin needs them apart.
+/// Asks the seller how the handover was made, type by type.
+///
+/// The shop settles in more ways than one — some by hand, some through the
+/// reader, some left at the house — and the admin counting it wants the
+/// same breakdown the seller counted out, not one lump sum.
 class _SettlementSplitDialog extends StatefulWidget {
   const _SettlementSplitDialog({required this.account});
 
@@ -395,75 +395,103 @@ class _SettlementSplitDialog extends StatefulWidget {
 }
 
 class _SettlementSplitDialogState extends State<_SettlementSplitDialog> {
-  late final TextEditingController _cash = TextEditingController(
-    // The usual case is the whole amount in cash, so the seller only
-    // types when part of it went through the card reader.
-    text: widget.account.settleable > 0
-        ? widget.account.settleable.toStringAsFixed(0)
-        : '',
-  );
-  final TextEditingController _card = TextEditingController();
+  /// Bread given away brings in no money, so it is never handed over.
+  static final List<PaymentType> _types = PaymentType.values
+      .where((type) => !type.isGiveaway)
+      .toList();
+
+  late final Map<PaymentType, TextEditingController> _fields = {
+    for (final type in _types)
+      type: TextEditingController(
+        // The usual case is the whole amount in cash, so only the
+        // exceptions have to be typed.
+        text: type == PaymentType.cash && widget.account.settleable > 0
+            ? widget.account.settleable.toStringAsFixed(0)
+            : '',
+      ),
+  };
 
   @override
   void dispose() {
-    _cash.dispose();
-    _card.dispose();
+    for (final field in _fields.values) {
+      field.dispose();
+    }
     super.dispose();
   }
 
-  double get _cashValue => double.tryParse(_cash.text.trim()) ?? 0;
+  double _valueOf(PaymentType type) =>
+      double.tryParse(_fields[type]!.text.trim()) ?? 0;
 
-  double get _cardValue => double.tryParse(_card.text.trim()) ?? 0;
+  double get _entered =>
+      _types.fold(0.0, (sum, type) => sum + _valueOf(type));
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final entered = _cashValue + _cardValue;
     final owed = widget.account.settleable;
-    final mismatch = (entered - owed).abs() > 0.5;
+    final mismatch = (_entered - owed).abs() > 0.5;
 
     return AlertDialog(
       title: const Text('تسویه حساب'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'مبلغ قابل تسویه: ${widget.account.settleableFormatted}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _cash,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: 'تحویل نقدی',
-              prefixIcon: Icon(Icons.payments_rounded),
-            ),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _card,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              labelText: 'پرداخت با کارتخوان',
-              prefixIcon: Icon(Icons.credit_card_rounded),
-            ),
-          ),
-          if (mismatch) ...[
-            const SizedBox(height: 10),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             Text(
-              'مجموع دو مبلغ با حساب شما برابر نیست.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.error,
+              'مبلغ قابل تسویه: ${widget.account.settleableFormatted}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
             ),
+            const SizedBox(height: 6),
+            Text(
+              'مبلغ هر نوع پرداخت را جدا وارد کنید.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            for (final type in _types)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TextField(
+                  controller: _fields[type],
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: type.label,
+                    isDense: true,
+                  ),
+                ),
+              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'جمع واردشده',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                Text(
+                  _entered.toStringAsFixed(0),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: mismatch ? scheme.error : null,
+                      ),
+                ),
+              ],
+            ),
+            if (mismatch)
+              Text(
+                'جمع مبالغ با حساب شما برابر نیست.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.error,
+                    ),
+              ),
           ],
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -471,12 +499,12 @@ class _SettlementSplitDialogState extends State<_SettlementSplitDialog> {
           child: const Text('انصراف'),
         ),
         FilledButton(
-          onPressed: entered <= 0
+          onPressed: _entered <= 0
               ? null
-              : () => Navigator.pop(
-                    context,
-                    (cash: _cashValue, card: _cardValue),
-                  ),
+              : () => Navigator.pop(context, {
+                    for (final type in _types)
+                      if (_valueOf(type) > 0) type: _valueOf(type),
+                  }),
           child: const Text('ارسال درخواست'),
         ),
       ],

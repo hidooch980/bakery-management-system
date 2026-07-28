@@ -25,6 +25,7 @@ class SettlementRequest extends Model
         'shortfall_amount',
         'paid_cash',
         'paid_card',
+        'paid_breakdown',
         'bank_account_id',
         'note',
         'confirmed_at',
@@ -42,6 +43,7 @@ class SettlementRequest extends Model
             'shortfall_amount' => 'decimal:2',
             'paid_cash' => 'decimal:2',
             'paid_card' => 'decimal:2',
+            'paid_breakdown' => 'array',
             'confirmed_at' => 'datetime',
             'rejected_at' => 'datetime',
         ];

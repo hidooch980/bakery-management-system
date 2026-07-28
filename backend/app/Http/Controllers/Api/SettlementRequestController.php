@@ -26,6 +26,14 @@ class SettlementRequestController extends Controller
             // places, so the seller says how much went by each.
             'paid_cash' => ['nullable', 'numeric', 'min:0'],
             'paid_card' => ['nullable', 'numeric', 'min:0'],
+
+            // The shop settles in more ways than two, so the seller may
+            // send an amount per payment type. Cash and card are still
+            // kept apart on their own columns, since one lands at the
+            // bank and the other in the admin's hand.
+            'payments' => ['nullable', 'array'],
+            'payments.*.payment_type' => ['required', 'in:'.implode(',', SaleController::PAYMENT_TYPES)],
+            'payments.*.amount' => ['required', 'numeric', 'min:0'],
         ]);
 
         $seller = $request->user();
@@ -39,6 +47,8 @@ class SettlementRequestController extends Controller
         if ($owed['total'] <= 0) {
             return $this->error('مبلغی برای تسویه وجود ندارد.', 422);
         }
+
+        $breakdown = $this->breakdownFrom($data);
 
         // The figures are captured now rather than read back at
         // confirmation, so a sale recorded in between cannot quietly
@@ -57,7 +67,8 @@ class SettlementRequestController extends Controller
                 : ($data['paid_card'] ?? null ? 0 : $owed['total']),
             'paid_card' => isset($data['paid_card'])
                 ? Money::toToman($data['paid_card'])
-                : 0,
+                : ($breakdown['card'] ?? 0),
+            'paid_breakdown' => $breakdown ?: null,
         ]);
 
         return $this->success(
@@ -65,6 +76,30 @@ class SettlementRequestController extends Controller
             'درخواست تسویه ثبت شد و در انتظار تأیید مدیر است.',
             201
         );
+    }
+
+    /**
+     * The per-type amounts, in Toman, keyed by payment type.
+     *
+     * @return array<string, float>
+     */
+    private function breakdownFrom(array $data): array
+    {
+        $breakdown = [];
+
+        foreach ($data['payments'] ?? [] as $line) {
+            $amount = Money::toToman((float) $line['amount']);
+
+            if ($amount <= 0) {
+                continue;
+            }
+
+            // A type sent twice is added up rather than overwritten.
+            $breakdown[$line['payment_type']] =
+                round(($breakdown[$line['payment_type']] ?? 0) + $amount, 2);
+        }
+
+        return $breakdown;
     }
 
     /** The seller's own requests, newest first. */
@@ -100,6 +135,13 @@ class SettlementRequestController extends Controller
             'paid_cash_formatted' => Money::format((float) $request->paid_cash),
             'paid_card' => Money::convert((float) $request->paid_card),
             'paid_card_formatted' => Money::format((float) $request->paid_card),
+            'paid_breakdown' => collect($request->paid_breakdown ?? [])
+                ->map(fn ($amount, $type) => [
+                    'payment_type' => $type,
+                    'label' => \App\Filament\Resources\SaleResource::PAYMENT_LABELS[$type] ?? $type,
+                    'amount' => Money::convert((float) $amount),
+                    'amount_formatted' => Money::format((float) $amount),
+                ])->values(),
             'note' => $request->note,
             'rejection_reason' => $request->rejection_reason,
             'requested_on_display' => $request->requested_on_display,
