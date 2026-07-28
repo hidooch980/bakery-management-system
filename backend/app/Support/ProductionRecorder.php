@@ -54,6 +54,39 @@ class ProductionRecorder
      * dough shaped into it is physically gone, so deducting only the normal
      * share would leave that dough looking untouched in stock.
      */
+    /**
+     * Whether a batch can physically yield this much shaped dough.
+     *
+     * A batch of ten bags makes a known weight of dough and no more. Left
+     * unchecked, a count typed one digit too long deducts more than the
+     * batch ever held, silently eating into the next batch's dough — and
+     * the shop only finds out when the next entry is refused for stock
+     * that should have been there.
+     *
+     * A small tolerance is allowed: the scale and the formula will never
+     * agree to the gram.
+     */
+    public const OVERSHOOT_TOLERANCE_KG = 0.5;
+
+    public static function problemWithChane(
+        DoughEntry $dough,
+        float $normalWeightKg,
+        float $naninoWeightKg,
+    ): ?string {
+        $available = DoughFormula::fromBakery()->doughKg((float) $dough->bag_count);
+        $shaped = $normalWeightKg + $naninoWeightKg;
+
+        if ($shaped <= $available + self::OVERSHOOT_TOLERANCE_KG) {
+            return null;
+        }
+
+        return sprintf(
+            'وزن چانه‌های ثبت‌شده (%s کیلوگرم) از خمیر این پخت (%s کیلوگرم) بیشتر است. تعداد چانه را بررسی کنید.',
+            number_format($shaped, 2),
+            number_format($available, 2),
+        );
+    }
+
     public static function chane(
         DoughEntry $dough,
         int $userId,
@@ -68,6 +101,12 @@ class ProductionRecorder
             $dough, $userId, $normalWeightKg, $naninoWeightKg,
             $sprayFlourKg, $chaneCount, $trayCount, $trayCounts
         ) {
+            // Guarded here too, not only in the controller, so the panel
+            // and any future caller cannot get round it.
+            if ($problem = self::problemWithChane($dough, $normalWeightKg, $naninoWeightKg)) {
+                throw new \RuntimeException($problem);
+            }
+
             $entry = ChaneEntry::create([
                 'dough_entry_id' => $dough->id,
                 'user_id' => $userId,

@@ -74,6 +74,14 @@ class ChaneEntryController extends Controller
             return $this->error('برای این خمیر قبلاً چانه ثبت شده است.', 409);
         }
 
+        // A batch yields a known weight of dough and no more. Without this
+        // an over-long count quietly consumes the next batch's dough.
+        if ($problem = ProductionRecorder::problemWithChane(
+            $dough, (float) $normalWeight, (float) ($naninoWeight ?? 0)
+        )) {
+            return $this->error($problem, 422);
+        }
+
         $entry = ProductionRecorder::chane(
             dough: $dough,
             userId: $request->user()->id,
