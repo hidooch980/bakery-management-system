@@ -46,18 +46,19 @@ class InventoryItemResource extends Resource
                         ->required()
                         ->maxLength(20),
 
+                    // Flour reads its sack size from the production formula,
+                    // and salt and dough are weighed rather than bagged, so
+                    // neither takes a bag weight here. The field is left for
+                    // any future item that really does come in fixed sacks.
                     Forms\Components\TextInput::make('bag_weight_kg')
                         ->label('وزن هر کیسه/بسته')
                         ->numeric()
                         ->minValue(0)
                         ->suffix('کیلوگرم')
-                        ->visible(fn (?InventoryItem $record) => $record?->key !== InventoryItem::FLOUR)
-                        ->helperText(fn (?InventoryItem $record) => $record?->key === InventoryItem::FLOUR
-                            ? null
-                            : 'برای نمایش موجودی به تعداد کیسه؛ مثلاً نمک ۲۵ کیلویی یا خمیر ۱۰ کیلویی')
-                        ->hint(fn (?InventoryItem $record) => $record?->key === InventoryItem::FLOUR
-                            ? 'وزن کیسه آرد از «اطلاعات نانوایی» خوانده می‌شود'
-                            : null),
+                        ->visible(fn (?InventoryItem $record) => $record !== null
+                            && ! in_array($record->key, InventoryItem::WEIGHED_ONLY, true)
+                            && $record->key !== InventoryItem::FLOUR)
+                        ->helperText('برای نمایش موجودی به تعداد کیسه'),
 
                     Forms\Components\TextInput::make('low_threshold')
                         ->label('حد هشدار موجودی')
@@ -71,6 +72,10 @@ class InventoryItemResource extends Resource
     /** Flour reads its sack size from the production formula; others carry their own. */
     private static function bagWeightFor(InventoryItem $item): float
     {
+        if (in_array($item->key, InventoryItem::WEIGHED_ONLY, true)) {
+            return 0.0;
+        }
+
         return $item->key === InventoryItem::FLOUR
             ? DoughFormula::fromBakery()->bagWeightKg
             : (float) ($item->bag_weight_kg ?? 0);

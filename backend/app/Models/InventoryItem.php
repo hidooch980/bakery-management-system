@@ -19,6 +19,13 @@ class InventoryItem extends Model
 
     protected $fillable = ['key', 'name', 'unit', 'bag_weight_kg', 'low_threshold'];
 
+    /**
+     * Goods kept in kilograms and nothing else. Salt arrives in sacks of no
+     * fixed size and dough is never bagged at all, so a bag count for either
+     * would be a number nobody weighs.
+     */
+    public const WEIGHED_ONLY = [self::SALT, self::DOUGH];
+
     protected function casts(): array
     {
         return [
@@ -52,6 +59,10 @@ class InventoryItem extends Model
      */
     public function getBalanceBagsAttribute(): ?float
     {
+        if (in_array($this->key, self::WEIGHED_ONLY, true)) {
+            return null;
+        }
+
         $bagWeight = $this->key === self::FLOUR
             ? \App\Support\DoughFormula::fromBakery()->bagWeightKg
             : (float) ($this->bag_weight_kg ?? 0);

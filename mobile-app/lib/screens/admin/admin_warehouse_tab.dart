@@ -192,10 +192,11 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
     return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
   }
 
-  /// "۱۰۰ کیلوگرم  •  ۴ کیسه" — the bag count only shown once the item actually
-  /// has a configured sack size (flour, salt, dough all do; a future item
-  /// added without one just shows the raw weight).
-  /// Bag count leads, weight follows on the same line.
+  /// "۴ کیسه  •  ۱۰۰ کیلوگرم" — the bag count leads, the weight follows.
+  ///
+  /// Only flour comes in fixed sacks. Salt arrives in sacks of no set size
+  /// and dough is never bagged, so the server sends no bag count for them
+  /// and they show their weight alone.
   static String _balanceLabel(Map<String, dynamic> item) {
     final weight = '${_fmt(item['balance'])} ${item['unit']}';
     final bags = item['balance_bags'];

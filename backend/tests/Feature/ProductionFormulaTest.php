@@ -1280,6 +1280,34 @@ class ProductionFormulaTest extends TestCase
         $this->assertNull($dough->balance_bags);
     }
 
+    /**
+     * A bag weight left on the record from before must not bring the bag
+     * count back: these two are weighed goods by nature, not by setting.
+     */
+    public function test_a_stale_bag_weight_does_not_revive_the_bag_count(): void
+    {
+        $salt = InventoryItem::ofKey(InventoryItem::SALT);
+        $salt->update(['bag_weight_kg' => 25]);
+        $salt->move('in', 75, 'purchase');
+
+        $this->assertNull($salt->fresh()->balance_bags);
+    }
+
+    public function test_recording_salt_in_bags_is_refused(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/inventory/movements', [
+                'item' => 'dough',
+                'direction' => 'in',
+                'bags' => 3,
+                'reason' => 'production',
+            ])
+            ->assertStatus(422);
+    }
+
     public function test_flour_still_reads_its_bag_size_from_the_formula(): void
     {
         // Flour predates the per-item column and must keep using the

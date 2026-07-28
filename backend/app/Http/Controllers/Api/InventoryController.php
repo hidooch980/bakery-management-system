@@ -80,6 +80,15 @@ class InventoryController extends Controller
         $item = InventoryItem::ofKey($data['item']);
 
         if (isset($data['bags'])) {
+            // Salt and dough are weighed, so a bag count for them would be
+            // converted at a figure nobody actually measures.
+            if (in_array($item->key, InventoryItem::WEIGHED_ONLY, true)) {
+                return $this->error(
+                    $item->name.' فقط به کیلوگرم ثبت می‌شود.',
+                    422
+                );
+            }
+
             $bagWeight = $item->key === InventoryItem::FLOUR
                 ? \App\Support\DoughFormula::fromBakery()->bagWeightKg
                 : (float) ($item->bag_weight_kg ?? 0);
