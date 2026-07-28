@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ChaneEntryController;
 use App\Http\Controllers\Api\ConsignmentFlourController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\CustomerDebtController;
+use App\Http\Controllers\Api\CustomerInteractionController;
 use App\Http\Controllers\Api\DoughEntryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FlourAllocationController;
@@ -203,6 +204,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/seller-accounts/{seller}/settle', [SellerAccountController::class, 'settle']);
             Route::post('/settlement-requests/{settlement}/confirm', [SellerAccountController::class, 'confirm']);
             Route::post('/settlement-requests/{settlement}/reject', [SellerAccountController::class, 'reject']);
+
+            // --- CRM: what was said to a customer, and what is owed back ---
+            Route::get('/follow-ups', [CustomerInteractionController::class, 'dueFollowUps']);
+            Route::get('/customers/{customer}/interactions', [CustomerInteractionController::class, 'index']);
+            Route::post('/customers/{customer}/interactions', [CustomerInteractionController::class, 'store']);
+            Route::post('/interactions/{interaction}/complete', [CustomerInteractionController::class, 'complete']);
 
             // --- What the schools and offices still owe ---
             Route::get('/customer-debts', [CustomerDebtController::class, 'index']);

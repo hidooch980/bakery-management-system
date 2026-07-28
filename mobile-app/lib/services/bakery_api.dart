@@ -327,6 +327,33 @@ class BakeryApi {
     );
   }
 
+  /// Today's call list: follow-ups that have come due, oldest first.
+  Future<List<Map<String, dynamic>>> dueFollowUps() async {
+    final body = await _client.get('/follow-ups');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return ((data['follow_ups'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((e) => e.map((k, v) => MapEntry('$k', v)))
+        .toList();
+  }
+
+  Future<void> recordInteraction(
+    int customerId, {
+    required String type,
+    required String summary,
+    String? followUpOn,
+  }) =>
+      _client.post('/customers/$customerId/interactions', {
+        'type': type,
+        'summary': summary,
+        if (followUpOn != null && followUpOn.isNotEmpty)
+          'follow_up_on': followUpOn,
+      });
+
+  Future<void> completeFollowUp(int interactionId) =>
+      _client.post('/interactions/$interactionId/complete', const {});
+
   Future<void> settleCustomerDebt(int customerId) =>
       _client.post('/customer-debts/$customerId/settle', const {});
 

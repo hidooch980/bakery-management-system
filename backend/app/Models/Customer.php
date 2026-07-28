@@ -53,6 +53,23 @@ class Customer extends Model
         return $query->where('type', self::PARTNER_TYPE);
     }
 
+    public function interactions()
+    {
+        return $this->hasMany(CustomerInteraction::class)->latest();
+    }
+
+    /** Follow-ups still owed to this customer. */
+    public function openFollowUps()
+    {
+        return $this->hasMany(CustomerInteraction::class)->open();
+    }
+
+    /** What this customer still owes, across every unpaid sale. */
+    public function getOutstandingAttribute(): float
+    {
+        return round((float) $this->sales()->outstanding()->sum('amount'), 2);
+    }
+
     public function consignments()
     {
         return $this->hasMany(ConsignmentFlour::class);

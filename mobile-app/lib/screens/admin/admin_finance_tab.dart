@@ -5,6 +5,7 @@ import '../../services/bakery_api.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import 'customer_debts_section.dart';
+import 'follow_ups_section.dart';
 import 'seller_debts_section.dart';
 
 /// Income against expenses, with the resulting profit, for a chosen range.
@@ -101,6 +102,10 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
               // Money the shop has earned but the buyer has not paid yet.
               const SizedBox(height: 22),
               CustomerDebtsSection(api: widget.api),
+
+              // Who has to be called today, and about what.
+              const SizedBox(height: 22),
+              FollowUpsSection(api: widget.api),
             ],
           );
         },
