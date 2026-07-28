@@ -8,7 +8,9 @@ use App\Models\InventoryItem;
 use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -139,6 +141,36 @@ class ChaneOvershootTest extends TestCase
             ->assertCreated();
 
         $this->assertSame(0.0, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
+    }
+
+    /**
+     * The panel calls the same recorder, so without its own check the
+     * admin would meet a Server Error page rather than being told the
+     * count is too high.
+     */
+    public function test_the_panel_refuses_an_overshoot_as_a_message(): void
+    {
+        $dough = $this->batch();
+        $before = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)
+            ->fillForm([
+                'dough_entry_id' => $dough->id,
+                'user_id' => $this->chaneGir->id,
+                'spray_flour_kg' => 0,
+                'trays' => [['count' => 797]],
+            ])
+            ->call('create');
+
+        // Refused, and nothing was written or spent.
+        $this->assertSame(0, \App\Models\ChaneEntry::count());
+        $this->assertSame($before, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
+        $this->assertSame('pending', $dough->fresh()->status);
     }
 
     public function test_nanino_counts_against_the_same_batch(): void

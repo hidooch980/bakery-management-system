@@ -56,3 +56,4 @@ Thumbs.db
 # --- Build artifacts kept out of source control ---
 dist/
 *.log
+graphify-out/

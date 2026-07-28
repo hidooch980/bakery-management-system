@@ -8,7 +8,9 @@ use App\Support\DoughFormula;
 use App\Support\ProductionRecorder;
 use Illuminate\Database\Eloquent\Model;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Support\Exceptions\Halt;
 
 class CreateChaneEntry extends CreateRecord
 {
@@ -35,13 +37,28 @@ class CreateChaneEntry extends CreateRecord
 
         $count = $trays->sum();
 
+        $dough = DoughEntry::findOrFail($data['dough_entry_id']);
+
+        $normalWeight = (float) ($formula->weightForNormalChane($count) ?? 0);
+        $naninoWeight = (float) ($formula->weightForNaninoChane(
+            (int) ($this->data['nanino_chane_count'] ?? 0)
+        ) ?? 0);
+
+        // The recorder refuses a batch shaped into more dough than it made.
+        // Raised here as a form error rather than left to throw, or the
+        // admin would meet a 500 page instead of being told the count is
+        // too high.
+        if ($problem = ProductionRecorder::problemWithChane($dough, $normalWeight, $naninoWeight)) {
+            Notification::make()->title('ثبت انجام نشد')->body($problem)->danger()->send();
+
+            throw new Halt();
+        }
+
         return ProductionRecorder::chane(
-            dough: DoughEntry::findOrFail($data['dough_entry_id']),
+            dough: $dough,
             userId: (int) $data['user_id'],
-            normalWeightKg: (float) ($formula->weightForNormalChane($count) ?? 0),
-            naninoWeightKg: (float) ($formula->weightForNaninoChane(
-                (int) ($this->data['nanino_chane_count'] ?? 0)
-            ) ?? 0),
+            normalWeightKg: $normalWeight,
+            naninoWeightKg: $naninoWeight,
             sprayFlourKg: (float) ($data['spray_flour_kg'] ?? 0),
             chaneCount: $count,
             trayCount: $trays->isEmpty() ? null : $trays->count(),
