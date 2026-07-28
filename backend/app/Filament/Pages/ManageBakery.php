@@ -234,14 +234,40 @@ class ManageBakery extends Page implements HasForms
                                 $count = $normal > 0 ? floor($dough / $normal) : null;
                                 $naninoCount = $nanino > 0 ? floor($dough / $nanino) : null;
 
+                                // Shaping spends the dough it was given, so
+                                // the line says what each chane costs and
+                                // what a whole bag's worth is used for —
+                                // the figures the warehouse is deducted by.
+                                $consumption = '';
+
+                                if ($count !== null) {
+                                    $used = $count * $normal;
+                                    $leftOver = $dough - $used;
+
+                                    $consumption = sprintf(
+                                        '<br>مصرف خمیر: هر چانه %s کیلوگرم  •  %s چانه = %s کیلوگرم%s',
+                                        number_format($normal, 3),
+                                        number_format($count),
+                                        number_format($used, 2),
+                                        // Dough short of a whole chane is not
+                                        // waste; it is what the next batch is
+                                        // started with, so it is named rather
+                                        // than left as a gap in the numbers.
+                                        $leftOver >= 0.005
+                                            ? '  •  باقیمانده '.number_format($leftOver, 2).' کیلوگرم'
+                                            : ''
+                                    );
+                                }
+
                                 return sprintf(
-                                    'آرد %s + آب %s + نمک %s  ←  خمیر %s کیلوگرم%s%s',
+                                    'آرد %s + آب %s + نمک %s  ←  خمیر %s کیلوگرم%s%s%s',
                                     number_format($bag, 1),
                                     number_format($bag * $water, 1),
                                     number_format($bag * $salt, 2),
                                     number_format($dough, 2),
                                     $count !== null ? '  ←  حدود '.number_format($count).' چانه عادی' : '',
-                                    $naninoCount !== null ? '  یا  حدود '.number_format($naninoCount).' چانه نانینو' : ''
+                                    $naninoCount !== null ? '  یا  حدود '.number_format($naninoCount).' چانه نانینو' : '',
+                                    $consumption
                                 );
                             }),
 

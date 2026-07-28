@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Bakery;
+use App\Models\BankAccount;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
 use Illuminate\Support\Facades\DB;
@@ -57,6 +58,14 @@ class SaleRecorder
                     ? null
                     : round((float) $amount - $line['bread_count'] * $breadPrice, 2);
 
+                // Card money is settled to the account by the reader, so
+                // the sale names the account it landed in. Cash and credit
+                // name none: that money is still with the seller or the
+                // customer, and posting it here would invent a deposit.
+                $bankAccountId = in_array($line['payment_type'], Sale::BANKED_TYPES, true)
+                    ? BankAccount::where('is_default', true)->value('id')
+                    : null;
+
                 $created[] = Sale::create([
                     'chane_entry_id' => $chane->id,
                     'user_id' => $userId,
@@ -73,6 +82,7 @@ class SaleRecorder
                     'amount_difference' => $difference,
                     'customer_id' => $line['customer_id'] ?? null,
                     'amount' => $amount,
+                    'bank_account_id' => $bankAccountId,
                     'note' => $line['note'] ?? null,
                 ]);
 

@@ -37,6 +37,14 @@ class Sale extends Model
     public const GIVEAWAY_TYPES = ['charity'];
 
     /**
+     * Payment types whose money reaches the bank on its own. A card
+     * payment is taken by the reader and settled to the account without
+     * anyone carrying it, so it is posted when the sale is recorded —
+     * otherwise it sits in neither the seller's hands nor the bank.
+     */
+    public const BANKED_TYPES = ['card'];
+
+    /**
      * Payment types where the seller physically holds the money until they
      * hand it over. Card payments reach the bank on their own, and credit
      * and school sales are the customer's debt, not the seller's.

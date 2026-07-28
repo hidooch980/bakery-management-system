@@ -1308,6 +1308,29 @@ class ProductionFormulaTest extends TestCase
             ->assertStatus(422);
     }
 
+    /**
+     * Shaping spends the dough it was given, so the formula preview says
+     * what each chane costs and what the batch is used for — the figures
+     * the warehouse is actually deducted by.
+     */
+    public function test_the_formula_preview_shows_what_the_dough_is_spent_on(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+        $this->actingAs($admin);
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+        $html = preg_replace('/\s+/u', ' ', strip_tags(
+            \Livewire\Livewire::test(\App\Filament\Pages\ManageBakery::class)->html(),
+            '<br>'
+        ));
+
+        $this->assertStringContainsString('مصرف خمیر', $html);
+        // One bag of 40kg makes 64.6kg, which is 76 chane of 0.85kg.
+        $this->assertStringContainsString('هر چانه 0.850 کیلوگرم', $html);
+        $this->assertStringContainsString('76 چانه = 64.60 کیلوگرم', $html);
+    }
+
     public function test_flour_still_reads_its_bag_size_from_the_formula(): void
     {
         // Flour predates the per-item column and must keep using the
