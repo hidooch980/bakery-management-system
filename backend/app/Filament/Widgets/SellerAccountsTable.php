@@ -2,10 +2,12 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\BankAccount;
 use App\Models\Sale;
 use App\Models\User;
 use App\Support\Money;
 use App\Support\SellerSettlement;
+use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -116,7 +118,6 @@ class SellerAccountsTable extends BaseWidget
                     ->label('تسویه حساب')
                     ->icon('heroicon-o-check-badge')
                     ->color('success')
-                    ->requiresConfirmation()
                     ->modalHeading('تسویه حساب فروشنده')
                     ->modalDescription(fn (User $record) => 'مبلغ '
                         .Money::format(self::settleableFor($record))
@@ -125,17 +126,75 @@ class SellerAccountsTable extends BaseWidget
                             ? ' نسیه وصول‌نشده در حساب می‌ماند تا مشتری پرداخت کند.'
                             : ''))
                     ->modalSubmitActionLabel('تسویه شد')
-                    ->action(function (User $record) {
-                        $amount = self::settleableFor($record);
+                    // A handover arrives partly in notes and partly through the
+                    // reader, and the two do not land in the same place: cash
+                    // stays in the till, the card share reaches a bank account.
+                    // Settling without asking left that money unbanked.
+                    ->form(fn (User $record) => [
+                        Forms\Components\TextInput::make('paid_cash')
+                            ->label('تحویل نقدی')
+                            ->numeric()
+                            ->minValue(0)
+                            // Typed in the display unit, so the default is
+                            // converted out of stored Toman the same way.
+                            ->default(Money::convert(self::settleableFor($record)))
+                            ->suffix(Money::label())
+                            ->live(onBlur: true)
+                            ->required(),
 
-                        SellerSettlement::settle($record);
+                        Forms\Components\TextInput::make('paid_card')
+                            ->label('کارتخوان')
+                            ->numeric()
+                            ->minValue(0)
+                            ->default(0)
+                            ->suffix(Money::label())
+                            ->live(onBlur: true)
+                            ->required(),
+
+                        Forms\Components\Select::make('bank_account_id')
+                            ->label('واریز کارتخوان به حساب')
+                            ->options(BankAccount::pluck('title', 'id'))
+                            ->default(BankAccount::where('is_default', true)->value('id'))
+                            ->native(false)
+                            // Only a card share needs an account to land in.
+                            ->visible(fn (Forms\Get $get) => (float) $get('paid_card') > 0)
+                            ->required(fn (Forms\Get $get) => (float) $get('paid_card') > 0),
+                    ])
+                    ->action(function (User $record, array $data) {
+                        $settleable = self::settleableFor($record);
+                        $cash = Money::toToman((float) $data['paid_cash']);
+                        $card = Money::toToman((float) $data['paid_card']);
+
+                        // The parts have to come to the whole. Letting them
+                        // differ would mark the account clear on a figure
+                        // nobody actually handed over.
+                        if (abs($cash + $card - $settleable) > 0.01) {
+                            Notification::make()
+                                ->title('جمع نقد و کارتخوان با مبلغ حساب نمی‌خواند')
+                                ->body('باید '.Money::format($settleable).' باشد،'
+                                    .' ولی '.Money::format($cash + $card).' وارد شده.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        $banked = SellerSettlement::settleWithMethod(
+                            $record,
+                            auth()->user(),
+                            $card,
+                            isset($data['bank_account_id'])
+                                ? BankAccount::find($data['bank_account_id'])
+                                : null,
+                        );
 
                         // The account just changed, so the cached rows are stale.
                         unset(self::$cache[$record->id]);
 
                         Notification::make()
                             ->title('حساب '.$record->name.' تسویه شد')
-                            ->body('مبلغ '.Money::format($amount).' تسویه شد.')
+                            ->body('نقد '.Money::format($cash).'   •   کارتخوان '.Money::format($card)
+                                .($banked ? ' به حساب '.$banked->title : ''))
                             ->success()
                             ->send();
                     }),

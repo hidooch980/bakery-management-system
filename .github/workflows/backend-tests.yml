@@ -52,6 +52,12 @@ jobs:
         working-directory: backend
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      # Cheap and fails fast, so a formatting drift is caught before the
+      # database is even up.
+      - name: Check formatting
+        working-directory: backend
+        run: ./vendor/bin/pint --test
+
       - name: Prepare environment
         working-directory: backend
         run: |

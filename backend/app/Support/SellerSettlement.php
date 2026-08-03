@@ -67,11 +67,50 @@ class SellerSettlement
     }
 
     /**
-     * Confirms a request and settles the account in one step.
+     * Settles the account and banks whatever came in on the card reader.
      *
-     * The card share is posted into a bank account, because that money
-     * really did arrive there — cash stays in the till and is not a bank
-     * movement, so only the card part is recorded against an account.
+     * The two halves of a handover land in different places: cash stays in
+     * the till and is no bank movement at all, while the card share really
+     * did arrive in an account and has to be recorded there or the bank
+     * balance reads short by exactly what the seller paid that way.
+     *
+     * @param  float  $card  Toman taken on the reader, not the whole handover.
+     * @param  mixed  $source  What the movement is recorded against — a
+     *                         settlement request, or null when an admin
+     *                         settled the account directly.
+     * @return BankAccount|null The account the card share went to, if any.
+     */
+    public static function settleWithMethod(
+        User $seller,
+        User $admin,
+        float $card,
+        ?BankAccount $account = null,
+        mixed $source = null,
+    ): ?BankAccount {
+        return DB::transaction(function () use ($seller, $admin, $card, $account, $source) {
+            self::settle($seller);
+
+            $account ??= BankAccount::where('is_default', true)->first();
+
+            if ($card <= 0 || ! $account) {
+                return null;
+            }
+
+            $account->record(
+                'in',
+                $card,
+                'sale',
+                $admin->id,
+                $source,
+                'تسویه کارتخوان — '.$seller->name,
+            );
+
+            return $account;
+        });
+    }
+
+    /**
+     * Confirms a request and settles the account in one step.
      */
     public static function confirm(
         SettlementRequest $request,
@@ -79,26 +118,18 @@ class SellerSettlement
         ?BankAccount $account = null,
     ): void {
         DB::transaction(function () use ($request, $admin, $account) {
-            self::settle($request->user);
-
-            $card = (float) $request->paid_card;
-            $account ??= BankAccount::where('is_default', true)->first();
-
-            if ($card > 0 && $account) {
-                $account->record(
-                    'in',
-                    $card,
-                    'sale',
-                    $admin->id,
-                    $request,
-                    'تسویه کارتخوان — '.$request->user->name,
-                );
-            }
+            $banked = self::settleWithMethod(
+                $request->user,
+                $admin,
+                (float) $request->paid_card,
+                $account,
+                $request,
+            );
 
             $request->update([
                 'confirmed_at' => now(),
                 'confirmed_by' => $admin->id,
-                'bank_account_id' => $card > 0 ? $account?->id : null,
+                'bank_account_id' => $banked?->id,
             ]);
         });
     }

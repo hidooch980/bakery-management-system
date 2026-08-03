@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Filament\Widgets\SellerAccountsTable;
 use App\Models\Bakery;
+use App\Models\BankAccount;
 use App\Models\ChaneEntry;
 use App\Models\Customer;
 use App\Models\DoughEntry;
@@ -205,10 +206,91 @@ class SellerAccountTest extends TestCase
         // 500,000 plus 200,000 is held by this seller.
         $this->assertStringContainsString('700,000 تومان', $text);
 
-        $component->callTableAction('settleSellerAccount', $seller);
+        $component->callTableAction('settleSellerAccount', $seller, [
+            'paid_cash' => 700_000,
+            'paid_card' => 0,
+        ]);
 
         $this->assertSame(0, Sale::query()->sellerAccountOutstanding()->count());
         $this->assertNotNull(Sale::first()->cash_settled_on);
+    }
+
+    // ------------------------- settling by how the money was handed over
+
+    /** Puts a seller on 700,000 Toman and returns them with an admin ready. */
+    private function sellerOwing700k(): User
+    {
+        $seller = $this->userWithRole('seller');
+        $this->sell($seller, 'cash', 100, 500_000);
+        $this->sell($seller, 'cash', 40, 200_000);
+
+        $this->actingAs($this->userWithRole('admin'));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        return $seller;
+    }
+
+    public function test_settling_all_in_cash_touches_no_bank_account(): void
+    {
+        $seller = $this->sellerOwing700k();
+        $account = BankAccount::create(['title' => 'ملی', 'is_default' => true]);
+
+        Livewire::test(SellerAccountsTable::class)
+            ->callTableAction('settleSellerAccount', $seller, [
+                'paid_cash' => 700_000,
+                'paid_card' => 0,
+            ]);
+
+        $this->assertSame(0, Sale::query()->sellerAccountOutstanding()->count());
+        // Cash stays in the till; it never was a bank movement.
+        $this->assertSame(0, $account->transactions()->count());
+    }
+
+    public function test_settling_on_the_card_reaches_the_bank_account(): void
+    {
+        $seller = $this->sellerOwing700k();
+        $account = BankAccount::create(['title' => 'ملی', 'is_default' => true]);
+
+        Livewire::test(SellerAccountsTable::class)
+            ->callTableAction('settleSellerAccount', $seller, [
+                'paid_cash' => 0,
+                'paid_card' => 700_000,
+                'bank_account_id' => $account->id,
+            ]);
+
+        $this->assertSame(0, Sale::query()->sellerAccountOutstanding()->count());
+        $this->assertEqualsWithDelta(700_000, (float) $account->transactions()->sum('amount'), 0.01);
+    }
+
+    public function test_a_split_handover_banks_only_the_card_share(): void
+    {
+        $seller = $this->sellerOwing700k();
+        $account = BankAccount::create(['title' => 'ملی', 'is_default' => true]);
+
+        Livewire::test(SellerAccountsTable::class)
+            ->callTableAction('settleSellerAccount', $seller, [
+                'paid_cash' => 450_000,
+                'paid_card' => 250_000,
+                'bank_account_id' => $account->id,
+            ]);
+
+        $this->assertSame(0, Sale::query()->sellerAccountOutstanding()->count());
+        $this->assertEqualsWithDelta(250_000, (float) $account->transactions()->sum('amount'), 0.01);
+    }
+
+    public function test_parts_that_do_not_come_to_the_whole_are_refused(): void
+    {
+        $seller = $this->sellerOwing700k();
+        BankAccount::create(['title' => 'ملی', 'is_default' => true]);
+
+        Livewire::test(SellerAccountsTable::class)
+            ->callTableAction('settleSellerAccount', $seller, [
+                'paid_cash' => 100_000,
+                'paid_card' => 0,
+            ]);
+
+        // Nothing settled: the account still carries the whole amount.
+        $this->assertSame(2, Sale::query()->sellerAccountOutstanding()->count());
     }
 
     public function test_a_settled_account_drops_off_the_list(): void
