@@ -11,11 +11,13 @@ use App\Models\InventoryMovement;
 use App\Models\Sale;
 use App\Models\User;
 use App\Support\IssueScanner;
+use App\Support\Money;
 use App\Support\SystemIssue;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -49,7 +51,7 @@ class IssueCenterTest extends TestCase
             'bread_price' => 5000,
             'currency' => 'toman',
         ]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->admin = User::factory()->create(['is_active' => true]);
         $this->admin->assignRole('admin');
@@ -58,7 +60,7 @@ class IssueCenterTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
-    private function scan(): \Illuminate\Support\Collection
+    private function scan(): Collection
     {
         return app(IssueScanner::class)->scan();
     }

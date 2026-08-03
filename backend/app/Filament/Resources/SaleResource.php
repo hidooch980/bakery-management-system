@@ -2,8 +2,14 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\SaleResource\Pages;
+use App\Models\Bakery;
+use App\Models\Customer;
 use App\Models\Sale;
+use App\Support\Jalali;
+use App\Support\Money;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -94,29 +100,29 @@ class SaleResource extends Resource
                                 ->afterStateUpdated(function ($state, Forms\Set $set, Forms\Get $get) {
                                     $type = $get('payment_type');
 
-                                    if (in_array($type, \App\Models\Sale::GIVEAWAY_TYPES, true)
-                                        || in_array($type, \App\Models\Sale::SHORTFALL_TYPES, true)) {
+                                    if (in_array($type, Sale::GIVEAWAY_TYPES, true)
+                                        || in_array($type, Sale::SHORTFALL_TYPES, true)) {
                                         $set('amount', null);
 
                                         return;
                                     }
 
-                                    $price = (float) (\App\Models\Bakery::first()?->bread_price ?? 0);
+                                    $price = (float) (Bakery::first()?->bread_price ?? 0);
                                     $count = (int) $state;
 
                                     if ($price > 0 && $count > 0) {
                                         // Written in the display unit, since
                                         // that is what this field shows.
-                                        $set('amount', \App\Support\Money::convert($count * $price));
+                                        $set('amount', Money::convert($count * $price));
                                     }
                                 }),
 
-                            \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ')
+                            MoneyInput::make('amount', 'مبلغ')
                                 ->helperText('از قیمت نان در اطلاعات نانوایی حساب می‌شود؛ اگر فرق داشت تغییرش دهید.'),
 
                             Forms\Components\Select::make('customer_id')
                                 ->label('مدرسه / اداره')
-                                ->options(fn () => \App\Models\Customer::query()
+                                ->options(fn () => Customer::query()
                                     ->buyers()->pluck('name', 'id'))
                                 ->searchable()
                                 ->native(false)
@@ -159,13 +165,13 @@ class SaleResource extends Resource
                         ->required(fn (Forms\Get $get) => in_array($get('payment_type'), ['schools', 'credit'], true))
                         ->helperText('برای فروش مدارس و نسیه الزامی است.'),
 
-                    \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ')->visibleOn('edit'),
+                    MoneyInput::make('amount', 'مبلغ')->visibleOn('edit'),
 
-                    \App\Filament\Forms\JalaliDateInput::make('settled_on', 'تاریخ تسویه')
+                    JalaliDateInput::make('settled_on', 'تاریخ تسویه')
                         // Only credit and school sales leave money owed.
                         ->visible(fn (Forms\Get $get) => in_array(
                             $get('payment_type'),
-                            \App\Models\Sale::DEBT_TYPES,
+                            Sale::DEBT_TYPES,
                             true
                         ))
                         ->helperText('خالی بگذارید تا در فهرست بدهی‌ها بماند.'),
@@ -226,13 +232,13 @@ class SaleResource extends Resource
 
                 Tables\Columns\TextColumn::make('amount')
                     ->label('مبلغ')
-                    ->formatStateUsing(fn ($state) => $state === null ? '—' : \App\Support\Money::format($state))
+                    ->formatStateUsing(fn ($state) => $state === null ? '—' : Money::format($state))
                     ->placeholder('—')
                     ->sortable()
                     ->summarize(
                         Tables\Columns\Summarizers\Sum::make()
                             ->label('جمع')
-                            ->formatStateUsing(fn ($state) => \App\Support\Money::format($state))
+                            ->formatStateUsing(fn ($state) => Money::format($state))
                     ),
 
                 Tables\Columns\TextColumn::make('shortfall_count')
@@ -244,7 +250,7 @@ class SaleResource extends Resource
                         ? ($record->shortfall_settled_on ? 'success' : 'danger')
                         : 'gray')
                     ->description(fn (Sale $record) => $record->has_shortfall
-                        ? \App\Support\Money::format($record->shortfall_amount)
+                        ? Money::format($record->shortfall_amount)
                         .($record->shortfall_settled_on ? ' — تسویه شد' : '')
                         : null)
                     ->toggleable(),
@@ -269,7 +275,7 @@ class SaleResource extends Resource
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('زمان فروش')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
+                    ->formatStateUsing(fn ($state) => Jalali::dateTime($state))
                     ->sortable(),
             ])
             ->filters([

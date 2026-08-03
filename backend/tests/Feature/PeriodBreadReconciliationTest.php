@@ -8,6 +8,8 @@ use App\Models\DoughEntry;
 use App\Models\FlourAllocation;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\Jalali;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -48,7 +50,7 @@ class PeriodBreadReconciliationTest extends TestCase
             'normal_chane_weight_kg' => 0.85,
             'currency' => 'toman',
         ]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->admin = User::factory()->create(['is_active' => true]);
         $this->admin->assignRole('admin');
@@ -58,7 +60,7 @@ class PeriodBreadReconciliationTest extends TestCase
     {
         $allocation = FlourAllocation::create([
             'month_start' => now()->startOfMonth(),
-            'month_label' => \App\Support\Jalali::monthLabel(now()->startOfMonth()) ?? '',
+            'month_label' => Jalali::monthLabel(now()->startOfMonth()) ?? '',
             'total_bags' => $bags,
         ]);
 

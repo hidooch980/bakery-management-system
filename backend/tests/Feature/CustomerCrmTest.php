@@ -7,6 +7,8 @@ use App\Models\Bakery;
 use App\Models\Customer;
 use App\Models\CustomerInteraction;
 use App\Models\User;
+use App\Support\Jalali;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -33,7 +35,7 @@ class CustomerCrmTest extends TestCase
         $this->seed(BakerySeeder::class);
 
         Bakery::first()->update(['currency' => 'toman', 'flour_bag_weight_kg' => 40]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->admin = User::factory()->create();
         $this->admin->assignRole('admin');
@@ -82,7 +84,7 @@ class CustomerCrmTest extends TestCase
 
         $this->assertSame(
             '1405/05/10',
-            \App\Support\Jalali::date(CustomerInteraction::first()->follow_up_on)
+            Jalali::date(CustomerInteraction::first()->follow_up_on)
         );
     }
 

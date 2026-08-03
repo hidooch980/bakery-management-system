@@ -6,10 +6,10 @@ use App\Filament\Resources\ChaneEntryResource;
 use App\Models\DoughEntry;
 use App\Support\DoughFormula;
 use App\Support\ProductionRecorder;
-use Illuminate\Database\Eloquent\Model;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
+use Illuminate\Database\Eloquent\Model;
 
 class CreateChaneEntry extends CreateRecord
 {
@@ -50,7 +50,7 @@ class CreateChaneEntry extends CreateRecord
         if ($problem = ProductionRecorder::problemWithChane($dough, $normalWeight, $naninoWeight)) {
             Notification::make()->title('ثبت انجام نشد')->body($problem)->danger()->send();
 
-            throw new Halt();
+            throw new Halt;
         }
 
         return ProductionRecorder::chane(

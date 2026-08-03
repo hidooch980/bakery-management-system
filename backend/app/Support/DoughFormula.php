@@ -22,6 +22,7 @@ class DoughFormula
 {
     /** Which yeast a batch was mixed with. Fresh proves faster in the cold. */
     public const DRY = 'dry';
+
     public const WET = 'wet';
 
     public const YEAST_LABELS = [

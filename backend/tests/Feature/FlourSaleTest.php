@@ -131,7 +131,7 @@ class FlourSaleTest extends TestCase
     public function test_admin_updates_the_purchase_cost_settings_through_the_api(): void
     {
         $this->actingAs($this->seller(), 'sanctum');
-        $admin = \App\Models\User::factory()->create(['is_active' => true]);
+        $admin = User::factory()->create(['is_active' => true]);
         $admin->assignRole('admin');
 
         $this->actingAs($admin, 'sanctum')

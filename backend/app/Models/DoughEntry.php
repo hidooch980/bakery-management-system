@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\DoughFormula;
+use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
 
 class DoughEntry extends Model
@@ -17,7 +19,7 @@ class DoughEntry extends Model
     /** Which yeast this batch was mixed with. */
     public function getYeastTypeLabelAttribute(): string
     {
-        return \App\Support\DoughFormula::yeastLabel($this->yeast_type);
+        return DoughFormula::yeastLabel($this->yeast_type);
     }
 
     protected static function booted(): void
@@ -28,7 +30,7 @@ class DoughEntry extends Model
         // entry deleted without this leaves flour missing from the ledger
         // with nothing left to say where it went.
         static::deleted(function (self $entry) {
-            \App\Support\StockReversal::of($entry, 'ابطال ثبت خمیر');
+            StockReversal::of($entry, 'ابطال ثبت خمیر');
         });
     }
 

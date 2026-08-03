@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry;
+use App\Filament\Resources\ChaneEntryResource\Pages\EditChaneEntry;
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
-use App\Support\ProductionRecorder;
 use App\Models\User;
+use App\Support\ProductionRecorder;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -58,7 +60,7 @@ class ChaneEntryPanelTest extends TestCase
     {
         $admin = User::first();
 
-        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)
+        Livewire::test(CreateChaneEntry::class)
             ->fillForm([
                 'dough_entry_id' => $this->dough->id,
                 'user_id' => $admin->id,
@@ -79,7 +81,7 @@ class ChaneEntryPanelTest extends TestCase
 
     public function test_the_form_has_no_way_to_type_a_raw_weight(): void
     {
-        $html = Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)->html();
+        $html = Livewire::test(CreateChaneEntry::class)->html();
 
         // The old inputs named normal_weight_kg/nanino_weight_kg must be
         // gone; only the count fields and the computed placeholders remain.
@@ -100,7 +102,7 @@ class ChaneEntryPanelTest extends TestCase
             'spray_flour_kg' => 2,
         ]);
 
-        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\EditChaneEntry::class, [
+        Livewire::test(EditChaneEntry::class, [
             'record' => $entry->getRouteKey(),
         ])->assertFormSet(['nanino_chane_count' => 40]);
     }
@@ -118,7 +120,7 @@ class ChaneEntryPanelTest extends TestCase
             'spray_flour_kg' => 2,
         ]);
 
-        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\EditChaneEntry::class, [
+        Livewire::test(EditChaneEntry::class, [
             'record' => $entry->getRouteKey(),
         ])
             ->fillForm([
@@ -136,7 +138,7 @@ class ChaneEntryPanelTest extends TestCase
 
     public function test_the_panel_stores_how_the_batch_was_counted_out(): void
     {
-        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)
+        Livewire::test(CreateChaneEntry::class)
             ->fillForm([
                 'dough_entry_id' => $this->dough->id,
                 'user_id' => $this->dough->user_id,
@@ -170,7 +172,7 @@ class ChaneEntryPanelTest extends TestCase
         // empty, so it shows the whole count as a single tray. Repeater
         // state is keyed by generated ids, so read the counts out of it.
         $state = Livewire::test(
-            \App\Filament\Resources\ChaneEntryResource\Pages\EditChaneEntry::class,
+            EditChaneEntry::class,
             ['record' => $entry->id]
         )->get('data.trays');
 

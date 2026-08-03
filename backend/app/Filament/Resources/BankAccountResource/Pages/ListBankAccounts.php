@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\BankAccountResource\Pages;
 
 use App\Filament\Resources\BankAccountResource;
+use App\Filament\Widgets\BankBalanceOverview;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
@@ -18,7 +19,7 @@ class ListBankAccounts extends ListRecords
     protected function getHeaderWidgets(): array
     {
         return [
-            \App\Filament\Widgets\BankBalanceOverview::class,
+            BankBalanceOverview::class,
         ];
     }
 }

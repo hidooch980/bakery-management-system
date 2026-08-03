@@ -2,7 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\ExpenseResource\Pages;
+use App\Models\BankAccount;
 use App\Models\Expense;
 use App\Support\Jalali;
 use App\Support\Money;
@@ -45,10 +48,10 @@ class ExpenseResource extends Resource
                         ->required()
                         ->maxLength(255),
 
-                    \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ')
+                    MoneyInput::make('amount', 'مبلغ')
                         ->required(),
 
-                    \App\Filament\Forms\JalaliDateInput::today('spent_on', 'تاریخ هزینه')
+                    JalaliDateInput::today('spent_on', 'تاریخ هزینه')
                         ->required(),
 
                     Forms\Components\Select::make('user_id')
@@ -61,9 +64,9 @@ class ExpenseResource extends Resource
 
                     Forms\Components\Select::make('bank_account_id')
                         ->label('حساب بانکی')
-                        ->options(fn () => \App\Models\BankAccount::active()
+                        ->options(fn () => BankAccount::active()
                             ->pluck('title', 'id'))
-                        ->default(fn () => \App\Models\BankAccount::defaultAccount()?->id)
+                        ->default(fn () => BankAccount::defaultAccount()?->id)
                         ->searchable()
                         ->preload()
                         ->native(false)

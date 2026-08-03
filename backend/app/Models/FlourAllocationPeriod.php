@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\DoughFormula;
+use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
 
 class FlourAllocationPeriod extends Model
@@ -257,7 +258,7 @@ class FlourAllocationPeriod extends Model
 
     public function getCardAmountFormattedAttribute(): string
     {
-        return \App\Support\Money::format($this->card_amount);
+        return Money::format($this->card_amount);
     }
 
     /**

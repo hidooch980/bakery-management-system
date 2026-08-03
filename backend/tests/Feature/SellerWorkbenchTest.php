@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\InventoryItem;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +30,7 @@ class SellerWorkbenchTest extends TestCase
 
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->seed(BakerySeeder::class);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->seller = User::factory()->create(['is_active' => true]);
         $this->seller->assignRole('seller');

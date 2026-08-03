@@ -13,7 +13,9 @@ namespace App\Support;
 class SystemIssue
 {
     public const CRITICAL = 'critical';
+
     public const WARNING = 'warning';
+
     public const INFO = 'info';
 
     public function __construct(

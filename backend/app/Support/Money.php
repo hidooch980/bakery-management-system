@@ -11,6 +11,7 @@ use App\Models\Bakery;
 class Money
 {
     public const TOMAN = 'toman';
+
     public const RIAL = 'rial';
 
     public const UNITS = [

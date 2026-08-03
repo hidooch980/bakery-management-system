@@ -2,9 +2,10 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\InventoryItemResource\Pages;
 use App\Exceptions\InsufficientStockException;
+use App\Filament\Resources\InventoryItemResource\Pages;
 use App\Models\InventoryItem;
+use App\Models\InventoryMovement;
 use App\Support\DoughFormula;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -177,7 +178,7 @@ class InventoryItemResource extends Resource
 
                             Forms\Components\Select::make('reason')
                                 ->label('علت')
-                                ->options(\App\Models\InventoryMovement::REASONS)
+                                ->options(InventoryMovement::REASONS)
                                 ->default('manual')
                                 ->required()
                                 ->native(false),

@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Resources\ConsignmentFlourResource\Pages;
 use App\Models\ConsignmentFlour;
+use App\Models\Customer;
 use App\Support\AppCalendar;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -56,8 +58,8 @@ class ConsignmentFlourResource extends Resource
                                 ->tel()
                                 ->maxLength(20),
                         ])
-                        ->createOptionUsing(fn (array $data) => \App\Models\Customer::create(
-                            $data + ['type' => \App\Models\Customer::PARTNER_TYPE, 'is_active' => true]
+                        ->createOptionUsing(fn (array $data) => Customer::create(
+                            $data + ['type' => Customer::PARTNER_TYPE, 'is_active' => true]
                         )->id)
                         ->helperText('از فهرست انتخاب کنید یا با + همکار جدید تعریف کنید.'),
 
@@ -74,10 +76,10 @@ class ConsignmentFlourResource extends Resource
                         ->required()
                         ->suffix('کیلوگرم'),
 
-                    \App\Filament\Forms\JalaliDateInput::today('occurred_on', 'تاریخ')
+                    JalaliDateInput::today('occurred_on', 'تاریخ')
                         ->required(),
 
-                    \App\Filament\Forms\JalaliDateInput::make('settled_on', 'تاریخ تسویه')
+                    JalaliDateInput::make('settled_on', 'تاریخ تسویه')
                         ->helperText('خالی بگذارید تا در وضعیت «تسویه‌نشده» بماند.'),
 
                     Forms\Components\Textarea::make('note')

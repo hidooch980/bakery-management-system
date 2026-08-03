@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\FlourSale;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Support\Jalali;
@@ -40,7 +41,7 @@ class FinancialOverview extends BaseWidget
         // on credit is a debt in exactly the same way bread is.
         $breadDebts = Sale::outstanding()->get()
             ->map(fn (Sale $s) => ['amount' => (float) $s->amount, 'on' => $s->created_at]);
-        $flourDebts = \App\Models\FlourSale::outstanding()->get()
+        $flourDebts = FlourSale::outstanding()->get()
             ->map(fn ($s) => ['amount' => (float) $s->amount, 'on' => $s->sold_on]);
 
         $debts = $breadDebts->concat($flourDebts);

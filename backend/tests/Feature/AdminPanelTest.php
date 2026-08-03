@@ -2,7 +2,23 @@
 
 namespace Tests\Feature;
 
+use App\Models\Attendance;
+use App\Models\Bakery;
+use App\Models\BakeryShare;
+use App\Models\BankAccount;
+use App\Models\ChaneEntry;
+use App\Models\Customer;
+use App\Models\DoughEntry;
+use App\Models\Expense;
+use App\Models\FlourAllocation;
+use App\Models\FlourSale;
+use App\Models\Income;
+use App\Models\InventoryItem;
+use App\Models\Sale;
 use App\Models\User;
+use App\Support\Jalali;
+use App\Support\Money;
+use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -98,19 +114,19 @@ class AdminPanelTest extends TestCase
         $admin = $this->admin();
 
         // This class does not seed the bakery, so create it here.
-        $this->seed(\Database\Seeders\BakerySeeder::class);
+        $this->seed(BakerySeeder::class);
 
-        \App\Models\Bakery::first()->update([
+        Bakery::first()->update([
             'normal_chane_weight_kg' => 0.85,
             'nanino_chane_weight_kg' => 1.0,
             'currency' => 'rial',
         ]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         // Production, stock, a quota, a debt and an attendance record, so no
         // widget is exercised only against empty tables.
-        $dough = \App\Models\DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 2]);
-        $chane = \App\Models\ChaneEntry::create([
+        $dough = DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 2]);
+        $chane = ChaneEntry::create([
             'dough_entry_id' => $dough->id,
             'user_id' => $admin->id,
             'chane_count' => 100,
@@ -119,8 +135,8 @@ class AdminPanelTest extends TestCase
             'spray_flour_kg' => 2,
         ]);
 
-        $customer = \App\Models\Customer::create(['name' => 'دبستان', 'type' => 'school']);
-        \App\Models\Sale::create([
+        $customer = Customer::create(['name' => 'دبستان', 'type' => 'school']);
+        Sale::create([
             'chane_entry_id' => $chane->id,
             'user_id' => $admin->id,
             'payment_type' => 'credit',
@@ -128,17 +144,17 @@ class AdminPanelTest extends TestCase
             'amount' => 500000,
         ]);
 
-        \App\Models\Expense::create([
+        Expense::create([
             'category' => 'fuel',
             'title' => 'سوخت',
             'amount' => 100000,
             'spent_on' => now(),
         ]);
 
-        \App\Models\InventoryItem::ofKey('flour')->move('in', 400, 'purchase');
+        InventoryItem::ofKey('flour')->move('in', 400, 'purchase');
 
-        $allocation = \App\Models\FlourAllocation::create([
-            'month_start' => \App\Support\Jalali::currentMonthRange()[0],
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::currentMonthRange()[0],
             'month_label' => 'تست',
             'total_bags' => 75,
             'carryover_bags' => 10,
@@ -147,16 +163,16 @@ class AdminPanelTest extends TestCase
 
         // A bank account and a partner, so the two widgets that hide
         // themselves when empty are actually exercised.
-        $account = \App\Models\BankAccount::create([
+        $account = BankAccount::create([
             'title' => 'حساب جاری',
             'opening_balance' => 5000000,
             'is_default' => true,
         ]);
         $account->record('in', 250000);
 
-        \App\Models\BakeryShare::create(['name' => 'شریک', 'dang' => 6]);
+        BakeryShare::create(['name' => 'شریک', 'dang' => 6]);
 
-        \App\Models\Income::create([
+        Income::create([
             'category' => 'rent',
             'title' => 'اجاره',
             'amount' => 200000,
@@ -164,8 +180,8 @@ class AdminPanelTest extends TestCase
             'bank_account_id' => $account->id,
         ]);
 
-        \App\Models\InventoryItem::ofKey('flour')->move('in', 200, 'purchase');
-        \App\Models\FlourSale::create([
+        InventoryItem::ofKey('flour')->move('in', 200, 'purchase');
+        FlourSale::create([
             'user_id' => $admin->id,
             'unit' => 'bag',
             'quantity' => 1,
@@ -174,7 +190,7 @@ class AdminPanelTest extends TestCase
             'sold_on' => now(),
         ]);
 
-        \App\Models\Attendance::create([
+        Attendance::create([
             'user_id' => $admin->id,
             'date' => now(),
             'checked_in_at' => now(),

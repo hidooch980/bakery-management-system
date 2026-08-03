@@ -11,6 +11,7 @@ use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Support\Carbon;
 
 /**
  * What each school or office owes, as one figure per buyer.
@@ -116,7 +117,7 @@ class CustomerDebtsTable extends BaseWidget
     {
         return $since === null
             ? 0
-            : (int) \Illuminate\Support\Carbon::parse($since)
+            : (int) Carbon::parse($since)
                 ->startOfDay()
                 ->diffInDays(now()->startOfDay());
     }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\FlourAllocation;
 use App\Support\AppCalendar;
+use App\Support\DoughFormula;
 use App\Support\Jalali;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -115,7 +116,7 @@ class FlourAllocationController extends Controller
             'carryover_note' => $allocation->carryover_note,
             'available_bags' => $allocation->available_bags,
             'available_kg' => $allocation->available_kg,
-            'bag_weight_kg' => \App\Support\DoughFormula::fromBakery()->bagWeightKg,
+            'bag_weight_kg' => DoughFormula::fromBakery()->bagWeightKg,
             'note' => $allocation->note,
             'current_period_number' => $current?->period_number,
             'periods' => $allocation->periods->map(fn ($p) => [

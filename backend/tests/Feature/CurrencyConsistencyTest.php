@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Widgets\BakeryStatsOverview;
+use App\Filament\Widgets\ExpenseByCategoryChart;
+use App\Filament\Widgets\FinancialOverview;
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
@@ -12,7 +15,9 @@ use App\Models\User;
 use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -173,13 +178,13 @@ class CurrencyConsistencyTest extends TestCase
     public function test_widget_renders_in_the_configured_unit(string $widget): void
     {
         $this->actingAs($this->admin);
-        \Filament\Facades\Filament::setCurrentPanel(
-            \Filament\Facades\Filament::getPanel('admin')
+        Filament::setCurrentPanel(
+            Filament::getPanel('admin')
         );
 
         $this->useCurrency(Money::RIAL);
 
-        \Livewire\Livewire::test($widget)
+        Livewire::test($widget)
             ->assertSee('ریال')
             ->assertDontSee('تومان');
     }
@@ -187,15 +192,15 @@ class CurrencyConsistencyTest extends TestCase
     public static function moneyWidgets(): array
     {
         return [
-            'financial overview' => [\App\Filament\Widgets\FinancialOverview::class],
-            'bakery stats' => [\App\Filament\Widgets\BakeryStatsOverview::class],
+            'financial overview' => [FinancialOverview::class],
+            'bakery stats' => [BakeryStatsOverview::class],
         ];
     }
 
     public function test_charts_plot_values_in_the_display_unit(): void
     {
         $data = function (): array {
-            $widget = new \App\Filament\Widgets\ExpenseByCategoryChart();
+            $widget = new ExpenseByCategoryChart;
             $method = new \ReflectionMethod($widget, 'getData');
             $method->setAccessible(true);
 

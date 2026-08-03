@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Bakery;
+use App\Models\BankAccount;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\FlourAllocation;
@@ -245,7 +246,7 @@ class IssueScanner
     {
         $issues = [];
 
-        foreach (\App\Models\BankAccount::all() as $account) {
+        foreach (BankAccount::all() as $account) {
             if ($account->balance >= 0) {
                 continue;
             }

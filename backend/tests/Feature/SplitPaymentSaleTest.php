@@ -9,6 +9,7 @@ use App\Models\DoughEntry;
 use App\Models\InventoryItem;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,7 +42,7 @@ class SplitPaymentSaleTest extends TestCase
             'bread_price' => 5000,
             'currency' => 'toman',
         ]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
     }
 
     private function userWithRole(string $role): User

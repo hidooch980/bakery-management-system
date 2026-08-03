@@ -2,7 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\FlourSaleResource\Pages;
+use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\FlourSale;
 use App\Support\AppCalendar;
@@ -62,7 +65,7 @@ class FlourSaleResource extends Resource
                             ? 'هر کیسه '.DoughFormula::fromBakery()->bagWeightKg.' کیلوگرم'
                             : null),
 
-                    \App\Filament\Forms\MoneyInput::make('unit_price', 'قیمت واحد')
+                    MoneyInput::make('unit_price', 'قیمت واحد')
                         ->default(fn () => Money::convert(FlourSale::defaultUnitPrice(FlourSale::KG)))
                         ->helperText('قیمت هر کیلو یا هر کیسه، بسته به واحد انتخابی'),
 
@@ -118,17 +121,17 @@ class FlourSaleResource extends Resource
                         ->preload()
                         ->native(false),
 
-                    \App\Filament\Forms\JalaliDateInput::today('sold_on', 'تاریخ فروش')
+                    JalaliDateInput::today('sold_on', 'تاریخ فروش')
                         ->required(),
 
-                    \App\Filament\Forms\JalaliDateInput::make('settled_on', 'تاریخ تسویه')
+                    JalaliDateInput::make('settled_on', 'تاریخ تسویه')
                         ->helperText('اگر بدهی پرداخت شده، تاریخ آن را وارد کنید'),
 
                     Forms\Components\Select::make('bank_account_id')
                         ->label('حساب بانکی')
-                        ->options(fn () => \App\Models\BankAccount::active()
+                        ->options(fn () => BankAccount::active()
                             ->pluck('title', 'id'))
-                        ->default(fn () => \App\Models\BankAccount::defaultAccount()?->id)
+                        ->default(fn () => BankAccount::defaultAccount()?->id)
                         ->searchable()
                         ->preload()
                         ->native(false)

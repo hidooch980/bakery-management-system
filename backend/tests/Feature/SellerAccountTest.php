@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Filament\Widgets\SellerAccountsTable;
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
+use App\Models\Customer;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -43,7 +45,7 @@ class SellerAccountTest extends TestCase
             'bread_price' => 5000,
             'currency' => 'toman',
         ]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
     }
 
     private function userWithRole(string $role): User
@@ -146,7 +148,7 @@ class SellerAccountTest extends TestCase
     public function test_a_credit_sale_is_the_customers_debt_not_the_sellers(): void
     {
         $seller = $this->userWithRole('seller');
-        $customer = \App\Models\Customer::create(['name' => 'دبستان', 'type' => 'school']);
+        $customer = Customer::create(['name' => 'دبستان', 'type' => 'school']);
 
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');

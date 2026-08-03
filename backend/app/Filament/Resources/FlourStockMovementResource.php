@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\FlourStockMovementResource\Pages;
 use App\Models\FlourStockMovement;
+use App\Support\Jalali;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -105,7 +106,7 @@ class FlourStockMovementResource extends Resource
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('زمان')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
+                    ->formatStateUsing(fn ($state) => Jalali::dateTime($state))
                     ->sortable(),
             ])
             ->filters([

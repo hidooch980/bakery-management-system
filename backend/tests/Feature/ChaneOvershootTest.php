@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry;
 use App\Models\Bakery;
+use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
 use App\Models\User;
@@ -159,7 +161,7 @@ class ChaneOvershootTest extends TestCase
         $this->actingAs($admin);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)
+        Livewire::test(CreateChaneEntry::class)
             ->fillForm([
                 'dough_entry_id' => $dough->id,
                 'user_id' => $this->chaneGir->id,
@@ -169,7 +171,7 @@ class ChaneOvershootTest extends TestCase
             ->call('create');
 
         // Refused, and nothing was written or spent.
-        $this->assertSame(0, \App\Models\ChaneEntry::count());
+        $this->assertSame(0, ChaneEntry::count());
         $this->assertSame('pending', $dough->fresh()->status);
     }
 

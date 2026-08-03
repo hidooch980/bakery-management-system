@@ -2,7 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\IncomeResource\Pages;
+use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\Income;
 use App\Support\AppCalendar;
@@ -47,10 +50,10 @@ class IncomeResource extends Resource
                         ->required()
                         ->maxLength(255),
 
-                    \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ')
+                    MoneyInput::make('amount', 'مبلغ')
                         ->required(),
 
-                    \App\Filament\Forms\JalaliDateInput::today('received_on', 'تاریخ دریافت')
+                    JalaliDateInput::today('received_on', 'تاریخ دریافت')
                         ->required(),
 
                     Forms\Components\Select::make('customer_id')
@@ -71,9 +74,9 @@ class IncomeResource extends Resource
 
                     Forms\Components\Select::make('bank_account_id')
                         ->label('حساب بانکی')
-                        ->options(fn () => \App\Models\BankAccount::active()
+                        ->options(fn () => BankAccount::active()
                             ->pluck('title', 'id'))
-                        ->default(fn () => \App\Models\BankAccount::defaultAccount()?->id)
+                        ->default(fn () => BankAccount::defaultAccount()?->id)
                         ->searchable()
                         ->preload()
                         ->native(false)

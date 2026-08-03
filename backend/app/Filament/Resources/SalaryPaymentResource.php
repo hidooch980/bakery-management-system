@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\SalaryPaymentResource\Pages;
 use App\Models\SalaryPayment;
 use App\Models\User;
@@ -51,7 +53,7 @@ class SalaryPaymentResource extends Resource
                             }
                         }),
 
-                    \App\Filament\Forms\JalaliDateInput::make('period_start', 'شروع دوره')
+                    JalaliDateInput::make('period_start', 'شروع دوره')
                         ->required()
                         ->default(fn () => Jalali::currentMonthRange()[0]->toDateString())
                         ->live(onBlur: true)
@@ -64,16 +66,16 @@ class SalaryPaymentResource extends Resource
                 ->icon('heroicon-o-calculator')
                 ->columns(3)
                 ->schema([
-                    \App\Filament\Forms\MoneyInput::make('base_amount', 'حقوق پایه')
+                    MoneyInput::make('base_amount', 'حقوق پایه')
                         ->required()
                         ->default(0)
                         ->live(onBlur: true),
 
-                    \App\Filament\Forms\MoneyInput::make('bonus', 'پاداش / اضافه‌کاری')
+                    MoneyInput::make('bonus', 'پاداش / اضافه‌کاری')
                         ->default(0)
                         ->live(onBlur: true),
 
-                    \App\Filament\Forms\MoneyInput::make('deduction', 'کسورات')
+                    MoneyInput::make('deduction', 'کسورات')
                         ->default(0)
                         ->live(onBlur: true),
 
@@ -94,7 +96,7 @@ class SalaryPaymentResource extends Resource
             Forms\Components\Section::make('پرداخت')
                 ->columns(2)
                 ->schema([
-                    \App\Filament\Forms\JalaliDateInput::make('paid_on', 'تاریخ پرداخت')
+                    JalaliDateInput::make('paid_on', 'تاریخ پرداخت')
                         ->helperText('خالی بگذارید تا در وضعیت «پرداخت‌نشده» بماند.'),
 
                     Forms\Components\Textarea::make('note')

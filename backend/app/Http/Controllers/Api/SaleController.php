@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
+use App\Support\AppCalendar;
 use App\Support\Money;
 use App\Support\SaleRecorder;
 use App\Traits\ApiResponse;
@@ -121,9 +122,9 @@ class SaleController extends Controller
                 'count' => $sales->count(),
                 'bread_count' => (int) $sales->sum('bread_count'),
                 'total_amount' => round((float) $sales->sum('amount'), 2),
-                'total_amount_formatted' => \App\Support\Money::format($sales->sum('amount')),
-                'currency' => \App\Support\Money::currency(),
-                'currency_label' => \App\Support\Money::label(),
+                'total_amount_formatted' => Money::format($sales->sum('amount')),
+                'currency' => Money::currency(),
+                'currency_label' => Money::label(),
                 'by_payment_type' => $sales->groupBy('payment_type')->map(fn ($g) => [
                     'count' => $g->count(),
                     'bread_count' => (int) $g->sum('bread_count'),
@@ -187,7 +188,7 @@ class SaleController extends Controller
                 'customer' => $s->customer?->name,
                 'bread_count' => (int) $s->bread_count,
                 'amount_formatted' => Money::format((float) $s->amount),
-                'date_display' => \App\Support\AppCalendar::date($s->created_at),
+                'date_display' => AppCalendar::date($s->created_at),
             ])->values(),
         ]);
     }

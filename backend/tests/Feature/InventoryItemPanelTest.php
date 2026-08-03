@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems;
 use App\Models\Bakery;
 use App\Models\InventoryItem;
 use App\Models\User;
@@ -42,7 +43,7 @@ class InventoryItemPanelTest extends TestCase
         InventoryItem::ofKey('flour')->move('in', 120, 'purchase');
 
         $html = Livewire::test(
-            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+            ListInventoryItems::class
         )->html();
 
         // 120kg at the bakery's 40kg sack is 3 sacks.
@@ -54,7 +55,7 @@ class InventoryItemPanelTest extends TestCase
         InventoryItem::ofKey('flour')->move('in', 120, 'purchase');
 
         $html = Livewire::test(
-            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+            ListInventoryItems::class
         )->html();
 
         $bagsPosition = strpos($html, '3.00 کیسه');
@@ -74,7 +75,7 @@ class InventoryItemPanelTest extends TestCase
         $flour = InventoryItem::ofKey('flour');
 
         Livewire::test(
-            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+            ListInventoryItems::class
         )
             ->callTableAction('recordStock', $flour, data: [
                 'direction' => 'in',
@@ -97,7 +98,7 @@ class InventoryItemPanelTest extends TestCase
         $salt = InventoryItem::ofKey('salt');
 
         Livewire::test(
-            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+            ListInventoryItems::class
         )
             ->callTableAction('recordStock', $salt, data: [
                 'direction' => 'in',
@@ -115,7 +116,7 @@ class InventoryItemPanelTest extends TestCase
         $flour = InventoryItem::ofKey('flour');
 
         Livewire::test(
-            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+            ListInventoryItems::class
         )
             ->callTableAction('recordStock', $flour, data: [
                 'direction' => 'in',
@@ -134,7 +135,7 @@ class InventoryItemPanelTest extends TestCase
         $salt->move('in', 100, 'purchase');
 
         Livewire::test(
-            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+            ListInventoryItems::class
         )
             ->callTableAction('recordStock', $salt, data: [
                 'direction' => 'out',
@@ -153,7 +154,7 @@ class InventoryItemPanelTest extends TestCase
         $flour->move('in', 40, 'purchase');
 
         Livewire::test(
-            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+            ListInventoryItems::class
         )
             ->callTableAction('recordStock', $flour, data: [
                 'direction' => 'out',

@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Exceptions\InsufficientStockException;
+use App\Support\DoughFormula;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryItem extends Model
 {
     public const FLOUR = 'flour';
+
     public const SALT = 'salt';
 
     /**
@@ -17,6 +19,7 @@ class InventoryItem extends Model
      * the warehouse drawing down whichever it happens to hold.
      */
     public const YEAST_DRY = 'yeast_dry';
+
     public const YEAST_WET = 'yeast_wet';
 
     public const YEAST_TYPES = [
@@ -89,7 +92,7 @@ class InventoryItem extends Model
         }
 
         $bagWeight = $this->key === self::FLOUR
-            ? \App\Support\DoughFormula::fromBakery()->bagWeightKg
+            ? DoughFormula::fromBakery()->bagWeightKg
             : (float) ($this->bag_weight_kg ?? 0);
 
         return $bagWeight > 0 ? round($this->balance / $bagWeight, 2) : null;

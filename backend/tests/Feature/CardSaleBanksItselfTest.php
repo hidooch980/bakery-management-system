@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\Bakery;
 use App\Models\BankAccount;
 use App\Models\ChaneEntry;
+use App\Models\Customer;
 use App\Models\DoughEntry;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,7 +40,7 @@ class CardSaleBanksItselfTest extends TestCase
             'flour_bag_weight_kg' => 40,
             'bread_price' => 5000,
         ]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->seller = User::factory()->create();
         $this->seller->assignRole('seller');
@@ -108,7 +110,7 @@ class CardSaleBanksItselfTest extends TestCase
                 'bread_count' => 100,
                 'amount' => 500000,
                 // Credit is owed by a named buyer, so the sale needs one.
-                'customer_id' => \App\Models\Customer::create([
+                'customer_id' => Customer::create([
                     'name' => 'دبستان', 'type' => 'school',
                 ])->id,
             ])

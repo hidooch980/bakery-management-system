@@ -3,6 +3,11 @@
 namespace App\Filament\Resources\SaleResource\Pages;
 
 use App\Filament\Resources\SaleResource;
+use App\Filament\Widgets\OutstandingDebtsTable;
+use App\Filament\Widgets\SalesByPaymentTypeBreakdown;
+use App\Filament\Widgets\SalesByPaymentTypeChart;
+use App\Filament\Widgets\SellerAccountsTable;
+use App\Filament\Widgets\SettlementRequestsTable;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
@@ -20,11 +25,11 @@ class ListSales extends ListRecords
     protected function getHeaderWidgets(): array
     {
         return [
-            \App\Filament\Widgets\SalesByPaymentTypeBreakdown::class,
-            \App\Filament\Widgets\SalesByPaymentTypeChart::class,
-            \App\Filament\Widgets\SettlementRequestsTable::class,
-            \App\Filament\Widgets\SellerAccountsTable::class,
-            \App\Filament\Widgets\OutstandingDebtsTable::class,
+            SalesByPaymentTypeBreakdown::class,
+            SalesByPaymentTypeChart::class,
+            SettlementRequestsTable::class,
+            SellerAccountsTable::class,
+            OutstandingDebtsTable::class,
         ];
     }
 }

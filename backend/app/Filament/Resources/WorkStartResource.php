@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Resources\WorkStartResource\Pages;
 use App\Models\WorkStart;
 use App\Support\AppCalendar;
+use App\Support\Jalali;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -31,7 +33,7 @@ class WorkStartResource extends Resource
     public static function getNavigationBadge(): ?string
     {
         $count = WorkStart::late()
-            ->whereBetween('date', \App\Support\Jalali::currentMonthRange())
+            ->whereBetween('date', Jalali::currentMonthRange())
             ->count();
 
         return $count > 0 ? (string) $count : null;
@@ -54,7 +56,7 @@ class WorkStartResource extends Resource
                         ->required()
                         ->native(false),
 
-                    \App\Filament\Forms\JalaliDateInput::today('date', 'تاریخ')
+                    JalaliDateInput::today('date', 'تاریخ')
                         ->required(),
 
                     Forms\Components\DateTimePicker::make('started_at')

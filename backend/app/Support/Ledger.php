@@ -5,8 +5,8 @@ namespace App\Support;
 use App\Models\Expense;
 use App\Models\FlourSale;
 use App\Models\Income;
-use App\Models\Sale;
 use App\Models\SalaryPayment;
+use App\Models\Sale;
 use Illuminate\Support\Carbon;
 
 /**

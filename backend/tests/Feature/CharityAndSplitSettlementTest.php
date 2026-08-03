@@ -9,6 +9,7 @@ use App\Models\DoughEntry;
 use App\Models\Sale;
 use App\Models\SettlementRequest;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,7 +40,7 @@ class CharityAndSplitSettlementTest extends TestCase
             'flour_bag_weight_kg' => 40,
             'bread_price' => 5000,
         ]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->admin = User::factory()->create();
         $this->admin->assignRole('admin');

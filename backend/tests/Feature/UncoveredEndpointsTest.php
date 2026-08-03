@@ -8,6 +8,7 @@ use App\Models\ConsignmentFlour;
 use App\Models\InventoryItem;
 use App\Models\SalaryPayment;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,7 +32,7 @@ class UncoveredEndpointsTest extends TestCase
         $this->seed(BakerySeeder::class);
 
         Bakery::first()->update(['currency' => 'toman', 'flour_bag_weight_kg' => 40]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->admin = User::factory()->create(['is_active' => true]);
         $this->admin->assignRole('admin');

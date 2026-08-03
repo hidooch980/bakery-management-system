@@ -3,8 +3,8 @@
 namespace App\Support;
 
 use App\Models\Bakery;
-use IntlCalendar;
 use Illuminate\Support\Carbon;
+use IntlCalendar;
 
 /**
  * Formats dates in whichever calendar the bakery has selected.
@@ -14,7 +14,9 @@ use Illuminate\Support\Carbon;
 class AppCalendar
 {
     public const JALALI = 'jalali';
+
     public const HIJRI = 'hijri';
+
     public const GREGORIAN = 'gregorian';
 
     public const OPTIONS = [

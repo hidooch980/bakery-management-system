@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
 use App\Support\AppCalendar;
+use App\Support\DoughFormula;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,7 +41,7 @@ class FlourStockController extends Controller
         $in = (float) $item->movements()->where('direction', 'in')->sum('quantity');
         $out = (float) $item->movements()->where('direction', 'out')->sum('quantity');
 
-        $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
         $inBags = fn (float $kg) => $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
 
         return $this->success([
@@ -76,7 +77,7 @@ class FlourStockController extends Controller
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
 
         if (isset($data['bags'])) {
             if ($bagWeight <= 0) {
@@ -103,7 +104,7 @@ class FlourStockController extends Controller
     /** The shape this endpoint has always returned. */
     private function payload(InventoryMovement $movement): array
     {
-        $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
 
         return [
             'id' => $movement->id,

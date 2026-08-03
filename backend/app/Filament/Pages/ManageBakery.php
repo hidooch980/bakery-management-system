@@ -2,9 +2,14 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Forms\MoneyInput;
 use App\Models\Bakery;
 use App\Models\FlourAllocation;
+use App\Support\AppCalendar;
 use App\Support\DoughFormula;
+use App\Support\LatePenalty;
+use App\Support\Money;
+use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -108,7 +113,7 @@ class ManageBakery extends Page implements HasForms
                             ->suffix('عدد')
                             ->helperText('چانه‌گیر تشتک‌به‌تشتک ثبت می‌کند؛ این عدد پیش‌فرض هر تشتک است و تشتک آخر معمولاً کمتر می‌شود.'),
 
-                        \App\Filament\Forms\MoneyInput::make('bread_price', 'قیمت هر نان')
+                        MoneyInput::make('bread_price', 'قیمت هر نان')
                             ->helperText('برای پیشنهاد مبلغ فروش در اپلیکیشن'),
 
                         Forms\Components\TextInput::make('flour_bag_weight_kg')
@@ -119,13 +124,13 @@ class ManageBakery extends Page implements HasForms
                             ->suffix('کیلوگرم')
                             ->helperText('پایه فرمول تولید'),
 
-                        \App\Filament\Forms\MoneyInput::make('flour_price_per_kg', 'قیمت هر کیلو آرد')
+                        MoneyInput::make('flour_price_per_kg', 'قیمت هر کیلو آرد')
                             ->helperText('برای فروش آرد به‌صورت کیلویی'),
 
-                        \App\Filament\Forms\MoneyInput::make('flour_price_per_bag', 'قیمت هر کیسه آرد')
+                        MoneyInput::make('flour_price_per_bag', 'قیمت هر کیسه آرد')
                             ->helperText('اگر خالی بماند، از قیمت کیلویی × وزن کیسه محاسبه می‌شود'),
 
-                        \App\Filament\Forms\MoneyInput::make('flour_purchase_price_per_kg', 'قیمت خرید هر کیلو آرد از کارخانه')
+                        MoneyInput::make('flour_purchase_price_per_kg', 'قیمت خرید هر کیلو آرد از کارخانه')
                             ->helperText('برای محاسبه بهای تمام‌شده؛ جدا از قیمت فروش آرد به مشتری'),
 
                         Forms\Components\Toggle::make('flour_transport_by_factory')
@@ -168,16 +173,16 @@ class ManageBakery extends Page implements HasForms
                             ->suffix('روز')
                             ->helperText('مثلاً ۷ یعنی روزهای ۴ تا ۷'),
 
-                        \App\Filament\Forms\MoneyInput::make('late_tier1_amount', 'جریمه روزانه — نرخ اول')
+                        MoneyInput::make('late_tier1_amount', 'جریمه روزانه — نرخ اول')
                             ->helperText('برای روزهای بعد از اخطارها'),
 
-                        \App\Filament\Forms\MoneyInput::make('late_tier2_amount', 'جریمه روزانه — نرخ دوم')
+                        MoneyInput::make('late_tier2_amount', 'جریمه روزانه — نرخ دوم')
                             ->helperText('برای روزهای بعد از نرخ اول'),
 
                         Forms\Components\Placeholder::make('late_rules_preview')
                             ->label('خلاصه قانون')
                             ->columnSpanFull()
-                            ->content(fn () => \App\Support\LatePenalty::tariff()['summary']),
+                            ->content(fn () => LatePenalty::tariff()['summary']),
                     ]),
 
                 Forms\Components\Section::make('فرمول تولید خمیر')
@@ -365,16 +370,16 @@ class ManageBakery extends Page implements HasForms
                     ->schema([
                         Forms\Components\Select::make('currency')
                             ->label('واحد پول نمایشی')
-                            ->options(\App\Support\Money::UNITS)
-                            ->default(\App\Support\Money::TOMAN)
+                            ->options(Money::UNITS)
+                            ->default(Money::TOMAN)
                             ->required()
                             ->native(false)
                             ->helperText('مبالغ به تومان ذخیره و با این واحد نمایش داده می‌شوند.'),
 
                         Forms\Components\Select::make('calendar')
                             ->label('تقویم')
-                            ->options(\App\Support\AppCalendar::OPTIONS)
-                            ->default(\App\Support\AppCalendar::JALALI)
+                            ->options(AppCalendar::OPTIONS)
+                            ->default(AppCalendar::JALALI)
                             ->required()
                             ->native(false)
                             ->helperText('تاریخ‌ها در پنل و اپلیکیشن با این تقویم نمایش داده می‌شوند.'),
@@ -406,8 +411,8 @@ class ManageBakery extends Page implements HasForms
         Bakery::firstOrNew(['id' => 1])->fill($data)->save();
 
         // The formatter caches the unit, so drop it after a settings change.
-        \App\Support\Money::forgetCache();
-        \App\Support\AppCalendar::forgetCache();
+        Money::forgetCache();
+        AppCalendar::forgetCache();
 
         Notification::make()
             ->title('اطلاعات نانوایی ذخیره شد.')
@@ -418,7 +423,7 @@ class ManageBakery extends Page implements HasForms
     protected function getFormActions(): array
     {
         return [
-            \Filament\Actions\Action::make('save')
+            Action::make('save')
                 ->label('ذخیره تغییرات')
                 ->submit('save')
                 ->icon('heroicon-o-check'),

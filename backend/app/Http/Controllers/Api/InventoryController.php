@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
 use App\Support\AppCalendar;
+use App\Support\DoughFormula;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,7 +91,7 @@ class InventoryController extends Controller
             }
 
             $bagWeight = $item->key === InventoryItem::FLOUR
-                ? \App\Support\DoughFormula::fromBakery()->bagWeightKg
+                ? DoughFormula::fromBakery()->bagWeightKg
                 : (float) ($item->bag_weight_kg ?? 0);
 
             if ($bagWeight <= 0) {

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CustomerResource\RelationManagers;
 
+use App\Filament\Forms\JalaliDateInput;
 use App\Models\CustomerInteraction;
 use App\Support\AppCalendar;
 use Filament\Forms;
@@ -41,7 +42,7 @@ class InteractionsRelationManager extends RelationManager
                 ->maxLength(1000)
                 ->columnSpanFull(),
 
-            \App\Filament\Forms\JalaliDateInput::make('follow_up_on', 'پیگیری بعدی')
+            JalaliDateInput::make('follow_up_on', 'پیگیری بعدی')
                 ->helperText('خالی بگذارید اگر پیگیری لازم نیست.'),
         ]);
     }

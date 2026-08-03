@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\DoughEntry;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -36,7 +37,7 @@ class CustomerDebtTest extends TestCase
         $this->seed(BakerySeeder::class);
 
         Bakery::first()->update(['currency' => 'toman', 'flour_bag_weight_kg' => 40]);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->admin = User::factory()->create();
         $this->admin->assignRole('admin');

@@ -4,9 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Bakery;
 use App\Models\BakeryShare;
+use App\Models\ChaneEntry;
+use App\Models\DoughEntry;
 use App\Models\Expense;
+use App\Models\FlourSale;
 use App\Models\Income;
 use App\Models\InventoryItem;
+use App\Models\Sale;
 use App\Models\ShareSettlement;
 use App\Models\User;
 use App\Support\Jalali;
@@ -343,8 +347,8 @@ class IncomeAndSharesTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $dough = \App\Models\DoughEntry::create(['user_id' => $user->id, 'bag_count' => 1]);
-        $chane = \App\Models\ChaneEntry::create([
+        $dough = DoughEntry::create(['user_id' => $user->id, 'bag_count' => 1]);
+        $chane = ChaneEntry::create([
             'dough_entry_id' => $dough->id,
             'user_id' => $user->id,
             'chane_count' => 10,
@@ -353,7 +357,7 @@ class IncomeAndSharesTest extends TestCase
             'spray_flour_kg' => 0,
         ]);
 
-        \App\Models\Sale::create([
+        Sale::create([
             'chane_entry_id' => $chane->id,
             'user_id' => $user->id,
             'payment_type' => 'cash',
@@ -363,7 +367,7 @@ class IncomeAndSharesTest extends TestCase
 
     private function makeFlourSale(float $kg, float $pricePerKg): void
     {
-        \App\Models\FlourSale::create([
+        FlourSale::create([
             'user_id' => User::factory()->create()->id,
             'unit' => 'kg',
             'quantity' => $kg,

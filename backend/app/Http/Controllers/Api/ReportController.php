@@ -4,21 +4,25 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
+use App\Models\BakeryShare;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\Expense;
+use App\Models\FlourSale;
 use App\Models\Holiday;
 use App\Models\InventoryItem;
-use App\Models\Sale;
 use App\Models\SalaryPayment;
+use App\Models\Sale;
 use App\Models\User;
 use App\Support\AppCalendar;
+use App\Support\DoughFormula;
 use App\Support\Jalali;
 use App\Support\Ledger;
 use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * Admin-facing reporting. All endpoints accept optional `from` / `to`
@@ -32,7 +36,7 @@ class ReportController extends Controller
     {
         $today = now()->toDateString();
         $chaneCount = (int) ChaneEntry::whereDate('created_at', $today)->sum('chane_count');
-        $formula = \App\Support\DoughFormula::fromBakery();
+        $formula = DoughFormula::fromBakery();
         $naninoEquivalent = $formula->naninoEquivalentForNormalCount($chaneCount);
 
         return $this->success([
@@ -86,7 +90,7 @@ class ReportController extends Controller
             'total_nanino_weight_kg' => round((float) $chane->sum('nanino_weight_kg'), 2),
             // The real nanino count for the period, derived from its weight —
             // previously only ever reported for today, nowhere over a range.
-            'total_nanino_count' => \App\Support\DoughFormula::fromBakery()
+            'total_nanino_count' => DoughFormula::fromBakery()
                 ->naninoCountForWeight((float) $chane->sum('nanino_weight_kg')),
             'total_spray_flour_kg' => round((float) $chane->sum('spray_flour_kg'), 2),
             // Day-by-day dough count, so the range total isn't the only
@@ -102,7 +106,7 @@ class ReportController extends Controller
      */
     private function dailyDoughCounts($from, $to): array
     {
-        $formula = \App\Support\DoughFormula::fromBakery();
+        $formula = DoughFormula::fromBakery();
 
         $days = collect();
         $cursor = $from->copy()->startOfDay();
@@ -122,7 +126,7 @@ class ReportController extends Controller
 
             $days->push([
                 'date' => $date,
-                'date_display' => \App\Support\Jalali::date($cursor),
+                'date_display' => Jalali::date($cursor),
                 'dough_entries' => $entries->count(),
                 'dough_bags' => (int) $entries->sum('bag_count'),
                 'normal_chane_count' => $normalCount,
@@ -320,11 +324,11 @@ class ReportController extends Controller
                 'sales' => round($income, 2),
                 'sales_formatted' => Money::format($income),
                 'sales_count' => Sale::whereBetween('created_at', [$from, $to])->count(),
-                'flour_sales_count' => \App\Models\FlourSale::whereBetween('sold_on', [
+                'flour_sales_count' => FlourSale::whereBetween('sold_on', [
                     $from->toDateString(), $to->toDateString(),
                 ])->count(),
             ]),
-            'profit_split' => \App\Models\BakeryShare::splitFor($from, $to),
+            'profit_split' => BakeryShare::splitFor($from, $to),
             'expenses' => [
                 'recorded' => round($recordedExpenses, 2),
                 'recorded_formatted' => Money::format($recordedExpenses),
@@ -479,7 +483,7 @@ class ReportController extends Controller
         return [$from, $to];
     }
 
-    private function parseDate(?string $value): ?\Illuminate\Support\Carbon
+    private function parseDate(?string $value): ?Carbon
     {
         if (blank($value)) {
             return null;

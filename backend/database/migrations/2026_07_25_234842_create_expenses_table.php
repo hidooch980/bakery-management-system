@@ -16,7 +16,7 @@ return new class extends Migration
                 'fuel',       // سوخت
                 'utilities',  // آب، برق، گاز
                 'rent',       // اجاره
-                'maintenance',// تعمیرات
+                'maintenance', // تعمیرات
                 'salary',     // حقوق (mirrored from salary_payments)
                 'other',      // سایر
             ]);

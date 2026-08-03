@@ -6,6 +6,7 @@ use App\Models\Bakery;
 use App\Models\Holiday;
 use App\Models\User;
 use App\Models\WorkStart;
+use App\Support\Jalali;
 use App\Support\LatePenalty;
 use App\Support\Money;
 use Database\Seeders\BakerySeeder;
@@ -380,7 +381,7 @@ class WorkStartTest extends TestCase
     /** Records a late start on a given day of this Jalali month. */
     private function lateOn(int $dayOffset, string $type = WorkStart::CHANE): WorkStart
     {
-        [$monthStart] = \App\Support\Jalali::currentMonthRange();
+        [$monthStart] = Jalali::currentMonthRange();
         $day = $monthStart->copy()->addDays($dayOffset)->setTime(7, 0, 0);
 
         Carbon::setTestNow($day);

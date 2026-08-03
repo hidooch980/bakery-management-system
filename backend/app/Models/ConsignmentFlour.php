@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\DoughFormula;
 use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
 
@@ -52,7 +53,7 @@ class ConsignmentFlour extends Model
         // and the sack size in settings — never entered beside them, where
         // the two could disagree. A record given only a weight keeps it.
         static::saving(function (self $record) {
-            $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+            $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
 
             if ($record->bags !== null && $bagWeight > 0) {
                 $record->amount_kg = round((float) $record->bags * $bagWeight, 3);

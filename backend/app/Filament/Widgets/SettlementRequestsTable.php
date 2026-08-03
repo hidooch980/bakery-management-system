@@ -2,7 +2,9 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\BankAccount;
 use App\Models\SettlementRequest;
+use App\Support\AppCalendar;
 use App\Support\Money;
 use App\Support\SellerSettlement;
 use Filament\Forms;
@@ -33,7 +35,7 @@ class SettlementRequestsTable extends BaseWidget
             ->columns([
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('زمان درخواست')
-                    ->formatStateUsing(fn ($state) => \App\Support\AppCalendar::dateTime($state))
+                    ->formatStateUsing(fn ($state) => AppCalendar::dateTime($state))
                     ->description(fn (SettlementRequest $record) => $record->created_at?->diffForHumans()),
 
                 Tables\Columns\TextColumn::make('user.name')
@@ -102,8 +104,8 @@ class SettlementRequestsTable extends BaseWidget
                         ? [
                             Forms\Components\Select::make('bank_account_id')
                                 ->label('واریز کارتخوان به حساب')
-                                ->options(\App\Models\BankAccount::pluck('title', 'id'))
-                                ->default(\App\Models\BankAccount::where('is_default', true)->value('id'))
+                                ->options(BankAccount::pluck('title', 'id'))
+                                ->default(BankAccount::where('is_default', true)->value('id'))
                                 ->required()
                                 ->native(false),
                         ]
@@ -113,7 +115,7 @@ class SettlementRequestsTable extends BaseWidget
                             $record,
                             auth()->user(),
                             isset($data['bank_account_id'])
-                                ? \App\Models\BankAccount::find($data['bank_account_id'])
+                                ? BankAccount::find($data['bank_account_id'])
                                 : null,
                         );
 

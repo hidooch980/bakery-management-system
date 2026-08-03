@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
 class WorkStart extends Model
 {
     public const CHANE = 'chane';
+
     public const BAKING = 'baking';
 
     public const TYPES = [

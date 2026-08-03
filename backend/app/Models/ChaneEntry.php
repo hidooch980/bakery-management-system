@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
 
 class ChaneEntry extends Model
@@ -30,7 +31,7 @@ class ChaneEntry extends Model
         // otherwise the dough stays spent and the batch stays stuck as
         // processed with nothing to show for it.
         static::deleted(function (self $entry) {
-            \App\Support\StockReversal::of($entry, 'ابطال ثبت چانه');
+            StockReversal::of($entry, 'ابطال ثبت چانه');
 
             $entry->doughEntry?->update(['status' => 'pending']);
         });

@@ -5,10 +5,12 @@ namespace App\Filament\Widgets;
 use App\Models\Sale;
 use App\Models\User;
 use App\Support\Money;
+use App\Support\SellerSettlement;
 use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Support\Collection;
 
 /**
  * Each seller's temporary account — everything they are answerable for
@@ -126,7 +128,7 @@ class SellerAccountsTable extends BaseWidget
                     ->action(function (User $record) {
                         $amount = self::settleableFor($record);
 
-                        \App\Support\SellerSettlement::settle($record);
+                        SellerSettlement::settle($record);
 
                         // The account just changed, so the cached rows are stale.
                         unset(self::$cache[$record->id]);
@@ -148,12 +150,12 @@ class SellerAccountsTable extends BaseWidget
      * question of the same seller, so without this a five-seller table
      * ran the query dozens of times to render one screen.
      *
-     * @var array<int, \Illuminate\Support\Collection<int, Sale>>
+     * @var array<int, Collection<int, Sale>>
      */
     private static array $cache = [];
 
-    /** @return \Illuminate\Support\Collection<int, Sale> */
-    private static function outstandingFor(User $seller): \Illuminate\Support\Collection
+    /** @return Collection<int, Sale> */
+    private static function outstandingFor(User $seller): Collection
     {
         return self::$cache[$seller->id] ??= Sale::query()
             ->where('user_id', $seller->id)

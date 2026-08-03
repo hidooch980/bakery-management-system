@@ -17,6 +17,7 @@ class FlourSale extends Model
     use PostsToBankAccount;
 
     public const KG = 'kg';
+
     public const BAG = 'bag';
 
     public const UNITS = [

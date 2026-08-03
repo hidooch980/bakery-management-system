@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\ManageBakery;
+use App\Models\FlourAllocation;
 use App\Models\User;
+use App\Support\Jalali;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -78,8 +80,8 @@ class BakeryFormulaPreviewTest extends TestCase
 
     public function test_the_period_preview_covers_each_period_and_the_month_total(): void
     {
-        $allocation = \App\Models\FlourAllocation::create([
-            'month_start' => \App\Support\Jalali::currentMonthRange()[0],
+        $allocation = FlourAllocation::create([
+            'month_start' => Jalali::currentMonthRange()[0],
             'month_label' => 'تست',
             'total_bags' => 30,
         ]);

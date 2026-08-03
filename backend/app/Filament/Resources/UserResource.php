@@ -2,8 +2,11 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
+use App\Support\Jalali;
+use App\Support\Money;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -74,7 +77,7 @@ class UserResource extends Resource
                         ->required(fn (string $operation) => $operation === 'create')
                         ->helperText('در حالت ویرایش، خالی بگذارید تا تغییر نکند.'),
 
-                    \App\Filament\Forms\MoneyInput::make('monthly_salary', 'حقوق ماهانه')
+                    MoneyInput::make('monthly_salary', 'حقوق ماهانه')
                         ->helperText('برای پیش‌پر کردن فرم حقوق استفاده می‌شود.'),
 
                     Forms\Components\Toggle::make('is_active')
@@ -132,18 +135,18 @@ class UserResource extends Resource
 
                 Tables\Columns\TextColumn::make('monthly_salary')
                     ->label('حقوق ماهانه')
-                    ->formatStateUsing(fn ($state) => $state ? \App\Support\Money::format($state) : '—')
+                    ->formatStateUsing(fn ($state) => $state ? Money::format($state) : '—')
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('last_login_at')
                     ->label('آخرین ورود')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
+                    ->formatStateUsing(fn ($state) => Jalali::dateTime($state))
                     ->placeholder('هرگز')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('تاریخ ساخت')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::date($state))
+                    ->formatStateUsing(fn ($state) => Jalali::date($state))
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])

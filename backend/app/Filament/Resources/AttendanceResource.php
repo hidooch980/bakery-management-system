@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Resources\AttendanceResource\Pages;
 use App\Models\Attendance;
+use App\Support\Jalali;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -44,7 +46,7 @@ class AttendanceResource extends Resource
                         ->required()
                         ->native(false),
 
-                    \App\Filament\Forms\JalaliDateInput::today('date', 'تاریخ')
+                    JalaliDateInput::today('date', 'تاریخ')
                         ->required(),
 
                     Forms\Components\DateTimePicker::make('checked_in_at')
@@ -76,12 +78,12 @@ class AttendanceResource extends Resource
 
                 Tables\Columns\TextColumn::make('date')
                     ->label('تاریخ')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::date($state))
+                    ->formatStateUsing(fn ($state) => Jalali::date($state))
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('checked_in_at')
                     ->label('ساعت تیک حضور')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::time($state))
+                    ->formatStateUsing(fn ($state) => Jalali::time($state))
                     ->badge()
                     ->color('success')
                     ->icon('heroicon-m-clock')
@@ -89,7 +91,7 @@ class AttendanceResource extends Resource
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('ثبت در سیستم')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
+                    ->formatStateUsing(fn ($state) => Jalali::dateTime($state))
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([

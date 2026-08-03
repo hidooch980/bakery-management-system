@@ -2,10 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\ManageBakery;
+use App\Filament\Resources\ExpenseResource\Pages\EditExpense;
+use App\Filament\Resources\FlourAllocationResource\Pages\ListFlourAllocations;
+use App\Filament\Widgets\FlourQuotaOverview;
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
+use App\Models\Expense;
 use App\Models\FlourAllocation;
+use App\Models\FlourAllocationPeriod;
+use App\Models\Holiday;
 use App\Models\InventoryItem;
 use App\Models\User;
 use App\Support\AppCalendar;
@@ -13,7 +20,11 @@ use App\Support\DoughFormula;
 use App\Support\Jalali;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class ProductionFormulaTest extends TestCase
@@ -166,7 +177,6 @@ class ProductionFormulaTest extends TestCase
             ->postJson('/api/v1/dough-entries', ['bag_count' => 3])
             ->assertCreated();
 
-
         $this->actingAs($chane, 'sanctum')
             ->postJson('/api/v1/chane-entries', [
                 'dough_entry_id' => DoughEntry::first()->id,
@@ -198,7 +208,6 @@ class ProductionFormulaTest extends TestCase
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 5])
             ->assertCreated();
-
 
         // 64 nanino loaves at the configured 1.0kg is 64kg of dough — that
         // dough must leave stock even though nanino itself is never sold.
@@ -395,12 +404,12 @@ class ProductionFormulaTest extends TestCase
     {
         // There is no standing "every Friday" closure — only dates someone
         // actually registered, such as a monthly-recurring 15th and 25th.
-        \App\Models\Holiday::create([
+        Holiday::create([
             'date' => Jalali::parse('1405/05/15'),
             'title' => 'تعطیل ماهانه',
             'type' => 'shop',
         ]);
-        \App\Models\Holiday::create([
+        Holiday::create([
             'date' => Jalali::parse('1405/05/20'),
             'title' => 'تعطیل رسمی',
             'type' => 'official',
@@ -423,7 +432,7 @@ class ProductionFormulaTest extends TestCase
 
     public function test_a_holiday_outside_the_period_does_not_count_against_it(): void
     {
-        \App\Models\Holiday::create([
+        Holiday::create([
             'date' => Jalali::parse('1405/05/01'),
             'title' => 'تعطیل خارج از دوره',
             'type' => 'shop',
@@ -444,7 +453,7 @@ class ProductionFormulaTest extends TestCase
 
     public function test_the_daily_pace_is_based_on_working_days_not_calendar_days(): void
     {
-        \App\Models\Holiday::create([
+        Holiday::create([
             'date' => Jalali::parse('1405/05/10'),
             'title' => 'تعطیل',
             'type' => 'shop',
@@ -470,7 +479,7 @@ class ProductionFormulaTest extends TestCase
         // periods (5–14, 15–24, 25–next 4) unless the previous month's
         // allocation was also entered — a fresh install's first month has
         // no such predecessor, so this is the expected state on day 4.
-        \Illuminate\Support\Carbon::setTestNow(Jalali::parse('1405/05/04'));
+        Carbon::setTestNow(Jalali::parse('1405/05/04'));
 
         $allocation = FlourAllocation::create([
             'month_start' => Jalali::parse('1405/05/01'),
@@ -489,12 +498,12 @@ class ProductionFormulaTest extends TestCase
         $this->assertNotNull($found);
         $this->assertSame($allocation->id, $found->id);
 
-        \Illuminate\Support\Carbon::setTestNow();
+        Carbon::setTestNow();
     }
 
     public function test_the_dashboard_explains_the_gap_rather_than_calling_it_undefined(): void
     {
-        \Illuminate\Support\Carbon::setTestNow(Jalali::parse('1405/05/04'));
+        Carbon::setTestNow(Jalali::parse('1405/05/04'));
 
         FlourAllocation::create([
             'month_start' => Jalali::parse('1405/05/01'),
@@ -505,33 +514,33 @@ class ProductionFormulaTest extends TestCase
         $admin = User::factory()->create(['is_active' => true]);
         $admin->assignRole('admin');
 
-        \Filament\Facades\Filament::setCurrentPanel(
-            \Filament\Facades\Filament::getPanel('admin')
+        Filament::setCurrentPanel(
+            Filament::getPanel('admin')
         );
 
-        $html = \Livewire\Livewire::actingAs($admin)->test(
-            \App\Filament\Widgets\FlourQuotaOverview::class
+        $html = Livewire::actingAs($admin)->test(
+            FlourQuotaOverview::class
         )->html();
 
         $this->assertStringContainsString('سهمیه این ماه ثبت شده', $html);
         $this->assertStringNotContainsString('در بخش انبار ثبت نشده است', $html);
 
-        \Illuminate\Support\Carbon::setTestNow();
+        Carbon::setTestNow();
     }
 
     public function test_no_allocation_at_all_is_still_reported_as_undefined(): void
     {
-        \Illuminate\Support\Carbon::setTestNow(Jalali::parse('1405/05/04'));
+        Carbon::setTestNow(Jalali::parse('1405/05/04'));
 
         $this->assertNull(FlourAllocation::forDate(now()));
         $this->assertNull(FlourAllocation::forJalaliMonthOf(now()));
 
-        \Illuminate\Support\Carbon::setTestNow();
+        Carbon::setTestNow();
     }
 
     public function test_the_panel_shows_working_days_for_each_period(): void
     {
-        \App\Models\Holiday::create([
+        Holiday::create([
             'date' => Jalali::parse('1405/05/15'),
             'title' => 'تعطیل ماهانه',
             'type' => 'shop',
@@ -546,12 +555,12 @@ class ProductionFormulaTest extends TestCase
             'total_kg' => 3000,
         ])->syncPeriods();
 
-        \Filament\Facades\Filament::setCurrentPanel(
-            \Filament\Facades\Filament::getPanel('admin')
+        Filament::setCurrentPanel(
+            Filament::getPanel('admin')
         );
 
-        $html = \Livewire\Livewire::actingAs($admin)->test(
-            \App\Filament\Resources\FlourAllocationResource\Pages\ListFlourAllocations::class
+        $html = Livewire::actingAs($admin)->test(
+            ListFlourAllocations::class
         )->html();
 
         $this->assertStringContainsString('روز کاری', $html);
@@ -585,7 +594,7 @@ class ProductionFormulaTest extends TestCase
         $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
         $flour->move('in', 100, 'purchase');
         $movement = $flour->move('out', 40, 'production');
-        \Illuminate\Support\Facades\DB::table('inventory_movements')
+        DB::table('inventory_movements')
             ->where('id', $movement->id)
             ->update(['created_at' => $period->starts_on->copy()->addDay()]);
 
@@ -676,7 +685,7 @@ class ProductionFormulaTest extends TestCase
             'spray_flour_kg' => 0,
         ]);
 
-        \Illuminate\Support\Facades\DB::table('chane_entries')
+        DB::table('chane_entries')
             ->where('id', $entry->id)
             ->update(['created_at' => $period->starts_on->copy()->addDay()]);
 
@@ -723,7 +732,7 @@ class ProductionFormulaTest extends TestCase
      * Sets up a period, burns $usedBags of flour inside it, and records
      * $naninoLoaves of nanino output on the same day.
      */
-    private function periodWithUsageAndOutput(float $usedBags, int $naninoLoaves): \App\Models\FlourAllocationPeriod
+    private function periodWithUsageAndOutput(float $usedBags, int $naninoLoaves): FlourAllocationPeriod
     {
         $allocation = FlourAllocation::create([
             'month_start' => Jalali::parse('1405/05/01'),
@@ -738,7 +747,7 @@ class ProductionFormulaTest extends TestCase
         $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
         $flour->move('in', 10000, 'purchase');
         $movement = $flour->move('out', $usedBags * 40, 'production');
-        \Illuminate\Support\Facades\DB::table('inventory_movements')
+        DB::table('inventory_movements')
             ->where('id', $movement->id)->update(['created_at' => $inside]);
 
         $user = $this->userWithRole('chane_gir');
@@ -752,7 +761,7 @@ class ProductionFormulaTest extends TestCase
             'nanino_weight_kg' => $naninoLoaves * 1.0,
             'spray_flour_kg' => 0,
         ]);
-        \Illuminate\Support\Facades\DB::table('chane_entries')
+        DB::table('chane_entries')
             ->where('id', $entry->id)->update(['created_at' => $inside]);
 
         return $period->refresh();
@@ -816,7 +825,7 @@ class ProductionFormulaTest extends TestCase
         $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
         $flour->move('in', 10000, 'purchase');
         $movement = $flour->move('out', 40, 'production');
-        \Illuminate\Support\Facades\DB::table('inventory_movements')
+        DB::table('inventory_movements')
             ->where('id', $movement->id)->update(['created_at' => $inside]);
 
         $user = $this->userWithRole('chane_gir');
@@ -830,7 +839,7 @@ class ProductionFormulaTest extends TestCase
             'nanino_weight_kg' => 0,
             'spray_flour_kg' => 0,
         ]);
-        \Illuminate\Support\Facades\DB::table('chane_entries')
+        DB::table('chane_entries')
             ->where('id', $entry->id)->update(['created_at' => $inside]);
 
         $period->refresh();
@@ -969,11 +978,11 @@ class ProductionFormulaTest extends TestCase
     public function test_panel_date_form_stores_a_jalali_date_as_gregorian(): void
     {
         $this->actingAs($this->userWithRole('admin'));
-        \Filament\Facades\Filament::setCurrentPanel(
-            \Filament\Facades\Filament::getPanel('admin')
+        Filament::setCurrentPanel(
+            Filament::getPanel('admin')
         );
 
-        $expense = \App\Models\Expense::create([
+        $expense = Expense::create([
             'category' => 'fuel',
             'title' => 'سوخت',
             'amount' => 1000,
@@ -982,8 +991,8 @@ class ProductionFormulaTest extends TestCase
 
         // Opening the form shows the stored Gregorian date in Jalali, and
         // saving converts it straight back — no drift either way.
-        \Livewire\Livewire::test(
-            \App\Filament\Resources\ExpenseResource\Pages\EditExpense::class,
+        Livewire::test(
+            EditExpense::class,
             ['record' => $expense->getRouteKey()]
         )
             ->assertFormSet(['spent_on' => '1405/05/03'])
@@ -997,7 +1006,7 @@ class ProductionFormulaTest extends TestCase
 
     public function test_calendar_setting_switches_the_displayed_date(): void
     {
-        $date = \Illuminate\Support\Carbon::parse('2026-07-25');
+        $date = Carbon::parse('2026-07-25');
 
         $this->assertSame('1405/05/03', AppCalendar::date($date, AppCalendar::JALALI));
         $this->assertSame('1448/02/09', AppCalendar::date($date, AppCalendar::HIJRI));
@@ -1009,7 +1018,7 @@ class ProductionFormulaTest extends TestCase
         Bakery::first()->update(['calendar' => AppCalendar::HIJRI]);
         AppCalendar::forgetCache();
 
-        $this->assertSame('1448/02/09', AppCalendar::date(\Illuminate\Support\Carbon::parse('2026-07-25')));
+        $this->assertSame('1448/02/09', AppCalendar::date(Carbon::parse('2026-07-25')));
     }
 
     // ------------------------------------------------- nanino equivalence
@@ -1340,10 +1349,10 @@ class ProductionFormulaTest extends TestCase
         $admin = User::factory()->create(['is_active' => true]);
         $admin->assignRole('admin');
         $this->actingAs($admin);
-        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         $html = preg_replace('/\s+/u', ' ', strip_tags(
-            \Livewire\Livewire::test(\App\Filament\Pages\ManageBakery::class)->html(),
+            Livewire::test(ManageBakery::class)->html(),
             '<br>'
         ));
 
@@ -1383,7 +1392,7 @@ class ProductionFormulaTest extends TestCase
         $back = $flour->move('in', 40, 'production_reversal');
 
         foreach ([$used, $back] as $movement) {
-            \Illuminate\Support\Facades\DB::table('inventory_movements')
+            DB::table('inventory_movements')
                 ->where('id', $movement->id)->update(['created_at' => $inside]);
         }
 
@@ -1412,7 +1421,7 @@ class ProductionFormulaTest extends TestCase
         $bought = $flour->move('in', 500, 'purchase');
 
         foreach ([$used, $bought] as $movement) {
-            \Illuminate\Support\Facades\DB::table('inventory_movements')
+            DB::table('inventory_movements')
                 ->where('id', $movement->id)->update(['created_at' => $inside]);
         }
 

@@ -2,14 +2,23 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\ExpenseResource\Pages\EditExpense;
+use App\Models\Bakery;
+use App\Models\ChaneEntry;
+use App\Models\Customer;
+use App\Models\DoughEntry;
 use App\Models\Expense;
 use App\Models\SalaryPayment;
+use App\Models\Sale;
 use App\Models\User;
 use App\Support\Jalali;
 use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class FinanceTest extends TestCase
@@ -196,14 +205,14 @@ class FinanceTest extends TestCase
     public function test_debt_report_separates_this_month_from_earlier_ones(): void
     {
         $admin = $this->userWithRole('admin');
-        $customer = \App\Models\Customer::create(['name' => 'دبستان', 'type' => 'school']);
+        $customer = Customer::create(['name' => 'دبستان', 'type' => 'school']);
 
         $thisMonth = $this->givenCreditSale($admin, $customer, 500_000);
         $old = $this->givenCreditSale($admin, $customer, 300_000);
 
         // Push the second sale into an earlier Jalali month.
-        [$monthStart] = \App\Support\Jalali::currentMonthRange();
-        \Illuminate\Support\Facades\DB::table('sales')
+        [$monthStart] = Jalali::currentMonthRange();
+        DB::table('sales')
             ->where('id', $old->id)
             ->update(['created_at' => $monthStart->copy()->subMonth()]);
 
@@ -221,7 +230,7 @@ class FinanceTest extends TestCase
     public function test_settled_debts_leave_the_report(): void
     {
         $admin = $this->userWithRole('admin');
-        $customer = \App\Models\Customer::create(['name' => 'اداره', 'type' => 'office']);
+        $customer = Customer::create(['name' => 'اداره', 'type' => 'office']);
 
         $sale = $this->givenCreditSale($admin, $customer, 200_000);
 
@@ -237,8 +246,8 @@ class FinanceTest extends TestCase
     {
         $admin = $this->userWithRole('admin');
 
-        $dough = \App\Models\DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 1]);
-        $chane = \App\Models\ChaneEntry::create([
+        $dough = DoughEntry::create(['user_id' => $admin->id, 'bag_count' => 1]);
+        $chane = ChaneEntry::create([
             'dough_entry_id' => $dough->id,
             'user_id' => $admin->id,
             'chane_count' => 10,
@@ -247,7 +256,7 @@ class FinanceTest extends TestCase
             'spray_flour_kg' => 0,
         ]);
 
-        \App\Models\Sale::create([
+        Sale::create([
             'chane_entry_id' => $chane->id,
             'user_id' => $admin->id,
             'payment_type' => 'cash',
@@ -263,8 +272,8 @@ class FinanceTest extends TestCase
     public function test_debt_report_groups_by_customer(): void
     {
         $admin = $this->userWithRole('admin');
-        $a = \App\Models\Customer::create(['name' => 'مدرسه الف', 'type' => 'school']);
-        $b = \App\Models\Customer::create(['name' => 'مدرسه ب', 'type' => 'school']);
+        $a = Customer::create(['name' => 'مدرسه الف', 'type' => 'school']);
+        $b = Customer::create(['name' => 'مدرسه ب', 'type' => 'school']);
 
         $this->givenCreditSale($admin, $a, 100_000);
         $this->givenCreditSale($admin, $a, 250_000);
@@ -280,10 +289,10 @@ class FinanceTest extends TestCase
         $this->assertSame(350000, $byCustomer[0]['amount']);
     }
 
-    private function givenCreditSale(User $user, \App\Models\Customer $customer, float $amount): \App\Models\Sale
+    private function givenCreditSale(User $user, Customer $customer, float $amount): Sale
     {
-        $dough = \App\Models\DoughEntry::create(['user_id' => $user->id, 'bag_count' => 1]);
-        $chane = \App\Models\ChaneEntry::create([
+        $dough = DoughEntry::create(['user_id' => $user->id, 'bag_count' => 1]);
+        $chane = ChaneEntry::create([
             'dough_entry_id' => $dough->id,
             'user_id' => $user->id,
             'chane_count' => 10,
@@ -292,7 +301,7 @@ class FinanceTest extends TestCase
             'spray_flour_kg' => 0,
         ]);
 
-        return \App\Models\Sale::create([
+        return Sale::create([
             'chane_entry_id' => $chane->id,
             'user_id' => $user->id,
             'payment_type' => 'credit',
@@ -389,11 +398,11 @@ class FinanceTest extends TestCase
 
     public function test_money_formats_in_the_configured_unit(): void
     {
-        \App\Models\Bakery::first()->update(['currency' => Money::TOMAN]);
+        Bakery::first()->update(['currency' => Money::TOMAN]);
         Money::forgetCache();
         $this->assertSame('1,000 تومان', Money::format(1000));
 
-        \App\Models\Bakery::first()->update(['currency' => Money::RIAL]);
+        Bakery::first()->update(['currency' => Money::RIAL]);
         Money::forgetCache();
         // Stored in Toman, displayed in Rial: ten times the amount.
         $this->assertSame('10,000 ریال', Money::format(1000));
@@ -410,13 +419,13 @@ class FinanceTest extends TestCase
 
     public function test_money_converts_a_typed_amount_back_to_toman(): void
     {
-        \App\Models\Bakery::first()->update(['currency' => Money::RIAL]);
+        Bakery::first()->update(['currency' => Money::RIAL]);
         Money::forgetCache();
 
         // A Rial shop types 10,000; storage must receive 1,000 Toman.
         $this->assertSame(1000.0, Money::toToman(10000));
 
-        \App\Models\Bakery::first()->update(['currency' => Money::TOMAN]);
+        Bakery::first()->update(['currency' => Money::TOMAN]);
         Money::forgetCache();
         $this->assertSame(1000.0, Money::toToman(1000));
     }
@@ -424,7 +433,7 @@ class FinanceTest extends TestCase
     public function test_money_conversion_round_trips(): void
     {
         foreach ([Money::TOMAN, Money::RIAL] as $unit) {
-            \App\Models\Bakery::first()->update(['currency' => $unit]);
+            Bakery::first()->update(['currency' => $unit]);
             Money::forgetCache();
 
             // Whatever the unit, display -> stored -> display must be lossless.
@@ -434,7 +443,7 @@ class FinanceTest extends TestCase
 
     public function test_panel_form_save_does_not_drift_the_stored_amount(): void
     {
-        \App\Models\Bakery::first()->update(['currency' => Money::RIAL]);
+        Bakery::first()->update(['currency' => Money::RIAL]);
         Money::forgetCache();
 
         $expense = Expense::create([
@@ -445,15 +454,15 @@ class FinanceTest extends TestCase
         ]);
 
         $this->actingAs($this->userWithRole('admin'));
-        \Filament\Facades\Filament::setCurrentPanel(
-            \Filament\Facades\Filament::getPanel('admin')
+        Filament::setCurrentPanel(
+            Filament::getPanel('admin')
         );
 
         // Opening the form converts Toman -> Rial and saving converts back.
         // If either direction were missing or applied twice, the stored value
         // would drift by a factor of ten on every save.
-        \Livewire\Livewire::test(
-            \App\Filament\Resources\ExpenseResource\Pages\EditExpense::class,
+        Livewire::test(
+            EditExpense::class,
             ['record' => $expense->getRouteKey()]
         )
             ->call('save')
@@ -464,7 +473,7 @@ class FinanceTest extends TestCase
 
     public function test_panel_expense_form_round_trips_the_displayed_amount(): void
     {
-        \App\Models\Bakery::first()->update(['currency' => Money::RIAL]);
+        Bakery::first()->update(['currency' => Money::RIAL]);
         Money::forgetCache();
 
         $expense = Expense::create([
@@ -475,13 +484,13 @@ class FinanceTest extends TestCase
         ]);
 
         $this->actingAs($this->userWithRole('admin'));
-        \Filament\Facades\Filament::setCurrentPanel(
-            \Filament\Facades\Filament::getPanel('admin')
+        Filament::setCurrentPanel(
+            Filament::getPanel('admin')
         );
 
         // Editing shows the stored Toman back in Rial.
-        \Livewire\Livewire::test(
-            \App\Filament\Resources\ExpenseResource\Pages\EditExpense::class,
+        Livewire::test(
+            EditExpense::class,
             ['record' => $expense->getRouteKey()]
         )->assertFormSet(['amount' => 10000.0]);
     }

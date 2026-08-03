@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ChaneEntryResource\Pages;
 
 use App\Filament\Resources\ChaneEntryResource;
+use App\Filament\Widgets\ProductionComparisonOverview;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
@@ -20,7 +21,7 @@ class ListChaneEntries extends ListRecords
     protected function getHeaderWidgets(): array
     {
         return [
-            \App\Filament\Widgets\ProductionComparisonOverview::class,
+            ProductionComparisonOverview::class,
         ];
     }
 }

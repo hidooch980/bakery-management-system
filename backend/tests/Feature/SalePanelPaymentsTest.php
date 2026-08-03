@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\SaleResource\Pages\CreateSale;
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\Customer;
 use App\Models\DoughEntry;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -36,7 +38,7 @@ class SalePanelPaymentsTest extends TestCase
         $this->seed(BakerySeeder::class);
 
         Bakery::first()->update(['bread_price' => 5000, 'currency' => 'toman']);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->admin = User::factory()->create(['is_active' => true]);
         $this->admin->assignRole('admin');
@@ -57,7 +59,7 @@ class SalePanelPaymentsTest extends TestCase
 
     private function create(array $payments)
     {
-        return Livewire::test(\App\Filament\Resources\SaleResource\Pages\CreateSale::class)
+        return Livewire::test(CreateSale::class)
             ->fillForm([
                 'chane_entry_id' => $this->chane->id,
                 'user_id' => $this->admin->id,

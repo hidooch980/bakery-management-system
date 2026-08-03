@@ -7,6 +7,7 @@ use App\Models\BakeryShare;
 use App\Models\ShareSettlement;
 use App\Support\AppCalendar;
 use App\Support\Jalali;
+use App\Support\Ledger;
 use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -122,7 +123,7 @@ class BakeryShareController extends Controller
             'bank_account_id' => $data['bank_account_id'] ?? null,
             'period_start' => $from->toDateString(),
             'period_end' => $to->toDateString(),
-            'period_profit' => \App\Support\Ledger::profit($from, $to),
+            'period_profit' => Ledger::profit($from, $to),
             'dang' => $share->dang,
             'amount' => $amount,
             'paid_on' => Jalali::parseFlexible($data['paid_on'] ?? null) ?? now(),

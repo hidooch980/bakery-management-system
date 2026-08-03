@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\UserResource;
 use App\Models\Attendance;
+use App\Support\Jalali;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
@@ -42,7 +43,7 @@ class TodayAttendanceTable extends BaseWidget
 
                 Tables\Columns\TextColumn::make('checked_in_at')
                     ->label('ساعت حضور')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::time($state))
+                    ->formatStateUsing(fn ($state) => Jalali::time($state))
                     ->badge()
                     ->color('success')
                     ->icon('heroicon-m-clock'),

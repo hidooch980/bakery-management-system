@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\BankAccount;
+use App\Models\Expense;
 use App\Models\SalaryPayment;
 use App\Models\StaffAdvance;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,7 +28,7 @@ class StaffAdvanceTest extends TestCase
 
         $this->seed(RolesAndPermissionsSeeder::class);
         $this->seed(BakerySeeder::class);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->staff = User::factory()->create(['is_active' => true]);
         $this->staff->assignRole('seller');
@@ -165,7 +167,7 @@ class StaffAdvanceTest extends TestCase
 
         // Pay brought forward is not a cost; it becomes one when the payslip
         // it is recovered from counts as one.
-        $this->assertSame(0, \App\Models\Expense::count());
+        $this->assertSame(0, Expense::count());
     }
 
     private function advance_first(): StaffAdvance

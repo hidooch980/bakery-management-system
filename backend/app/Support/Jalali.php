@@ -14,7 +14,6 @@ class Jalali
     /** Years at or above this are Gregorian, not Jalali. */
     private const MAX_JALALI_YEAR = 1700;
 
-
     /** e.g. ۱۴۰۵/۰۵/۰۳ */
     public static function date(Carbon|string|null $value): ?string
     {

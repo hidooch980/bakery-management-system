@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\InsufficientStockException;
+use App\Filament\Resources\DoughEntryResource\Pages\CreateDoughEntry;
+use App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems;
 use App\Models\Bakery;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
@@ -58,7 +61,7 @@ class PanelStockGuardTest extends TestCase
         // The quick stock action is the panel's own way of moving stock,
         // and it is where an admin meets the guard.
         Livewire::test(
-            \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
+            ListInventoryItems::class
         )
             ->callTableAction('recordStock', InventoryItem::ofKey(InventoryItem::SALT), data: [
                 'direction' => 'out',
@@ -77,7 +80,7 @@ class PanelStockGuardTest extends TestCase
         try {
             InventoryItem::ofKey(InventoryItem::SALT)->move('out', 646, 'production');
             $this->fail('the guard should have refused this');
-        } catch (\App\Exceptions\InsufficientStockException $e) {
+        } catch (InsufficientStockException $e) {
             // Whoever reads it needs to know what ran out and by how much.
             $this->assertStringContainsString('نمک', $e->getMessage());
             $this->assertStringContainsString('80.000', $e->getMessage());
@@ -91,7 +94,7 @@ class PanelStockGuardTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 100, 'purchase');
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
 
-        Livewire::test(\App\Filament\Resources\DoughEntryResource\Pages\CreateDoughEntry::class)
+        Livewire::test(CreateDoughEntry::class)
             ->fillForm([
                 'user_id' => $this->admin->id,
                 'bag_count' => 5,

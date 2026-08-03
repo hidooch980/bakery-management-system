@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\SaleResource\Pages\ListSales;
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
@@ -11,7 +12,9 @@ use App\Models\User;
 use App\Support\SaleRecorder;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -207,10 +210,10 @@ class SaleShortfallTest extends TestCase
 
         $admin = $this->userWithRole('admin');
         $this->actingAs($admin);
-        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        \Livewire\Livewire::test(
-            \App\Filament\Resources\SaleResource\Pages\ListSales::class
+        Livewire::test(
+            ListSales::class
         )->callTableAction('settleShortfall', $sale);
 
         $this->assertNotNull($sale->fresh()->shortfall_settled_on);

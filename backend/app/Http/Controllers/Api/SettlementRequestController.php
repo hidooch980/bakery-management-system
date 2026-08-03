@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Filament\Resources\SaleResource;
 use App\Http\Controllers\Controller;
 use App\Models\SettlementRequest;
 use App\Support\Money;
@@ -138,7 +139,7 @@ class SettlementRequestController extends Controller
             'paid_breakdown' => collect($request->paid_breakdown ?? [])
                 ->map(fn ($amount, $type) => [
                     'payment_type' => $type,
-                    'label' => \App\Filament\Resources\SaleResource::PAYMENT_LABELS[$type] ?? $type,
+                    'label' => SaleResource::PAYMENT_LABELS[$type] ?? $type,
                     'amount' => Money::convert((float) $amount),
                     'amount_formatted' => Money::format((float) $amount),
                 ])->values(),

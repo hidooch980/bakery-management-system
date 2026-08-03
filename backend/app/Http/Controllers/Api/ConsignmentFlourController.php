@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ConsignmentFlour;
 use App\Support\AppCalendar;
+use App\Support\DoughFormula;
 use App\Support\Jalali;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +34,7 @@ class ConsignmentFlourController extends Controller
         $borrowed = (float) ConsignmentFlour::outstanding()->where('direction', 'borrowed')->sum('amount_kg');
         $lent = (float) ConsignmentFlour::outstanding()->where('direction', 'lent')->sum('amount_kg');
 
-        $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
         $inBags = fn (float $kg) => $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
 
         return $this->success([

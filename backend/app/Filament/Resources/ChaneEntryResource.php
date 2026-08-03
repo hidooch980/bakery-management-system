@@ -3,8 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ChaneEntryResource\Pages;
+use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Support\DoughFormula;
+use App\Support\Jalali;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -87,7 +89,7 @@ class ChaneEntryResource extends Resource
                                 ->minValue(1)
                                 ->required()
                                 ->live(onBlur: true)
-                                ->default(fn () => \App\Models\Bakery::first()?->chane_per_tray ?: null)
+                                ->default(fn () => Bakery::first()?->chane_per_tray ?: null)
                                 ->suffix('عدد'),
                         ])
                         ->dehydrated(false),
@@ -255,7 +257,7 @@ class ChaneEntryResource extends Resource
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('زمان ثبت')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
+                    ->formatStateUsing(fn ($state) => Jalali::dateTime($state))
                     ->sortable(),
             ])
             ->filters([

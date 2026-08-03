@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\WorkStartResource\Pages;
 
 use App\Filament\Resources\WorkStartResource;
+use App\Filament\Widgets\WorkStartTable;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
@@ -18,7 +19,7 @@ class ListWorkStarts extends ListRecords
     protected function getHeaderWidgets(): array
     {
         return [
-            \App\Filament\Widgets\WorkStartTable::class,
+            WorkStartTable::class,
         ];
     }
 }

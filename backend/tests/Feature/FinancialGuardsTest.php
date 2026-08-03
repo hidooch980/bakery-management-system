@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\Bakery;
 use App\Models\BakeryShare;
 use App\Models\BankAccount;
+use App\Models\InventoryMovement;
 use App\Models\ShareSettlement;
 use App\Models\User;
 use App\Support\IssueScanner;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,7 +34,7 @@ class FinancialGuardsTest extends TestCase
         $this->seed(BakerySeeder::class);
 
         Bakery::first()->update(['currency' => 'toman']);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->admin = User::factory()->create(['is_active' => true]);
         $this->admin->assignRole('admin');
@@ -130,7 +132,7 @@ class FinancialGuardsTest extends TestCase
         foreach (['production_reversal', 'flour_sale_reversal'] as $reason) {
             $this->assertArrayHasKey(
                 $reason,
-                \App\Models\InventoryMovement::REASONS,
+                InventoryMovement::REASONS,
                 "reason {$reason} needs a Persian label"
             );
         }

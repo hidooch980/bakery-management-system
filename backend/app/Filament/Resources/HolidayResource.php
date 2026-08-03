@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Resources\HolidayResource\Pages;
 use App\Models\Holiday;
 use App\Support\AppCalendar;
@@ -34,7 +35,7 @@ class HolidayResource extends Resource
                 ->description('روزهایی که نانوایی تعطیل است. در گزارش حضور و غیاب، غیبت محسوب نمی‌شوند.')
                 ->columns(2)
                 ->schema([
-                    \App\Filament\Forms\JalaliDateInput::today('date', 'تاریخ')
+                    JalaliDateInput::today('date', 'تاریخ')
                         ->required()
                         // One record per day keeps the calendar unambiguous.
                         ->unique(ignoreRecord: true),

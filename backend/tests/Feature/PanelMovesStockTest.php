@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry;
+use App\Filament\Resources\DoughEntryResource\Pages\CreateDoughEntry;
 use App\Models\Bakery;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
@@ -64,7 +66,7 @@ class PanelMovesStockTest extends TestCase
         $flour = InventoryItem::ofKey(InventoryItem::FLOUR)->balance;
         $salt = InventoryItem::ofKey(InventoryItem::SALT)->balance;
 
-        Livewire::test(\App\Filament\Resources\DoughEntryResource\Pages\CreateDoughEntry::class)
+        Livewire::test(CreateDoughEntry::class)
             ->fillForm([
                 'user_id' => $this->admin->id,
                 'bag_count' => 5,
@@ -94,7 +96,7 @@ class PanelMovesStockTest extends TestCase
         $this->actingAs($this->admin);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        Livewire::test(\App\Filament\Resources\DoughEntryResource\Pages\CreateDoughEntry::class)
+        Livewire::test(CreateDoughEntry::class)
             ->fillForm([
                 'user_id' => $this->admin->id,
                 'bag_count' => 5,
@@ -118,7 +120,7 @@ class PanelMovesStockTest extends TestCase
     {
         $batch = ProductionRecorder::dough(5, $this->admin->id);
 
-        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)
+        Livewire::test(CreateChaneEntry::class)
             ->fillForm([
                 'dough_entry_id' => $batch->id,
                 'user_id' => $this->admin->id,
@@ -137,7 +139,7 @@ class PanelMovesStockTest extends TestCase
         $batch = ProductionRecorder::dough(5, $this->admin->id);
         $flour = InventoryItem::ofKey(InventoryItem::FLOUR)->balance;
 
-        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)
+        Livewire::test(CreateChaneEntry::class)
             ->fillForm([
                 'dough_entry_id' => $batch->id,
                 'user_id' => $this->admin->id,
@@ -155,7 +157,7 @@ class PanelMovesStockTest extends TestCase
     {
         $batch = ProductionRecorder::dough(5, $this->admin->id);
 
-        Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)
+        Livewire::test(CreateChaneEntry::class)
             ->fillForm([
                 'dough_entry_id' => $batch->id,
                 'user_id' => $this->admin->id,
@@ -173,7 +175,7 @@ class PanelMovesStockTest extends TestCase
     {
         $flour = InventoryItem::ofKey(InventoryItem::FLOUR)->balance;
 
-        Livewire::test(\App\Filament\Resources\DoughEntryResource\Pages\CreateDoughEntry::class)
+        Livewire::test(CreateDoughEntry::class)
             ->fillForm([
                 'user_id' => $this->admin->id,
                 'bag_count' => 5,

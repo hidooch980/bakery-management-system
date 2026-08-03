@@ -10,10 +10,12 @@ use App\Models\DoughEntry;
 use App\Models\Sale;
 use App\Models\SettlementRequest;
 use App\Models\User;
+use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -38,7 +40,7 @@ class SettlementRequestTest extends TestCase
         $this->seed(BakerySeeder::class);
 
         Bakery::first()->update(['bread_price' => 5000, 'currency' => 'toman']);
-        \App\Support\Money::forgetCache();
+        Money::forgetCache();
 
         $this->seller = User::factory()->create(['is_active' => true]);
         $this->seller->assignRole('seller');
@@ -68,7 +70,7 @@ class SettlementRequestTest extends TestCase
         ]);
     }
 
-    private function request(): \Illuminate\Testing\TestResponse
+    private function request(): TestResponse
     {
         return $this->actingAs($this->seller, 'sanctum')
             ->postJson('/api/v1/settlement-requests', ['note' => 'تحویل شد']);

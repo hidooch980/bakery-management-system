@@ -2,12 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Api\UserManagementController;
+use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
+use App\Models\InventoryItem;
 use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -34,7 +38,7 @@ class BakeryWorkflowTest extends TestCase
         $this->seed(BakerySeeder::class);
 
         // The chane weights the formula derives from are shop settings.
-        \App\Models\Bakery::first()->update([
+        Bakery::first()->update([
             'normal_chane_weight_kg' => 0.85,
             'nanino_chane_weight_kg' => 1.0,
         ]);
@@ -70,11 +74,11 @@ class BakeryWorkflowTest extends TestCase
         $chane = $this->userWithRole('chane_gir');
         $seller = $this->userWithRole('seller');
 
-        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::FLOUR)->move('in', 500, 'purchase');
-        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::SALT)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
-        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         // 1. Dough maker records bags.
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 10])
@@ -133,11 +137,11 @@ class BakeryWorkflowTest extends TestCase
         $dough = $this->userWithRole('dough_maker');
         $chane = $this->userWithRole('chane_gir');
 
-        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::FLOUR)->move('in', 500, 'purchase');
-        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::SALT)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
+        InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
-        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 5]);
 
@@ -264,7 +268,7 @@ class BakeryWorkflowTest extends TestCase
 
     public function test_bakery_settings_are_readable_by_all_staff(): void
     {
-        \App\Models\Bakery::first()->update([
+        Bakery::first()->update([
             'normal_chane_weight_kg' => 0.430,
             'nanino_chane_weight_kg' => 0.380,
             'bread_price' => 3000,
@@ -313,8 +317,8 @@ class BakeryWorkflowTest extends TestCase
     {
         $admin = $this->userWithRole('admin');
 
-        $seeded = \Spatie\Permission\Models\Role::pluck('name')->sort()->values()->all();
-        $assignable = collect(\App\Http\Controllers\Api\UserManagementController::ASSIGNABLE_ROLES)
+        $seeded = Role::pluck('name')->sort()->values()->all();
+        $assignable = collect(UserManagementController::ASSIGNABLE_ROLES)
             ->sort()->values()->all();
 
         // A role that exists but is not assignable cannot be given to anyone.

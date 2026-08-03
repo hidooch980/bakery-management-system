@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliDateInput;
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\BankAccountResource\Pages;
 use App\Models\BankAccount;
 use App\Support\Money;
@@ -57,7 +59,7 @@ class BankAccountResource extends Resource
                         ->maxLength(34)
                         ->prefix('IR'),
 
-                    \App\Filament\Forms\MoneyInput::make('opening_balance', 'موجودی اولیه')
+                    MoneyInput::make('opening_balance', 'موجودی اولیه')
                         ->helperText('موجودی حساب در زمان تعریف؛ بعد از آن از تراکنش‌ها محاسبه می‌شود'),
 
                     Forms\Components\Toggle::make('is_default')
@@ -127,10 +129,10 @@ class BankAccountResource extends Resource
                             ->required()
                             ->inline(),
 
-                        \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ')
+                        MoneyInput::make('amount', 'مبلغ')
                             ->required(),
 
-                        \App\Filament\Forms\JalaliDateInput::today('occurred_on', 'تاریخ')
+                        JalaliDateInput::today('occurred_on', 'تاریخ')
                             ->required(),
 
                         Forms\Components\Textarea::make('note')

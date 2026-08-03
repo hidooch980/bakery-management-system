@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DoughEntryResource\Pages;
 use App\Models\DoughEntry;
+use App\Support\Jalali;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -96,7 +97,7 @@ class DoughEntryResource extends Resource
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('زمان ثبت')
-                    ->formatStateUsing(fn ($state) => \App\Support\Jalali::dateTime($state))
+                    ->formatStateUsing(fn ($state) => Jalali::dateTime($state))
                     ->sortable(),
             ])
             ->filters([

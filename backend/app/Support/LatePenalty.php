@@ -17,8 +17,11 @@ use App\Models\Bakery;
 class LatePenalty
 {
     public const DEFAULT_FREE_DAYS = 3;
+
     public const DEFAULT_TIER1_LAST_DAY = 7;
+
     public const DEFAULT_TIER1_AMOUNT = 200_000;   // 2,000,000 Rial
+
     public const DEFAULT_TIER2_AMOUNT = 500_000;   // 5,000,000 Rial
 
     /**

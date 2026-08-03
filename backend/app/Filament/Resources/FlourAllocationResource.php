@@ -2,14 +2,18 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\JalaliMonthInput;
 use App\Filament\Resources\FlourAllocationResource\Pages;
 use App\Models\FlourAllocation;
+use App\Support\DoughFormula;
 use App\Support\Jalali;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\HtmlString;
 
 class FlourAllocationResource extends Resource
 {
@@ -34,7 +38,7 @@ class FlourAllocationResource extends Resource
                 ->description('سهمیه را به کیسه وارد کنید؛ وزن از روی وزن کیسه در تنظیمات محاسبه و بین سه دوره (۵ تا ۱۴، ۱۵ تا ۲۴، ۲۵ تا ۴ ماه بعد) تقسیم می‌شود.')
                 ->columns(2)
                 ->schema([
-                    \App\Filament\Forms\JalaliMonthInput::make('month_start', 'ماه')
+                    JalaliMonthInput::make('month_start', 'ماه')
                         ->required()
                         ->live(),
 
@@ -52,7 +56,7 @@ class FlourAllocationResource extends Resource
                                 return 'تعداد کیسه را وارد کنید؛ وزن خودکار محاسبه می‌شود.';
                             }
 
-                            $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+                            $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
                             $kg = $bags * $bagWeight;
 
                             return sprintf(
@@ -91,7 +95,7 @@ class FlourAllocationResource extends Resource
                                 return 'اگر مانده‌ای از قبل ندارید، صفر بگذارید.';
                             }
 
-                            $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+                            $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
 
                             return number_format($bags, 1).' کیسه = '
                                 .number_format($bags * $bagWeight, 1).' کیلوگرم';
@@ -113,7 +117,7 @@ class FlourAllocationResource extends Resource
                                 return '—';
                             }
 
-                            $bagWeight = \App\Support\DoughFormula::fromBakery()->bagWeightKg;
+                            $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
 
                             return sprintf(
                                 'سهمیه %s + سنوات %s = %s کیسه (%s کیلوگرم)',
@@ -139,7 +143,7 @@ class FlourAllocationResource extends Resource
                                 return 'ابتدا ماه را انتخاب کنید.';
                             }
 
-                            $start = \Illuminate\Support\Carbon::parse($month);
+                            $start = Carbon::parse($month);
                             $lines = [];
 
                             foreach (array_keys(FlourAllocation::PERIODS) as $number) {
@@ -158,7 +162,7 @@ class FlourAllocationResource extends Resource
                                 );
                             }
 
-                            return new \Illuminate\Support\HtmlString(
+                            return new HtmlString(
                                 '<div style="line-height:2">'.implode('<br>', $lines).'</div>'
                             );
                         }),

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BankAccount;
 use App\Models\Customer;
 use App\Models\Sale;
 use App\Support\AppCalendar;
@@ -131,7 +132,7 @@ class SellerCollectionController extends Controller
             // Only what actually cleared an invoice is banked, so the
             // account never shows more than the debt that was settled.
             if ($method === 'card' && $collected > 0) {
-                $account = \App\Models\BankAccount::where('is_default', true)->first();
+                $account = BankAccount::where('is_default', true)->first();
 
                 $account?->record(
                     'in',

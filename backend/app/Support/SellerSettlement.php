@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\BankAccount;
 use App\Models\Sale;
 use App\Models\SettlementRequest;
 use App\Models\User;
@@ -75,13 +76,13 @@ class SellerSettlement
     public static function confirm(
         SettlementRequest $request,
         User $admin,
-        ?\App\Models\BankAccount $account = null,
+        ?BankAccount $account = null,
     ): void {
         DB::transaction(function () use ($request, $admin, $account) {
             self::settle($request->user);
 
             $card = (float) $request->paid_card;
-            $account ??= \App\Models\BankAccount::where('is_default', true)->first();
+            $account ??= BankAccount::where('is_default', true)->first();
 
             if ($card > 0 && $account) {
                 $account->record(

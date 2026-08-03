@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\FlourAllocationResource;
+use App\Filament\Resources\FlourAllocationResource\Pages\CreateFlourAllocation;
 use App\Models\Bakery;
 use App\Models\User;
 use App\Support\Jalali;
@@ -38,14 +40,14 @@ class FlourAllocationPanelTest extends TestCase
 
     public function test_creating_a_flour_allocation_redirects_to_the_list(): void
     {
-        Livewire::test(\App\Filament\Resources\FlourAllocationResource\Pages\CreateFlourAllocation::class)
+        Livewire::test(CreateFlourAllocation::class)
             ->fillForm([
                 'month_start' => Jalali::currentMonthRange()[0]->toDateString(),
                 'total_bags' => 75,
             ])
             ->call('create')
             ->assertHasNoFormErrors()
-            ->assertRedirect(\App\Filament\Resources\FlourAllocationResource::getUrl('index'));
+            ->assertRedirect(FlourAllocationResource::getUrl('index'));
 
         $this->assertDatabaseCount('flour_allocations', 1);
     }
