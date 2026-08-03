@@ -135,12 +135,33 @@ class InventoryBagIntakeTest extends TestCase
         $this->assertSame(0.0, InventoryItem::ofKey('flour')->balance);
     }
 
-    public function test_a_seller_cannot_record_stock(): void
+    /**
+     * The seller books flour in themselves.
+     *
+     * They are often the only one on the floor when a delivery arrives, and
+     * flour sitting unrecorded until an admin opens the panel is what put
+     * the warehouse out of step in the first place.
+     */
+    public function test_a_seller_can_record_flour_arriving(): void
     {
         $seller = User::factory()->create(['is_active' => true]);
         $seller->assignRole('seller');
 
         $this->actingAs($seller, 'sanctum')
+            ->postJson('/api/v1/inventory/movements', [
+                'item' => 'flour',
+                'direction' => 'in',
+                'bags' => 5,
+            ])
+            ->assertCreated();
+    }
+
+    public function test_production_staff_still_cannot_record_stock(): void
+    {
+        $doughMaker = User::factory()->create(['is_active' => true]);
+        $doughMaker->assignRole('dough_maker');
+
+        $this->actingAs($doughMaker, 'sanctum')
             ->postJson('/api/v1/inventory/movements', [
                 'item' => 'flour',
                 'direction' => 'in',

@@ -101,6 +101,8 @@ class ApiCoverageTest extends TestCase
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 1])->assertCreated();
 
@@ -155,8 +157,10 @@ class ApiCoverageTest extends TestCase
         $this->actingAs($this->admin, 'sanctum')
             ->getJson('/api/v1/inventory')
             ->assertOk()
-            // The three standard goods are created on first read.
-            ->assertJsonCount(3, 'data');
+            // The stocked goods are created on first read: flour, salt and
+            // the two yeasts. Dough is not among them — it is mixed and
+            // shaped the same day and never sits on a shelf.
+            ->assertJsonCount(4, 'data');
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson('/api/v1/inventory/movements', [
@@ -179,6 +183,8 @@ class ApiCoverageTest extends TestCase
         InventoryItem::ofKey('flour')->move('in', 200, 'purchase');
         InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
 
+        InventoryItem::ofKey('yeast_dry')->move('in', 50, 'purchase');
+        InventoryItem::ofKey('yeast_wet')->move('in', 50, 'purchase');
         $data = $this->actingAs($this->admin, 'sanctum')
             ->getJson('/api/v1/inventory')
             ->assertOk()
@@ -214,10 +220,11 @@ class ApiCoverageTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_a_seller_may_read_inventory_but_not_change_it(): void
+    public function test_a_seller_may_read_and_move_stock_but_not_the_books(): void
     {
-        // The seller sells flour out of the warehouse, so they need to see
-        // what is left — but stock is only adjusted by an admin.
+        // The seller sells flour out of the warehouse and books deliveries
+        // in, so they hold the stock permissions. Money is still the
+        // admin's: seeing what is on the shelf is not seeing the accounts.
         $seller = $this->userWithRole('seller');
 
         $this->actingAs($seller, 'sanctum')
@@ -229,7 +236,10 @@ class ApiCoverageTest extends TestCase
                 'direction' => 'in',
                 'quantity' => 100,
             ])
-            ->assertForbidden();
+            ->assertCreated();
+
+        $this->actingAs($seller, 'sanctum')
+            ->getJson('/api/v1/reports/financial')->assertForbidden();
     }
 
     public function test_production_staff_cannot_touch_inventory(): void

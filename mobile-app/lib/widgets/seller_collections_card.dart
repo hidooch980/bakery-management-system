@@ -47,33 +47,59 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
       text: (customer['owed'] as num?)?.toStringAsFixed(0) ?? '',
     );
 
+    // How the money arrived decides where it lands: cash stays in the till,
+    // a card payment is already in the bank.
+    var method = 'cash';
+
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text('دریافت از ${customer['name']}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('بدهی: ${customer['owed_formatted']}'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: field,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'مبلغ دریافتی'),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setSheetState) => AlertDialog(
+          title: Text('دریافت از ${customer['name']}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('بدهی: ${customer['owed_formatted']}'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: field,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'مبلغ دریافتی'),
+              ),
+              const SizedBox(height: 16),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'cash',
+                    label: Text('نقد'),
+                    icon: Icon(Icons.payments_rounded, size: 18),
+                  ),
+                  ButtonSegment(
+                    value: 'card',
+                    label: Text('کارتخوان'),
+                    icon: Icon(Icons.credit_card_rounded, size: 18),
+                  ),
+                ],
+                selected: {method},
+                onSelectionChanged: (selection) =>
+                    setSheetState(() => method = selection.first),
+                showSelectedIcon: false,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('ثبت دریافت'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('انصراف'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('ثبت دریافت'),
-          ),
-        ],
       ),
     );
 
@@ -82,7 +108,11 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
     if (ok != true || amount <= 0) return;
 
     try {
-      await widget.api.collectFromCustomer(customer['customer_id'] as int, amount);
+      await widget.api.collectFromCustomer(
+        customer['customer_id'] as int,
+        amount,
+        method: method,
+      );
       if (!mounted) return;
       showMessage(context, 'دریافت ثبت شد.');
       await _load();

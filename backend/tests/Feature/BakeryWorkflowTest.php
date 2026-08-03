@@ -73,6 +73,8 @@ class BakeryWorkflowTest extends TestCase
         \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::FLOUR)->move('in', 500, 'purchase');
         \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::SALT)->move('in', 50, 'purchase');
 
+        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         // 1. Dough maker records bags.
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 10])
@@ -102,8 +104,15 @@ class BakeryWorkflowTest extends TestCase
 
         $this->assertSame('processed', $doughEntry->fresh()->status);
 
-        // Spray flour is deducted from stock automatically.
-        $this->assertDatabaseHas('flour_stock_movements', ['type' => 'out', 'amount_kg' => 4.5]);
+        // Spray flour is deducted from the warehouse automatically. It used
+        // to be written to a flour ledger of its own as well; that second
+        // ledger received spray flour and nothing else, so it drifted from
+        // the warehouse and has been dropped in favour of this one.
+        $this->assertDatabaseHas('inventory_movements', [
+            'direction' => 'out',
+            'quantity' => 4.5,
+            'reason' => 'spray',
+        ]);
 
         // 3. Seller sells the chane.
         $chaneEntry = ChaneEntry::first();
@@ -127,6 +136,8 @@ class BakeryWorkflowTest extends TestCase
         \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::FLOUR)->move('in', 500, 'purchase');
         \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::SALT)->move('in', 50, 'purchase');
 
+        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        \App\Models\InventoryItem::ofKey(\App\Models\InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 5]);
 
@@ -201,8 +212,16 @@ class BakeryWorkflowTest extends TestCase
         $doughMaker = $this->userWithRole('dough_maker');
         $chaneGir = $this->userWithRole('chane_gir');
 
-        $this->actingAs($seller, 'sanctum')
-            ->postJson('/api/v1/dough-entries', ['bag_count' => 1])->assertForbidden();
+        // The seller works every step now — a batch should not wait for
+        // whoever nominally kneads it. Whether this particular batch has
+        // the flour behind it is beside the point; what matters here is
+        // that the door is no longer shut. The boundaries below still hold.
+        $this->assertNotSame(
+            403,
+            $this->actingAs($seller, 'sanctum')
+                ->postJson('/api/v1/dough-entries', ['bag_count' => 1])
+                ->status(),
+        );
 
         $this->actingAs($doughMaker, 'sanctum')
             ->postJson('/api/v1/chane-entries', [])->assertForbidden();

@@ -72,6 +72,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'change-password',
         ]);
 
+        // In a shop this size the seller is often the only one on the floor,
+        // so they can work every step rather than a batch waiting for the
+        // person whose job it nominally is. They still cannot touch money
+        // beyond their own sales, staff accounts, or the shop's settings.
         $seller = Role::firstOrCreate(['name' => 'seller', 'guard_name' => 'web']);
         $seller->syncPermissions([
             'record-work-start',
@@ -81,9 +85,19 @@ class RolesAndPermissionsSeeder extends Seeder
             // The seller also sells flour straight out of the warehouse.
             'record-flour-sale',
             'view-own-flour-sales',
+            // Kneading and shaping, so a batch is never held up.
+            'record-dough',
+            'view-pending-dough',
+            'view-own-dough-history',
+            'record-chane',
+            'view-own-chane-history',
+            // Flour arriving, and flour lent to or borrowed from a partner.
             'view-inventory',
+            'manage-inventory',
             'view-chane-board',
             'record-attendance',
+            // Who is in today — the whole floor, not just themselves.
+            'view-attendance-reports',
             'change-password',
         ]);
 

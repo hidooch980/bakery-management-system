@@ -83,9 +83,13 @@ class SellerCollectionController extends Controller
     {
         $data = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
+            // Cash stays in the till; a card payment really did land in the
+            // bank, so it is the only one posted to an account.
+            'method' => ['nullable', 'in:cash,card'],
         ]);
 
         $amount = Money::toToman((float) $data['amount']);
+        $method = $data['method'] ?? 'cash';
 
         $open = Sale::query()
             ->where('user_id', $request->user()->id)
@@ -108,9 +112,10 @@ class SellerCollectionController extends Controller
             ), 422);
         }
 
-        $settled = DB::transaction(function () use ($open, $amount) {
+        $settled = DB::transaction(function () use ($open, $amount, $method, $request, $customer) {
             $remaining = $amount;
             $count = 0;
+            $collected = 0.0;
 
             foreach ($open as $sale) {
                 if ($remaining + 0.01 < (float) $sale->amount) {
@@ -119,7 +124,23 @@ class SellerCollectionController extends Controller
 
                 $sale->update(['settled_on' => now()]);
                 $remaining -= (float) $sale->amount;
+                $collected += (float) $sale->amount;
                 $count++;
+            }
+
+            // Only what actually cleared an invoice is banked, so the
+            // account never shows more than the debt that was settled.
+            if ($method === 'card' && $collected > 0) {
+                $account = \App\Models\BankAccount::where('is_default', true)->first();
+
+                $account?->record(
+                    'in',
+                    $collected,
+                    'settlement',
+                    $request->user()->id,
+                    null,
+                    'وصول نسیه با کارتخوان — '.$customer->name,
+                );
             }
 
             return $count;
