@@ -41,14 +41,18 @@ class BakeryFormulaPreviewTest extends TestCase
                 'flour_bag_weight_kg' => 40,
                 'water_ratio' => 0.6,
                 'salt_ratio' => 0.015,
+                'yeast_ratio' => 0,
                 'dough_loss_ratio' => 0,
+                // Proving is measured in ProofGainTest; here the
+                // formula's own arithmetic is what is under test.
+                'proof_gain_ratio' => 0,
                 'normal_chane_weight_kg' => 0.85,
                 'nanino_chane_weight_kg' => 1.0,
             ])
             // 40 + 24 + 0.6 = 64.6kg dough; 76 normal (0.85kg), 64 nanino (1.0kg).
             ->assertSee('خمیر 64.60 کیلوگرم')
-            ->assertSee('حدود 76 چانه عادی')
-            ->assertSee('حدود 64 چانه نانینو');
+            ->assertSee('تا 76 چانه عادی')
+            ->assertSee('تا 64 چانه نانینو');
     }
 
     public function test_the_preview_omits_nanino_when_its_weight_is_not_set(): void
@@ -58,14 +62,18 @@ class BakeryFormulaPreviewTest extends TestCase
                 'flour_bag_weight_kg' => 40,
                 'water_ratio' => 0.6,
                 'salt_ratio' => 0.015,
+                'yeast_ratio' => 0,
                 'dough_loss_ratio' => 0,
+                // Proving is measured in ProofGainTest; here the
+                // formula's own arithmetic is what is under test.
+                'proof_gain_ratio' => 0,
                 'normal_chane_weight_kg' => 0.85,
                 'nanino_chane_weight_kg' => null,
             ])
-            ->assertSee('حدود 76 چانه عادی')
+            ->assertSee('تا 76 چانه عادی')
             // The field label itself says "چانه نانینو"; only the preview's
             // own "یا حدود..." clause is what should disappear here.
-            ->assertDontSee('یا  حدود');
+            ->assertDontSee('یا  تا');
     }
 
     public function test_the_period_preview_covers_each_period_and_the_month_total(): void
@@ -82,7 +90,11 @@ class BakeryFormulaPreviewTest extends TestCase
                 'flour_bag_weight_kg' => 40,
                 'water_ratio' => 0.6,
                 'salt_ratio' => 0.015,
+                'yeast_ratio' => 0,
                 'dough_loss_ratio' => 0,
+                // Proving is measured in ProofGainTest; here the
+                // formula's own arithmetic is what is under test.
+                'proof_gain_ratio' => 0,
                 'normal_chane_weight_kg' => 0.85,
                 'nanino_chane_weight_kg' => 1.0,
             ])
@@ -90,12 +102,11 @@ class BakeryFormulaPreviewTest extends TestCase
 
         $text = preg_replace('/\s+/u', ' ', strip_tags($html));
 
-        // 30 bags split three ways is 10 each: 648kg of dough once the
-        // yeast is counted, 762 normal chane or 648 nanino. The month total
-        // restates all 30 together.
-        $this->assertStringContainsString('10.0 کیسه ← خمیر 648.0 کیلوگرم', $text);
-        $this->assertStringContainsString('حدود 762 چانه عادی یا حدود 648 چانه نانینو', $text);
-        $this->assertStringContainsString('سرجمع ماه: 30.0 کیسه ← خمیر 1,944.0 کیلوگرم', $text);
+        // 30 bags split three ways is 10 each: 646kg of dough, which is
+        // 760 normal chane or 646 nanino. The month total restates all 30.
+        $this->assertStringContainsString('10.0 کیسه ← خمیر 646.0 کیلوگرم', $text);
+        $this->assertStringContainsString('حدود 760 چانه عادی یا حدود 646 چانه نانینو', $text);
+        $this->assertStringContainsString('سرجمع ماه: 30.0 کیسه ← خمیر 1,938.0 کیلوگرم', $text);
     }
 
     public function test_the_period_preview_says_so_when_no_quota_is_registered(): void

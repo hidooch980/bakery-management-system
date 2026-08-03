@@ -205,6 +205,16 @@ class ManageBakery extends Page implements HasForms
                             ->live(onBlur: true)
                             ->helperText('مثلاً ۰٫۰۱۷۵ یعنی ۷۰۰ گرم در کیسه ۴۰ کیلویی'),
 
+                        Forms\Components\TextInput::make('proof_gain_ratio')
+                            ->label('افزایش پس از خواب')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(1)
+                            ->step(0.01)
+                            ->required()
+                            ->live(onBlur: true)
+                            ->helperText('خمیر بعد از خواب ور می‌آید و چانه بیشتری می‌دهد. مثلاً ۰٫۱۰ یعنی ۱۰٪ بیشتر.'),
+
                         Forms\Components\TextInput::make('yeast_ratio')
                             ->label('نسبت خمیرمایه به آرد')
                             ->numeric()
@@ -230,19 +240,32 @@ class ManageBakery extends Page implements HasForms
                             ->columnSpanFull()
                             ->content(function (Forms\Get $get) {
                                 $bag = (float) ($get('flour_bag_weight_kg') ?: 0);
-                                $water = (float) ($get('water_ratio') ?: 0);
-                                $salt = (float) ($get('salt_ratio') ?: 0);
-                                $loss = (float) ($get('dough_loss_ratio') ?: 0);
-                                $normal = (float) ($get('normal_chane_weight_kg') ?: 0);
-                                $nanino = (float) ($get('nanino_chane_weight_kg') ?: 0);
 
                                 if ($bag <= 0) {
                                     return 'ابتدا وزن کیسه را وارد کنید.';
                                 }
 
-                                $dough = ($bag + $bag * $water + $bag * $salt) * (1 - $loss);
-                                $count = $normal > 0 ? floor($dough / $normal) : null;
-                                $naninoCount = $nanino > 0 ? floor($dough / $nanino) : null;
+                                // Built from the formula itself rather than
+                                // repeating its arithmetic here. The copy
+                                // that used to live in this preview had
+                                // quietly fallen a whole ingredient behind.
+                                $formula = new DoughFormula(
+                                    bagWeightKg: $bag,
+                                    waterRatio: (float) ($get('water_ratio') ?: 0),
+                                    saltRatio: (float) ($get('salt_ratio') ?: 0),
+                                    yeastRatio: (float) ($get('yeast_ratio') ?: 0),
+                                    lossRatio: (float) ($get('dough_loss_ratio') ?: 0),
+                                    normalChaneWeightKg: ((float) $get('normal_chane_weight_kg')) ?: null,
+                                    naninoChaneWeightKg: ((float) $get('nanino_chane_weight_kg')) ?: null,
+                                    proofGainRatio: (float) ($get('proof_gain_ratio') ?: 0),
+                                );
+
+                                $normal = $formula->normalChaneWeightKg ?? 0;
+                                $mixed = $formula->doughKg(1);
+                                $dough = $formula->shapeableKg(1);
+                                $count = $formula->normalChaneCount(1);
+                                $naninoCount = $formula->naninoChaneCount(1);
+                                $rawCount = $normal > 0 ? (int) floor($mixed / $normal) : null;
 
                                 // Shaping spends the dough it was given, so
                                 // the line says what each chane costs and
@@ -250,7 +273,7 @@ class ManageBakery extends Page implements HasForms
                                 // the figures the warehouse is deducted by.
                                 $consumption = '';
 
-                                if ($count !== null) {
+                                if ($count !== null && $normal > 0) {
                                     $used = $count * $normal;
                                     $leftOver = $dough - $used;
 
@@ -269,16 +292,26 @@ class ManageBakery extends Page implements HasForms
                                     );
                                 }
 
-                                return sprintf(
-                                    'آرد %s + آب %s + نمک %s  ←  خمیر %s کیلوگرم%s%s%s',
-                                    number_format($bag, 1),
-                                    number_format($bag * $water, 1),
-                                    number_format($bag * $salt, 2),
+                                // Both figures, because a batch is not one
+                                // number: it weighs one thing in the bowl and
+                                // gives another off the bench, and how much
+                                // more depends on how the day's rest went.
+                                return new HtmlString(sprintf(
+                                    'آرد %s + آب %s + نمک %s + خمیرمایه %s  ←  خمیر %s کیلوگرم'
+                                    .'%s<br>پس از خواب: %s کیلوگرم%s%s%s',
+                                    number_format($formula->flourKg(1), 1),
+                                    number_format($formula->waterKg(1), 1),
+                                    number_format($formula->saltKg(1), 2),
+                                    number_format($formula->yeastKg(1), 3),
+                                    number_format($mixed, 2),
+                                    $rawCount !== null
+                                        ? '  ←  '.number_format($rawCount).' چانه عادی پیش از خواب'
+                                        : '',
                                     number_format($dough, 2),
-                                    $count !== null ? '  ←  حدود '.number_format($count).' چانه عادی' : '',
-                                    $naninoCount !== null ? '  یا  حدود '.number_format($naninoCount).' چانه نانینو' : '',
+                                    $count !== null ? '  ←  تا '.number_format($count).' چانه عادی' : '',
+                                    $naninoCount !== null ? '  یا  تا '.number_format($naninoCount).' چانه نانینو' : '',
                                     $consumption
-                                );
+                                ));
                             }),
 
                         Forms\Components\Placeholder::make('period_preview')
@@ -306,6 +339,7 @@ class ManageBakery extends Page implements HasForms
                                     saltRatio: (float) ($get('salt_ratio') ?: 0),
                                     yeastRatio: (float) ($get('yeast_ratio') ?: 0),
                                     lossRatio: (float) ($get('dough_loss_ratio') ?: 0),
+                                    proofGainRatio: (float) ($get('proof_gain_ratio') ?: 0),
                                     normalChaneWeightKg: ((float) $get('normal_chane_weight_kg')) ?: null,
                                     naninoChaneWeightKg: ((float) $get('nanino_chane_weight_kg')) ?: null,
                                 );

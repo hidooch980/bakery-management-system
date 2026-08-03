@@ -85,9 +85,34 @@ class SaleResource extends Resource
                                 ->numeric()
                                 ->minValue(1)
                                 ->required()
-                                ->suffix('عدد'),
+                                ->suffix('عدد')
+                                ->live(onBlur: true)
+                                // The amount follows the count at the shop's
+                                // own price, so nobody multiplies it by hand
+                                // and nobody types the wrong unit. It stays
+                                // editable for the sale that went otherwise.
+                                ->afterStateUpdated(function ($state, Forms\Set $set, Forms\Get $get) {
+                                    $type = $get('payment_type');
 
-                            \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ'),
+                                    if (in_array($type, \App\Models\Sale::GIVEAWAY_TYPES, true)
+                                        || in_array($type, \App\Models\Sale::SHORTFALL_TYPES, true)) {
+                                        $set('amount', null);
+
+                                        return;
+                                    }
+
+                                    $price = (float) (\App\Models\Bakery::first()?->bread_price ?? 0);
+                                    $count = (int) $state;
+
+                                    if ($price > 0 && $count > 0) {
+                                        // Written in the display unit, since
+                                        // that is what this field shows.
+                                        $set('amount', \App\Support\Money::convert($count * $price));
+                                    }
+                                }),
+
+                            \App\Filament\Forms\MoneyInput::make('amount', 'مبلغ')
+                                ->helperText('از قیمت نان در اطلاعات نانوایی حساب می‌شود؛ اگر فرق داشت تغییرش دهید.'),
 
                             Forms\Components\Select::make('customer_id')
                                 ->label('مدرسه / اداره')

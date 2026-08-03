@@ -37,6 +37,8 @@ class DoughFormula
         public readonly float $lossRatio,
         public readonly ?float $normalChaneWeightKg,
         public readonly ?float $naninoChaneWeightKg,
+        /** How much more the dough yields once it has proved. */
+        public readonly float $proofGainRatio = 0.0,
     ) {}
 
     public static function fromBakery(?Bakery $bakery = null): self
@@ -55,7 +57,21 @@ class DoughFormula
             naninoChaneWeightKg: $bakery?->nanino_chane_weight_kg
                 ? (float) $bakery->nanino_chane_weight_kg
                 : null,
+            proofGainRatio: (float) ($bakery?->proof_gain_ratio ?? 0.115),
         );
+    }
+
+    /**
+     * What the batch actually yields on the bench.
+     *
+     * doughKg() is what went into the bowl. The batch is shaped after it
+     * has proved, and by then it gives more chane than that raw weight
+     * divided by the weight of one — worth up to ninety chane on a batch
+     * in a shop that lets it rest properly.
+     */
+    public function shapeableKg(float $bags): float
+    {
+        return round($this->doughKg($bags) * (1 + $this->proofGainRatio), 3);
     }
 
     public static function yeastLabel(?string $type): string
@@ -102,7 +118,7 @@ class DoughFormula
             return null;
         }
 
-        return (int) floor($this->doughKg($bags) / $this->normalChaneWeightKg);
+        return (int) floor($this->shapeableKg($bags) / $this->normalChaneWeightKg);
     }
 
     public function naninoChaneCount(float $bags): ?int
@@ -111,7 +127,7 @@ class DoughFormula
             return null;
         }
 
-        return (int) floor($this->doughKg($bags) / $this->naninoChaneWeightKg);
+        return (int) floor($this->shapeableKg($bags) / $this->naninoChaneWeightKg);
     }
 
     /**
@@ -180,6 +196,7 @@ class DoughFormula
             'salt_ratio' => $this->saltRatio,
             'yeast_ratio' => $this->yeastRatio,
             'dough_loss_ratio' => $this->lossRatio,
+            'proof_gain_ratio' => $this->proofGainRatio,
             'normal_chane_weight_kg' => $this->normalChaneWeightKg,
             'nanino_chane_weight_kg' => $this->naninoChaneWeightKg,
             'per_bag' => [
@@ -188,6 +205,7 @@ class DoughFormula
                 'salt_kg' => $this->saltKg($bags),
                 'yeast_kg' => $this->yeastKg($bags),
                 'dough_kg' => $this->doughKg($bags),
+                'shapeable_kg' => $this->shapeableKg($bags),
                 'normal_chane_count' => $this->normalChaneCount($bags),
                 'nanino_chane_count' => $this->naninoChaneCount($bags),
             ],

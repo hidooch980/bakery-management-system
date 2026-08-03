@@ -38,6 +38,9 @@ class ChaneOvershootTest extends TestCase
             'water_ratio' => 0.6,
             'salt_ratio' => 0.015,
             'dough_loss_ratio' => 0,
+            // Proving is measured in ProofGainTest; here the
+            // formula's own arithmetic is what is under test.
+            'proof_gain_ratio' => 0,
             'normal_chane_weight_kg' => 0.85,
         ]);
 
@@ -66,12 +69,13 @@ class ChaneOvershootTest extends TestCase
     {
         $dough = $this->batch();
 
-        // Ten bags make 646kg. 797 chane at 0.85kg is 677kg — more dough
-        // than this batch ever held.
+        // Ten bags make 646kg. 900 chane at 0.85kg is 765kg — eighteen per
+        // cent more dough than the batch held, which is past anything a
+        // scale or a good rest can account for.
         $this->actingAs($this->chaneGir, 'sanctum')
             ->postJson('/api/v1/chane-entries', [
                 'dough_entry_id' => $dough->id,
-                'chane_count' => 797,
+                'chane_count' => 900,
                 'spray_flour_kg' => 0,
             ])
             ->assertStatus(422);
@@ -84,7 +88,7 @@ class ChaneOvershootTest extends TestCase
         $this->actingAs($this->chaneGir, 'sanctum')
             ->postJson('/api/v1/chane-entries', [
                 'dough_entry_id' => $dough->id,
-                'chane_count' => 797,
+                'chane_count' => 900,
                 'spray_flour_kg' => 0,
             ])
             ->assertStatus(422);
@@ -103,7 +107,7 @@ class ChaneOvershootTest extends TestCase
         $this->actingAs($this->chaneGir, 'sanctum')
             ->postJson('/api/v1/chane-entries', [
                 'dough_entry_id' => $first->id,
-                'chane_count' => 797,
+                'chane_count' => 900,
                 'spray_flour_kg' => 0,
             ])
             ->assertStatus(422);
@@ -160,7 +164,7 @@ class ChaneOvershootTest extends TestCase
                 'dough_entry_id' => $dough->id,
                 'user_id' => $this->chaneGir->id,
                 'spray_flour_kg' => 0,
-                'trays' => [['count' => 797]],
+                'trays' => [['count' => 900]],
             ])
             ->call('create');
 

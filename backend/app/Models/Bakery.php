@@ -26,6 +26,7 @@ class Bakery extends Model
         'salt_ratio',
         'yeast_ratio',
         'dough_loss_ratio',
+        'proof_gain_ratio',
         'calendar',
         'chane_start_deadline',
         'baking_start_deadline',
@@ -48,6 +49,7 @@ class Bakery extends Model
             'flour_bag_weight_kg' => 'decimal:3',
             'water_ratio' => 'decimal:3',
             'yeast_ratio' => 'decimal:5',
+            'proof_gain_ratio' => 'decimal:4',
             'salt_ratio' => 'decimal:4',
             'dough_loss_ratio' => 'decimal:4',
         ];

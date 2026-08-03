@@ -32,6 +32,9 @@ class ProductionFormulaTest extends TestCase
             'water_ratio' => 0.6,
             'salt_ratio' => 0.015,
             'dough_loss_ratio' => 0,
+            // Proving is measured in ProofGainTest; here the
+            // formula's own arithmetic is what is under test.
+            'proof_gain_ratio' => 0,
             'normal_chane_weight_kg' => 0.85,
             'nanino_chane_weight_kg' => 1.0,
         ]);

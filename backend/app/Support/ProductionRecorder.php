@@ -90,27 +90,47 @@ class ProductionRecorder
      * the shop only finds out when the next entry is refused for stock
      * that should have been there.
      *
-     * A small tolerance is allowed: the scale and the formula will never
-     * agree to the gram.
+     * The tolerance is a share of the batch, not a fixed weight. Half a
+     * kilo sounds generous until it is measured against a ten-bag batch,
+     * where it is seven hundredths of one per cent — tighter than any
+     * scale, and tighter than shaping by hand can ever be. A batch that
+     * comes out two per cent over is a normal day; a count typed one digit
+     * too long is a thousand per cent over, and still caught.
      */
-    public const OVERSHOOT_TOLERANCE_KG = 0.5;
+    public const OVERSHOOT_TOLERANCE_RATIO = 0.05;
+
+    /** A floor for tiny batches, where a percentage is worth almost nothing. */
+    public const OVERSHOOT_TOLERANCE_MIN_KG = 0.5;
+
+    public static function overshootAllowance(float $availableKg): float
+    {
+        return max(
+            self::OVERSHOOT_TOLERANCE_MIN_KG,
+            $availableKg * self::OVERSHOOT_TOLERANCE_RATIO
+        );
+    }
 
     public static function problemWithChane(
         DoughEntry $dough,
         float $normalWeightKg,
         float $naninoWeightKg,
     ): ?string {
-        $available = DoughFormula::fromBakery()->doughKg((float) $dough->bag_count);
+        // Measured against what the batch yields once proved, not what it
+        // weighed in the bowl — the shaping happens after the rest.
+        $available = DoughFormula::fromBakery()->shapeableKg((float) $dough->bag_count);
         $shaped = $normalWeightKg + $naninoWeightKg;
 
-        if ($shaped <= $available + self::OVERSHOOT_TOLERANCE_KG) {
+        if ($shaped <= $available + self::overshootAllowance($available)) {
             return null;
         }
 
+        // Say by how much, so the difference between a heavy day and a
+        // mistyped count is obvious to whoever is standing there.
         return sprintf(
-            'وزن چانه‌های ثبت‌شده (%s کیلوگرم) از خمیر این پخت (%s کیلوگرم) بیشتر است. تعداد چانه را بررسی کنید.',
+            'وزن چانه‌های ثبت‌شده (%s کیلوگرم) از خمیر این پخت (%s کیلوگرم) بیشتر است — %s درصد اضافه. تعداد چانه را بررسی کنید.',
             number_format($shaped, 2),
             number_format($available, 2),
+            number_format($available > 0 ? ($shaped - $available) / $available * 100 : 0, 1),
         );
     }
 

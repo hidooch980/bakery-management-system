@@ -52,6 +52,7 @@ class BakeryController extends Controller
             'salt_ratio' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'yeast_ratio' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'dough_loss_ratio' => ['nullable', 'numeric', 'min:0', 'max:0.9'],
+            'proof_gain_ratio' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'flour_price_per_kg' => ['nullable', 'numeric', 'min:0'],
             'flour_price_per_bag' => ['nullable', 'numeric', 'min:0'],
             'flour_purchase_price_per_kg' => ['nullable', 'numeric', 'min:0'],
