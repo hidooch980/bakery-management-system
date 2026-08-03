@@ -52,7 +52,8 @@ class SaleRecorder
                 // price change cannot rewrite what a seller already owed.
                 // Bread given away is expected to bring in nothing, so it
                 // is not a gap the seller has to answer for.
-                $isGiveaway = in_array($line['payment_type'], Sale::GIVEAWAY_TYPES, true);
+                $isGiveaway = in_array($line['payment_type'], Sale::GIVEAWAY_TYPES, true)
+                    || in_array($line['payment_type'], Sale::SHORTFALL_TYPES, true);
 
                 $difference = ($isGiveaway || $amount === null || $breadPrice <= 0)
                     ? null
@@ -66,6 +67,17 @@ class SaleRecorder
                     ? BankAccount::where('is_default', true)->value('id')
                     : null;
 
+                // Bread the seller named as unaccounted-for is its own
+                // shortfall. The automatic figure below is the backstop for
+                // what they did not name; the two never cover the same
+                // loaves, because a named line counts towards the batch.
+                $isNamedShortfall = in_array($line['payment_type'], Sale::SHORTFALL_TYPES, true);
+                $lineShortfall = $isNamedShortfall ? (int) $line['bread_count'] : 0;
+
+                $carriesBatchShortfall = ! $isNamedShortfall
+                    && ! $shortfallApplied
+                    && $shortfallCount > 0;
+
                 $created[] = Sale::create([
                     'chane_entry_id' => $chane->id,
                     'user_id' => $userId,
@@ -73,12 +85,14 @@ class SaleRecorder
                     'bread_count' => $line['bread_count'],
                     // The batch's shortfall belongs to the batch, so it
                     // rides on the first line only and is never doubled.
-                    'shortfall_count' => (! $shortfallApplied && $shortfallCount > 0)
-                        ? $shortfallCount
-                        : null,
-                    'shortfall_amount' => (! $shortfallApplied && $shortfallCount > 0)
-                        ? round($shortfallCount * $breadPrice, 2)
-                        : null,
+                    'shortfall_count' => $lineShortfall > 0
+                        ? $lineShortfall
+                        : ($carriesBatchShortfall ? $shortfallCount : null),
+                    'shortfall_amount' => $lineShortfall > 0
+                        ? round($lineShortfall * $breadPrice, 2)
+                        : ($carriesBatchShortfall
+                            ? round($shortfallCount * $breadPrice, 2)
+                            : null),
                     'amount_difference' => $difference,
                     'customer_id' => $line['customer_id'] ?? null,
                     'amount' => $amount,
@@ -86,7 +100,12 @@ class SaleRecorder
                     'note' => $line['note'] ?? null,
                 ]);
 
-                $shortfallApplied = true;
+                // Only a line that actually carried the batch's shortfall
+                // closes it off. A line the seller named as shortfall
+                // carries its own, and must not consume the backstop.
+                if ($carriesBatchShortfall) {
+                    $shortfallApplied = true;
+                }
             }
 
             $chane->update(['status' => 'sold']);

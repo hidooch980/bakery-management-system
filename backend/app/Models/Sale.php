@@ -30,11 +30,22 @@ class Sale extends Model
     public const DEBT_TYPES = ['credit', 'schools'];
 
     /**
-     * Bread given away. No money is expected, so these lines are left out
-     * of the money-gap check — counting them would put the price of every
-     * loaf donated onto the seller as a debt.
+     * Bread that leaves without money: donated, or taken home by the staff.
+     *
+     * No payment is expected for either, so they are left out of the
+     * money-gap check and never land on the seller's account. Counting
+     * them would put the price of every loaf given away onto the person
+     * who handed it over, as though they had pocketed it.
      */
-    public const GIVEAWAY_TYPES = ['charity'];
+    public const GIVEAWAY_TYPES = ['charity', 'home'];
+
+    /**
+     * Bread the seller cannot account for. No money is expected, so it is
+     * outside the money-gap check like the giveaways — but unlike them it
+     * lands on the seller's account, because the loaves left and nothing
+     * came back for them.
+     */
+    public const SHORTFALL_TYPES = ['shortfall'];
 
     /**
      * Payment types whose money reaches the bank on its own. A card
@@ -46,10 +57,11 @@ class Sale extends Model
 
     /**
      * Payment types where the seller physically holds the money until they
-     * hand it over. Card payments reach the bank on their own, and credit
-     * and school sales are the customer's debt, not the seller's.
+     * hand it over. Card payments reach the bank on their own, credit and
+     * school sales are the customer's debt rather than the seller's, and
+     * bread taken home was never paid for at all.
      */
-    public const CASH_TYPES = ['cash', 'home'];
+    public const CASH_TYPES = ['cash'];
 
     protected function casts(): array
     {

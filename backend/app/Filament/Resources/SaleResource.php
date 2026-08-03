@@ -33,6 +33,7 @@ class SaleResource extends Resource
         'home' => 'منزل',
         'schools' => 'مدارس',
         'charity' => 'خیرات و کمک',
+        'shortfall' => 'کسری نان',
         'other' => 'سایر',
     ];
 
@@ -194,6 +195,7 @@ class SaleResource extends Resource
                         'home' => 'warning',
                         'schools' => 'primary',
                         'charity' => 'info',
+                        'shortfall' => 'danger',
                         default => 'gray',
                     }),
 

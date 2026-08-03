@@ -5,6 +5,7 @@ namespace App\Filament\Resources\SaleResource\Pages;
 use App\Filament\Resources\SaleResource;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
+use App\Support\Money;
 use App\Support\SaleRecorder;
 use Filament\Actions;
 use Filament\Notifications\Notification;
@@ -30,8 +31,15 @@ class CreateSale extends CreateRecord
             ->map(fn (array $line) => [
                 'payment_type' => $line['payment_type'] ?? 'cash',
                 'bread_count' => (int) ($line['bread_count'] ?? 0),
+                // Read from the live form state, which is what the admin
+                // typed — in the shop's display unit. MoneyInput's own
+                // conversion only applies to the dehydrated payload, so it
+                // never reaches here; converting it now keeps this figure
+                // in the same Toman as the bread price it is measured
+                // against. Skip it and the money gap comes out at nine
+                // times the sale on a Rial shop.
                 'amount' => isset($line['amount']) && $line['amount'] !== ''
-                    ? (float) $line['amount']
+                    ? Money::toToman((float) $line['amount'])
                     : null,
                 'customer_id' => $line['customer_id'] ?? null,
                 'note' => $data['note'] ?? null,

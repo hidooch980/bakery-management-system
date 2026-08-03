@@ -8,6 +8,7 @@ use App\Models\DoughEntry;
 use App\Models\InventoryItem;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\SaleRecorder;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,6 +40,61 @@ class SaleShortfallTest extends TestCase
         ]);
     }
 
+    public function test_a_named_shortfall_line_charges_the_seller(): void
+    {
+        $seller = $this->userWithRole('seller');
+        $chane = $this->chaneBatchOf(100);
+
+        // The seller says plainly that 10 loaves are unaccounted for,
+        // rather than leaving them to be inferred from what is missing.
+        SaleRecorder::record($chane, [
+            ['payment_type' => 'cash', 'bread_count' => 90, 'amount' => 450_000,
+                'customer_id' => null, 'note' => null],
+            ['payment_type' => 'shortfall', 'bread_count' => 10, 'amount' => null,
+                'customer_id' => null, 'note' => null],
+        ], $seller->id);
+
+        $named = Sale::where('payment_type', 'shortfall')->firstOrFail();
+
+        $this->assertSame(10, (int) $named->shortfall_count);
+        $this->assertSame('50000.00', $named->shortfall_amount);
+
+        // Counted once for the batch: the cash line carries nothing, since
+        // the lines already add up to every loaf.
+        $cash = Sale::where('payment_type', 'cash')->firstOrFail();
+        $this->assertNull($cash->shortfall_count);
+
+        // And no money gap — a shortfall line was never expected to pay.
+        $this->assertNull($named->amount_difference);
+    }
+
+    public function test_the_automatic_shortfall_still_catches_what_was_not_named(): void
+    {
+        $seller = $this->userWithRole('seller');
+        $chane = $this->chaneBatchOf(100);
+
+        // 80 sold, 5 named as short — the other 15 are still unaccounted
+        // for and must not slip through because a line was named.
+        SaleRecorder::record($chane, [
+            ['payment_type' => 'shortfall', 'bread_count' => 5, 'amount' => null,
+                'customer_id' => null, 'note' => null],
+            ['payment_type' => 'cash', 'bread_count' => 80, 'amount' => 400_000,
+                'customer_id' => null, 'note' => null],
+        ], $seller->id);
+
+        $named = Sale::where('payment_type', 'shortfall')->firstOrFail();
+        $cash = Sale::where('payment_type', 'cash')->firstOrFail();
+
+        $this->assertSame(5, (int) $named->shortfall_count);
+        $this->assertSame(15, (int) $cash->shortfall_count);
+
+        // 20 loaves in all, at 5,000 apiece.
+        $total = Sale::where('user_id', $seller->id)->get()
+            ->sum(fn (Sale $s) => $s->open_shortfall);
+
+        $this->assertSame(100_000.0, round($total, 2));
+    }
+
     private function userWithRole(string $role): User
     {
         $user = User::factory()->create(['is_active' => true]);
@@ -52,6 +108,8 @@ class SaleShortfallTest extends TestCase
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $dough = $this->userWithRole('dough_maker');
         $chane = $this->userWithRole('chane_gir');
 

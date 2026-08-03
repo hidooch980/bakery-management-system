@@ -21,7 +21,7 @@ class SaleController extends Controller
     // anyone in need. It moves real bread but brings in no money, so it
     // is a payment type of its own rather than a sale recorded at zero,
     // which would read as a shortfall the seller has to answer for.
-    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'charity', 'other'];
+    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'charity', 'shortfall', 'other'];
 
     /**
      * Seller records the sale of a pending chane batch.
