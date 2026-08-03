@@ -1,8 +1,8 @@
 <?php
 
-use App\Models\InventoryItem;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -19,8 +19,11 @@ return new class extends Migration
             $table->decimal('bag_weight_kg', 8, 3)->nullable()->after('unit');
         });
 
-        InventoryItem::ofKey(InventoryItem::SALT)->update(['bag_weight_kg' => 25]);
-        InventoryItem::ofKey(InventoryItem::DOUGH)->update(['bag_weight_kg' => 10]);
+        // Written as literals rather than model constants: a migration
+        // has to keep meaning what it meant the day it ran, and the model
+        // moves on — dough has since stopped being a stocked good at all.
+        DB::table('inventory_items')->where('key', 'salt')->update(['bag_weight_kg' => 25]);
+        DB::table('inventory_items')->where('key', 'dough')->update(['bag_weight_kg' => 10]);
     }
 
     public function down(): void

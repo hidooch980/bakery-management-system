@@ -22,21 +22,33 @@ class DoughEntryController extends Controller
     {
         $data = $request->validate([
             'bag_count' => ['required', 'integer', 'min:1', 'max:1000'],
+            // Which yeast: fresh proves faster, so it is what winter calls
+            // for; dry is the rest of the year.
+            'yeast_type' => ['nullable', 'in:dry,wet'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $type = $data['yeast_type'] ?? DoughFormula::DRY;
         $formula = DoughFormula::fromBakery();
         $bags = (int) $data['bag_count'];
 
-        $entry = ProductionRecorder::dough($bags, $request->user()->id, $data['note'] ?? null);
+        $entry = ProductionRecorder::dough(
+            $bags,
+            $request->user()->id,
+            $data['note'] ?? null,
+            $type,
+        );
 
         return $this->success([
             'entry' => $entry,
+            'yeast_type' => $entry->yeast_type,
+            'yeast_type_label' => $entry->yeast_type_label,
             // The expected yield, so the app can show it straight away.
             'expected' => [
                 'flour_kg' => $formula->flourKg($bags),
                 'water_kg' => $formula->waterKg($bags),
                 'salt_kg' => $formula->saltKg($bags),
+                'yeast_kg' => $formula->yeastKg($bags),
                 'dough_kg' => $formula->doughKg($bags),
                 'normal_chane_count' => $formula->normalChaneCount($bags),
                 'nanino_chane_count' => $formula->naninoChaneCount($bags),

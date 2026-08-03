@@ -24,6 +24,7 @@ class Bakery extends Model
         'flour_bag_weight_kg',
         'water_ratio',
         'salt_ratio',
+        'yeast_ratio',
         'dough_loss_ratio',
         'calendar',
         'chane_start_deadline',
@@ -46,6 +47,7 @@ class Bakery extends Model
             'flour_transport_by_factory' => 'boolean',
             'flour_bag_weight_kg' => 'decimal:3',
             'water_ratio' => 'decimal:3',
+            'yeast_ratio' => 'decimal:5',
             'salt_ratio' => 'decimal:4',
             'dough_loss_ratio' => 'decimal:4',
         ];

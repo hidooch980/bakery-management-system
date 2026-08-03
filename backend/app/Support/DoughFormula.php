@@ -11,7 +11,8 @@ use App\Models\Bakery;
  *   flour   = bags × bag weight
  *   water   = flour × water ratio
  *   salt    = flour × salt ratio
- *   dough   = (flour + water + salt) × (1 − loss ratio)
+ *   yeast   = flour × yeast ratio
+ *   dough   = (flour + water + salt + yeast) × (1 − loss ratio)
  *   chane   = dough ÷ per-chane weight
  *
  * Keeping this in one place means the panel, the API and the app can never
@@ -19,10 +20,20 @@ use App\Models\Bakery;
  */
 class DoughFormula
 {
+    /** Which yeast a batch was mixed with. Fresh proves faster in the cold. */
+    public const DRY = 'dry';
+    public const WET = 'wet';
+
+    public const YEAST_LABELS = [
+        self::DRY => 'خمیرمایه خشک',
+        self::WET => 'خمیرمایه تر',
+    ];
+
     public function __construct(
         public readonly float $bagWeightKg,
         public readonly float $waterRatio,
         public readonly float $saltRatio,
+        public readonly float $yeastRatio,
         public readonly float $lossRatio,
         public readonly ?float $normalChaneWeightKg,
         public readonly ?float $naninoChaneWeightKg,
@@ -34,8 +45,9 @@ class DoughFormula
 
         return new self(
             bagWeightKg: (float) ($bakery?->flour_bag_weight_kg ?? 40),
-            waterRatio: (float) ($bakery?->water_ratio ?? 0.6),
-            saltRatio: (float) ($bakery?->salt_ratio ?? 0.015),
+            waterRatio: (float) ($bakery?->water_ratio ?? 0.5),
+            saltRatio: (float) ($bakery?->salt_ratio ?? 0.0175),
+            yeastRatio: (float) ($bakery?->yeast_ratio ?? 0.005),
             lossRatio: (float) ($bakery?->dough_loss_ratio ?? 0),
             normalChaneWeightKg: $bakery?->normal_chane_weight_kg
                 ? (float) $bakery->normal_chane_weight_kg
@@ -44,6 +56,11 @@ class DoughFormula
                 ? (float) $bakery->nanino_chane_weight_kg
                 : null,
         );
+    }
+
+    public static function yeastLabel(?string $type): string
+    {
+        return self::YEAST_LABELS[$type] ?? self::YEAST_LABELS[self::DRY];
     }
 
     public function flourKg(float $bags): float
@@ -61,10 +78,19 @@ class DoughFormula
         return round($this->flourKg($bags) * $this->saltRatio, 3);
     }
 
+    /** Yeast the batch takes, whichever kind the shop used. */
+    public function yeastKg(float $bags): float
+    {
+        return round($this->flourKg($bags) * $this->yeastRatio, 3);
+    }
+
     /** Total usable dough after the configured handling loss. */
     public function doughKg(float $bags): float
     {
-        $raw = $this->flourKg($bags) + $this->waterKg($bags) + $this->saltKg($bags);
+        $raw = $this->flourKg($bags)
+            + $this->waterKg($bags)
+            + $this->saltKg($bags)
+            + $this->yeastKg($bags);
 
         return round($raw * (1 - $this->lossRatio), 3);
     }
@@ -152,6 +178,7 @@ class DoughFormula
             'flour_bag_weight_kg' => $this->bagWeightKg,
             'water_ratio' => $this->waterRatio,
             'salt_ratio' => $this->saltRatio,
+            'yeast_ratio' => $this->yeastRatio,
             'dough_loss_ratio' => $this->lossRatio,
             'normal_chane_weight_kg' => $this->normalChaneWeightKg,
             'nanino_chane_weight_kg' => $this->naninoChaneWeightKg,
@@ -159,6 +186,7 @@ class DoughFormula
                 'flour_kg' => $this->flourKg($bags),
                 'water_kg' => $this->waterKg($bags),
                 'salt_kg' => $this->saltKg($bags),
+                'yeast_kg' => $this->yeastKg($bags),
                 'dough_kg' => $this->doughKg($bags),
                 'normal_chane_count' => $this->normalChaneCount($bags),
                 'nanino_chane_count' => $this->naninoChaneCount($bags),

@@ -9,9 +9,16 @@ class DoughEntry extends Model
     protected $fillable = [
         'user_id',
         'bag_count',
+        'yeast_type',
         'status',
         'note',
     ];
+
+    /** Which yeast this batch was mixed with. */
+    public function getYeastTypeLabelAttribute(): string
+    {
+        return \App\Support\DoughFormula::yeastLabel($this->yeast_type);
+    }
 
     protected static function booted(): void
     {

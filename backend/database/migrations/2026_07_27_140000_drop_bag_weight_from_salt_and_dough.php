@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\InventoryItem;
 use Illuminate\Database\Migrations\Migration;
 
 return new class extends Migration
@@ -16,13 +15,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        InventoryItem::whereIn('key', [InventoryItem::SALT, InventoryItem::DOUGH])
+        DB::table('inventory_items')->whereIn('key', ['salt', 'dough'])
             ->update(['bag_weight_kg' => null]);
     }
 
     public function down(): void
     {
-        InventoryItem::ofKey(InventoryItem::SALT)->update(['bag_weight_kg' => 25]);
-        InventoryItem::ofKey(InventoryItem::DOUGH)->update(['bag_weight_kg' => 10]);
+        DB::table('inventory_items')->where('key', 'salt')->update(['bag_weight_kg' => 25]);
+        DB::table('inventory_items')->where('key', 'dough')->update(['bag_weight_kg' => 10]);
     }
 };

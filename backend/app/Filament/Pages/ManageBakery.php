@@ -203,7 +203,17 @@ class ManageBakery extends Page implements HasForms
                             ->step(0.001)
                             ->required()
                             ->live(onBlur: true)
-                            ->helperText('مثلاً ۰٫۰۱۵ یعنی ۱٫۵٪'),
+                            ->helperText('مثلاً ۰٫۰۱۷۵ یعنی ۷۰۰ گرم در کیسه ۴۰ کیلویی'),
+
+                        Forms\Components\TextInput::make('yeast_ratio')
+                            ->label('نسبت خمیرمایه به آرد')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(1)
+                            ->step(0.00001)
+                            ->required()
+                            ->live(onBlur: true)
+                            ->helperText('مثلاً ۰٫۰۰۵ یعنی ۲۰۰ گرم در کیسه ۴۰ کیلویی'),
 
                         Forms\Components\TextInput::make('dough_loss_ratio')
                             ->label('ضایعات و تبخیر')
@@ -294,6 +304,7 @@ class ManageBakery extends Page implements HasForms
                                     bagWeightKg: $bag,
                                     waterRatio: (float) ($get('water_ratio') ?: 0),
                                     saltRatio: (float) ($get('salt_ratio') ?: 0),
+                                    yeastRatio: (float) ($get('yeast_ratio') ?: 0),
                                     lossRatio: (float) ($get('dough_loss_ratio') ?: 0),
                                     normalChaneWeightKg: ((float) $get('normal_chane_weight_kg')) ?: null,
                                     naninoChaneWeightKg: ((float) $get('nanino_chane_weight_kg')) ?: null,

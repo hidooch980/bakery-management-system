@@ -9,13 +9,38 @@ class InventoryItem extends Model
 {
     public const FLOUR = 'flour';
     public const SALT = 'salt';
-    public const DOUGH = 'dough';
 
+    /**
+     * Yeast, in the two forms the shop keeps. Fresh proves faster, so it is
+     * what winter calls for; dry is the rest of the year. Both are bought
+     * and both are stocked, so a batch says which one it took rather than
+     * the warehouse drawing down whichever it happens to hold.
+     */
+    public const YEAST_DRY = 'yeast_dry';
+    public const YEAST_WET = 'yeast_wet';
+
+    public const YEAST_TYPES = [
+        'dry' => self::YEAST_DRY,
+        'wet' => self::YEAST_WET,
+    ];
+
+    /**
+     * What the shop buys and therefore counts. Dough is not here: it is
+     * mixed and shaped the same day, so carrying it as stock only gave the
+     * gap between the formula and the scale somewhere to accumulate.
+     */
     public const DEFAULTS = [
         self::FLOUR => 'آرد',
         self::SALT => 'نمک',
-        self::DOUGH => 'خمیر',
+        self::YEAST_DRY => 'خمیرمایه خشک',
+        self::YEAST_WET => 'خمیرمایه تر',
     ];
+
+    /** The warehouse item the given kind of yeast is drawn from. */
+    public static function forYeastType(string $type): self
+    {
+        return self::ofKey(self::YEAST_TYPES[$type] ?? self::YEAST_DRY);
+    }
 
     protected $fillable = ['key', 'name', 'unit', 'bag_weight_kg', 'low_threshold'];
 
@@ -24,7 +49,7 @@ class InventoryItem extends Model
      * fixed size and dough is never bagged at all, so a bag count for either
      * would be a number nobody weighs.
      */
-    public const WEIGHED_ONLY = [self::SALT, self::DOUGH];
+    public const WEIGHED_ONLY = [self::SALT, self::YEAST_DRY, self::YEAST_WET];
 
     protected function casts(): array
     {
