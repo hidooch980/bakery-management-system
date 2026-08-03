@@ -86,26 +86,31 @@ class FlourAllocationPeriod extends Model
      * The bread this period's quota comes to.
      *
      * Nanino is the measure here because the card reader is wired into it,
-     * so its loaf is the one the outside world counts: 115 sacks at 64
-     * loaves a sack is 7,360 loaves for the period, whatever shape the
+     * so its loaf is the one the outside world counts, whatever shape the
      * shop actually baked them in.
      */
+
+    /**
+     * Loaves a sack is worth in the nanino system.
+     *
+     * A fixed standard, not a figure derived from the shop's own dough: the
+     * sāmāne counts 64 to the sack and does not care what the bench yielded
+     * on the day. Working it out from the formula instead made the quota
+     * drift every time the proof gain or the loaf weight was adjusted.
+     */
+    public const NANINO_PER_BAG = 64;
+
     public function getAllocatedBreadCountAttribute(): int
     {
-        $formula = DoughFormula::fromBakery();
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
 
-        if ($formula->bagWeightKg <= 0 || ! $formula->naninoChaneWeightKg) {
+        if ($bagWeight <= 0) {
             return 0;
         }
 
-        // Counted a sack at a time, the way the shop does it. A sack yields
-        // 64 whole loaves and a remainder too small to be another one, and
-        // that remainder is lost per sack rather than pooling across the
-        // period into loaves nobody could have baked.
-        $perBag = $formula->naninoChaneCount(1) ?? 0;
-        $bags = (float) $this->allocated_kg / $formula->bagWeightKg;
+        $bags = (float) $this->allocated_kg / $bagWeight;
 
-        return (int) round($bags * $perBag);
+        return (int) round($bags * self::NANINO_PER_BAG);
     }
 
     /** Loaves rung through the card reader inside this period. */

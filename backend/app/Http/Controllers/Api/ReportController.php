@@ -19,6 +19,7 @@ use App\Support\DoughFormula;
 use App\Support\Jalali;
 use App\Support\Ledger;
 use App\Support\Money;
+use App\Support\PeriodBuckets;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -466,6 +467,128 @@ class ReportController extends Controller
                 'net_amount_formatted' => Money::format($group->sum('net_amount')),
                 'unpaid' => round((float) $group->where('paid_on', null)->sum('net_amount'), 2),
             ])->values(),
+        ]);
+    }
+
+    /**
+     * Income and cost read a day, a week or a month at a time.
+     *
+     * The same figures the financial report totals, only cut into the
+     * buckets the admin asked for, so a run of days can be read as a
+     * trend instead of re-running the report date by date.
+     */
+    public function financialSeries(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+        $granularity = PeriodBuckets::normalise($request->query('granularity'));
+
+        $rows = collect(PeriodBuckets::build($from, $to, $granularity))
+            ->map(function (array $bucket) {
+                $income = Ledger::incomeBreakdown($bucket['from'], $bucket['to']);
+                $recorded = Ledger::recordedExpenses($bucket['from'], $bucket['to']);
+                $salaries = Ledger::paidSalaries($bucket['from'], $bucket['to']);
+                $expense = round($recorded + $salaries, 2);
+                $profit = round($income['total'] - $expense, 2);
+
+                return [
+                    'key' => $bucket['key'],
+                    'label' => $bucket['label'],
+                    'from' => $bucket['from']->toDateString(),
+                    'to' => $bucket['to']->toDateString(),
+                    'income' => $income['total'],
+                    'income_formatted' => Money::format($income['total']),
+                    'income_bread' => $income['bread'],
+                    'income_flour' => $income['flour'],
+                    'income_other' => $income['other'],
+                    'expense' => $expense,
+                    'expense_formatted' => Money::format($expense),
+                    'expense_recorded' => round($recorded, 2),
+                    'expense_salaries' => round($salaries, 2),
+                    'profit' => $profit,
+                    'profit_formatted' => Money::format($profit),
+                ];
+            });
+
+        return $this->success([
+            'granularity' => $granularity,
+            'granularity_label' => PeriodBuckets::label($granularity),
+            'from_jalali' => Jalali::date($from),
+            'to_jalali' => Jalali::date($to),
+            'currency_label' => Money::label(),
+            'totals' => [
+                'income' => round((float) $rows->sum('income'), 2),
+                'expense' => round((float) $rows->sum('expense'), 2),
+                'profit' => round((float) $rows->sum('profit'), 2),
+            ],
+            'rows' => $rows->values(),
+        ]);
+    }
+
+    /**
+     * What the shop got through, a day, a week or a month at a time.
+     *
+     * Flour is the two ways a bakery actually eats it — the kneaded batch
+     * and the flour thrown on the bench — kept apart from flour that was
+     * sold on, which left the store without being baked.
+     */
+    public function consumptionSeries(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+        $granularity = PeriodBuckets::normalise($request->query('granularity'));
+
+        $items = InventoryItem::all()->keyBy('key');
+
+        $rows = collect(PeriodBuckets::build($from, $to, $granularity))
+            ->map(function (array $bucket) use ($items) {
+                $window = [$bucket['from'], $bucket['to']];
+
+                $used = function (?InventoryItem $item, array $reasons) use ($window) {
+                    if (! $item) {
+                        return 0.0;
+                    }
+
+                    return round((float) $item->movements()
+                        ->where('direction', 'out')
+                        ->whereIn('reason', $reasons)
+                        ->whereBetween('created_at', $window)
+                        ->sum('quantity'), 3);
+                };
+
+                $flour = $items->get(InventoryItem::FLOUR);
+                $production = $used($flour, ['production']);
+                $spray = $used($flour, ['spray']);
+
+                return [
+                    'key' => $bucket['key'],
+                    'label' => $bucket['label'],
+                    'from' => $bucket['from']->toDateString(),
+                    'to' => $bucket['to']->toDateString(),
+                    'bags_kneaded' => (float) DoughEntry::whereBetween('created_at', $window)->sum('bag_count'),
+                    'flour_production_kg' => $production,
+                    'flour_spray_kg' => $spray,
+                    'flour_used_kg' => round($production + $spray, 3),
+                    // Sold on rather than baked — reported beside the usage
+                    // so the store's outflow still adds up, without being
+                    // counted as consumption.
+                    'flour_sold_kg' => $used($flour, ['flour_sale', 'consignment_out']),
+                    'salt_kg' => $used($items->get(InventoryItem::SALT), ['production']),
+                    'yeast_dry_kg' => $used($items->get('yeast_dry'), ['production']),
+                    'yeast_wet_kg' => $used($items->get('yeast_wet'), ['production']),
+                ];
+            });
+
+        return $this->success([
+            'granularity' => $granularity,
+            'granularity_label' => PeriodBuckets::label($granularity),
+            'from_jalali' => Jalali::date($from),
+            'to_jalali' => Jalali::date($to),
+            'totals' => [
+                'bags_kneaded' => round((float) $rows->sum('bags_kneaded'), 2),
+                'flour_used_kg' => round((float) $rows->sum('flour_used_kg'), 3),
+                'flour_sold_kg' => round((float) $rows->sum('flour_sold_kg'), 3),
+                'salt_kg' => round((float) $rows->sum('salt_kg'), 3),
+            ],
+            'rows' => $rows->values(),
         ]);
     }
 

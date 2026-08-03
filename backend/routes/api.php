@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\FlourStockController;
 use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\IncomeController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\PowerBiExportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
@@ -175,6 +176,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/reports/sales', [ReportController::class, 'sales']);
             Route::get('/reports/flour', [ReportController::class, 'flourConsumption']);
             Route::get('/reports/efficiency', [ReportController::class, 'efficiency']);
+            // What the shop got through, a day, a week or a month at a time.
+            Route::get('/reports/consumption-series', [ReportController::class, 'consumptionSeries']);
 
             Route::get('/flour/balance', [FlourStockController::class, 'balance']);
             Route::get('/flour/movements', [FlourStockController::class, 'index']);
@@ -246,6 +249,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/reports/financial-trend', [ReportController::class, 'financialTrend']);
             Route::get('/reports/payroll', [ReportController::class, 'payroll']);
             Route::get('/reports/debts', [ReportController::class, 'debts']);
+            // Income and cost bucketed daily, weekly or monthly.
+            Route::get('/reports/financial-series', [ReportController::class, 'financialSeries']);
+            // Flat rows for Power BI and anything else that models its own
+            // data — see docs/POWERBI.md.
+            Route::get('/reports/export/{dataset}', [PowerBiExportController::class, 'show']);
         });
     });
 });
