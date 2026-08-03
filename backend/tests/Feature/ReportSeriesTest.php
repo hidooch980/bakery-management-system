@@ -274,6 +274,17 @@ class ReportSeriesTest extends TestCase
             ->assertNotFound();
     }
 
+    // --------------------------------------------------- the health probe
+
+    public function test_the_health_endpoint_answers_without_a_login(): void
+    {
+        // The app asks this while deciding which published address to talk
+        // to, before anyone has signed in.
+        $this->getJson('/api/v1/health')
+            ->assertOk()
+            ->assertJson(['success' => true, 'service' => 'bakery']);
+    }
+
     // ---------------------------------------------- the panel's own page
 
     public function test_the_reports_page_opens_on_the_current_jalali_month(): void

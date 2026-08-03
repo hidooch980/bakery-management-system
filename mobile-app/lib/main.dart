@@ -13,14 +13,21 @@ import 'screens/admin/admin_home_screen.dart';
 import 'screens/shater/shater_home_screen.dart';
 import 'services/api_client.dart';
 import 'services/bakery_api.dart';
+import 'services/server_directory.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final api = BakeryApi(ApiClient());
+  final client = ApiClient();
 
-  runApp(BakeryApp(api: api));
+  // Where the backend lives is published in the repository rather than
+  // baked into the build, so moving the server does not strand every
+  // phone that already has the app. The lookup never throws and falls
+  // back to the last address that worked.
+  client.useBaseUrl(await ServerDirectory().resolve());
+
+  runApp(BakeryApp(api: BakeryApi(client)));
 }
 
 class BakeryApp extends StatelessWidget {

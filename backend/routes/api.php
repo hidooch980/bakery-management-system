@@ -39,6 +39,14 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1')->group(function () {
+    // Unauthenticated on purpose and deliberately empty of detail: the app
+    // asks it only "are you the bakery, and are you up?" while deciding
+    // which published address to talk to during a server move.
+    Route::get('/health', fn () => response()->json([
+        'success' => true,
+        'service' => 'bakery',
+    ]));
+
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 
     Route::middleware('auth:sanctum')->group(function () {

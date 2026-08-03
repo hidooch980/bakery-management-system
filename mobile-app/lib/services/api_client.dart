@@ -60,10 +60,24 @@ class ApiClient {
 
   /// 10.0.2.2 is the Android emulator's alias for the host machine.
   /// Override with --dart-define=API_BASE_URL=... for a real device.
+  ///
+  /// This is only where the app starts: [ServerDirectory] looks up the
+  /// address published in the repository at launch and hands it to
+  /// [useBaseUrl], so the server can move without a new build.
   static const defaultBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://10.0.2.2:8000/api/v1',
   );
+
+  /// Points every later call at a different backend.
+  ///
+  /// Changed on the live Dio instance rather than by building a new client,
+  /// so screens already holding this one follow the move too.
+  void useBaseUrl(String url) {
+    _dio.options.baseUrl = url;
+  }
+
+  String get baseUrl => _dio.options.baseUrl;
 
   static const _tokenKey = 'auth_token';
 
