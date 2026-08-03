@@ -23,7 +23,13 @@ class StockReversal
             ->where('source_type', $source::class)
             ->where('source_id', $source->getKey())
             ->with('item')
-            ->get();
+            ->get()
+            // Undoing an "out" puts stock back; undoing an "in" takes it
+            // away. Doing the giving first means a record whose movements
+            // cancel out — borrowed flour that was later handed back — can
+            // always be reversed, instead of failing on an interim step
+            // that dips below zero on the way to the same final balance.
+            ->sortByDesc(fn (InventoryMovement $m) => $m->direction === 'out' ? 1 : 0);
 
         foreach ($movements as $movement) {
             $movement->item?->move(
@@ -40,8 +46,10 @@ class StockReversal
 
     private static function reversalReasonFor(string $reason): string
     {
-        return $reason === 'flour_sale'
-            ? 'flour_sale_reversal'
-            : 'production_reversal';
+        return match ($reason) {
+            'flour_sale' => 'flour_sale_reversal',
+            'consignment_in', 'consignment_out' => 'consignment_return',
+            default => 'production_reversal',
+        };
     }
 }

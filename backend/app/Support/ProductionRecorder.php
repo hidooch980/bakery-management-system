@@ -4,30 +4,46 @@ namespace App\Support;
 
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
-use App\Models\FlourStockMovement;
 use App\Models\InventoryItem;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Records production and moves the stock it consumed.
  *
- * Kneading and shaping are physical: flour and salt leave the store, dough
- * appears and is then spent. Both the app and the admin panel come through
- * here so the warehouse says the same thing however the work was entered —
- * the panel used to write the entry and move nothing, which left the books
- * reading differently depending on where someone recorded the batch.
+ * Kneading spends flour, salt and yeast; shaping spends the flour dusted
+ * over the bench. Those are the things the shop buys, so those are the
+ * things the warehouse counts — the dough between them is mixed and shaped
+ * the same day and is never stocked.
+ *
+ * Both the app and the admin panel come through here so the warehouse says
+ * the same thing however the work was entered — the panel used to write the
+ * entry and move nothing, which left the books reading differently
+ * depending on where someone recorded the batch.
  */
 class ProductionRecorder
 {
-    /** Kneading: flour and salt out, dough in. */
-    public static function dough(int $bags, int $userId, ?string $note = null): DoughEntry
-    {
+    /**
+     * Kneading: flour, salt and yeast out, dough in.
+     *
+     * @param  string  $yeastType  'dry', or 'wet' for the fresh yeast that
+     *                             proves faster and is what winter calls
+     *                             for. Both are stocked, so the batch says
+     *                             which tub it came out of.
+     */
+    public static function dough(
+        int $bags,
+        int $userId,
+        ?string $note = null,
+        string $yeastType = DoughFormula::DRY,
+    ): DoughEntry {
         $formula = DoughFormula::fromBakery();
+        $yeastType = $yeastType === DoughFormula::WET ? DoughFormula::WET : DoughFormula::DRY;
 
-        return DB::transaction(function () use ($bags, $userId, $note, $formula) {
+        return DB::transaction(function () use ($bags, $userId, $note, $formula, $yeastType) {
             $entry = DoughEntry::create([
                 'user_id' => $userId,
                 'bag_count' => $bags,
+                'yeast_type' => $yeastType,
                 'note' => $note,
                 'status' => 'pending',
             ]);
@@ -38,9 +54,20 @@ class ProductionRecorder
             InventoryItem::ofKey(InventoryItem::SALT)->move(
                 'out', $formula->saltKg($bags), 'production', $userId, $entry
             );
-            InventoryItem::ofKey(InventoryItem::DOUGH)->move(
-                'in', $formula->doughKg($bags), 'production', $userId, $entry
-            );
+
+            // Drawn from whichever tub was actually opened, so a winter run
+            // does not quietly eat into the dry stock.
+            $yeast = $formula->yeastKg($bags);
+
+            if ($yeast > 0) {
+                InventoryItem::forYeastType($yeastType)->move(
+                    'out', $yeast, 'production', $userId, $entry
+                );
+            }
+
+            // Dough itself is not stocked — see the migration that took it
+            // out. What the batch yields is the formula's answer, and the
+            // formula is read wherever that answer is needed.
 
             return $entry;
         });
@@ -122,23 +149,14 @@ class ProductionRecorder
             $dough->update(['status' => 'processed']);
 
             if ($sprayFlourKg > 0) {
-                // The legacy per-entry flour ledger still has readers, so
-                // it is written alongside the warehouse movement.
-                FlourStockMovement::create([
-                    'user_id' => $userId,
-                    'type' => 'out',
-                    'amount_kg' => $sprayFlourKg,
-                    'note' => "آرد پاششی چانه #{$entry->id}",
-                ]);
-
+                // Only the warehouse is written. The separate flour ledger
+                // this used to mirror into received spray flour and nothing
+                // else, so it drifted negative while the warehouse stayed
+                // right; the flour endpoints now read the warehouse instead.
                 InventoryItem::ofKey(InventoryItem::FLOUR)->move(
                     'out', $sprayFlourKg, 'spray', $userId, $entry
                 );
             }
-
-            InventoryItem::ofKey(InventoryItem::DOUGH)->move(
-                'out', $normalWeightKg + $naninoWeightKg, 'production', $userId, $entry
-            );
 
             return $entry;
         });
