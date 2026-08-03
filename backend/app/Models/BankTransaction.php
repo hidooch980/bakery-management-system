@@ -15,6 +15,7 @@ class BankTransaction extends Model
         'income' => 'درآمد متفرقه',
         'expense' => 'هزینه',
         'salary' => 'حقوق',
+        'advance' => 'علی‌الحساب کارکنان',
         'share' => 'سهم شریک',
         'transfer' => 'انتقال',
         'settlement' => 'وصول بدهی',
