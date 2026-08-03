@@ -132,16 +132,11 @@ class FlourAllocationController extends Controller
                 'remaining_kg' => $p->remaining_kg,
                 'usage_percent' => $p->usage_percent,
                 'is_over' => $p->is_over,
-                // Reconciliation against what the nanino system accounts for.
-                'nanino_chane_count' => $p->nanino_chane_count,
-                'nanino_flour_kg' => $p->nanino_flour_kg,
-                'nanino_balance_kg' => $p->nanino_balance_kg,
-                // The quota restated as loaves, against what the card
-                // reader — which the nanino system reads — actually sold.
+                // The quota restated as nanino loaves, against what the card
+                // reader actually sold. That reader is the only thing the
+                // flour is ever measured against — chane counts move with
+                // the day's shaping and settle nothing.
                 'allocated_bread_count' => $p->allocated_bread_count,
-                // What the flour actually burned through comes to, so the
-                // quota and the real consumption are read side by side.
-                'produced_bread_count' => $p->expected_nanino_count,
                 'card_bread_count' => $p->card_bread_count,
                 'bread_remainder' => $p->bread_remainder,
                 'card_amount' => $p->card_amount,

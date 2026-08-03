@@ -226,24 +226,20 @@ class FlourAllocationResource extends Resource
                             .number_format((float) $p->allocated_kg, 0))
                         ->implode('   •   ').'  (مصرف/سهمیه کیلوگرم)'),
 
-                Tables\Columns\TextColumn::make('nanino_balance')
-                    ->label('تراز نانینو')
-                    ->state(function (FlourAllocation $record) {
-                        return $record->periods
-                            ->map(function ($p) {
-                                $balance = $p->nanino_balance_kg;
-                                $sign = $balance >= 0 ? '+' : '−';
-
-                                return sprintf(
-                                    '%d) %s%s',
-                                    $p->period_number,
-                                    $sign,
-                                    number_format(abs($balance), 0),
-                                );
-                            })
-                            ->implode('   •   ');
-                    })
-                    ->description('سهمیه منهای آرد معادل نانینو (کیلوگرم)')
+                // Flour is only ever measured against the card reader, and
+                // the gap between the two is worked out for each period
+                // rather than left to be counted by hand.
+                Tables\Columns\TextColumn::make('card_difference')
+                    ->label('اختلاف با کارتخوان')
+                    ->state(fn (FlourAllocation $record) => $record->periods
+                        ->map(fn ($p) => sprintf(
+                            '%d) %s%s',
+                            $p->period_number,
+                            $p->bread_remainder >= 0 ? '+' : '−',
+                            number_format(abs($p->bread_remainder)),
+                        ))
+                        ->implode('   •   '))
+                    ->description('سهمیه دوره منهای نان کارتخوان')
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('current')

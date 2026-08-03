@@ -11,7 +11,6 @@ use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\Expense;
 use App\Models\FlourAllocation;
-use App\Models\FlourAllocationPeriod;
 use App\Models\Holiday;
 use App\Models\InventoryItem;
 use App\Models\User;
@@ -660,59 +659,10 @@ class ProductionFormulaTest extends TestCase
             ->assertJsonPath('data.bag_weight_kg', 40);
     }
 
-    // ------------------------------- quota reconciled against nanino output
+    // ------------------------- quota reconciled against the card reader
 
-    public function test_period_reports_the_flour_nanino_accounts_for(): void
+    public function test_the_period_states_its_quota_in_nanino_loaves(): void
     {
-        $allocation = FlourAllocation::create([
-            'month_start' => Jalali::parse('1405/05/01'),
-            'month_label' => 'مرداد 1405',
-            'total_bags' => 75,
-        ]);
-        $allocation->syncPeriods();
-        $period = $allocation->periods()->first();
-
-        // One bag yields 129.2/2 = 64.6kg of dough, so at 1kg per nanino
-        // chane a bag is worth about 64.6 nanino chane.
-        $dough = DoughEntry::create(['user_id' => $this->userWithRole('admin')->id, 'bag_count' => 1]);
-        $entry = ChaneEntry::create([
-            'dough_entry_id' => $dough->id,
-            'user_id' => $dough->user_id,
-            'chane_count' => 10,
-            'normal_weight_kg' => 8.5,
-            // 64.6kg of nanino chane is exactly one bag's worth of dough.
-            'nanino_weight_kg' => 64.6,
-            'spray_flour_kg' => 0,
-        ]);
-
-        DB::table('chane_entries')
-            ->where('id', $entry->id)
-            ->update(['created_at' => $period->starts_on->copy()->addDay()]);
-
-        $period->refresh();
-
-        // 64.6kg of nanino dough came from one 40kg bag.
-        $this->assertEqualsWithDelta(40.0, $period->nanino_flour_kg, 0.5);
-    }
-
-    public function test_period_balances_its_allocation_against_nanino(): void
-    {
-        $allocation = FlourAllocation::create([
-            'month_start' => Jalali::parse('1405/05/01'),
-            'month_label' => 'مرداد 1405',
-            'total_bags' => 75,
-        ]);
-        $allocation->syncPeriods();
-        $period = $allocation->periods()->first();
-
-        // With no nanino output the whole allocation is still unaccounted for.
-        $this->assertSame((float) $period->allocated_kg, $period->nanino_balance_kg);
-    }
-
-    public function test_nanino_reconciliation_is_zero_without_a_nanino_weight(): void
-    {
-        Bakery::first()->update(['nanino_chane_weight_kg' => null]);
-
         $allocation = FlourAllocation::create([
             'month_start' => Jalali::parse('1405/05/01'),
             'month_label' => 'مرداد 1405',
@@ -722,18 +672,15 @@ class ProductionFormulaTest extends TestCase
 
         $period = $allocation->periods()->first();
 
-        $this->assertSame(0, $period->nanino_chane_count);
-        $this->assertSame(0.0, $period->nanino_flour_kg);
+        // A third of 75 bags is 25, and one bag yields 64 nanino loaves.
+        $this->assertSame(25 * 64, $period->allocated_bread_count);
     }
 
-    // ------------------------- production measured against flour consumed
-
-    /**
-     * Sets up a period, burns $usedBags of flour inside it, and records
-     * $naninoLoaves of nanino output on the same day.
-     */
-    private function periodWithUsageAndOutput(float $usedBags, int $naninoLoaves): FlourAllocationPeriod
+    public function test_flour_sold_on_is_not_counted_as_consumed(): void
     {
+        // A bakery only eats flour two ways: what the dough maker kneads
+        // and what is thrown on the bench. Flour sold to someone else was
+        // never baked, so it must not spend the period's quota.
         $allocation = FlourAllocation::create([
             'month_start' => Jalali::parse('1405/05/01'),
             'month_label' => 'مرداد 1405',
@@ -746,158 +693,15 @@ class ProductionFormulaTest extends TestCase
 
         $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
         $flour->move('in', 10000, 'purchase');
-        $movement = $flour->move('out', $usedBags * 40, 'production');
-        DB::table('inventory_movements')
-            ->where('id', $movement->id)->update(['created_at' => $inside]);
 
-        $user = $this->userWithRole('chane_gir');
-        $dough = DoughEntry::create(['user_id' => $user->id, 'bag_count' => 1]);
-        $entry = ChaneEntry::create([
-            'dough_entry_id' => $dough->id,
-            'user_id' => $user->id,
-            'chane_count' => 0,
-            'normal_weight_kg' => 0,
-            // Nanino weight is 1.0kg, so the weight is the loaf count.
-            'nanino_weight_kg' => $naninoLoaves * 1.0,
-            'spray_flour_kg' => 0,
-        ]);
-        DB::table('chane_entries')
-            ->where('id', $entry->id)->update(['created_at' => $inside]);
+        foreach ([['production', 400.0], ['spray', 5.0], ['flour_sale', 120.0]] as [$reason, $qty]) {
+            $movement = $flour->move('out', $qty, $reason);
+            DB::table('inventory_movements')
+                ->where('id', $movement->id)->update(['created_at' => $inside]);
+        }
 
-        return $period->refresh();
-    }
-
-    public function test_the_period_expects_nanino_output_from_the_flour_it_consumed(): void
-    {
-        // One bag yields 64.6kg of dough, so 64 nanino loaves at 1.0kg.
-        $period = $this->periodWithUsageAndOutput(usedBags: 1, naninoLoaves: 64);
-
-        $this->assertSame(64, $period->expected_nanino_count);
-        $this->assertSame(64, $period->nanino_chane_count);
-        $this->assertSame(0, $period->nanino_production_gap);
-        $this->assertSame('ok', $period->nanino_production_status);
-    }
-
-    public function test_producing_less_than_the_flour_accounts_for_is_an_error(): void
-    {
-        // A bag of flour went out, but only 10 loaves came back.
-        $period = $this->periodWithUsageAndOutput(usedBags: 1, naninoLoaves: 10);
-
-        $this->assertSame(64, $period->expected_nanino_count);
-        $this->assertSame(-54, $period->nanino_production_gap);
-        $this->assertSame('short', $period->nanino_production_status);
-    }
-
-    public function test_a_small_overshoot_is_not_treated_as_an_error(): void
-    {
-        // 10 loaves over is well inside one bag's 64, so it is tolerated.
-        $period = $this->periodWithUsageAndOutput(usedBags: 1, naninoLoaves: 74);
-
-        $this->assertSame(10, $period->nanino_production_gap);
-        $this->assertSame('ok', $period->nanino_production_status);
-    }
-
-    public function test_producing_more_than_a_bag_over_is_an_error(): void
-    {
-        // 65 loaves over is more than one bag's worth.
-        $period = $this->periodWithUsageAndOutput(usedBags: 1, naninoLoaves: 129);
-
-        $this->assertSame(65, $period->nanino_production_gap);
-        $this->assertGreaterThan(1, $period->nanino_production_gap_bags);
-        $this->assertSame('over', $period->nanino_production_status);
-    }
-
-    public function test_normal_chane_counts_towards_the_period_production(): void
-    {
-        // A shop that shapes everything the normal way used to read as
-        // having lost every bag of flour it consumed, because only nanino
-        // was counted on the production side of the comparison.
-        $allocation = FlourAllocation::create([
-            'month_start' => Jalali::parse('1405/05/01'),
-            'month_label' => 'مرداد 1405',
-            'total_bags' => 75,
-        ]);
-        $allocation->syncPeriods();
-
-        $period = $allocation->periods()->first();
-        $inside = $period->starts_on->copy()->addDay();
-
-        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
-        $flour->move('in', 10000, 'purchase');
-        $movement = $flour->move('out', 40, 'production');
-        DB::table('inventory_movements')
-            ->where('id', $movement->id)->update(['created_at' => $inside]);
-
-        $user = $this->userWithRole('chane_gir');
-        $dough = DoughEntry::create(['user_id' => $user->id, 'bag_count' => 1]);
-        $entry = ChaneEntry::create([
-            'dough_entry_id' => $dough->id,
-            'user_id' => $user->id,
-            // One bag yields 64.6kg of dough, all shaped as normal chane.
-            'chane_count' => 76,
-            'normal_weight_kg' => 64.6,
-            'nanino_weight_kg' => 0,
-            'spray_flour_kg' => 0,
-        ]);
-        DB::table('chane_entries')
-            ->where('id', $entry->id)->update(['created_at' => $inside]);
-
-        $period->refresh();
-
-        // 64.6kg of dough at 1.0kg a nanino loaf is 64 — exactly what one
-        // bag of flour should give, so nothing is missing.
-        $this->assertSame(64, $period->produced_nanino_equivalent);
-        $this->assertSame(64, $period->expected_nanino_count);
-        $this->assertSame('ok', $period->nanino_production_status);
-    }
-
-    public function test_a_period_without_usage_says_which_figure_is_missing(): void
-    {
-        $allocation = FlourAllocation::create([
-            'month_start' => Jalali::parse('1405/05/01'),
-            'month_label' => 'مرداد 1405',
-            'total_bags' => 75,
-        ]);
-        $allocation->syncPeriods();
-
-        $period = $allocation->periods()->first();
-
-        $this->assertSame(
-            'مصرف آردی برای این دوره ثبت نشده',
-            $period->nanino_production_status_label
-        );
-    }
-
-    public function test_a_missing_nanino_weight_is_named_as_the_reason(): void
-    {
-        Bakery::first()->update(['nanino_chane_weight_kg' => null]);
-
-        $allocation = FlourAllocation::create([
-            'month_start' => Jalali::parse('1405/05/01'),
-            'month_label' => 'مرداد 1405',
-            'total_bags' => 75,
-        ]);
-        $allocation->syncPeriods();
-
-        $this->assertSame(
-            'وزن چانه نانینو در تنظیمات ثبت نشده',
-            $allocation->periods()->first()->nanino_production_status_label
-        );
-    }
-
-    public function test_the_comparison_is_unknown_when_no_flour_was_consumed(): void
-    {
-        $allocation = FlourAllocation::create([
-            'month_start' => Jalali::parse('1405/05/01'),
-            'month_label' => 'مرداد 1405',
-            'total_bags' => 75,
-        ]);
-        $allocation->syncPeriods();
-
-        $period = $allocation->periods()->first();
-
-        $this->assertSame(0, $period->expected_nanino_count);
-        $this->assertSame('unknown', $period->nanino_production_status);
+        // The kneaded batch and the bench flour, and nothing else.
+        $this->assertSame(405.0, $period->refresh()->used_kg);
     }
 
     // -------------------------------------------- carry-over (سنوات)

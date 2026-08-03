@@ -85,36 +85,18 @@ class FlourQuotaOverview extends BaseWidget
                 ->descriptionIcon($period->is_over ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-circle')
                 ->color($period->is_over ? 'danger' : 'success'),
 
-            Stat::make('تراز نانینو', number_format(abs($period->nanino_balance_kg), 0).' کیلوگرم')
-                ->description($period->nanino_balance_kg >= 0
-                    ? 'سهمیه بیشتر از مصرف نانینو'
-                    : 'مصرف نانینو بیشتر از سهمیه')
-                ->descriptionIcon('heroicon-m-scale')
-                ->color($period->nanino_balance_kg >= 0 ? 'success' : 'danger'),
-
-            // Does the bread produced account for the flour burned through?
-            // Producing less is always wrong; a small overshoot is normal,
-            // more than a bag's worth is not.
+            // The one comparison the flour is held to: the quota restated as
+            // nanino loaves against what the card reader actually rang up.
+            // The difference is worked out here, not by hand.
             Stat::make(
-                'نان تولیدی دوره',
-                $period->nanino_production_status === 'unknown'
-                    ? '—'
-                    : number_format($period->produced_nanino_equivalent).' از '
-                        .number_format($period->expected_nanino_count).' نان'
+                'اختلاف با کارتخوان',
+                ($period->bread_remainder >= 0 ? '+' : '−')
+                    .number_format(abs($period->bread_remainder)).' نان'
             )
-                ->description($period->nanino_production_status_label
-                    .($period->nanino_production_gap !== 0
-                        ? '   •   '.($period->nanino_production_gap > 0 ? '+' : '')
-                            .number_format($period->nanino_production_gap).' نان'
-                        : ''))
-                ->descriptionIcon($period->nanino_production_status === 'ok'
-                    ? 'heroicon-m-check-circle'
-                    : 'heroicon-m-exclamation-triangle')
-                ->color(match ($period->nanino_production_status) {
-                    'ok' => 'success',
-                    'short', 'over' => 'danger',
-                    default => 'gray',
-                }),
+                ->description(number_format($period->allocated_bread_count).' نان سهمیه'
+                    .'   •   '.number_format($period->card_bread_count).' نان کارتخوان')
+                ->descriptionIcon('heroicon-m-credit-card')
+                ->color($period->bread_remainder < 0 ? 'danger' : 'info'),
 
             Stat::make('سنوات', number_format((float) $allocation->carryover_kg, 0).' کیلوگرم')
                 ->description((float) $allocation->carryover_bags > 0

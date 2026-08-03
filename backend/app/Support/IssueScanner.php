@@ -33,7 +33,6 @@ class IssueScanner
             ...$this->negativeStock(),
             ...$this->missingSettings(),
             ...$this->lowStock(),
-            ...$this->productionShortfall(),
             ...$this->quotaOverrun(),
             ...$this->negativeBankBalance(),
             ...$this->sellerAccounts(),
@@ -159,45 +158,6 @@ class IssueScanner
                 suggestion: 'برای جلوگیری از توقف تولید، تأمین کنید.',
                 url: '/admin/inventory-items',
                 urlLabel: 'مشاهده انبار',
-            );
-        }
-
-        return $issues;
-    }
-
-    /**
-     * Bread that does not account for the flour a period burned through.
-     * Producing less is the telling direction: the flour left the store
-     * but nothing came back for it.
-     */
-    private function productionShortfall(): array
-    {
-        $allocation = FlourAllocation::forJalaliMonthOf(now());
-
-        if (! $allocation) {
-            return [];
-        }
-
-        $issues = [];
-
-        foreach ($allocation->periods as $period) {
-            if ($period->nanino_production_status !== 'short') {
-                continue;
-            }
-
-            $issues[] = new SystemIssue(
-                key: "production-short-{$period->id}",
-                severity: SystemIssue::CRITICAL,
-                title: "تولید {$period->label} کمتر از آرد مصرفی است",
-                detail: number_format($period->nanino_chane_count).' نان تولید شده،'
-                    .' اما آرد مصرفی این دوره باید '
-                    .number_format($period->expected_nanino_count).' نان می‌داد'
-                    .' ('.number_format(abs($period->nanino_production_gap)).' نان کمتر).',
-                cause: 'چانه‌ای ثبت نشده، ضایعات ثبت‌نشده، یا آردی که بدون تولید از انبار خارج شده.',
-                suggestion: 'ثبت‌های تولید این بازه را بررسی کنید. این اختلاف نباید'
-                    .' بدون توضیح بماند، چون نشانه آرد از دست رفته است.',
-                url: '/admin/chane-entries',
-                urlLabel: 'بررسی ثبت‌های چانه',
             );
         }
 

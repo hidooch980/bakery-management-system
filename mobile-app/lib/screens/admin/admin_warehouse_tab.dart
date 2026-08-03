@@ -322,7 +322,6 @@ class _BreadReconciliation extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     final quota = _int(period['allocated_bread_count']);
-    final produced = _int(period['produced_bread_count']);
     final sold = _int(period['card_bread_count']);
     final remainder = _int(period['bread_remainder']);
 
@@ -356,7 +355,6 @@ class _BreadReconciliation extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _BreadRow(label: 'سهمیه دوره', value: '$quota نان'),
-          _BreadRow(label: 'مصرف آرد', value: '$produced نان'),
           _BreadRow(
             label: 'فروش کارتخوان',
             value: '$sold نان  •  ${period['card_amount_formatted'] ?? '—'}',

@@ -31,7 +31,17 @@ class FlourAllocationPeriod extends Model
         return $this->belongsTo(FlourAllocation::class, 'flour_allocation_id');
     }
 
-    /** Flour actually consumed inside this period's date range. */
+    /**
+     * Flour actually consumed inside this period's date range.
+     *
+     * A bakery only ever eats flour two ways: the batch the dough maker
+     * kneads, and the flour thrown on the bench while shaping. Flour that
+     * leaves the store any other way — sold on, or handed to another shop
+     * as consignment — was never baked, so counting it here would spend
+     * the period's quota on bread nobody made.
+     */
+    public const CONSUMING_REASONS = ['production', 'spray'];
+
     public function getUsedKgAttribute(): float
     {
         $flour = InventoryItem::query()->where('key', InventoryItem::FLOUR)->first();
@@ -47,6 +57,7 @@ class FlourAllocationPeriod extends Model
 
         $out = (float) $flour->movements()
             ->where('direction', 'out')
+            ->whereIn('reason', self::CONSUMING_REASONS)
             ->whereBetween('created_at', $window)
             ->sum('quantity');
 
@@ -55,7 +66,7 @@ class FlourAllocationPeriod extends Model
         // for work that no longer exists — and only reversals are netted
         // off, since an ordinary purchase is not a refund of usage.
         $reversed = (float) $flour->movements()
-            ->whereIn('reason', ['production_reversal', 'flour_sale_reversal'])
+            ->where('reason', 'production_reversal')
             ->whereBetween('created_at', $window)
             ->sum('quantity');
 
@@ -63,162 +74,15 @@ class FlourAllocationPeriod extends Model
     }
 
     /**
-     * Nanino chane recorded inside this period's window.
+     * Chane is never measured against flour.
      *
-     * Nanino is a display figure for production, but the quota is reconciled
-     * against it: the flour the nanino system says should have been used is
-     * compared with what the period was actually granted.
-     */
-    public function getNaninoChaneCountAttribute(): int
-    {
-        $formula = DoughFormula::fromBakery();
-
-        if (! $formula->naninoChaneWeightKg) {
-            return 0;
-        }
-
-        $weight = (float) ChaneEntry::whereBetween('created_at', [
-            $this->starts_on->copy()->startOfDay(),
-            $this->ends_on->copy()->endOfDay(),
-        ])->sum('nanino_weight_kg');
-
-        return (int) round($weight / $formula->naninoChaneWeightKg);
-    }
-
-    /**
-     * Flour the nanino output accounts for, working the dough formula
-     * backwards: dough weight divided by what one bag yields.
-     */
-    public function getNaninoFlourKgAttribute(): float
-    {
-        $formula = DoughFormula::fromBakery();
-        $doughPerBag = $formula->doughKg(1);
-
-        if ($doughPerBag <= 0 || ! $formula->naninoChaneWeightKg) {
-            return 0.0;
-        }
-
-        $doughKg = $this->nanino_chane_count * $formula->naninoChaneWeightKg;
-
-        return round($doughKg / $doughPerBag * $formula->bagWeightKg, 3);
-    }
-
-    /**
-     * The reconciliation: allocation minus the flour nanino accounts for.
-     * Positive means the period was granted more than nanino used.
-     */
-    public function getNaninoBalanceKgAttribute(): float
-    {
-        return round((float) $this->allocated_kg - $this->nanino_flour_kg, 3);
-    }
-
-    /**
-     * How many nanino loaves the flour actually consumed this period should
-     * have produced, running the formula forwards from the usage figure.
-     */
-    public function getExpectedNaninoCountAttribute(): int
-    {
-        $formula = DoughFormula::fromBakery();
-
-        if ($formula->bagWeightKg <= 0 || ! $formula->naninoChaneWeightKg) {
-            return 0;
-        }
-
-        // Counted a sack at a time, like the quota figure above, so the two
-        // are read against each other on the same footing.
-        $perBag = $formula->naninoChaneCount(1) ?? 0;
-
-        return (int) round($this->used_kg / $formula->bagWeightKg * $perBag);
-    }
-
-    /**
-     * Everything shaped in this period, restated in nanino loaves.
+     * The shop shapes to the day: a batch comes out as more or fewer pieces
+     * depending on the dough, the weather and the hand doing the shaping,
+     * and none of that is a loss of flour. Reconciling the quota against a
+     * chane count therefore invented a shortfall on any ordinary day, so
+     * the period is judged on flour in and flour out alone — and against
+     * the card reader, which counts loaves actually sold.
      *
-     * Both systems draw on the same dough, so the comparison below has to
-     * count both. Measuring only the nanino actually shaped would mark a
-     * shop that works entirely in normal chane as losing every bag of
-     * flour it used.
-     */
-    public function getProducedNaninoEquivalentAttribute(): int
-    {
-        $formula = DoughFormula::fromBakery();
-
-        if (! $formula->naninoChaneWeightKg) {
-            return 0;
-        }
-
-        // Both weights come off the same rows, so they are summed in one pass
-        // rather than querying the same window twice.
-        $doughKg = (float) ChaneEntry::whereBetween('created_at', [
-            $this->starts_on->copy()->startOfDay(),
-            $this->ends_on->copy()->endOfDay(),
-        ])->selectRaw(
-            'COALESCE(SUM(normal_weight_kg), 0) + COALESCE(SUM(nanino_weight_kg), 0) as dough_kg'
-        )->value('dough_kg');
-
-        return (int) floor($doughKg / $formula->naninoChaneWeightKg);
-    }
-
-    /**
-     * Production minus what the consumed flour should have yielded, in
-     * loaves. Negative means the period produced less bread than the flour
-     * it burned through can account for.
-     */
-    public function getNaninoProductionGapAttribute(): int
-    {
-        return $this->produced_nanino_equivalent - $this->expected_nanino_count;
-    }
-
-    /** The same gap in bags, which is how a shortfall is judged. */
-    public function getNaninoProductionGapBagsAttribute(): float
-    {
-        $formula = DoughFormula::fromBakery();
-        $perBag = $formula->naninoChaneCount(1);
-
-        if (! $perBag) {
-            return 0.0;
-        }
-
-        return round($this->nanino_production_gap / $perBag, 2);
-    }
-
-    /**
-     * Producing less bread than the consumed flour accounts for is always
-     * wrong; producing more is only wrong once it passes a whole bag, since
-     * rounding and the handling loss make small overshoots normal.
-     */
-    public function getNaninoProductionStatusAttribute(): string
-    {
-        if ($this->expected_nanino_count <= 0) {
-            return 'unknown';
-        }
-
-        return match (true) {
-            $this->nanino_production_gap < 0 => 'short',
-            $this->nanino_production_gap_bags > 1 => 'over',
-            default => 'ok',
-        };
-    }
-
-    public function getNaninoProductionStatusLabelAttribute(): string
-    {
-        if ($this->nanino_production_status === 'unknown') {
-            // Say which of the two is missing, so it is clear whether this
-            // is a setting to fill in or simply a period nobody has
-            // started working yet.
-            return DoughFormula::fromBakery()->naninoChaneWeightKg
-                ? 'مصرف آردی برای این دوره ثبت نشده'
-                : 'وزن چانه نانینو در تنظیمات ثبت نشده';
-        }
-
-        return match ($this->nanino_production_status) {
-            'short' => 'کمتر از مصرف آرد — خطا',
-            'over' => 'بیش از یک کیسه اضافه — خطا',
-            default => 'مطابق مصرف آرد',
-        };
-    }
-
-    /**
      * The bread this period's quota comes to.
      *
      * Nanino is the measure here because the card reader is wired into it,
