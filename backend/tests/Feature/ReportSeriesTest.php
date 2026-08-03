@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\Reports;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\Expense;
@@ -13,9 +14,11 @@ use App\Support\Money;
 use App\Support\PeriodBuckets;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -269,6 +272,71 @@ class ReportSeriesTest extends TestCase
         $this->actingAs($this->admin())
             ->getJson('/api/v1/reports/export/everything')
             ->assertNotFound();
+    }
+
+    // ---------------------------------------------- the panel's own page
+
+    public function test_the_reports_page_opens_on_the_current_jalali_month(): void
+    {
+        $this->actingAs($this->admin());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        [$start, $end] = Jalali::currentMonthRange();
+
+        Livewire::test(Reports::class)
+            ->assertOk()
+            ->assertSet('from', Jalali::date($start))
+            ->assertSet('to', Jalali::date($end))
+            ->assertSet('granularity', PeriodBuckets::DAY);
+    }
+
+    public function test_the_reports_page_reads_all_three_tabs_over_one_range(): void
+    {
+        $this->saleOn('1405/05/10', 500000);
+
+        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $flour->move('in', 10000, 'purchase');
+        $movement = $flour->move('out', 400, 'production');
+        DB::table('inventory_movements')->where('id', $movement->id)
+            ->update(['created_at' => Jalali::parse('1405/05/10')->setTime(9, 0)]);
+
+        $this->actingAs($this->admin());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $page = Livewire::test(Reports::class)
+            ->set('from', '1405/05/10')
+            ->set('to', '1405/05/10')
+            ->set('granularity', PeriodBuckets::DAY);
+
+        $this->assertEqualsWithDelta(500000.0, (float) $page->instance()->financialRows()->sum('income'), 0.001);
+        $this->assertEqualsWithDelta(400.0, (float) $page->instance()->consumptionRows()->sum('flour_used_kg'), 0.001);
+        $this->assertSame(10, (int) $page->instance()->productionRows()->sum('bread_sold'));
+    }
+
+    public function test_dates_entered_the_wrong_way_round_still_read_the_range(): void
+    {
+        $this->saleOn('1405/05/10', 500000);
+
+        $this->actingAs($this->admin());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $page = Livewire::test(Reports::class)
+            ->set('from', '1405/05/12')
+            ->set('to', '1405/05/08');
+
+        $this->assertEqualsWithDelta(500000.0, (float) $page->instance()->financialRows()->sum('income'), 0.001);
+    }
+
+    public function test_a_half_typed_date_does_not_break_the_page(): void
+    {
+        $this->actingAs($this->admin());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        // Falls back to the current Jalali month rather than throwing while
+        // the admin is still typing.
+        Livewire::test(Reports::class)
+            ->set('from', '۱۴۰۵/۰')
+            ->assertOk();
     }
 
     public function test_staff_cannot_pull_the_export(): void
