@@ -10,12 +10,24 @@ class Expense extends Model
 {
     use PostsToBankAccount;
 
+    /**
+     * Order matters: this is the order the picker offers them in, so the
+     * costs a bakery pays most often come first.
+     */
     public const CATEGORIES = [
         'flour' => 'خرید آرد',
+        'salt' => 'خرید نمک',
+        'dough' => 'خرید خمیر',
+        'freight' => 'حمل و نقل',
+        'unloading' => 'تخلیه و باربری',
         'fuel' => 'سوخت',
         'utilities' => 'آب، برق، گاز',
         'rent' => 'اجاره',
         'maintenance' => 'تعمیرات',
+        'equipment' => 'تجهیزات',
+        'packaging' => 'بسته‌بندی',
+        'insurance' => 'بیمه',
+        'tax' => 'مالیات و عوارض',
         'salary' => 'حقوق کارکنان',
         'other' => 'سایر',
     ];

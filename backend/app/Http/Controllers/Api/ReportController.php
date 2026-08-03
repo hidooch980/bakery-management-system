@@ -294,14 +294,14 @@ class ReportController extends Controller
             ])
             ->values();
 
-        $recordedExpenses = (float) Expense::whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
-            ->sum('amount');
+        // Read through the Ledger, like every other figure, so this report
+        // cannot drift from the trend chart or the profit split if what
+        // counts as a cost ever changes.
+        $recordedExpenses = Ledger::recordedExpenses($from, $to);
 
         // Salaries are tracked separately so they are not double-counted with
         // an "expense" row unless the admin also entered one.
-        $paidSalaries = (float) SalaryPayment::paid()
-            ->whereBetween('paid_on', [$from->toDateString(), $to->toDateString()])
-            ->sum('net_amount');
+        $paidSalaries = Ledger::paidSalaries($from, $to);
 
         $unpaidSalaries = (float) SalaryPayment::unpaid()->sum('net_amount');
 

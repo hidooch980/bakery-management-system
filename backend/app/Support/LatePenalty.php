@@ -21,28 +21,48 @@ class LatePenalty
     public const DEFAULT_TIER1_AMOUNT = 200_000;   // 2,000,000 Rial
     public const DEFAULT_TIER2_AMOUNT = 500_000;   // 5,000,000 Rial
 
+    /**
+     * The four tariff settings, read in one go.
+     *
+     * Every figure below comes from the same Bakery row, so reading them one
+     * accessor at a time meant a query per value — and totalFor() charging a
+     * month of late days paid that cost once per day. Reading fresh on each
+     * call keeps a settings change visible immediately, as before.
+     */
+    private static function settings(): array
+    {
+        $bakery = Bakery::first();
+
+        return [
+            'free_days' => (int) ($bakery?->late_free_days ?: self::DEFAULT_FREE_DAYS),
+            'tier1_last_day' => (int) ($bakery?->late_tier1_last_day ?: self::DEFAULT_TIER1_LAST_DAY),
+            'tier1_amount' => $bakery?->late_tier1_amount === null
+                ? (float) self::DEFAULT_TIER1_AMOUNT
+                : (float) $bakery->late_tier1_amount,
+            'tier2_amount' => $bakery?->late_tier2_amount === null
+                ? (float) self::DEFAULT_TIER2_AMOUNT
+                : (float) $bakery->late_tier2_amount,
+        ];
+    }
+
     public static function freeDays(): int
     {
-        return (int) (Bakery::first()?->late_free_days ?: self::DEFAULT_FREE_DAYS);
+        return self::settings()['free_days'];
     }
 
     public static function tier1LastDay(): int
     {
-        return (int) (Bakery::first()?->late_tier1_last_day ?: self::DEFAULT_TIER1_LAST_DAY);
+        return self::settings()['tier1_last_day'];
     }
 
     public static function tier1Amount(): float
     {
-        $value = Bakery::first()?->late_tier1_amount;
-
-        return $value === null ? self::DEFAULT_TIER1_AMOUNT : (float) $value;
+        return self::settings()['tier1_amount'];
     }
 
     public static function tier2Amount(): float
     {
-        $value = Bakery::first()?->late_tier2_amount;
-
-        return $value === null ? self::DEFAULT_TIER2_AMOUNT : (float) $value;
+        return self::settings()['tier2_amount'];
     }
 
     /**
@@ -52,29 +72,32 @@ class LatePenalty
      */
     public static function amountFor(int $sequence): float
     {
-        if ($sequence <= 0) {
-            return 0.0;
-        }
-
-        if ($sequence <= self::freeDays()) {
-            return 0.0;
-        }
-
-        return $sequence <= self::tier1LastDay()
-            ? self::tier1Amount()
-            : self::tier2Amount();
+        return self::amountWith($sequence, self::settings());
     }
 
     /** The running total for a month, given how many late days there were. */
     public static function totalFor(int $lateDays): float
     {
+        $settings = self::settings();
         $total = 0.0;
 
         for ($i = 1; $i <= $lateDays; $i++) {
-            $total += self::amountFor($i);
+            $total += self::amountWith($i, $settings);
         }
 
         return round($total, 2);
+    }
+
+    /** The tariff applied to one day, against an already-read settings set. */
+    private static function amountWith(int $sequence, array $settings): float
+    {
+        if ($sequence <= 0 || $sequence <= $settings['free_days']) {
+            return 0.0;
+        }
+
+        return $sequence <= $settings['tier1_last_day']
+            ? $settings['tier1_amount']
+            : $settings['tier2_amount'];
     }
 
     /** Explains what this particular late day costs, or that it is free. */
@@ -99,17 +122,20 @@ class LatePenalty
     /** The tariff itself, for showing staff the rules up front. */
     public static function tariff(): array
     {
+        ['free_days' => $free, 'tier1_last_day' => $tier1Last,
+            'tier1_amount' => $tier1, 'tier2_amount' => $tier2] = self::settings();
+
         return [
-            'free_days' => self::freeDays(),
-            'tier1_last_day' => self::tier1LastDay(),
-            'tier1_amount' => Money::convert(self::tier1Amount()),
-            'tier1_amount_formatted' => Money::format(self::tier1Amount()),
-            'tier2_amount' => Money::convert(self::tier2Amount()),
-            'tier2_amount_formatted' => Money::format(self::tier2Amount()),
-            'summary' => 'تا '.self::freeDays().' روز تأخیر در ماه فقط اخطار است. '
-                .'از روز '.(self::freeDays() + 1).' تا '.self::tier1LastDay()
-                .' روزی '.Money::format(self::tier1Amount()).' و '
-                .'پس از آن روزی '.Money::format(self::tier2Amount()).' کسر می‌شود.',
+            'free_days' => $free,
+            'tier1_last_day' => $tier1Last,
+            'tier1_amount' => Money::convert($tier1),
+            'tier1_amount_formatted' => Money::format($tier1),
+            'tier2_amount' => Money::convert($tier2),
+            'tier2_amount_formatted' => Money::format($tier2),
+            'summary' => 'تا '.$free.' روز تأخیر در ماه فقط اخطار است. '
+                .'از روز '.($free + 1).' تا '.$tier1Last
+                .' روزی '.Money::format($tier1).' و '
+                .'پس از آن روزی '.Money::format($tier2).' کسر می‌شود.',
         ];
     }
 }
