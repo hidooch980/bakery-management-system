@@ -125,7 +125,7 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
         AdminRecordKind.consignment => await widget.api.recordConsignmentFlour(
             partnerName: _title.text.trim(),
             direction: _direction,
-            amountKg: value,
+            bags: value,
             note: note,
           ),
       };
@@ -148,13 +148,13 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
 
   String get _amountLabel => switch (widget.kind) {
         AdminRecordKind.flourIntake => 'تعداد کیسه',
-        AdminRecordKind.consignment => 'مقدار',
+        AdminRecordKind.consignment => 'تعداد کیسه',
         _ => 'مبلغ',
       };
 
   String get _amountSuffix => switch (widget.kind) {
         AdminRecordKind.flourIntake => 'کیسه',
-        AdminRecordKind.consignment => 'کیلوگرم',
+        AdminRecordKind.consignment => 'کیسه',
         _ => _unit.label,
       };
 

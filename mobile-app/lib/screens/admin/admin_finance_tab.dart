@@ -48,7 +48,8 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
       _Range.month => now.subtract(const Duration(days: 29)),
     };
 
-    // The API accepts Jalali dates, which is what the app speaks.
+    // Sent as Gregorian; the API takes either calendar and tells them apart
+    // by the year, so no conversion is needed on this side.
     return widget.api.financialReport(
       from: _toApiDate(from),
       to: _toApiDate(now),

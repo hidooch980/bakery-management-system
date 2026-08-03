@@ -14,6 +14,7 @@ import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
 import '../../widgets/seller_account_card.dart';
 import '../../widgets/seller_collections_card.dart';
+import '../../widgets/station_rail.dart';
 import '../../widgets/sync_status_card.dart';
 import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
@@ -21,6 +22,7 @@ import '../../widgets/common.dart';
 import '../../models/flour_sale.dart';
 import '../shared/settings_screen.dart';
 import 'flour_sale_sheet.dart';
+import 'seller_workbench.dart';
 
 /// Home screen for the seller. One scrolling page rather than tabs, so the
 /// day's numbers, the chane waiting to be sold and the sales already made
@@ -177,6 +179,34 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                         ?.copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 14),
+                  StationRail(
+                    trailing: data.board == null
+                        ? null
+                        : '${data.board!.waitingChane} چانه در انتظار پخت',
+                    stations: [
+                      Station(
+                        label: 'خمیر',
+                        value: '${data.board?.doughBagsToday ?? 0}',
+                        state: StationState.done,
+                      ),
+                      Station(
+                        label: 'چانه',
+                        value: '${pending.fold<int>(0, (a, c) => a + c.chaneCount)}',
+                        state: pending.isEmpty
+                            ? StationState.done
+                            : StationState.active,
+                      ),
+                      Station(
+                        label: 'فروش',
+                        value: '${today.count}',
+                        state: today.count > 0
+                            ? StationState.done
+                            : StationState.idle,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
                   SyncStatusCard(api: widget.api),
               const SizedBox(height: 14),
               AttendanceCard(api: widget.api),
@@ -224,6 +254,16 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                     const SizedBox(height: 16),
                     ChaneComparison(board: data.board!),
                   ],
+
+                  // Kneading, shaping, flour and who is in today. Sections
+                  // hide themselves when the permission is not held, so a
+                  // shop that keeps the roles separate sees nothing new.
+                  const SizedBox(height: 22),
+                  SellerWorkbench(
+                    api: widget.api,
+                    bakery: _bakery,
+                    onChanged: _reload,
+                  ),
 
                   const SizedBox(height: 22),
                   _SectionHeader(
@@ -496,7 +536,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   /// to the shop's display unit when it renders — doing it here too
   /// showed every figure ten times over on a Rial shop.
   double get _totalAmount => _usedTypes
-      .where((type) => !type.isGiveaway)
+      .where((type) => !type.expectsNoAmount)
       .fold(0.0, (sum, type) => sum + _countFor(type) * _unitPrice);
 
   /// Loaves of the batch not yet placed on any payment row. Recorded as a
@@ -553,7 +593,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                 // and the bread price is already in it. Bread given away
                 // is sent with no amount rather than a zero, which would
                 // read as money that went missing.
-                amount: type.isGiveaway ? null : _countFor(type) * _unitPrice,
+                amount: type.expectsNoAmount ? null : _countFor(type) * _unitPrice,
                 customerId: _customers[type],
               ))
           .toList();
@@ -785,7 +825,7 @@ class _PaymentRow extends StatelessWidget {
 
     // Toman, the unit everything is stored in. MoneyFormat converts to the
     // shop's display unit when it renders.
-    final amount = type.isGiveaway ? 0.0 : count * unitPrice;
+    final amount = type.expectsNoAmount ? 0.0 : count * unitPrice;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -814,7 +854,7 @@ class _PaymentRow extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                     ),
-                    if (active && type.isGiveaway)
+                    if (active && type.expectsNoAmount)
                       Text(
                         'بدون دریافت وجه',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(

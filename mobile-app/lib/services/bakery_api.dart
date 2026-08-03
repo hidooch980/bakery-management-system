@@ -264,8 +264,18 @@ class BakeryApi {
   }
 
   /// Records money a buyer handed back, oldest invoice first.
-  Future<void> collectFromCustomer(int customerId, double amount) =>
-      _client.post('/my-collections/$customerId/collect', {'amount': amount});
+  ///
+  /// [method] is how it arrived: 'cash' stays in the till, 'card' is banked,
+  /// because that money really did reach the account.
+  Future<void> collectFromCustomer(
+    int customerId,
+    double amount, {
+    String method = 'cash',
+  }) =>
+      _client.post('/my-collections/$customerId/collect', {
+        'amount': amount,
+        'method': method,
+      });
 
   /// Asks the admin to confirm the seller has handed their account over.
   /// The account only clears once the admin agrees, so this returns the
@@ -615,10 +625,12 @@ class BakeryApi {
   }
 
   /// Flour lent to or borrowed from another bakery.
+  /// Flour lent to or borrowed from a neighbouring bakery, counted in
+  /// sacks — the weight follows from the sack size on the server.
   Future<bool> recordConsignmentFlour({
     required String partnerName,
     required String direction,
-    required double amountKg,
+    required double bags,
     String? note,
   }) async {
     final body = await _client.postOrQueue(
@@ -626,7 +638,7 @@ class BakeryApi {
       {
         'partner_name': partnerName,
         'direction': direction,
-        'amount_kg': amountKg,
+        'bags': bags,
         if (note != null && note.isNotEmpty) 'note': note,
       },
       label: 'آرد امانی — $partnerName',

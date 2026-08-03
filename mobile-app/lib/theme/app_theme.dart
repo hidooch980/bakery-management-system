@@ -1,20 +1,33 @@
 import 'package:flutter/material.dart';
 
-/// Warm, bread-inspired palette shared by the light and dark themes.
+/// The shop's palette.
+///
+/// The ground is a cool neutral and the only warm note is the colour of a
+/// baked top, so the accent carries every button and figure that matters
+/// instead of competing with a warm background for attention. Screens are
+/// read at arm's length in a bright shop, so contrast is kept high in both
+/// brightnesses rather than softened.
 class AppColors {
-  static const Color crust = Color(0xFFB4700F); // deep baked crust
-  static const Color wheat = Color(0xFFE8A33D); // golden wheat
-  static const Color dough = Color(0xFFF5E6D3); // pale dough
-  static const Color sesame = Color(0xFFFFF8ED); // light surface
+  static const Color crust = Color(0xFFC2740F); // baked top — the accent
+  static const Color wheat = Color(0xFFE9A03C); // the same, lifted for dark
 
-  static const Color darkBase = Color(0xFF16120D); // dark oven
-  static const Color darkSurface = Color(0xFF221B14);
-  static const Color darkCard = Color(0xFF2C231A);
+  static const Color paper = Color(0xFFEEF1F4); // cool light ground
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color line = Color(0xFFDCE2E8);
 
-  static const Color success = Color(0xFF2E9E6B);
-  static const Color info = Color(0xFF3B82C4);
-  static const Color danger = Color(0xFFD1495B);
-  static const Color warning = Color(0xFFE8952D);
+  static const Color darkBase = Color(0xFF0B0F14); // cool dark ground
+  static const Color darkSurface = Color(0xFF151B23);
+  static const Color darkCard = Color(0xFF1B222B);
+  static const Color darkLine = Color(0xFF28313C);
+
+  /// Semantic, and deliberately not the accent: a settled account and a
+  /// primary button must never be told apart by shade alone.
+  static const Color success = Color(0xFF0B7A54);
+  static const Color successDark = Color(0xFF35C793);
+  static const Color info = Color(0xFF2C6FA8);
+  static const Color danger = Color(0xFFC5373C);
+  static const Color dangerDark = Color(0xFFF1666B);
+  static const Color warning = Color(0xFFC2740F);
 }
 
 class AppTheme {
@@ -25,13 +38,14 @@ class AppTheme {
       seedColor: AppColors.crust,
       brightness: Brightness.light,
       primary: AppColors.crust,
-      secondary: AppColors.wheat,
-      surface: AppColors.sesame,
+      secondary: AppColors.info,
+      surface: AppColors.surface,
       error: AppColors.danger,
+      outlineVariant: AppColors.line,
     );
 
     return _base(scheme).copyWith(
-      scaffoldBackgroundColor: const Color(0xFFFDF9F3),
+      scaffoldBackgroundColor: AppColors.paper,
     );
   }
 
@@ -40,9 +54,10 @@ class AppTheme {
       seedColor: AppColors.wheat,
       brightness: Brightness.dark,
       primary: AppColors.wheat,
-      secondary: AppColors.crust,
+      secondary: AppColors.info,
       surface: AppColors.darkSurface,
-      error: AppColors.danger,
+      error: AppColors.dangerDark,
+      outlineVariant: AppColors.darkLine,
     );
 
     return _base(scheme).copyWith(

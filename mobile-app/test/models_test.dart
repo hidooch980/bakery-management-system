@@ -118,18 +118,36 @@ void main() {
     test('covers every payment method the backend accepts', () {
       expect(
         PaymentType.values.map((t) => t.apiValue).toSet(),
-        {'cash', 'card', 'credit', 'home', 'schools', 'charity', 'other'},
+        {
+          'cash',
+          'card',
+          'credit',
+          'home',
+          'schools',
+          'charity',
+          'shortfall',
+          'other',
+        },
       );
     });
 
-    test('only charity is bread given away', () {
+    test('bread given away is donated or taken home', () {
       // A giveaway asks for no money, so it must not be treated as a sale
-      // that came up short.
-      expect(PaymentType.charity.isGiveaway, isTrue);
+      // that came up short, and it never lands on the seller's account.
       expect(
         PaymentType.values.where((t) => t.isGiveaway),
-        [PaymentType.charity],
+        [PaymentType.home, PaymentType.charity],
       );
+    });
+
+    test('a shortfall asks for no money but is not a giveaway', () {
+      // The loaves left and nothing came back for them, so the seller
+      // answers for it — unlike bread that was deliberately given away.
+      expect(PaymentType.shortfall.isShortfall, isTrue);
+      expect(PaymentType.shortfall.isGiveaway, isFalse);
+      expect(PaymentType.shortfall.expectsNoAmount, isTrue);
+      expect(PaymentType.charity.expectsNoAmount, isTrue);
+      expect(PaymentType.cash.expectsNoAmount, isFalse);
     });
 
     test('falls back to other for an unrecognised value', () {

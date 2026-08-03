@@ -83,6 +83,7 @@ enum PaymentType {
   home('home', 'منزل'),
   schools('schools', 'مدارس'),
   charity('charity', 'خیرات و کمک'),
+  shortfall('shortfall', 'کسری نان'),
   other('other', 'سایر');
 
   const PaymentType(this.apiValue, this.label);
@@ -100,10 +101,20 @@ enum PaymentType {
   bool get needsCustomer =>
       this == PaymentType.credit || this == PaymentType.schools;
 
-  /// Bread given away — to a mosque, a religious school or anyone in need.
-  /// No money is expected, so the sheet asks for no amount and the seller
-  /// is not left owing the price of what was donated.
-  bool get isGiveaway => this == PaymentType.charity;
+  /// Bread that leaves with no money behind it — donated, or taken home.
+  /// The sheet asks for no amount, and the seller is not left owing the
+  /// price of what was given away.
+  bool get isGiveaway =>
+      this == PaymentType.charity || this == PaymentType.home;
+
+  /// Loaves the seller cannot account for. No money is expected either,
+  /// but unlike a giveaway this does land on their account — the bread
+  /// left and nothing came back for it, and naming it at the counter beats
+  /// meeting it as a figure at the end of the month.
+  bool get isShortfall => this == PaymentType.shortfall;
+
+  /// Neither of the above expects an amount to be typed.
+  bool get expectsNoAmount => isGiveaway || isShortfall;
 }
 
 /// One way a batch was paid for: how many loaves went out under this
