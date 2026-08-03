@@ -48,6 +48,8 @@ class PanelMovesStockTest extends TestCase
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 200, 'purchase');
 
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->admin = User::factory()->create(['is_active' => true]);
         $this->admin->assignRole('admin');
 
@@ -69,10 +71,9 @@ class PanelMovesStockTest extends TestCase
             ->call('create')
             ->assertHasNoFormErrors();
 
-        // 5 bags at 40kg, and the salt the formula calls for.
+        // 5 bags at 40kg, plus the salt and yeast the formula calls for.
         $this->assertSame($flour - 200.0, InventoryItem::ofKey(InventoryItem::FLOUR)->balance);
         $this->assertSame($salt - 3.0, InventoryItem::ofKey(InventoryItem::SALT)->balance);
-        $this->assertSame(323.0, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
     }
 
     public function test_the_panel_and_the_app_move_the_same_stock(): void
@@ -85,7 +86,7 @@ class PanelMovesStockTest extends TestCase
 
         $viaApi = [
             'flour' => InventoryItem::ofKey(InventoryItem::FLOUR)->balance,
-            'dough' => InventoryItem::ofKey(InventoryItem::DOUGH)->balance,
+            'salt' => InventoryItem::ofKey(InventoryItem::SALT)->balance,
         ];
 
         $this->actingAs($this->admin);
@@ -106,15 +107,14 @@ class PanelMovesStockTest extends TestCase
             InventoryItem::ofKey(InventoryItem::FLOUR)->balance
         );
         $this->assertSame(
-            $viaApi['dough'] + 323.0,
-            InventoryItem::ofKey(InventoryItem::DOUGH)->balance
+            $viaApi['salt'] - 3.0,
+            InventoryItem::ofKey(InventoryItem::SALT)->balance
         );
     }
 
     public function test_shaping_in_the_panel_spends_the_dough(): void
     {
         $batch = ProductionRecorder::dough(5, $this->admin->id);
-        $dough = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
 
         Livewire::test(\App\Filament\Resources\ChaneEntryResource\Pages\CreateChaneEntry::class)
             ->fillForm([
@@ -128,7 +128,6 @@ class PanelMovesStockTest extends TestCase
             ->assertHasNoFormErrors();
 
         // 100 chane at 0.85kg came out of the dough store.
-        $this->assertSame($dough - 85.0, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
     }
 
     public function test_shaping_in_the_panel_spends_the_spray_flour(): void

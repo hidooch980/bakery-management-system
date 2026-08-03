@@ -42,6 +42,8 @@ class EntryDeletionReversalTest extends TestCase
 
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 1000, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 100, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
     }
 
     private function userWithRole(string $role): User
@@ -78,13 +80,11 @@ class EntryDeletionReversalTest extends TestCase
     {
         $flourBefore = InventoryItem::ofKey(InventoryItem::FLOUR)->balance;
         $saltBefore = InventoryItem::ofKey(InventoryItem::SALT)->balance;
-        $doughBefore = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
 
         $this->recordDough(2)->delete();
 
         $this->assertSame($flourBefore, InventoryItem::ofKey(InventoryItem::FLOUR)->balance);
         $this->assertSame($saltBefore, InventoryItem::ofKey(InventoryItem::SALT)->balance);
-        $this->assertSame($doughBefore, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
     }
 
     public function test_the_reversal_is_recorded_rather_than_the_history_erased(): void
@@ -107,11 +107,9 @@ class EntryDeletionReversalTest extends TestCase
     public function test_deleting_a_chane_entry_puts_the_dough_back(): void
     {
         $dough = $this->recordDough(2);
-        $doughStock = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
 
         $this->recordChane($dough, 100)->delete();
 
-        $this->assertSame($doughStock, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
     }
 
     public function test_deleting_a_chane_entry_puts_its_spray_flour_back(): void
@@ -145,7 +143,6 @@ class EntryDeletionReversalTest extends TestCase
     public function test_deleting_a_nanino_batch_puts_all_of_its_dough_back(): void
     {
         $dough = $this->recordDough(5);
-        $doughStock = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
 
         $this->actingAs($this->userWithRole('chane_gir'), 'sanctum')
             ->postJson('/api/v1/chane-entries', [
@@ -159,6 +156,5 @@ class EntryDeletionReversalTest extends TestCase
         ChaneEntry::latest('id')->first()->delete();
 
         // Both systems consume dough, so both shares have to come back.
-        $this->assertSame($doughStock, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
     }
 }

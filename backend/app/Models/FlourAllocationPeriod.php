@@ -126,7 +126,11 @@ class FlourAllocationPeriod extends Model
             return 0;
         }
 
-        return (int) ($formula->naninoChaneCount($this->used_kg / $formula->bagWeightKg) ?? 0);
+        // Counted a sack at a time, like the quota figure above, so the two
+        // are read against each other on the same footing.
+        $perBag = $formula->naninoChaneCount(1) ?? 0;
+
+        return (int) round($this->used_kg / $formula->bagWeightKg * $perBag);
     }
 
     /**
@@ -145,14 +149,14 @@ class FlourAllocationPeriod extends Model
             return 0;
         }
 
+        // Both weights come off the same rows, so they are summed in one pass
+        // rather than querying the same window twice.
         $doughKg = (float) ChaneEntry::whereBetween('created_at', [
             $this->starts_on->copy()->startOfDay(),
             $this->ends_on->copy()->endOfDay(),
-        ])->sum('normal_weight_kg')
-            + (float) ChaneEntry::whereBetween('created_at', [
-                $this->starts_on->copy()->startOfDay(),
-                $this->ends_on->copy()->endOfDay(),
-            ])->sum('nanino_weight_kg');
+        ])->selectRaw(
+            'COALESCE(SUM(normal_weight_kg), 0) + COALESCE(SUM(nanino_weight_kg), 0) as dough_kg'
+        )->value('dough_kg');
 
         return (int) floor($doughKg / $formula->naninoChaneWeightKg);
     }
@@ -214,6 +218,67 @@ class FlourAllocationPeriod extends Model
             'over' => 'بیش از یک کیسه اضافه — خطا',
             default => 'مطابق مصرف آرد',
         };
+    }
+
+    /**
+     * The bread this period's quota comes to.
+     *
+     * Nanino is the measure here because the card reader is wired into it,
+     * so its loaf is the one the outside world counts: 115 sacks at 64
+     * loaves a sack is 7,360 loaves for the period, whatever shape the
+     * shop actually baked them in.
+     */
+    public function getAllocatedBreadCountAttribute(): int
+    {
+        $formula = DoughFormula::fromBakery();
+
+        if ($formula->bagWeightKg <= 0 || ! $formula->naninoChaneWeightKg) {
+            return 0;
+        }
+
+        // Counted a sack at a time, the way the shop does it. A sack yields
+        // 64 whole loaves and a remainder too small to be another one, and
+        // that remainder is lost per sack rather than pooling across the
+        // period into loaves nobody could have baked.
+        $perBag = $formula->naninoChaneCount(1) ?? 0;
+        $bags = (float) $this->allocated_kg / $formula->bagWeightKg;
+
+        return (int) round($bags * $perBag);
+    }
+
+    /** Loaves rung through the card reader inside this period. */
+    public function getCardBreadCountAttribute(): int
+    {
+        return (int) $this->cardSales()->sum('bread_count');
+    }
+
+    /** What those card sales took, for the admin's card turnover figure. */
+    public function getCardAmountAttribute(): float
+    {
+        return round((float) $this->cardSales()->sum('amount'), 2);
+    }
+
+    public function getCardAmountFormattedAttribute(): string
+    {
+        return \App\Support\Money::format($this->card_amount);
+    }
+
+    /**
+     * The quota's bread, less what the reader sold. Positive means loaves
+     * the period paid for that the reader has not accounted for yet.
+     */
+    public function getBreadRemainderAttribute(): int
+    {
+        return $this->allocated_bread_count - $this->card_bread_count;
+    }
+
+    private function cardSales()
+    {
+        return Sale::whereIn('payment_type', Sale::BANKED_TYPES)
+            ->whereBetween('created_at', [
+                $this->starts_on->copy()->startOfDay(),
+                $this->ends_on->copy()->endOfDay(),
+            ]);
     }
 
     public function getRemainingKgAttribute(): float

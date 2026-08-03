@@ -296,8 +296,120 @@ class _PeriodCard extends StatelessWidget {
                 ),
               ],
             ),
+            _BreadReconciliation(period: period),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The period's flour restated as loaves, against what the card reader sold.
+///
+/// Nanino is the measure because the reader is wired into it, so its loaf is
+/// the one counted outside the shop — 115 sacks at 64 loaves a sack is 7,360
+/// loaves for the period, whatever shape they were actually baked in.
+class _BreadReconciliation extends StatelessWidget {
+  const _BreadReconciliation({required this.period});
+
+  final Map<String, dynamic> period;
+
+  static int _int(dynamic value) =>
+      value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    final quota = _int(period['allocated_bread_count']);
+    final produced = _int(period['produced_bread_count']);
+    final sold = _int(period['card_bread_count']);
+    final remainder = _int(period['bread_remainder']);
+
+    // Nothing to say until the nanino loaf weight is configured.
+    if (quota == 0) return const SizedBox.shrink();
+
+    // More sold than the quota allows is the figure worth noticing.
+    final remainderColor = remainder < 0
+        ? const Color(0xFFD1495B)
+        : scheme.onSurfaceVariant;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Divider(height: 1, color: scheme.outlineVariant),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.bakery_dining_rounded, size: 16, color: scheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                'نان دوره',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _BreadRow(label: 'سهمیه دوره', value: '$quota نان'),
+          _BreadRow(label: 'مصرف آرد', value: '$produced نان'),
+          _BreadRow(
+            label: 'فروش کارتخوان',
+            value: '$sold نان  •  ${period['card_amount_formatted'] ?? '—'}',
+          ),
+          _BreadRow(
+            label: 'باقی‌مانده',
+            value: '$remainder نان',
+            color: remainderColor,
+            emphasise: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BreadRow extends StatelessWidget {
+  const _BreadRow({
+    required this.label,
+    required this.value,
+    this.color,
+    this.emphasise = false,
+  });
+
+  final String label;
+  final String value;
+  final Color? color;
+  final bool emphasise;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: emphasise ? FontWeight.w800 : FontWeight.w600,
+                  color: color ?? scheme.onSurface,
+                ),
+          ),
+        ],
       ),
     );
   }

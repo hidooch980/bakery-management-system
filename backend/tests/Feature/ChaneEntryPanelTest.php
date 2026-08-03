@@ -47,6 +47,8 @@ class ChaneEntryPanelTest extends TestCase
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 200, 'purchase');
 
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->dough = ProductionRecorder::dough(10, $admin->id);
     }
 

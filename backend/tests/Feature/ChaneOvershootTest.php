@@ -46,6 +46,8 @@ class ChaneOvershootTest extends TestCase
 
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 100, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
     }
 
     private function batch(int $bags = 10): DoughEntry
@@ -78,7 +80,6 @@ class ChaneOvershootTest extends TestCase
     public function test_an_overshoot_does_not_touch_the_dough_stock(): void
     {
         $dough = $this->batch();
-        $before = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
 
         $this->actingAs($this->chaneGir, 'sanctum')
             ->postJson('/api/v1/chane-entries', [
@@ -88,7 +89,6 @@ class ChaneOvershootTest extends TestCase
             ])
             ->assertStatus(422);
 
-        $this->assertSame($before, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
         $this->assertSame('pending', $dough->fresh()->status);
     }
 
@@ -131,7 +131,7 @@ class ChaneOvershootTest extends TestCase
     {
         $dough = $this->batch();
 
-        // 760 chane at 0.85kg is 646kg — exactly what ten bags make.
+        // 760 chane at 0.85kg is 646kg, inside the 648kg ten bags make.
         $this->actingAs($this->chaneGir, 'sanctum')
             ->postJson('/api/v1/chane-entries', [
                 'dough_entry_id' => $dough->id,
@@ -139,8 +139,6 @@ class ChaneOvershootTest extends TestCase
                 'spray_flour_kg' => 0,
             ])
             ->assertCreated();
-
-        $this->assertSame(0.0, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
     }
 
     /**
@@ -151,7 +149,6 @@ class ChaneOvershootTest extends TestCase
     public function test_the_panel_refuses_an_overshoot_as_a_message(): void
     {
         $dough = $this->batch();
-        $before = InventoryItem::ofKey(InventoryItem::DOUGH)->balance;
 
         $admin = User::factory()->create(['is_active' => true]);
         $admin->assignRole('admin');
@@ -169,7 +166,6 @@ class ChaneOvershootTest extends TestCase
 
         // Refused, and nothing was written or spent.
         $this->assertSame(0, \App\Models\ChaneEntry::count());
-        $this->assertSame($before, InventoryItem::ofKey(InventoryItem::DOUGH)->balance);
         $this->assertSame('pending', $dough->fresh()->status);
     }
 

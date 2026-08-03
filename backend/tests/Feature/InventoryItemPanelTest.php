@@ -130,21 +130,21 @@ class InventoryItemPanelTest extends TestCase
 
     public function test_an_outbound_entry_deducts_stock(): void
     {
-        $dough = InventoryItem::ofKey('dough');
-        $dough->move('in', 100, 'production');
+        $salt = InventoryItem::ofKey('salt');
+        $salt->move('in', 100, 'purchase');
 
         Livewire::test(
             \App\Filament\Resources\InventoryItemResource\Pages\ListInventoryItems::class
         )
-            ->callTableAction('recordStock', $dough, data: [
+            ->callTableAction('recordStock', $salt, data: [
                 'direction' => 'out',
                 'quantity' => 30,
-                'reason' => 'shaping',
+                'reason' => 'production',
             ])
             ->assertHasNoTableActionErrors();
 
         // 100kg in, 30kg out: 70kg left.
-        $this->assertEquals(70.0, $dough->fresh()->balance);
+        $this->assertEquals(70.0, $salt->fresh()->balance);
     }
 
     public function test_recording_more_stock_out_than_available_is_rejected(): void

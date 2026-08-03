@@ -54,6 +54,8 @@ class SplitPaymentSaleTest extends TestCase
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
+        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $dough = $this->userWithRole('dough_maker');
         $chaneGir = $this->userWithRole('chane_gir');
 

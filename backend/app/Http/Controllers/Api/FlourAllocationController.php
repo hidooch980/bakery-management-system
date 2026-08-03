@@ -135,6 +135,16 @@ class FlourAllocationController extends Controller
                 'nanino_chane_count' => $p->nanino_chane_count,
                 'nanino_flour_kg' => $p->nanino_flour_kg,
                 'nanino_balance_kg' => $p->nanino_balance_kg,
+                // The quota restated as loaves, against what the card
+                // reader — which the nanino system reads — actually sold.
+                'allocated_bread_count' => $p->allocated_bread_count,
+                // What the flour actually burned through comes to, so the
+                // quota and the real consumption are read side by side.
+                'produced_bread_count' => $p->expected_nanino_count,
+                'card_bread_count' => $p->card_bread_count,
+                'bread_remainder' => $p->bread_remainder,
+                'card_amount' => $p->card_amount,
+                'card_amount_formatted' => $p->card_amount_formatted,
                 'is_current' => $current !== null && $current->id === $p->id,
             ]),
         ];
