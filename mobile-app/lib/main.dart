@@ -15,6 +15,7 @@ import 'services/api_client.dart';
 import 'services/bakery_api.dart';
 import 'services/server_directory.dart';
 import 'theme/app_theme.dart';
+import 'widgets/update_prompt.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,14 +85,18 @@ class AppGate extends StatelessWidget {
       child: switch (auth.status) {
         AuthStatus.unknown => const _SplashScreen(),
         AuthStatus.unauthenticated => const LoginScreen(),
-        AuthStatus.authenticated => switch (auth.user?.role) {
-            UserRole.admin => AdminHomeScreen(api: api),
-            UserRole.doughMaker => DoughHomeScreen(api: api),
-            UserRole.chaneGir => ChaneHomeScreen(api: api),
-            UserRole.shater => ShaterHomeScreen(api: api),
-            UserRole.seller => SellerHomeScreen(api: api),
-            _ => const _UnknownRoleScreen(),
-          },
+        // Signed in and on their own screen is the one moment the user is
+        // certain to reach, so it is where a waiting update is mentioned.
+        AuthStatus.authenticated => UpdatePrompt(
+            child: switch (auth.user?.role) {
+              UserRole.admin => AdminHomeScreen(api: api),
+              UserRole.doughMaker => DoughHomeScreen(api: api),
+              UserRole.chaneGir => ChaneHomeScreen(api: api),
+              UserRole.shater => ShaterHomeScreen(api: api),
+              UserRole.seller => SellerHomeScreen(api: api),
+              _ => const _UnknownRoleScreen(),
+            },
+          ),
       },
     );
   }
