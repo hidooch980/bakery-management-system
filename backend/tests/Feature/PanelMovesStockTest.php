@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Bakery;
-use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
 use App\Models\User;

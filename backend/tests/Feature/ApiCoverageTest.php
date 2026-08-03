@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
-use App\Models\ConsignmentFlour;
 use App\Models\Customer;
 use App\Models\DoughEntry;
 use App\Models\Expense;

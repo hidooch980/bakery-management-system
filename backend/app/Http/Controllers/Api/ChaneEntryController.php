@@ -5,13 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
-use App\Models\InventoryItem;
 use App\Support\DoughFormula;
 use App\Support\ProductionRecorder;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ChaneEntryController extends Controller
 {

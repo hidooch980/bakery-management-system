@@ -8,7 +8,6 @@ use App\Models\BankAccount;
 use App\Models\ShareSettlement;
 use App\Models\User;
 use App\Support\IssueScanner;
-use App\Support\Jalali;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;

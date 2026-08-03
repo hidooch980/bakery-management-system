@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Bakery;
-use App\Models\FlourAllocation;
 use App\Models\User;
 use App\Support\Jalali;
 use Database\Seeders\BakerySeeder;

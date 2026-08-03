@@ -2,11 +2,8 @@
 
 namespace App\Models;
 
-use App\Models\ChaneEntry;
-use App\Models\InventoryItem;
 use App\Support\DoughFormula;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 
 class FlourAllocationPeriod extends Model
 {

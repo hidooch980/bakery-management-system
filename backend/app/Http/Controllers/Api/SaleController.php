@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
 use App\Support\Money;
@@ -11,7 +10,6 @@ use App\Support\SaleRecorder;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class SaleController extends Controller
 {

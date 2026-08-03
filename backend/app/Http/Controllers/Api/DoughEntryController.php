@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DoughEntry;
-use App\Models\InventoryItem;
 use App\Support\DoughFormula;
 use App\Support\ProductionRecorder;
 use App\Traits\ApiResponse;
