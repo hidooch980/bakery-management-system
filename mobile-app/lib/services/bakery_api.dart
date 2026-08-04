@@ -1,4 +1,5 @@
 import '../models/bakery.dart';
+import '../models/balance_sheet.dart';
 import '../models/bank_account.dart';
 import '../models/financial_series.dart';
 import '../models/chane_board.dart';
@@ -358,6 +359,17 @@ class BakeryApi {
     });
 
     return body['data'] as Map<String, dynamic>;
+  }
+
+  /// What the shop owns against what it owes, as of now.
+  ///
+  /// Cached like the other admin reads, so a phone that cannot reach the
+  /// server still shows the last sheet — with the card above it saying
+  /// plainly that it is not live.
+  Future<BalanceSheet> balanceSheet() async {
+    final body = await _client.getCached('/reports/balance-sheet');
+
+    return BalanceSheet.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   /// Money in against money out, cut into days, weeks or months.

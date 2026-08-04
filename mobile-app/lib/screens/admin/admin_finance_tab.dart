@@ -6,6 +6,7 @@ import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import 'customer_debts_section.dart';
 import 'follow_ups_section.dart';
+import 'balance_sheet_section.dart';
 import 'bank_balances_section.dart';
 import 'income_expense_chart.dart';
 import 'seller_debts_section.dart';
@@ -152,6 +153,12 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
               // Who has to be called today, and about what.
               const SizedBox(height: 22),
               FollowUpsSection(api: widget.api),
+
+              // Last, because it answers the widest question: everything
+              // above is this month's movement, this is where the shop
+              // stands.
+              const SizedBox(height: 22),
+              BalanceSheetSection(api: widget.api),
             ],
           );
         },
