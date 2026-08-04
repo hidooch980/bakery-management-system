@@ -38,7 +38,15 @@ class SaleRecorder
             // temporary debt against the seller — computed from the batch's
             // own count, never from client input, so it can't be typed
             // away. Counted once for the batch rather than once per line.
-            $shortfallCount = max(0, $chane->chane_count - $totalBread);
+            //
+            // A batch is not always sold in one go. Measuring this sale
+            // against the whole batch charged the seller for loaves that
+            // simply had not sold yet, and then charged them again at the
+            // next sale — a batch that sold out could end the day owing its
+            // own size. What is already gone counts too.
+            $soldBefore = (int) Sale::where('chane_entry_id', $chane->id)->sum('bread_count');
+
+            $shortfallCount = max(0, $chane->chane_count - $soldBefore - $totalBread);
             $shortfallApplied = false;
 
             $created = [];
@@ -107,6 +115,17 @@ class SaleRecorder
                 }
             }
 
+            // An earlier sale's shortfall was the right answer at the time
+            // and is the wrong one now that more of the batch has gone.
+            // Only figures nobody has acted on are revised: money that has
+            // already changed hands stands, and the admin sees both.
+            Sale::where('chane_entry_id', $chane->id)
+                ->whereNotIn('id', array_column($created, 'id'))
+                ->whereNotNull('shortfall_count')
+                ->whereNull('shortfall_settled_on')
+                ->whereNotIn('payment_type', Sale::SHORTFALL_TYPES)
+                ->update(['shortfall_count' => null, 'shortfall_amount' => null]);
+
             $chane->update(['status' => 'sold']);
 
             return $created;
@@ -134,9 +153,17 @@ class SaleRecorder
 
         $totalBread = array_sum(array_column($lines, 'bread_count'));
 
-        if ($totalBread > $chane->chane_count) {
-            return 'مجموع تعداد نان ('.number_format($totalBread).') از تعداد چانه این دسته ('
-                .number_format($chane->chane_count).') بیشتر است.';
+        // Counted against everything already sold from the batch, not just
+        // against this sale: checking each transaction on its own let a
+        // batch of a hundred be sold sixty at a time, twice over.
+        $soldBefore = (int) Sale::where('chane_entry_id', $chane->id)->sum('bread_count');
+
+        if ($soldBefore + $totalBread > $chane->chane_count) {
+            $remaining = max(0, $chane->chane_count - $soldBefore);
+
+            return 'مجموع تعداد نان ('.number_format($totalBread).') از باقی‌مانده این دسته ('
+                .number_format($remaining).' از '.number_format($chane->chane_count)
+                .' چانه) بیشتر است.';
         }
 
         return null;
