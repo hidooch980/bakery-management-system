@@ -79,3 +79,56 @@ class BankBalances {
 
   bool get isEmpty => accounts.isEmpty;
 }
+
+/// One movement through an account, as the statement shows it.
+class BankTransaction {
+  const BankTransaction({
+    required this.id,
+    required this.isIncoming,
+    required this.amountFormatted,
+    required this.reasonLabel,
+    this.dateDisplay,
+    this.user,
+    this.note,
+  });
+
+  final int id;
+
+  /// Money in, as against money out. Kept as a plain answer rather than the
+  /// server's word for it, so the screen does not have to know the wording.
+  final bool isIncoming;
+
+  final String amountFormatted;
+  final String reasonLabel;
+  final String? dateDisplay;
+  final String? user;
+  final String? note;
+
+  factory BankTransaction.fromJson(Map<String, dynamic> json) => BankTransaction(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        isIncoming: json['direction'] == 'in',
+        amountFormatted: json['amount_formatted'] as String? ?? '',
+        reasonLabel: json['reason_label'] as String? ?? '',
+        dateDisplay: json['occurred_on_display'] as String?,
+        user: json['user'] as String?,
+        note: json['note'] as String?,
+      );
+}
+
+/// An account's statement: what it is, and what has moved through it.
+class BankStatement {
+  const BankStatement({required this.account, required this.transactions});
+
+  final BankAccount account;
+  final List<BankTransaction> transactions;
+
+  factory BankStatement.fromJson(Map<String, dynamic> json) => BankStatement(
+        account: BankAccount.fromJson(
+          (json['account'] as Map<String, dynamic>?) ?? const {},
+        ),
+        transactions: ((json['transactions'] as List?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(BankTransaction.fromJson)
+            .toList(),
+      );
+}

@@ -96,4 +96,57 @@ void main() {
       expect(balances.accounts, hasLength(1));
     });
   });
+
+  group('BankStatement', () {
+    test('reads an account with its movements', () {
+      final statement = BankStatement.fromJson({
+        'account': {
+          'id': 1,
+          'title': 'ملی',
+          'balance': 900,
+          'balance_formatted': '۹۰۰',
+        },
+        'transactions': [
+          {
+            'id': 5,
+            'direction': 'in',
+            'amount_formatted': '۱٬۰۰۰',
+            'reason_label': 'فروش نان',
+            'occurred_on_display': '۱۴۰۵/۰۵/۱۲',
+            'user': 'مدیر',
+          },
+          {
+            'id': 6,
+            'direction': 'out',
+            'amount_formatted': '۱۰۰',
+            'reason_label': 'هزینه',
+          },
+        ],
+      });
+
+      expect(statement.account.title, 'ملی');
+      expect(statement.transactions, hasLength(2));
+      expect(statement.transactions.first.isIncoming, isTrue);
+      expect(statement.transactions.last.isIncoming, isFalse);
+      expect(statement.transactions.first.user, 'مدیر');
+    });
+
+    test('an account with no movements yet still reads', () {
+      final statement = BankStatement.fromJson({
+        'account': {'id': 1, 'title': 'ملی', 'balance_formatted': '۰'},
+        'transactions': [],
+      });
+
+      expect(statement.transactions, isEmpty);
+      expect(statement.account.title, 'ملی');
+    });
+
+    test('anything but in counts as money leaving', () {
+      // The screen colours and points the arrow off this one answer, so a
+      // word it does not recognise must not read as money coming in.
+      final move = BankTransaction.fromJson({'id': 1, 'direction': 'خروج'});
+
+      expect(move.isIncoming, isFalse);
+    });
+  });
 }

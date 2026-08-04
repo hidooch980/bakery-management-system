@@ -338,6 +338,19 @@ class BakeryApi {
     return BankBalances.fromJson(body['data'] as Map<String, dynamic>);
   }
 
+  /// What has moved through one account, most recent first.
+  ///
+  /// Not cached: a statement is read to answer a question about a
+  /// particular moment, and a stale one would answer it wrongly.
+  Future<BankStatement> bankStatement(int accountId, {String? from, String? until}) async {
+    final body = await _client.get('/bank-accounts/$accountId/transactions', query: {
+      if (from != null) 'from': from,
+      if (until != null) 'until': until,
+    });
+
+    return BankStatement.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
   Future<List<Map<String, dynamic>>> sellerAccounts() async {
     final body = await _client.get('/seller-accounts');
     final data = body['data'] as Map<String, dynamic>;

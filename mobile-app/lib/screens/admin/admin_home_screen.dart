@@ -133,6 +133,7 @@ class AdminRow extends StatelessWidget {
     this.icon,
     this.color,
     this.emphasise = false,
+    this.onTap,
   });
 
   final String label;
@@ -141,12 +142,16 @@ class AdminRow extends StatelessWidget {
   final Color? color;
   final bool emphasise;
 
+  /// Given when the row leads somewhere — a balance to its statement. The
+  /// row grows a chevron so it is visibly worth pressing.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final accent = color ?? scheme.onSurface;
 
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       child: Row(
         children: [
@@ -169,9 +174,20 @@ class AdminRow extends StatelessWidget {
                     : Theme.of(context).textTheme.bodyLarge)
                 ?.copyWith(fontWeight: FontWeight.w700, color: accent),
           ),
+          if (onTap != null) ...[
+            const SizedBox(width: 6),
+            Icon(Icons.chevron_left_rounded,
+                size: 20, color: scheme.onSurfaceVariant),
+          ],
         ],
       ),
     );
+
+    if (onTap == null) {
+      return row;
+    }
+
+    return InkWell(onTap: onTap, child: row);
   }
 }
 
