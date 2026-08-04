@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../../models/bakery.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../utils/formatters.dart';
-import '../../widgets/common.dart';
-import '../../widgets/sync_status_card.dart';
-import '../shared/settings_screen.dart';
+import '../../widgets/role_home_scaffold.dart';
 import 'admin_finance_tab.dart';
 import 'admin_overview_tab.dart';
 import 'admin_staff_tab.dart';
@@ -26,7 +22,6 @@ class AdminHomeScreen extends StatefulWidget {
 }
 
 class _AdminHomeScreenState extends State<AdminHomeScreen> {
-  int _tab = 0;
   Bakery? _bakery;
 
   @override
@@ -44,102 +39,41 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     }
   }
 
-  static const _titles = ['خلاصه امروز', 'مالی', 'انبار', 'کارکنان'];
-
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthProvider>().user;
-
-    final tabs = [
-      AdminOverviewTab(api: widget.api, bakery: _bakery),
-      AdminFinanceTab(api: widget.api, bakery: _bakery),
-      AdminWarehouseTab(api: widget.api),
-      AdminStaffTab(api: widget.api),
-    ];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_titles[_tab]),
-        actions: [
-          const ThemeToggleButton(),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _bakery?.name ?? 'نانوایی',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                ),
-                Text(
-                  user?.name ?? '',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-              ],
-            ),
-          ),
+    return RoleHomeScaffold(
+      api: widget.api,
+      bakery: _bakery,
+      tabs: [
+        HomeTab(
+          label: 'خلاصه',
+          title: 'خلاصه امروز',
+          icon: Icons.dashboard_outlined,
+          selectedIcon: Icons.dashboard_rounded,
+          builder: (_) => AdminOverviewTab(api: widget.api, bakery: _bakery),
         ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // The admin was the one role that could not see the shop had
-            // lost its server, which is exactly who needs to know first.
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: SyncStatusCard(api: widget.api),
-            ),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: KeyedSubtree(key: ValueKey(_tab), child: tabs[_tab]),
-              ),
-            ),
-          ],
+        HomeTab(
+          label: 'مالی',
+          title: 'مالی',
+          icon: Icons.account_balance_wallet_outlined,
+          selectedIcon: Icons.account_balance_wallet_rounded,
+          builder: (_) => AdminFinanceTab(api: widget.api, bakery: _bakery),
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (index) => setState(() => _tab = index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard_rounded),
-            label: 'خلاصه',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-            label: 'مالی',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.warehouse_outlined),
-            selectedIcon: Icon(Icons.warehouse_rounded),
-            label: 'انبار',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline_rounded),
-            selectedIcon: Icon(Icons.people_rounded),
-            label: 'کارکنان',
-          ),
-        ],
-      ),
+        HomeTab(
+          label: 'انبار',
+          title: 'انبار',
+          icon: Icons.warehouse_outlined,
+          selectedIcon: Icons.warehouse_rounded,
+          builder: (_) => AdminWarehouseTab(api: widget.api),
+        ),
+        HomeTab(
+          label: 'کارکنان',
+          title: 'کارکنان',
+          icon: Icons.people_outline_rounded,
+          selectedIcon: Icons.people_rounded,
+          builder: (_) => AdminStaffTab(api: widget.api),
+        ),
+      ],
     );
   }
 }

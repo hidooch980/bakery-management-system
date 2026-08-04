@@ -15,18 +15,22 @@ import '../../widgets/attendance_card.dart';
 import '../../widgets/seller_account_card.dart';
 import '../../widgets/seller_collections_card.dart';
 import '../../widgets/station_rail.dart';
-import '../../widgets/sync_status_card.dart';
+import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
 import '../../models/flour_sale.dart';
-import '../shared/settings_screen.dart';
 import 'flour_sale_sheet.dart';
 import 'seller_workbench.dart';
 
-/// Home screen for the seller. One scrolling page rather than tabs, so the
-/// day's numbers, the chane waiting to be sold and the sales already made
-/// are all reachable without switching context.
+/// Home screen for the seller.
+///
+/// It used to be one scrolling page of everything: the greeting, attendance,
+/// the workbench, chane waiting to be sold, flour, the account, the day's
+/// sales. Reaching the sales meant scrolling past the lot. The same content
+/// is now three pages — what the day looks like, the selling itself, and
+/// what the seller is answerable for — laid out the way the admin's screen
+/// already was.
 class SellerHomeScreen extends StatefulWidget {
   const SellerHomeScreen({super.key, required this.api});
 
@@ -127,220 +131,240 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return RoleHomeScaffold(
+      api: widget.api,
+      bakery: _bakery,
+      tabs: [
+        HomeTab(
+          label: 'خلاصه',
+          title: 'خلاصه امروز',
+          icon: Icons.dashboard_outlined,
+          selectedIcon: Icons.dashboard_rounded,
+          builder: (_) => _withData(_overview),
+        ),
+        HomeTab(
+          label: 'فروش',
+          title: 'فروش',
+          icon: Icons.point_of_sale_outlined,
+          selectedIcon: Icons.point_of_sale_rounded,
+          builder: (_) => _withData(_selling),
+        ),
+        HomeTab(
+          label: 'حساب من',
+          title: 'حساب من',
+          icon: Icons.account_balance_wallet_outlined,
+          selectedIcon: Icons.account_balance_wallet_rounded,
+          builder: (_) => _withData(_account),
+        ),
+      ],
+    );
+  }
+
+  /// Every page reads the same fetch and pulls to refresh the same way, so
+  /// switching pages does not re-ask the server and the three cannot show
+  /// figures from different moments.
+  Widget _withData(List<Widget> Function(_SellerData data) children) {
+    return RefreshIndicator(
+      onRefresh: () async => _reload(),
+      child: FutureBuilder<_SellerData>(
+        future: _data,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                ErrorBox(message: '${snapshot.error}', onRetry: _reload),
+              ],
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            children: children(snapshot.data!),
+          );
+        },
+      ),
+    );
+  }
+
+  // ------------------------------------------------------------ خلاصه
+
+  List<Widget> _overview(_SellerData data) {
     final user = context.watch<AuthProvider>().user;
     final scheme = Theme.of(context).colorScheme;
     final unit = _bakery?.currency ?? Currency.toman;
+    final today = data.today;
+    final pending = data.pending;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('فروش'),
-        actions: [
-          const ThemeToggleButton(),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    return [
+      Text(
+        'سلام ${user?.name ?? ''}',
+        style: Theme.of(context)
+            .textTheme
+            .titleLarge
+            ?.copyWith(fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 14),
+      StationRail(
+        trailing: data.board == null
+            ? null
+            : '${data.board!.waitingChane} چانه در انتظار پخت',
+        stations: [
+          Station(
+            label: 'خمیر',
+            value: '${data.board?.doughBagsToday ?? 0}',
+            state: StationState.done,
+          ),
+          Station(
+            label: 'چانه',
+            value: '${pending.fold<int>(0, (a, c) => a + c.chaneCount)}',
+            state: pending.isEmpty ? StationState.done : StationState.active,
+          ),
+          Station(
+            label: 'فروش',
+            value: '${today.count}',
+            state: today.count > 0 ? StationState.done : StationState.idle,
+          ),
+        ],
+      ),
+      const SizedBox(height: 14),
+      AttendanceCard(api: widget.api),
+      const SizedBox(height: 14),
+      WorkStartCard(
+        api: widget.api,
+        // Shaping start is the chane gir's tick — the seller only records
+        // the start of baking.
+        visibleTypes: const {WorkStartType.baking},
+      ),
+      const SizedBox(height: 16),
+      Row(
+        children: [
+          Expanded(
+            child: StatTile(
+              label: 'فروش امروز',
+              value: '${today.count}',
+              icon: Icons.receipt_rounded,
+              color: scheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: StatTile(
+              label: 'مجموع (${unit.label})',
+              value: MoneyFormat.plain(today.total, currency: unit),
+              icon: Icons.payments_rounded,
+              color: const Color(0xFF2E9E6B),
             ),
           ),
         ],
       ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: FutureBuilder<_SellerData>(
-            future: _data,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
+      if (data.board != null) ...[
+        const SizedBox(height: 16),
+        ChaneComparison(board: data.board!),
+      ],
+    ];
+  }
 
-              if (snapshot.hasError) {
-                return ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    ErrorBox(message: '${snapshot.error}', onRetry: _reload),
-                  ],
-                );
-              }
+  // ------------------------------------------------------------- فروش
 
-              final data = snapshot.data!;
-              final pending = data.pending;
-              final today = data.today;
+  List<Widget> _selling(_SellerData data) {
+    final unit = _bakery?.currency ?? Currency.toman;
+    final pending = data.pending;
+    final today = data.today;
 
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-                children: [
-                  Text(
-                    'سلام ${user?.name ?? ''}',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 14),
-                  StationRail(
-                    trailing: data.board == null
-                        ? null
-                        : '${data.board!.waitingChane} چانه در انتظار پخت',
-                    stations: [
-                      Station(
-                        label: 'خمیر',
-                        value: '${data.board?.doughBagsToday ?? 0}',
-                        state: StationState.done,
-                      ),
-                      Station(
-                        label: 'چانه',
-                        value: '${pending.fold<int>(0, (a, c) => a + c.chaneCount)}',
-                        state: pending.isEmpty
-                            ? StationState.done
-                            : StationState.active,
-                      ),
-                      Station(
-                        label: 'فروش',
-                        value: '${today.count}',
-                        state: today.count > 0
-                            ? StationState.done
-                            : StationState.idle,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 14),
-                  SyncStatusCard(api: widget.api),
-              const SizedBox(height: 14),
-              AttendanceCard(api: widget.api),
-
-                  const SizedBox(height: 14),
-                  WorkStartCard(
-                    api: widget.api,
-                    // Shaping start is the chane gir's tick — the seller
-                    // only records the start of baking.
-                    visibleTypes: const {WorkStartType.baking},
-                  ),
-
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: StatTile(
-                          label: 'فروش امروز',
-                          value: '${today.count}',
-                          icon: Icons.receipt_rounded,
-                          color: scheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: StatTile(
-                          label: 'مجموع (${unit.label})',
-                          value: MoneyFormat.plain(today.total, currency: unit),
-                          icon: Icons.payments_rounded,
-                          color: const Color(0xFF2E9E6B),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 14),
-                  SellerAccountCard(api: widget.api),
-
-                  // Money the buyers who run an account still owe, and
-                  // what they have handed back.
-                  const SizedBox(height: 14),
-                  SellerCollectionsCard(api: widget.api),
-
-                  if (data.board != null) ...[
-                    const SizedBox(height: 16),
-                    ChaneComparison(board: data.board!),
-                  ],
-
-                  // Kneading, shaping, flour and who is in today. Sections
-                  // hide themselves when the permission is not held, so a
-                  // shop that keeps the roles separate sees nothing new.
-                  const SizedBox(height: 22),
-                  SellerWorkbench(
-                    api: widget.api,
-                    bakery: _bakery,
-                    onChanged: _reload,
-                  ),
-
-                  const SizedBox(height: 22),
-                  _SectionHeader(
-                    title: 'چانه‌های آماده فروش',
-                    count: pending.length,
-                    icon: Icons.storefront_rounded,
-                  ),
-                  const SizedBox(height: 10),
-                  if (pending.isEmpty)
-                    const _InlineEmpty(
-                      icon: Icons.done_all_rounded,
-                      text: 'همه چانه‌ها فروخته شده‌اند.',
-                    )
-                  else
-                    for (final entry in pending) ...[
-                      ActionCard(
-                        title: '${entry.chaneCount} چانه',
-                        subtitle: 'وزن: ${entry.weightKg.toStringAsFixed(2)} کیلوگرم'
-                            '${entry.userName != null ? '  •  ${entry.userName}' : ''}',
-                        icon: Icons.shopping_basket_rounded,
-                        color: const Color(0xFF3B82C4),
-                        onTap: () => _openSaleSheet(entry),
-                        trailing: const Icon(Icons.point_of_sale_rounded),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-
-                  if (data.flour != null) ...[
-                    const SizedBox(height: 22),
-                    _SectionHeader(
-                      title: 'فروش آرد امروز',
-                      count: data.flour!.count,
-                      icon: Icons.inventory_2_rounded,
-                    ),
-                    const SizedBox(height: 10),
-                    ActionCard(
-                      title: 'فروش آرد (کیلویی یا کیسه‌ای)',
-                      subtitle: data.flour!.count == 0
-                          ? 'امروز آردی فروخته نشده است'
-                          : '${data.flour!.count} فروش  •  '
-                              '${data.flour!.totalWeightKg.toStringAsFixed(1)} کیلوگرم  •  '
-                              '${data.flour!.totalFormatted}',
-                      icon: Icons.local_shipping_rounded,
-                      color: const Color(0xFFE8952D),
-                      onTap: _openFlourSaleSheet,
-                      trailing: const Icon(Icons.add_rounded),
-                    ),
-                    for (final sale in data.flour!.sales) ...[
-                      const SizedBox(height: 10),
-                      _FlourSaleTile(sale: sale),
-                    ],
-                  ],
-
-                  const SizedBox(height: 16),
-                  _SectionHeader(
-                    title: 'فروش‌های امروز',
-                    count: today.sales.length,
-                    icon: Icons.receipt_long_rounded,
-                  ),
-                  const SizedBox(height: 10),
-                  if (today.sales.isEmpty)
-                    const _InlineEmpty(
-                      icon: Icons.receipt_long_outlined,
-                      text: 'امروز هنوز فروشی ثبت نشده است.',
-                    )
-                  else
-                    for (final sale in today.sales) ...[
-                      _SaleTile(sale: sale, unit: unit),
-                      const SizedBox(height: 10),
-                    ],
-                ],
-              );
-            },
-          ),
-        ),
+    return [
+      // Kneading, shaping, flour and who is in today. Sections hide
+      // themselves when the permission is not held, so a shop that keeps
+      // the roles separate sees nothing new.
+      SellerWorkbench(
+        api: widget.api,
+        bakery: _bakery,
+        onChanged: _reload,
       ),
-    );
+      const SizedBox(height: 22),
+      _SectionHeader(
+        title: 'چانه‌های آماده فروش',
+        count: pending.length,
+        icon: Icons.storefront_rounded,
+      ),
+      const SizedBox(height: 10),
+      if (pending.isEmpty)
+        const _InlineEmpty(
+          icon: Icons.done_all_rounded,
+          text: 'همه چانه‌ها فروخته شده‌اند.',
+        )
+      else
+        for (final entry in pending) ...[
+          ActionCard(
+            title: '${entry.chaneCount} چانه',
+            subtitle: 'وزن: ${entry.weightKg.toStringAsFixed(2)} کیلوگرم'
+                '${entry.userName != null ? '  •  ${entry.userName}' : ''}',
+            icon: Icons.shopping_basket_rounded,
+            color: const Color(0xFF3B82C4),
+            onTap: () => _openSaleSheet(entry),
+            trailing: const Icon(Icons.point_of_sale_rounded),
+          ),
+          const SizedBox(height: 10),
+        ],
+      if (data.flour != null) ...[
+        const SizedBox(height: 22),
+        _SectionHeader(
+          title: 'فروش آرد امروز',
+          count: data.flour!.count,
+          icon: Icons.inventory_2_rounded,
+        ),
+        const SizedBox(height: 10),
+        ActionCard(
+          title: 'فروش آرد (کیلویی یا کیسه‌ای)',
+          subtitle: data.flour!.count == 0
+              ? 'امروز آردی فروخته نشده است'
+              : '${data.flour!.count} فروش  •  '
+                  '${data.flour!.totalWeightKg.toStringAsFixed(1)} کیلوگرم  •  '
+                  '${data.flour!.totalFormatted}',
+          icon: Icons.local_shipping_rounded,
+          color: const Color(0xFFE8952D),
+          onTap: _openFlourSaleSheet,
+          trailing: const Icon(Icons.add_rounded),
+        ),
+        for (final sale in data.flour!.sales) ...[
+          const SizedBox(height: 10),
+          _FlourSaleTile(sale: sale),
+        ],
+      ],
+      const SizedBox(height: 16),
+      _SectionHeader(
+        title: 'فروش‌های امروز',
+        count: today.sales.length,
+        icon: Icons.receipt_long_rounded,
+      ),
+      const SizedBox(height: 10),
+      if (today.sales.isEmpty)
+        const _InlineEmpty(
+          icon: Icons.receipt_long_outlined,
+          text: 'امروز هنوز فروشی ثبت نشده است.',
+        )
+      else
+        for (final sale in today.sales) ...[
+          _SaleTile(sale: sale, unit: unit),
+          const SizedBox(height: 10),
+        ],
+    ];
+  }
+
+  // --------------------------------------------------------- حساب من
+
+  List<Widget> _account(_SellerData data) {
+    return [
+      SellerAccountCard(api: widget.api),
+      // Money the buyers who run an account still owe, and what they have
+      // handed back.
+      const SizedBox(height: 14),
+      SellerCollectionsCard(api: widget.api),
+    ];
   }
 }
 

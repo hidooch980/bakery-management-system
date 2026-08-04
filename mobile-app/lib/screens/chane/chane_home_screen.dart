@@ -11,11 +11,10 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
-import '../../widgets/sync_status_card.dart';
+import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
-import '../shared/settings_screen.dart';
 
 /// Home screen for the chane gir. One scrolling page: the dough waiting to be
 /// shaped, today's production split, and the entries already recorded.
@@ -88,124 +87,135 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthProvider>().user;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('چانه‌گیری'),
-        actions: [
-          const ThemeToggleButton(),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: FutureBuilder<_ChaneData>(
-            future: _data,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (snapshot.hasError) {
-                return ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    ErrorBox(message: '${snapshot.error}', onRetry: _reload),
-                  ],
-                );
-              }
-
-              final data = snapshot.data!;
-
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-                children: [
-                  Text(
-                    'سلام ${user?.name ?? ''}',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 14),
-                  SyncStatusCard(api: widget.api),
-              const SizedBox(height: 14),
-              AttendanceCard(api: widget.api),
-
-                  const SizedBox(height: 14),
-                  WorkStartCard(
-                    api: widget.api,
-                    // Baking start is the seller's tick, not the chane
-                    // gir's — each role sees only the one it records.
-                    visibleTypes: const {WorkStartType.chane},
-                  ),
-
-                  if (data.board != null) ...[
-                    const SizedBox(height: 16),
-                    ChaneComparison(board: data.board!),
-                  ],
-
-                  const SizedBox(height: 22),
-                  _SectionHeader(
-                    title: 'خمیرهای در انتظار',
-                    count: data.pending.length,
-                    icon: Icons.pending_actions_rounded,
-                  ),
-                  const SizedBox(height: 10),
-                  if (data.pending.isEmpty)
-                    const _InlineEmpty(
-                      icon: Icons.check_circle_outline_rounded,
-                      text: 'همه خمیرها چانه شده‌اند.',
-                    )
-                  else
-                    for (final entry in data.pending) ...[
-                      ActionCard(
-                        title: '${entry.bagCount} کیسه خمیر',
-                        subtitle: [
-                          if (entry.userName != null) entry.userName!,
-                          if (entry.createdAt != null)
-                            JalaliFormat.dateTime(entry.createdAt),
-                        ].join('  •  '),
-                        icon: Icons.inventory_2_rounded,
-                        color: const Color(0xFFE8952D),
-                        onTap: () => _openRecordSheet(entry),
-                        trailing: const Icon(Icons.add_circle_outline_rounded),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-
-                  const SizedBox(height: 16),
-                  _SectionHeader(
-                    title: 'ثبت‌های من',
-                    count: data.history.length,
-                    icon: Icons.history_rounded,
-                  ),
-                  const SizedBox(height: 10),
-                  if (data.history.isEmpty)
-                    const _InlineEmpty(
-                      icon: Icons.history_rounded,
-                      text: 'هنوز چانه‌ای ثبت نکرده‌اید.',
-                    )
-                  else
-                    for (final entry in data.history) ...[
-                      _ChaneTile(entry: entry),
-                      const SizedBox(height: 10),
-                    ],
-                ],
-              );
-            },
-          ),
+    return RoleHomeScaffold(
+      api: widget.api,
+      bakery: _bakery,
+      tabs: [
+        HomeTab(
+          label: 'خلاصه',
+          title: 'خلاصه امروز',
+          icon: Icons.dashboard_outlined,
+          selectedIcon: Icons.dashboard_rounded,
+          builder: (_) => _withData(_overview),
         ),
+        HomeTab(
+          label: 'چانه‌گیری',
+          title: 'چانه‌گیری',
+          icon: Icons.pan_tool_outlined,
+          selectedIcon: Icons.pan_tool_rounded,
+          builder: (_) => _withData(_shaping),
+        ),
+      ],
+    );
+  }
+
+  /// Both pages read the same fetch and pull to refresh the same way, so
+  /// switching pages does not re-ask the server.
+  Widget _withData(List<Widget> Function(_ChaneData data) children) {
+    return RefreshIndicator(
+      onRefresh: () async => _reload(),
+      child: FutureBuilder<_ChaneData>(
+        future: _data,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                ErrorBox(message: '${snapshot.error}', onRetry: _reload),
+              ],
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            children: children(snapshot.data!),
+          );
+        },
       ),
     );
+  }
+
+  // ------------------------------------------------------------ خلاصه
+
+  List<Widget> _overview(_ChaneData data) {
+    final user = context.watch<AuthProvider>().user;
+
+    return [
+      Text(
+        'سلام ${user?.name ?? ''}',
+        style: Theme.of(context)
+            .textTheme
+            .titleLarge
+            ?.copyWith(fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 14),
+      AttendanceCard(api: widget.api),
+      const SizedBox(height: 14),
+      WorkStartCard(
+        api: widget.api,
+        // Baking start is the seller's tick, not the chane gir's — each
+        // role sees only the one it records.
+        visibleTypes: const {WorkStartType.chane},
+      ),
+      if (data.board != null) ...[
+        const SizedBox(height: 16),
+        ChaneComparison(board: data.board!),
+      ],
+    ];
+  }
+
+  // ------------------------------------------------------- چانه‌گیری
+
+  List<Widget> _shaping(_ChaneData data) {
+    return [
+      _SectionHeader(
+        title: 'خمیرهای در انتظار',
+        count: data.pending.length,
+        icon: Icons.pending_actions_rounded,
+      ),
+      const SizedBox(height: 10),
+      if (data.pending.isEmpty)
+        const _InlineEmpty(
+          icon: Icons.check_circle_outline_rounded,
+          text: 'همه خمیرها چانه شده‌اند.',
+        )
+      else
+        for (final entry in data.pending) ...[
+          ActionCard(
+            title: '${entry.bagCount} کیسه خمیر',
+            subtitle: [
+              if (entry.userName != null) entry.userName!,
+              if (entry.createdAt != null) JalaliFormat.dateTime(entry.createdAt),
+            ].join('  •  '),
+            icon: Icons.inventory_2_rounded,
+            color: const Color(0xFFE8952D),
+            onTap: () => _openRecordSheet(entry),
+            trailing: const Icon(Icons.add_circle_outline_rounded),
+          ),
+          const SizedBox(height: 10),
+        ],
+      const SizedBox(height: 16),
+      _SectionHeader(
+        title: 'ثبت‌های من',
+        count: data.history.length,
+        icon: Icons.history_rounded,
+      ),
+      const SizedBox(height: 10),
+      if (data.history.isEmpty)
+        const _InlineEmpty(
+          icon: Icons.history_rounded,
+          text: 'هنوز چانه‌ای ثبت نکرده‌اید.',
+        )
+      else
+        for (final entry in data.history) ...[
+          _ChaneTile(entry: entry),
+          const SizedBox(height: 10),
+        ],
+    ];
   }
 }
 

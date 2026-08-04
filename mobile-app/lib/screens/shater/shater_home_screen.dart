@@ -3,12 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../../models/chane_board.dart';
 import '../../providers/auth_provider.dart';
+import '../../models/bakery.dart';
+import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
-import '../../widgets/sync_status_card.dart';
+import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
-import '../shared/settings_screen.dart';
 
 /// The shater works the oven, so this screen answers one question at a
 /// glance: how many chane are waiting. Everything else is secondary.
@@ -24,10 +25,22 @@ class ShaterHomeScreen extends StatefulWidget {
 class _ShaterHomeScreenState extends State<ShaterHomeScreen> {
   late Future<ChaneBoard> _board;
 
+  Bakery? _bakery;
+
   @override
   void initState() {
     super.initState();
+    _loadBakery();
     _board = widget.api.chaneBoard();
+  }
+
+  Future<void> _loadBakery() async {
+    try {
+      final bakery = await widget.api.bakery();
+      if (mounted) setState(() => _bakery = bakery);
+    } on ApiException {
+      // The page reads fine without the shop's name in the bar.
+    }
   }
 
   void _reload() {
@@ -38,72 +51,65 @@ class _ShaterHomeScreenState extends State<ShaterHomeScreen> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('شاطر'),
-        actions: [
-          const ThemeToggleButton(),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    return RoleHomeScaffold(
+      api: widget.api,
+      bakery: _bakery,
+      tabs: [
+        HomeTab(
+          label: 'شاطر',
+          title: 'شاطر',
+          icon: Icons.local_fire_department_outlined,
+          selectedIcon: Icons.local_fire_department_rounded,
+          builder: (_) => RefreshIndicator(
+            onRefresh: () async => _reload(),
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                Text(
+                  'سلام ${user?.name ?? ''}',
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 20),
+                AttendanceCard(api: widget.api),
+                const SizedBox(height: 20),
+                FutureBuilder<ChaneBoard>(
+                  future: _board,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 60),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return ErrorBox(
+                        message: '${snapshot.error}',
+                        onRetry: _reload,
+                      );
+                    }
+
+                    final board = snapshot.data!;
+
+                    return Column(
+                      children: [
+                        _WaitingCard(board: board),
+                        const SizedBox(height: 16),
+                        ChaneComparison(board: board),
+                        const SizedBox(height: 16),
+                        _QueueCard(board: board),
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              Text(
-                'سلام ${user?.name ?? ''}',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 20),
-              SyncStatusCard(api: widget.api),
-              const SizedBox(height: 14),
-              AttendanceCard(api: widget.api),
-              const SizedBox(height: 20),
-              FutureBuilder<ChaneBoard>(
-                future: _board,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 60),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return ErrorBox(
-                      message: '${snapshot.error}',
-                      onRetry: _reload,
-                    );
-                  }
-
-                  final board = snapshot.data!;
-
-                  return Column(
-                    children: [
-                      _WaitingCard(board: board),
-                      const SizedBox(height: 16),
-                      ChaneComparison(board: board),
-                      const SizedBox(height: 16),
-                      _QueueCard(board: board),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -133,7 +139,9 @@ class _WaitingCard extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                hasWork ? Icons.local_fire_department_rounded : Icons.check_circle_rounded,
+                hasWork
+                    ? Icons.local_fire_department_rounded
+                    : Icons.check_circle_rounded,
                 size: 40,
                 color: accent,
               ),

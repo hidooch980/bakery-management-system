@@ -6,11 +6,11 @@ import 'package:provider/provider.dart';
 import '../../models/entries.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
+import '../../models/bakery.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
-import '../../widgets/sync_status_card.dart';
+import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/common.dart';
-import '../shared/settings_screen.dart';
 
 /// Home screen for the dough maker: record bag counts and review own history.
 class DoughHomeScreen extends StatefulWidget {
@@ -25,10 +25,22 @@ class DoughHomeScreen extends StatefulWidget {
 class _DoughHomeScreenState extends State<DoughHomeScreen> {
   late Future<List<DoughEntry>> _history;
 
+  Bakery? _bakery;
+
   @override
   void initState() {
     super.initState();
+    _loadBakery();
     _history = widget.api.myDoughHistory();
+  }
+
+  Future<void> _loadBakery() async {
+    try {
+      final bakery = await widget.api.bakery();
+      if (mounted) setState(() => _bakery = bakery);
+    } on ApiException {
+      // The page reads fine without the shop's name in the bar.
+    }
   }
 
   void _reload() {
@@ -49,92 +61,86 @@ class _DoughHomeScreenState extends State<DoughHomeScreen> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('خمیرگیری'),
-        actions: [
-          const ThemeToggleButton(),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
-        ],
-      ),
+    return RoleHomeScaffold(
+      api: widget.api,
+      bakery: _bakery,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openRecordSheet,
         icon: const Icon(Icons.add_rounded),
         label: const Text('ثبت خمیر'),
       ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
-            children: [
-              Text(
-                'سلام ${user?.name ?? ''}',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 20),
-              SyncStatusCard(api: widget.api),
-              const SizedBox(height: 14),
-              AttendanceCard(api: widget.api),
-              const SizedBox(height: 24),
-              Text(
-                'ثبت‌های من',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-              FutureBuilder<List<DoughEntry>>(
-                future: _history,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 40),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
+      tabs: [
+        HomeTab(
+          label: 'خمیرگیری',
+          title: 'خمیرگیری',
+          icon: Icons.blender_outlined,
+          selectedIcon: Icons.blender_rounded,
+          builder: (_) => RefreshIndicator(
+            onRefresh: () async => _reload(),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
+              children: [
+                Text(
+                  'سلام ${user?.name ?? ''}',
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 20),
+                AttendanceCard(api: widget.api),
+                const SizedBox(height: 24),
+                Text(
+                  'ثبت‌های من',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 12),
+                FutureBuilder<List<DoughEntry>>(
+                  future: _history,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
 
-                  if (snapshot.hasError) {
-                    return ErrorBox(
-                      message: '${snapshot.error}',
-                      onRetry: _reload,
-                    );
-                  }
+                    if (snapshot.hasError) {
+                      return ErrorBox(
+                        message: '${snapshot.error}',
+                        onRetry: _reload,
+                      );
+                    }
 
-                  final entries = snapshot.data ?? const <DoughEntry>[];
+                    final entries = snapshot.data ?? const <DoughEntry>[];
 
-                  if (entries.isEmpty) {
-                    return const EmptyState(
-                      icon: Icons.inventory_2_outlined,
-                      title: 'هنوز خمیری ثبت نکرده‌اید',
-                      subtitle: 'با دکمه «ثبت خمیر» اولین مورد را اضافه کنید.',
-                    );
-                  }
+                    if (entries.isEmpty) {
+                      return const EmptyState(
+                        icon: Icons.inventory_2_outlined,
+                        title: 'هنوز خمیری ثبت نکرده‌اید',
+                        subtitle:
+                            'با دکمه «ثبت خمیر» اولین مورد را اضافه کنید.',
+                      );
+                    }
 
-                  return Column(
-                    children: [
-                      for (final entry in entries) ...[
-                        _DoughTile(entry: entry),
-                        const SizedBox(height: 10),
+                    return Column(
+                      children: [
+                        for (final entry in entries) ...[
+                          _DoughTile(entry: entry),
+                          const SizedBox(height: 10),
+                        ],
                       ],
-                    ],
-                  );
-                },
-              ),
-            ],
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -299,7 +305,8 @@ class _RecordDoughSheetState extends State<_RecordDoughSheet> {
                   controller: _bagController,
                   keyboardType: TextInputType.number,
                   autofocus: true,
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w700),
                   decoration: const InputDecoration(
                     labelText: 'تعداد کیسه خمیرگیری‌شده',
                     prefixIcon: Icon(Icons.inventory_2_outlined),
@@ -342,4 +349,3 @@ class _RecordDoughSheetState extends State<_RecordDoughSheet> {
     );
   }
 }
-
