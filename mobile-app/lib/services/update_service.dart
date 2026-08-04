@@ -108,13 +108,34 @@ class UpdateService {
       },
     );
 
-    final result = await OpenFilex.open(file.path);
+    // Named rather than guessed from the extension: Android hands an APK to
+    // the installer only when the intent says it is one, and left to infer
+    // it the file opened in nothing at all.
+    final result = await OpenFilex.open(
+      file.path,
+      type: 'application/vnd.android.package-archive',
+    );
 
     if (result.type != ResultType.done) {
-      throw Exception(
-        'باز کردن فایل نصب ممکن نشد. لطفاً اجازه «نصب برنامه‌های ناشناس» را فعال کنید.',
-      );
+      throw Exception(_failureMessage(result));
     }
+  }
+
+  /// Says which of the two things went wrong, because they have different
+  /// fixes and "could not open" sent people to toggle a permission they had
+  /// already granted.
+  String _failureMessage(OpenResult result) {
+    if (result.type == ResultType.permissionDenied) {
+      return 'اجازه «نصب برنامه‌های ناشناس» داده نشده است.'
+          ' از تنظیمات آن را برای این برنامه فعال کنید.';
+    }
+
+    if (result.type == ResultType.noAppToOpen) {
+      return 'نصب‌کننده سیستم پیدا نشد. فایل دانلود شد ولی گوشی'
+          ' برنامه‌ای برای نصب آن معرفی نکرد.';
+    }
+
+    return 'باز کردن فایل نصب ممکن نشد: ${result.message}';
   }
 
   /// Strips a leading "v" and any build metadata so "v1.2.0" == "1.2.0+3".

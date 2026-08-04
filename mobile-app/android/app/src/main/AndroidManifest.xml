@@ -50,5 +50,17 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+
+        <!-- From Android 11 an app cannot see another unless it says so, and
+             that includes the system installer. Without these the downloaded
+             APK resolved to nothing at all: the update finished, the tap did
+             nothing, and there was no error to explain why. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:mimeType="application/vnd.android.package-archive"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.INSTALL_PACKAGE"/>
+        </intent>
     </queries>
 </manifest>
