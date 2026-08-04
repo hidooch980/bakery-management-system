@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BankAccount;
 use App\Models\Income;
 use App\Support\Jalali;
 use App\Support\Money;
@@ -47,6 +48,14 @@ class IncomeController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $this->validated($request);
+
+        // Money in lands in the shop's account unless it is said to have
+        // stayed in the till — the same assumption an expense makes going
+        // the other way, so income and cost cannot disagree about where the
+        // shop keeps its money.
+        if (! array_key_exists('bank_account_id', $data)) {
+            $data['bank_account_id'] = BankAccount::defaultAccount()?->id;
+        }
 
         $income = Income::create($data + ['user_id' => $request->user()->id]);
 

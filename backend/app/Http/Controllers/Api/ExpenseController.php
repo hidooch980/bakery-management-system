@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BankAccount;
 use App\Models\Expense;
 use App\Support\Jalali;
 use App\Support\Money;
@@ -36,6 +37,11 @@ class ExpenseController extends Controller
             'amount' => ['required', 'numeric', 'min:0'],
             'spent_on' => ['nullable', 'string', 'max:20'],
             'note' => ['nullable', 'string', 'max:500'],
+            'bank_account_id' => ['nullable', 'exists:bank_accounts,id'],
+            // Says the money came out of the till instead. Without it the
+            // shop's own account is assumed, because that is where the card
+            // takings sit and where the shop pays from.
+            'paid_in_cash' => ['nullable', 'boolean'],
         ]);
 
         $expense = Expense::create([
@@ -46,6 +52,11 @@ class ExpenseController extends Controller
             // Accepts either a Jalali date or a Gregorian one; defaults to today.
             'spent_on' => Jalali::parseFlexible($data['spent_on'] ?? null) ?? now(),
             'note' => $data['note'] ?? null,
+            // An expense recorded from the app never named an account, so it
+            // never came off the bank — the panel defaulted it and the app
+            // did not, and the same expense meant two different things
+            // depending on where it was typed.
+            'bank_account_id' => $this->accountFor($data),
         ]);
 
         return $this->success($this->payload($expense), 'هزینه ثبت شد.', 201);
@@ -59,6 +70,7 @@ class ExpenseController extends Controller
             'amount' => ['sometimes', 'numeric', 'min:0'],
             'spent_on' => ['sometimes', 'string', 'max:20'],
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'bank_account_id' => ['sometimes', 'nullable', 'exists:bank_accounts,id'],
         ]);
 
         if (isset($data['spent_on'])) {
@@ -85,6 +97,28 @@ class ExpenseController extends Controller
                 'label' => $label,
             ])->values()
         );
+    }
+
+    /**
+     * Which account the money left, or null when it came out of the till.
+     *
+     * Everything the shop takes on the reader lands in one account and
+     * everything it pays goes out of the same one, so that account is the
+     * assumption. Naming one overrides it; saying it was cash clears it.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function accountFor(array $data): ?int
+    {
+        if (array_key_exists('bank_account_id', $data) && $data['bank_account_id'] !== null) {
+            return (int) $data['bank_account_id'];
+        }
+
+        if (filter_var($data['paid_in_cash'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return null;
+        }
+
+        return BankAccount::defaultAccount()?->id;
     }
 
     private function payload(Expense $expense): array
