@@ -34,11 +34,29 @@ return new class extends Migration
                 continue;
             }
 
-            Schema::table($table, function (Blueprint $blueprint) use ($oldIndex, $columns) {
-                $blueprint->dropUnique($oldIndex);
-                $blueprint->unique(['bakery_id', ...$columns]);
-            });
+            // Each step is asked for only if it is still outstanding. A
+            // migration interrupted partway — a dropped connection on a
+            // slow server — must be able to be run again rather than fail
+            // on work it has already done.
+            if ($this->hasIndex($table, $oldIndex)) {
+                Schema::table($table, fn (Blueprint $blueprint) => $blueprint->dropUnique($oldIndex));
+            }
+
+            $newIndex = $table.'_bakery_id_'.implode('_', $columns).'_unique';
+
+            if (! $this->hasIndex($table, $newIndex)) {
+                Schema::table($table, fn (Blueprint $blueprint) => $blueprint->unique(['bakery_id', ...$columns]));
+            }
         }
+    }
+
+    private function hasIndex(string $table, string $index): bool
+    {
+        return DB::table('information_schema.STATISTICS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', $table)
+            ->where('INDEX_NAME', $index)
+            ->exists();
     }
 
     public function down(): void
@@ -48,10 +66,15 @@ return new class extends Migration
                 continue;
             }
 
-            Schema::table($table, function (Blueprint $blueprint) use ($table, $oldIndex, $columns) {
-                $blueprint->dropUnique($table.'_bakery_id_'.implode('_', $columns).'_unique');
-                $blueprint->unique($columns, $oldIndex);
-            });
+            $newIndex = $table.'_bakery_id_'.implode('_', $columns).'_unique';
+
+            if ($this->hasIndex($table, $newIndex)) {
+                Schema::table($table, fn (Blueprint $blueprint) => $blueprint->dropUnique($newIndex));
+            }
+
+            if (! $this->hasIndex($table, $oldIndex)) {
+                Schema::table($table, fn (Blueprint $blueprint) => $blueprint->unique($columns, $oldIndex));
+            }
         }
     }
 };
