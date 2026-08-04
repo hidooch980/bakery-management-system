@@ -20,6 +20,7 @@ class BankTransaction extends Model
         'salary' => 'حقوق',
         'advance' => 'علی‌الحساب کارکنان',
         'share' => 'سهم شریک',
+        'loan' => 'قسط وام',
         'transfer' => 'انتقال',
         'settlement' => 'وصول بدهی',
     ];

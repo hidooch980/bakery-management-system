@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BakeryController;
 use App\Http\Controllers\Api\BakeryShareController;
+use App\Http\Controllers\Api\BalanceSheetController;
 use App\Http\Controllers\Api\BankAccountController;
 use App\Http\Controllers\Api\ChaneBoardController;
 use App\Http\Controllers\Api\ChaneEntryController;
@@ -257,6 +258,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/reports/financial-trend', [ReportController::class, 'financialTrend']);
             Route::get('/reports/payroll', [ReportController::class, 'payroll']);
             Route::get('/reports/debts', [ReportController::class, 'debts']);
+            // What the shop owns against what it owes, as of now.
+            Route::get('/reports/balance-sheet', [BalanceSheetController::class, 'show']);
             // Income and cost bucketed daily, weekly or monthly.
             Route::get('/reports/financial-series', [ReportController::class, 'financialSeries']);
             // Flat rows for Power BI and anything else that models its own

@@ -149,8 +149,15 @@ class FlourAllocation extends Model
     /** The period covering a given date, if this allocation has one. */
     public function periodFor(Carbon $date): ?FlourAllocationPeriod
     {
-        return $this->periods
-            ->first(fn (FlourAllocationPeriod $p) => $date->betweenIncluded($p->starts_on, $p->ends_on));
+        // Both ends are whole days. The dates are stored at midnight, so
+        // comparing a moment against them left the last day of a period
+        // matching only until 00:00 — from one minute past, the quota
+        // screen said no period was running, on the very day the shop was
+        // finishing one.
+        return $this->periods->first(fn (FlourAllocationPeriod $p) => $date->betweenIncluded(
+            $p->starts_on->copy()->startOfDay(),
+            $p->ends_on->copy()->endOfDay(),
+        ));
     }
 
     public static function forDate(Carbon $date): ?self

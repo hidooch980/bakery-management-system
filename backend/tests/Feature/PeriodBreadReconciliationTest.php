@@ -131,6 +131,20 @@ class PeriodBreadReconciliationTest extends TestCase
         $this->assertSame(375_000.0, $period->fresh()->card_amount);
     }
 
+    public function test_the_last_day_of_a_period_still_belongs_to_it(): void
+    {
+        $allocation = $this->allocationOf(3);
+        $period = $allocation->periods->first();
+
+        // The dates are stored at midnight, so a moment later in the day
+        // used to fall outside the period it plainly belongs to — and the
+        // quota screen said none was running.
+        $lastDay = $period->ends_on->copy()->setTime(14, 30);
+
+        $this->assertNotNull($allocation->periodFor($lastDay));
+        $this->assertSame($period->id, $allocation->periodFor($lastDay)->id);
+    }
+
     public function test_the_figures_reach_the_api(): void
     {
         $allocation = $this->allocationOf(3);
