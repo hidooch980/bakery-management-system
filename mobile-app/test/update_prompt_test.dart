@@ -75,25 +75,32 @@ void main() {
       (tester) async {
     await _pumpPrompt(tester, _serviceOffering('v2.0.0'));
 
-    expect(find.text('نسخه جدید آماده است'), findsOneWidget);
-    expect(find.textContaining('2.0.0'), findsOneWidget);
+    expect(find.text('بروزرسانی لازم است'), findsOneWidget);
+    // Both versions are named, so the user can see what they have against
+    // what is waiting.
+    expect(find.text('1.0.0'), findsOneWidget);
+    expect(find.text('2.0.0'), findsOneWidget);
   });
 
   testWidgets('says nothing at all when already up to date', (tester) async {
     await _pumpPrompt(tester, _serviceOffering('v1.0.0'));
 
-    expect(find.text('نسخه جدید آماده است'), findsNothing);
+    expect(find.text('بروزرسانی لازم است'), findsNothing);
     // The user's own screen is never covered by the check.
     expect(find.text('صفحه اصلی'), findsOneWidget);
   });
 
-  testWidgets('waving it off returns the user to their work', (tester) async {
+  testWidgets('waving it off leaves a standing warning, not silence',
+      (tester) async {
     await _pumpPrompt(tester, _serviceOffering('v2.0.0'));
 
     await tester.tap(find.text('بعداً'));
     await tester.pumpAndSettle();
 
-    expect(find.text('نسخه جدید آماده است'), findsNothing);
+    // The dialog goes, but the warning stays: waving it off does not make
+    // the old build any more able to reach the server.
+    expect(find.text('بروزرسانی لازم است'), findsNothing);
+    expect(find.textContaining('بروزرسانی نکرده‌اید'), findsOneWidget);
     expect(find.text('صفحه اصلی'), findsOneWidget);
   });
 
@@ -113,7 +120,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('نسخه جدید آماده است'), findsNothing);
+    expect(find.text('بروزرسانی لازم است'), findsNothing);
   });
 
   testWidgets('a failed check is silent, never an error on screen',
@@ -123,7 +130,8 @@ void main() {
 
     await _pumpPrompt(tester, UpdateService(dio: dio, repo: 'owner/name'));
 
-    expect(find.text('نسخه جدید آماده است'), findsNothing);
+    expect(find.text('بروزرسانی لازم است'), findsNothing);
+    expect(find.textContaining('بروزرسانی نکرده‌اید'), findsNothing);
     expect(find.text('صفحه اصلی'), findsOneWidget);
   });
 }
