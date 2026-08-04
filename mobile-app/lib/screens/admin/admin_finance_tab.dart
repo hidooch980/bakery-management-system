@@ -6,6 +6,7 @@ import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import 'customer_debts_section.dart';
 import 'follow_ups_section.dart';
+import 'bank_balances_section.dart';
 import 'seller_debts_section.dart';
 
 /// Income against expenses, with the resulting profit, for a chosen range.
@@ -94,6 +95,11 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                 ErrorBox(message: '${snapshot.error}', onRetry: _reload)
               else
                 ..._buildReport(context, snapshot.data!),
+
+              // What the shop has actually collected, before what it is
+              // still owed — the money that is really in hand.
+              const SizedBox(height: 22),
+              BankBalancesSection(api: widget.api),
 
               // What the sellers still hold sits under the report: it is
               // money the shop has earned but not yet taken in.

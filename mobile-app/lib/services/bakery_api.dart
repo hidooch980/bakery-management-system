@@ -1,4 +1,5 @@
 import '../models/bakery.dart';
+import '../models/bank_account.dart';
 import '../models/chane_board.dart';
 import '../models/customer.dart';
 import '../models/entries.dart';
@@ -326,6 +327,17 @@ class BakeryApi {
   // ------------------------------------------ admin: seller accounts
 
   /// What every seller still owes, and who has asked to settle.
+  /// What is in the shop's bank accounts, and what they come to together.
+  ///
+  /// Cached like the other admin reads, so the figure is still there when
+  /// the phone cannot reach the server — with the sync card above it
+  /// saying plainly that it is not live.
+  Future<BankBalances> bankBalances() async {
+    final body = await _client.getCached('/bank-accounts');
+
+    return BankBalances.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
   Future<List<Map<String, dynamic>>> sellerAccounts() async {
     final body = await _client.get('/seller-accounts');
     final data = body['data'] as Map<String, dynamic>;
