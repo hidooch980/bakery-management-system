@@ -7,6 +7,7 @@ import 'admin_home_screen.dart';
 import 'customer_debts_section.dart';
 import 'follow_ups_section.dart';
 import 'bank_balances_section.dart';
+import 'income_expense_chart.dart';
 import 'seller_debts_section.dart';
 
 /// Income against expenses, with the resulting profit, for a chosen range.
@@ -57,6 +58,30 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
     );
   }
 
+  /// The range the report is showing, as the API takes it.
+  ({String from, String to, String granularity}) _apiRange() {
+    final now = DateTime.now();
+
+    return switch (_range) {
+      // A day has one bar, which says nothing; the week around it does.
+      _Range.today => (
+          from: _toApiDate(now.subtract(const Duration(days: 6))),
+          to: _toApiDate(now),
+          granularity: 'day',
+        ),
+      _Range.week => (
+          from: _toApiDate(now.subtract(const Duration(days: 6))),
+          to: _toApiDate(now),
+          granularity: 'day',
+        ),
+      _Range.month => (
+          from: _toApiDate(now.subtract(const Duration(days: 29))),
+          to: _toApiDate(now),
+          granularity: 'day',
+        ),
+    };
+  }
+
   String _toApiDate(DateTime value) =>
       '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
@@ -95,6 +120,20 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                 ErrorBox(message: '${snapshot.error}', onRetry: _reload)
               else
                 ..._buildReport(context, snapshot.data!),
+
+              // Two figures do not show a week carrying a bad day; a pair
+              // of bars a day does.
+              const SizedBox(height: 22),
+              () {
+                final range = _apiRange();
+
+                return IncomeExpenseChart(
+                  api: widget.api,
+                  from: range.from,
+                  to: range.to,
+                  granularity: range.granularity,
+                );
+              }(),
 
               // What the shop has actually collected, before what it is
               // still owed — the money that is really in hand.

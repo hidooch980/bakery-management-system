@@ -1,5 +1,6 @@
 import '../models/bakery.dart';
 import '../models/bank_account.dart';
+import '../models/financial_series.dart';
 import '../models/chane_board.dart';
 import '../models/customer.dart';
 import '../models/entries.dart';
@@ -336,6 +337,24 @@ class BakeryApi {
     final body = await _client.getCached('/bank-accounts');
 
     return BankBalances.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// Money in against money out, cut into days, weeks or months.
+  ///
+  /// [granularity] is 'day', 'week' or 'month'; anything else the server
+  /// reads as a day.
+  Future<FinancialSeries> financialSeries({
+    required String from,
+    required String to,
+    String granularity = 'day',
+  }) async {
+    final body = await _client.get('/reports/financial-series', query: {
+      'from': from,
+      'to': to,
+      'granularity': granularity,
+    });
+
+    return FinancialSeries.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   /// What has moved through one account, most recent first.
