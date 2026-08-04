@@ -3,8 +3,8 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\SaleResource;
-use App\Models\Bakery;
 use App\Models\Sale;
+use App\Support\CurrentBakery;
 use App\Support\Money;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -44,7 +44,7 @@ class SalesByPaymentTypeBreakdown extends BaseWidget
         // What the bread sold should have brought in at the shop's own
         // price. A gap means a sale was recorded with an amount that does
         // not match its bread count — worth seeing rather than hiding.
-        $breadPrice = (float) (Bakery::first()->bread_price ?? 0);
+        $breadPrice = (float) (CurrentBakery::get()->bread_price ?? 0);
         $expected = $totalBread * $breadPrice;
         $difference = round($totalAmount - $expected, 2);
 

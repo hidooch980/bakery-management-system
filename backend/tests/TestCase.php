@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Support\CurrentBakery;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use RuntimeException;
 
@@ -18,6 +19,10 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Held statically for the life of a request; a test process runs
+        // many, against a database that is wiped between them.
+        CurrentBakery::forget();
 
         $connection = config('database.default');
         $database = config("database.connections.{$connection}.database");

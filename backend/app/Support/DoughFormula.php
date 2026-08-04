@@ -44,7 +44,7 @@ class DoughFormula
 
     public static function fromBakery(?Bakery $bakery = null): self
     {
-        $bakery ??= Bakery::query()->first();
+        $bakery ??= CurrentBakery::get();
 
         return new self(
             bagWeightKg: (float) ($bakery?->flour_bag_weight_kg ?? 40),

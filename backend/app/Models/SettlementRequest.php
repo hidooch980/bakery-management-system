@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\AppCalendar;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class SettlementRequest extends Model
 {
+    use BelongsToBakery;
+
     protected $fillable = [
         'user_id',
         'amount',

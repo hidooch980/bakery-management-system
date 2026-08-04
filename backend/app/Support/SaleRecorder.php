@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\Bakery;
 use App\Models\BankAccount;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
@@ -33,7 +32,7 @@ class SaleRecorder
         $totalBread = array_sum(array_column($lines, 'bread_count'));
 
         return DB::transaction(function () use ($chane, $lines, $userId, $totalBread) {
-            $breadPrice = (float) (Bakery::first()->bread_price ?? 0);
+            $breadPrice = (float) (CurrentBakery::get()->bread_price ?? 0);
 
             // Whatever the batch held beyond everything sold from it is a
             // temporary debt against the seller — computed from the batch's

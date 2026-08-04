@@ -2,10 +2,23 @@
 
 namespace App\Models;
 
+use App\Support\CurrentBakery;
 use Illuminate\Database\Eloquent\Model;
 
 class Bakery extends Model
 {
+    /**
+     * Settings are held for the length of a request, so an admin saving
+     * them and then reading them back would otherwise be handed the copy
+     * from before the save — the formula, the currency and the calendar
+     * all reading one edit behind.
+     */
+    protected static function booted(): void
+    {
+        static::saved(fn () => CurrentBakery::forget());
+        static::deleted(fn () => CurrentBakery::forget());
+    }
+
     protected $fillable = [
         'name',
         'address',

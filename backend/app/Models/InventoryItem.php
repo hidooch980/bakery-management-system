@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Exceptions\InsufficientStockException;
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\DoughFormula;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryItem extends Model
 {
+    use BelongsToBakery;
+
     public const FLOUR = 'flour';
 
     public const SALT = 'salt';

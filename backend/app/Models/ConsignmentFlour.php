@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\DoughFormula;
 use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +17,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ConsignmentFlour extends Model
 {
+    use BelongsToBakery;
+
     // "Flour" is uncountable, so Laravel would guess `consignment_flour`.
     protected $table = 'consignment_flours';
 

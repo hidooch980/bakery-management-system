@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\DoughFormula;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
 
 class FlourAllocationPeriod extends Model
 {
+    use BelongsToBakery;
+
     protected $fillable = [
         'flour_allocation_id',
         'period_number',

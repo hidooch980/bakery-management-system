@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use Illuminate\Database\Eloquent\Model;
 
 class Attendance extends Model
 {
+    use BelongsToBakery;
+
     protected $fillable = [
         'user_id',
         'date',

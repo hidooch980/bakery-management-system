@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\Bakery;
 use App\Models\BankAccount;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
@@ -107,7 +106,7 @@ class IssueScanner
      */
     private function missingSettings(): array
     {
-        $bakery = Bakery::first();
+        $bakery = CurrentBakery::get();
 
         if (! $bakery) {
             return [];
@@ -231,7 +230,7 @@ class IssueScanner
     /** Money a seller is still holding, or a gap they have not answered for. */
     private function sellerAccounts(): array
     {
-        $sellers = User::query()
+        $sellers = User::query()->ofCurrentBakery()
             ->whereHas('sales', fn ($q) => $q->sellerAccountOutstanding())
             ->get();
 

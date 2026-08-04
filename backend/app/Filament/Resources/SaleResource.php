@@ -5,9 +5,9 @@ namespace App\Filament\Resources;
 use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\SaleResource\Pages;
-use App\Models\Bakery;
 use App\Models\Customer;
 use App\Models\Sale;
+use App\Support\CurrentBakery;
 use App\Support\Jalali;
 use App\Support\Money;
 use Filament\Forms;
@@ -107,7 +107,7 @@ class SaleResource extends Resource
                                         return;
                                     }
 
-                                    $price = (float) (Bakery::first()?->bread_price ?? 0);
+                                    $price = (float) (CurrentBakery::get()?->bread_price ?? 0);
                                     $count = (int) $state;
 
                                     if ($price > 0 && $count > 0) {

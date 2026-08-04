@@ -59,8 +59,8 @@ class ReportController extends Controller
                 'pending_chane' => ChaneEntry::pending()->count(),
             ],
             'staff' => [
-                'total' => User::count(),
-                'active' => User::where('is_active', true)->count(),
+                'total' => User::ofCurrentBakery()->count(),
+                'active' => User::ofCurrentBakery()->where('is_active', true)->count(),
             ],
             'flour_balance_kg' => $this->flourBalance(),
             // So a client that shows raw figures still labels them correctly.
@@ -250,7 +250,7 @@ class ReportController extends Controller
             ->diffInDays($to->copy()->startOfDay()) + 1;
         $workingDays = max($totalDays - $holidays->count(), 0);
 
-        $activeStaff = User::where('is_active', true)->count();
+        $activeStaff = User::ofCurrentBakery()->where('is_active', true)->count();
         $expected = $workingDays * $activeStaff;
 
         $actual = Attendance::whereBetween('date', [$from->toDateString(), $to->toDateString()])

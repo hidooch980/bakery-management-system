@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -10,6 +11,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class CustomerInteraction extends Model
 {
+    use BelongsToBakery;
+
     public const TYPES = [
         'call' => 'تماس تلفنی',
         'visit' => 'ملاقات حضوری',

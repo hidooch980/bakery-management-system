@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\DoughFormula;
 use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
 
 class DoughEntry extends Model
 {
+    use BelongsToBakery;
+
     protected $fillable = [
         'user_id',
         'bag_count',

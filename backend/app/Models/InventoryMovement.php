@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryMovement extends Model
 {
+    use BelongsToBakery;
+
     public const REASONS = [
         'manual' => 'ثبت دستی',
         'purchase' => 'خرید',

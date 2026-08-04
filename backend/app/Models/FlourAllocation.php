@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,8 @@ use Illuminate\Support\Carbon;
  */
 class FlourAllocation extends Model
 {
+    use BelongsToBakery;
+
     /**
      * Period boundaries as Jalali days of the month. The third period runs
      * from the 25th into the 4th of the following month.

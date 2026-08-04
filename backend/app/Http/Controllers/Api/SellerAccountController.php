@@ -29,7 +29,7 @@ class SellerAccountController extends Controller
     {
         $pending = SettlementRequest::pending()->get()->keyBy('user_id');
 
-        $sellers = User::role('seller')->orderBy('name')->get()
+        $sellers = User::ofCurrentBakery()->role('seller')->orderBy('name')->get()
             ->map(function (User $seller) use ($pending) {
                 $owed = SellerSettlement::outstandingFor($seller);
                 $request = $pending->get($seller->id);

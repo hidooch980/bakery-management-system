@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use Illuminate\Database\Eloquent\Model;
 
 /** One payslip taking back part of one advance. */
 class SalaryAdvanceRecovery extends Model
 {
+    use BelongsToBakery;
+
     protected $fillable = [
         'salary_payment_id',
         'staff_advance_id',

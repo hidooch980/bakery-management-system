@@ -6,6 +6,7 @@ use App\Filament\Forms\MoneyInput;
 use App\Models\Bakery;
 use App\Models\FlourAllocation;
 use App\Support\AppCalendar;
+use App\Support\CurrentBakery;
 use App\Support\DoughFormula;
 use App\Support\LatePenalty;
 use App\Support\Money;
@@ -38,7 +39,7 @@ class ManageBakery extends Page implements HasForms
 
     public function mount(): void
     {
-        $bakery = Bakery::firstOrCreate(['id' => 1], ['name' => 'نانوایی من']);
+        $bakery = CurrentBakery::get() ?? Bakery::create(['name' => 'نانوایی من']);
         $this->form->fill($bakery->toArray());
     }
 
@@ -408,7 +409,7 @@ class ManageBakery extends Page implements HasForms
     {
         $data = $this->form->getState();
 
-        Bakery::firstOrNew(['id' => 1])->fill($data)->save();
+        (CurrentBakery::get() ?? new Bakery)->fill($data)->save();
 
         // The formatter caches the unit, so drop it after a settings change.
         Money::forgetCache();

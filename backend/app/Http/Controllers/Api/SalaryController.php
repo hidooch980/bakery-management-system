@@ -124,7 +124,7 @@ class SalaryController extends Controller
     /** Staff list with their configured monthly pay, to pre-fill the form. */
     public function employees(): JsonResponse
     {
-        $users = User::where('is_active', true)
+        $users = User::ofCurrentBakery()->where('is_active', true)
             ->get(['id', 'name', 'monthly_salary'])
             ->map(fn (User $u) => [
                 'id' => $u->id,

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
 
 class ChaneEntry extends Model
 {
+    use BelongsToBakery;
+
     protected $fillable = [
         'dough_entry_id',
         'user_id',

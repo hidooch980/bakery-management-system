@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\AppCalendar;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
 
 class BankTransaction extends Model
 {
+    use BelongsToBakery;
+
     public const REASONS = [
         'manual' => 'ثبت دستی',
         'sale' => 'فروش نان',

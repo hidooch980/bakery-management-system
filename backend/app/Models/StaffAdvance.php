@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
 use Illuminate\Database\Eloquent\Model;
 
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class StaffAdvance extends Model
 {
-    use PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount;
 
     protected $fillable = [
         'user_id',

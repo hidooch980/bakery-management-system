@@ -3,8 +3,8 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ChaneEntryResource\Pages;
-use App\Models\Bakery;
 use App\Models\ChaneEntry;
+use App\Support\CurrentBakery;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
 use Filament\Forms;
@@ -89,7 +89,7 @@ class ChaneEntryResource extends Resource
                                 ->minValue(1)
                                 ->required()
                                 ->live(onBlur: true)
-                                ->default(fn () => Bakery::first()?->chane_per_tray ?: null)
+                                ->default(fn () => CurrentBakery::get()?->chane_per_tray ?: null)
                                 ->suffix('عدد'),
                         ])
                         ->dehydrated(false),

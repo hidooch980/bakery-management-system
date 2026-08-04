@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Bakery;
 use App\Support\AppCalendar;
+use App\Support\CurrentBakery;
 use App\Support\DoughFormula;
 use App\Support\Money;
 use App\Traits\ApiResponse;
@@ -21,7 +22,7 @@ class BakeryController extends Controller
      */
     public function show(): JsonResponse
     {
-        $bakery = Bakery::first();
+        $bakery = CurrentBakery::get();
 
         return $this->success([
             ...($bakery?->toArray() ?? []),
@@ -65,7 +66,7 @@ class BakeryController extends Controller
             'late_tier2_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $bakery = Bakery::firstOrNew(['id' => 1]);
+        $bakery = CurrentBakery::get() ?? new Bakery;
         $bakery->fill($data)->save();
 
         // Both formatters cache their setting, so drop them after a change.

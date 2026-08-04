@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Support\AppCalendar;
+use App\Support\CurrentBakery;
 use App\Support\DoughFormula;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +16,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class FlourSale extends Model
 {
-    use PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount;
 
     public const KG = 'kg';
 
@@ -173,7 +175,7 @@ class FlourSale extends Model
      */
     public static function defaultUnitPrice(string $unit): float
     {
-        $bakery = Bakery::first();
+        $bakery = CurrentBakery::get();
 
         if (! $bakery) {
             return 0.0;

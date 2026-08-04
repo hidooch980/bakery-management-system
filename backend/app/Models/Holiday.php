@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\AppCalendar;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
@@ -9,6 +10,8 @@ use Illuminate\Support\Carbon;
 
 class Holiday extends Model
 {
+    use BelongsToBakery;
+
     public const TYPES = [
         'official' => 'تعطیل رسمی',
         'religious' => 'مناسبت مذهبی',

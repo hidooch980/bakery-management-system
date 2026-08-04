@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CurrentBakery;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,6 +22,7 @@ class User extends Authenticatable implements FilamentUser
         'password',
         'is_active',
         'monthly_salary',
+        'bakery_id',
     ];
 
     protected $hidden = [
@@ -37,6 +39,34 @@ class User extends Authenticatable implements FilamentUser
             'monthly_salary' => 'decimal:2',
             'last_login_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The shop this person works at.
+     *
+     * Deliberately without the global scope every other model carries:
+     * resolving the signed-in user is how the current bakery is worked out
+     * in the first place, so scoping the user by it would ask the question
+     * to answer the question. Listings that must not cross shops say so
+     * themselves, through [scopeOfCurrentBakery].
+     */
+    public function bakery()
+    {
+        return $this->belongsTo(Bakery::class);
+    }
+
+    public function scopeOfCurrentBakery($query)
+    {
+        $bakeryId = CurrentBakery::id();
+
+        return $bakeryId === null ? $query : $query->where('bakery_id', $bakeryId);
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $user) {
+            $user->bakery_id ??= CurrentBakery::id();
+        });
     }
 
     public function doughEntries()

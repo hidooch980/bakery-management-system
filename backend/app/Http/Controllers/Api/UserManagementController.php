@@ -31,7 +31,7 @@ class UserManagementController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $users = User::with('roles:id,name')
+        $users = User::ofCurrentBakery()->with('roles:id,name')
             ->when($request->query('role'), fn ($q, $role) => $q->role($role))
             ->latest()
             ->paginate(20);

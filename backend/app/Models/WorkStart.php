@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\AppCalendar;
+use App\Support\CurrentBakery;
 use App\Support\Jalali;
 use App\Support\LatePenalty;
 use App\Support\Money;
@@ -19,6 +21,8 @@ use Illuminate\Support\Carbon;
  */
 class WorkStart extends Model
 {
+    use BelongsToBakery;
+
     public const CHANE = 'chane';
 
     public const BAKING = 'baking';
@@ -102,7 +106,7 @@ class WorkStart extends Model
     /** The deadline this activity must start by, from the bakery settings. */
     public static function deadlineFor(string $type): string
     {
-        $bakery = Bakery::first();
+        $bakery = CurrentBakery::get();
 
         $column = $type === self::BAKING
             ? 'baking_start_deadline'

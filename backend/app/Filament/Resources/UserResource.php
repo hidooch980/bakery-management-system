@@ -12,6 +12,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 
@@ -88,6 +89,17 @@ class UserResource extends Resource
                         ->offColor('danger'),
                 ]),
         ]);
+    }
+
+    /**
+     * Staff belong to one shop, and the user model carries no global scope
+     * — resolving the signed-in user is how the current shop is worked out,
+     * so scoping it by that would ask the question to answer it. The panel
+     * therefore says so here.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->ofCurrentBakery();
     }
 
     public static function table(Table $table): Table

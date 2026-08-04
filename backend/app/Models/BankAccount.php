@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\Relation;
  */
 class BankAccount extends Model
 {
+    use BelongsToBakery;
+
     protected $fillable = [
         'title',
         'bank_name',

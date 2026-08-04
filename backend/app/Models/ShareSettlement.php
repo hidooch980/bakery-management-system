@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Support\AppCalendar;
 use App\Support\Jalali;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ShareSettlement extends Model
 {
-    use PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount;
 
     protected $fillable = [
         'bakery_share_id',

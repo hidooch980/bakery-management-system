@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use Illuminate\Database\Eloquent\Model;
 
 class Customer extends Model
 {
+    use BelongsToBakery;
+
     public const TYPES = [
         'school' => 'مدرسه',
         'office' => 'اداره',

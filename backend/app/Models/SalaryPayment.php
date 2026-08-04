@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
 
 class SalaryPayment extends Model
 {
-    use PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount;
 
     protected $fillable = [
         'user_id',

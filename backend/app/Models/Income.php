@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Support\AppCalendar;
 use App\Support\Money;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Income extends Model
 {
-    use PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount;
 
     public const CATEGORIES = [
         'subsidy' => 'یارانه و کمک دولتی',

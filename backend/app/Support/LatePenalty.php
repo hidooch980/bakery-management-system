@@ -34,7 +34,7 @@ class LatePenalty
      */
     private static function settings(): array
     {
-        $bakery = Bakery::first();
+        $bakery = CurrentBakery::get();
 
         return [
             'free_days' => (int) ($bakery?->late_free_days ?: self::DEFAULT_FREE_DAYS),
