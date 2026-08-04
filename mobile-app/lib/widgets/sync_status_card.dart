@@ -1,18 +1,22 @@
-import 'dart:async';
-
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../services/bakery_api.dart';
+import '../services/connection_status.dart';
 import 'common.dart';
 
-/// Shows what is still waiting to be sent, and sends it the moment the
-/// device reconnects — so a dough or chane entry recorded with no signal
-/// never has to be remembered and resubmitted by hand.
+/// Shows whether the shop is talking to its server, what is still waiting to
+/// be sent, and sends it the moment the connection comes back — so a dough
+/// or chane entry recorded with no signal never has to be remembered and
+/// resubmitted by hand.
 ///
-/// Renders nothing at all when the queue is empty and the device is
-/// online, which is the common case — this card should only ever be
-/// visible when there is something to say.
+/// Online is read from [ConnectionStatus], which asks the server rather than
+/// the radio. A phone on café wifi, or on a server that has moved, reports
+/// itself connected while reaching nothing, and this card used to believe
+/// it — showing "در حال ارسال" over a queue that could not go anywhere.
+///
+/// Renders nothing at all when the queue is empty and the server is
+/// answering, which is the common case.
 class SyncStatusCard extends StatefulWidget {
   const SyncStatusCard({super.key, required this.api});
 
@@ -24,45 +28,23 @@ class SyncStatusCard extends StatefulWidget {
 
 class _SyncStatusCardState extends State<SyncStatusCard> {
   int _pending = 0;
-  bool _online = true;
   bool _syncing = false;
-  StreamSubscription<List<ConnectivityResult>>? _subscription;
+
+  /// What the connection was last time this card looked, so a reconnect can
+  /// be told apart from an ordinary rebuild.
+  bool? _wasOnline;
 
   @override
   void initState() {
     super.initState();
-    _refresh();
-
-    // Fires once for the current state and again on every change, so a
-    // reconnect while the screen is open triggers a sync immediately
-    // rather than waiting for the user to reopen the app.
-    _subscription = Connectivity().onConnectivityChanged.listen((results) {
-      final online = results.any((r) => r != ConnectivityResult.none);
-
-      if (!mounted) return;
-      setState(() => _online = online);
-
-      if (online) _sync();
-    });
+    _refreshCount();
   }
 
-  @override
-  void dispose() {
-    _subscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _refresh() async {
+  Future<void> _refreshCount() async {
     final count = await widget.api.pendingSyncCount();
-    final results = await Connectivity().checkConnectivity();
 
     if (!mounted) return;
-    setState(() {
-      _pending = count;
-      _online = results.any((r) => r != ConnectivityResult.none);
-    });
-
-    if (_online && _pending > 0) _sync();
+    setState(() => _pending = count);
   }
 
   Future<void> _sync() async {
@@ -85,11 +67,22 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Nothing to say: online with an empty queue.
-    if (_online && _pending == 0) return const SizedBox.shrink();
+    final connection = context.watch<ConnectionStatus>();
+    final online = connection.online;
+
+    // Coming back from offline is the moment to empty the queue, and it has
+    // to wait for the frame: sending during build would setState mid-paint.
+    if (online && _wasOnline == false && _pending > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+    }
+
+    _wasOnline = online;
+
+    // Nothing to say: the server is answering and nothing is waiting.
+    if (online && _pending == 0) return const SizedBox.shrink();
 
     final scheme = Theme.of(context).colorScheme;
-    final color = _online ? const Color(0xFFE8952D) : const Color(0xFFD1495B);
+    final color = online ? const Color(0xFFE8952D) : const Color(0xFFD1495B);
 
     return Card(
       color: color.withValues(alpha: 0.08),
@@ -98,7 +91,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
         child: Row(
           children: [
             Icon(
-              _online ? Icons.cloud_sync_rounded : Icons.cloud_off_rounded,
+              online ? Icons.cloud_sync_rounded : Icons.cloud_off_rounded,
               color: color,
             ),
             const SizedBox(width: 12),
@@ -107,7 +100,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _online ? 'در حال ارسال...' : 'اتصال اینترنت برقرار نیست',
+                    _headline(connection),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: color,
@@ -116,7 +109,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
                   if (_pending > 0)
                     Text(
                       '$_pending مورد ثبت‌شده در انتظار ارسال است'
-                      '${_online ? '' : ' — با وصل شدن اینترنت خودکار ارسال می‌شود'}',
+                      '${online ? '' : ' — با برقراری اتصال خودکار ارسال می‌شود'}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
@@ -124,7 +117,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
                 ],
               ),
             ),
-            if (_online && _pending > 0)
+            if (online && _pending > 0)
               _syncing
                   ? const SizedBox(
                       width: 20,
@@ -140,5 +133,17 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
         ),
       ),
     );
+  }
+
+  /// No signal and "signal but no server" are different problems with
+  /// different fixes, so they are not given the same sentence.
+  String _headline(ConnectionStatus connection) {
+    if (connection.online) {
+      return 'در حال ارسال...';
+    }
+
+    return connection.hasRadio
+        ? 'سرور در دسترس نیست'
+        : 'اتصال اینترنت برقرار نیست';
   }
 }

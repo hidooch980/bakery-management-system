@@ -13,6 +13,7 @@ import 'screens/admin/admin_home_screen.dart';
 import 'screens/shater/shater_home_screen.dart';
 import 'services/api_client.dart';
 import 'services/bakery_api.dart';
+import 'services/connection_status.dart';
 import 'services/server_directory.dart';
 import 'theme/app_theme.dart';
 import 'widgets/update_prompt.dart';
@@ -28,13 +29,15 @@ void main() async {
   // back to the last address that worked.
   client.useBaseUrl(await ServerDirectory().resolve());
 
-  runApp(BakeryApp(api: BakeryApi(client)));
+  runApp(BakeryApp(api: BakeryApi(client), client: client));
 }
 
 class BakeryApp extends StatelessWidget {
-  const BakeryApp({super.key, required this.api});
+  const BakeryApp({super.key, required this.api, required this.client});
 
   final BakeryApi api;
+
+  final ApiClient client;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +45,9 @@ class BakeryApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider(api)..bootstrap()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()..load()),
+        // Whether the backend answers — asked once at startup and then on
+        // every change in the radio, so every screen reads one truth.
+        ChangeNotifierProvider(create: (_) => ConnectionStatus(client)..start()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) => MaterialApp(

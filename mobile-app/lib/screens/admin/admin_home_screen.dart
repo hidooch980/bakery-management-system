@@ -7,6 +7,7 @@ import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
+import '../../widgets/sync_status_card.dart';
 import '../shared/settings_screen.dart';
 import 'admin_finance_tab.dart';
 import 'admin_overview_tab.dart';
@@ -96,9 +97,21 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
       ),
       body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: KeyedSubtree(key: ValueKey(_tab), child: tabs[_tab]),
+        child: Column(
+          children: [
+            // The admin was the one role that could not see the shop had
+            // lost its server, which is exactly who needs to know first.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SyncStatusCard(api: widget.api),
+            ),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: KeyedSubtree(key: ValueKey(_tab), child: tabs[_tab]),
+              ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: NavigationBar(

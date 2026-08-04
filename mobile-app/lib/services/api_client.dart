@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
@@ -69,6 +70,12 @@ class ApiClient {
     defaultValue: 'http://10.0.2.2:8000/api/v1',
   );
 
+  /// Swaps the transport so a test can answer requests without a network.
+  @visibleForTesting
+  void useAdapterForTest(HttpClientAdapter adapter) {
+    _dio.httpClientAdapter = adapter;
+  }
+
   /// Points every later call at a different backend.
   ///
   /// Changed on the live Dio instance rather than by building a new client,
@@ -107,6 +114,36 @@ class ApiClient {
   }
 
   OfflineQueue get queue => _queue;
+
+  /// Whether the backend itself is answering.
+  ///
+  /// A phone can be firmly on wifi and still reach nothing — a café portal,
+  /// a server that is down, or one that has been moved. Asking the radio
+  /// gets "connected" in all three cases, so the only honest answer comes
+  /// from the server saying so itself. Never throws: not reachable is an
+  /// answer, not a failure.
+  Future<bool> isServerReachable() async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/health',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 5),
+          sendTimeout: const Duration(seconds: 5),
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+
+      final data = response.data;
+
+      // The body is checked, not just the status, because a captive portal
+      // answers 200 to everything.
+      return response.statusCode == 200 &&
+          data is Map &&
+          data['service'] == 'bakery';
+    } on Object {
+      return false;
+    }
+  }
 
   /// Same as [post], except a connectivity-level failure — no signal, not a
   /// validation error from the server — is queued locally instead of
