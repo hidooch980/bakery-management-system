@@ -50,6 +50,7 @@ class BakeryApi {
     } finally {
       // Always drop the local token, even if the server call failed.
       await _client.clearToken();
+    await _client.clearCache();
     }
   }
 
@@ -64,6 +65,7 @@ class BakeryApi {
     });
 
     await _client.clearToken();
+    await _client.clearCache();
 
     return body['message'] as String? ?? 'رمز عبور تغییر کرد.';
   }
@@ -89,7 +91,7 @@ class BakeryApi {
   }
 
   Future<({bool checkedIn, DateTime? at})> attendanceToday() async {
-    final body = await _client.get('/attendance/today');
+    final body = await _client.getCached('/attendance/today');
     final data = body['data'] as Map<String, dynamic>;
 
     return (
@@ -99,7 +101,7 @@ class BakeryApi {
   }
 
   Future<List<AttendanceRecord>> attendanceHistory() async {
-    final body = await _client.get('/attendance/my-history');
+    final body = await _client.getCached('/attendance/my-history');
     return _paginated(body).map(AttendanceRecord.fromJson).toList();
   }
 
@@ -122,12 +124,12 @@ class BakeryApi {
   }
 
   Future<List<DoughEntry>> myDoughHistory() async {
-    final body = await _client.get('/dough-entries/my-history');
+    final body = await _client.getCached('/dough-entries/my-history');
     return _paginated(body).map(DoughEntry.fromJson).toList();
   }
 
   Future<List<DoughEntry>> pendingDough() async {
-    final body = await _client.get('/dough-entries/pending');
+    final body = await _client.getCached('/dough-entries/pending');
     return _paginated(body).map(DoughEntry.fromJson).toList();
   }
 
@@ -170,12 +172,12 @@ class BakeryApi {
   }
 
   Future<List<ChaneEntry>> myChaneHistory() async {
-    final body = await _client.get('/chane-entries/my-history');
+    final body = await _client.getCached('/chane-entries/my-history');
     return _paginated(body).map(ChaneEntry.fromJson).toList();
   }
 
   Future<List<ChaneEntry>> pendingChane() async {
-    final body = await _client.get('/chane-entries/pending');
+    final body = await _client.getCached('/chane-entries/pending');
     return _paginated(body).map(ChaneEntry.fromJson).toList();
   }
 
@@ -398,7 +400,7 @@ class BakeryApi {
       _client.post('/customer-debts/$customerId/settle', const {});
 
   Future<({List<Sale> sales, int count, double total})> todaySales() async {
-    final body = await _client.get('/sales/today');
+    final body = await _client.getCached('/sales/today');
     final data = body['data'] as Map<String, dynamic>;
     final summary = data['summary'] as Map<String, dynamic>;
 
@@ -482,7 +484,7 @@ class BakeryApi {
 
   /// Today's start board for shaping and baking.
   Future<WorkStartBoard> workStartBoard() async {
-    final body = await _client.get('/work-starts/today');
+    final body = await _client.getCached('/work-starts/today');
 
     return WorkStartBoard.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -525,7 +527,7 @@ class BakeryApi {
   // --------------------------------------------------------------- board
 
   Future<ChaneBoard> chaneBoard() async {
-    final body = await _client.get('/chane-board');
+    final body = await _client.getCached('/chane-board');
 
     return ChaneBoard.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -534,7 +536,7 @@ class BakeryApi {
 
   /// Admin dashboard counters for today.
   Future<Map<String, dynamic>> dashboard() async {
-    final body = await _client.get('/reports/dashboard');
+    final body = await _client.getCached('/reports/dashboard');
 
     return body['data'] as Map<String, dynamic>;
   }
@@ -668,7 +670,7 @@ class BakeryApi {
 
   /// Current stock levels for flour, salt and dough.
   Future<List<Map<String, dynamic>>> inventory() async {
-    final body = await _client.get('/inventory');
+    final body = await _client.getCached('/inventory');
 
     return (body['data'] as List).cast<Map<String, dynamic>>();
   }
@@ -690,7 +692,7 @@ class BakeryApi {
   // -------------------------------------------------------------- bakery
 
   Future<Bakery?> bakery() async {
-    final body = await _client.get('/bakery');
+    final body = await _client.getCached('/bakery');
     final data = body['data'] as Map<String, dynamic>?;
 
     return data == null ? null : Bakery.fromJson(data);

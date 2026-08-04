@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
 import 'offline_queue.dart';
+import 'response_cache.dart';
 
 /// Thrown for any non-2xx API response, carrying the backend's Persian message.
 class ApiException implements Exception {
@@ -91,6 +92,7 @@ class ApiClient {
   final Dio _dio;
   final _storage = const FlutterSecureStorage();
   final _queue = OfflineQueue();
+  final _cache = ResponseCache();
   static const _uuid = Uuid();
 
   Future<void> saveToken(String token) =>
@@ -114,6 +116,48 @@ class ApiClient {
   }
 
   OfflineQueue get queue => _queue;
+
+  /// When the shown copy of [path] was last fetched, or null if it is live.
+  DateTime? servedFrom(String path) => _servedAt[path];
+
+  final Map<String, DateTime> _servedAt = {};
+
+  /// Same as [get], except the last good answer is kept and served when the
+  /// server cannot be reached.
+  ///
+  /// Only a connectivity failure falls back. A 403 or a validation error is
+  /// the server talking, and answering it from yesterday's copy would hide
+  /// a real problem behind stale figures.
+  Future<Map<String, dynamic>> getCached(
+    String path, {
+    Map<String, dynamic>? query,
+  }) async {
+    try {
+      final body = await get(path, query: query);
+
+      _servedAt.remove(path);
+      await _cache.save(path, query, body);
+
+      return body;
+    } on ApiException catch (e) {
+      if (!e.isConnectivityError) rethrow;
+
+      final cached = await _cache.read(path, query);
+
+      if (cached == null) rethrow;
+
+      _servedAt[path] = cached.at;
+
+      return cached.body;
+    }
+  }
+
+  /// Forgets every cached read. Called on sign-out, so the next person to
+  /// use this phone is not shown the last one's figures.
+  Future<void> clearCache() async {
+    _servedAt.clear();
+    await _cache.clear();
+  }
 
   /// Whether the backend itself is answering.
   ///
