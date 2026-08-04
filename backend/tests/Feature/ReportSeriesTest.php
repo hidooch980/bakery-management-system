@@ -322,6 +322,12 @@ class ReportSeriesTest extends TestCase
         $this->assertEqualsWithDelta(500000.0, (float) $page->instance()->financialRows()->sum('income'), 0.001);
         $this->assertEqualsWithDelta(400.0, (float) $page->instance()->consumptionRows()->sum('flour_used_kg'), 0.001);
         $this->assertSame(10, (int) $page->instance()->productionRows()->sum('bread_sold'));
+
+        // All three tabs render together, each with its own totals row, so a
+        // broken column in one of them cannot hide behind an unopened tab.
+        $page->assertSee('جمع درآمد')
+            ->assertSee('خمیرگیری، چانه و فروش')
+            ->assertSee('مصرف آرد، نمک و خمیرمایه');
     }
 
     public function test_dates_entered_the_wrong_way_round_still_read_the_range(): void
