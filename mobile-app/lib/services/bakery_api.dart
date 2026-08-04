@@ -339,6 +339,27 @@ class BakeryApi {
     return BankBalances.fromJson(body['data'] as Map<String, dynamic>);
   }
 
+  /// How the shop was staffed over a stretch: working days, who was
+  /// expected and who actually turned up.
+  Future<Map<String, dynamic>> attendanceSummary({String? from, String? to}) async {
+    final body = await _client.getCached('/reports/attendance-summary', query: {
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  /// What each person is owed for a stretch, and what has been paid.
+  Future<Map<String, dynamic>> payrollReport({String? from, String? to}) async {
+    final body = await _client.getCached('/reports/payroll', query: {
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
   /// Money in against money out, cut into days, weeks or months.
   ///
   /// [granularity] is 'day', 'week' or 'month'; anything else the server

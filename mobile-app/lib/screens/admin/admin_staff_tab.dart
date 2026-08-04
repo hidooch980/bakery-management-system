@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/bakery_api.dart';
+import 'staff_report_section.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 
@@ -50,9 +51,11 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
 
           if (records.isEmpty) {
             return ListView(
-              children: const [
-                SizedBox(height: 60),
-                EmptyState(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              children: [
+                StaffReportSection(api: widget.api),
+                const SizedBox(height: 40),
+                const EmptyState(
                   icon: Icons.how_to_reg_outlined,
                   title: 'هنوز کسی تیک حضور نزده',
                   subtitle: 'ساعت ورود کارکنان اینجا نمایش داده می‌شود.',
@@ -63,10 +66,19 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
 
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-            itemCount: records.length,
+            // One more than the records: the month's report sits above
+            // today's list, which answers a different question.
+            itemCount: records.length + 1,
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
-              final record = records[index];
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: StaffReportSection(api: widget.api),
+                );
+              }
+
+              final record = records[index - 1];
               final user = record['user'] as Map<String, dynamic>?;
               final checkedInAt = DateTime.tryParse('${record['checked_in_at']}');
 
