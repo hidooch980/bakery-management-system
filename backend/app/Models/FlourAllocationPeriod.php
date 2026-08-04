@@ -93,15 +93,8 @@ class FlourAllocationPeriod extends Model
      * shop actually baked them in.
      */
 
-    /**
-     * Loaves a sack is worth in the nanino system.
-     *
-     * A fixed standard, not a figure derived from the shop's own dough: the
-     * sāmāne counts 64 to the sack and does not care what the bench yielded
-     * on the day. Working it out from the formula instead made the quota
-     * drift every time the proof gain or the loaf weight was adjusted.
-     */
-    public const NANINO_PER_BAG = 64;
+    /** Kept for readers of this model; the standard itself lives with the formula. */
+    public const NANINO_PER_BAG = DoughFormula::NANINO_PER_BAG;
 
     public function getAllocatedBreadCountAttribute(): int
     {

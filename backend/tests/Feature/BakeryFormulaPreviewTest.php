@@ -105,9 +105,10 @@ class BakeryFormulaPreviewTest extends TestCase
         $text = preg_replace('/\s+/u', ' ', strip_tags($html));
 
         // 30 bags split three ways is 10 each: 646kg of dough, which is
-        // 760 normal chane or 646 nanino. The month total restates all 30.
+        // 760 normal chane. Nanino is counted at the sāmāne's fixed 64 to
+        // the sack rather than by weight, so ten sacks are 640.
         $this->assertStringContainsString('10.0 کیسه ← خمیر 646.0 کیلوگرم', $text);
-        $this->assertStringContainsString('حدود 760 چانه عادی یا حدود 646 چانه نانینو', $text);
+        $this->assertStringContainsString('حدود 760 چانه عادی یا حدود 640 چانه نانینو', $text);
         $this->assertStringContainsString('سرجمع ماه: 30.0 کیسه ← خمیر 1,938.0 کیلوگرم', $text);
     }
 

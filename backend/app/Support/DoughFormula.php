@@ -122,13 +122,25 @@ class DoughFormula
         return (int) floor($this->shapeableKg($bags) / $this->normalChaneWeightKg);
     }
 
+    /**
+     * Loaves a sack is worth in the nanino system.
+     *
+     * A fixed standard, not a figure derived from the shop's own dough: the
+     * sāmāne counts 64 to the sack and does not care what the bench yielded
+     * on the day. Dividing the batch's dough by the loaf weight answered 72
+     * instead, and every screen that asked — the formula preview, the
+     * board, the quota — quietly disagreed with the system the shop is
+     * actually measured by.
+     */
+    public const NANINO_PER_BAG = 64;
+
     public function naninoChaneCount(float $bags): ?int
     {
         if (! $this->naninoChaneWeightKg) {
             return null;
         }
 
-        return (int) floor($this->shapeableKg($bags) / $this->naninoChaneWeightKg);
+        return (int) floor($bags * self::NANINO_PER_BAG);
     }
 
     /**

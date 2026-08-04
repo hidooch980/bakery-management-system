@@ -88,7 +88,10 @@ class ProductionFormulaTest extends TestCase
 
         // 129.2kg of dough at 0.85kg per chane rounds down to whole chane.
         $this->assertSame(152, $formula->normalChaneCount(2));
-        $this->assertSame(129, $formula->naninoChaneCount(2));
+
+        // Nanino is not weighed out the same way: the sāmāne counts 64 to
+        // the sack whatever the bench yields, so two sacks are 128.
+        $this->assertSame(128, $formula->naninoChaneCount(2));
     }
 
     public function test_formula_returns_null_when_no_chane_weight_is_set(): void
@@ -891,10 +894,11 @@ class ProductionFormulaTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.dough_today.bags', 2)
             ->assertJsonPath('data.dough_today.dough_kg', 129.6)
-            ->assertJsonPath('data.dough_today.as_nanino_count', 129)
+            // Two sacks at the sāmāne's fixed 64 to the sack.
+            ->assertJsonPath('data.dough_today.as_nanino_count', 128)
             ->assertJsonPath(
                 'data.dough_today.as_nanino_announcement',
-                'خمیر امروز (2 کیسه) معادل 129 نان نانینو است.'
+                'خمیر امروز (2 کیسه) معادل 128 نان نانینو است.'
             );
     }
 
@@ -911,7 +915,7 @@ class ProductionFormulaTest extends TestCase
             ->getJson('/api/v1/chane-board')
             ->assertOk()
             ->assertJsonPath('data.today.normal_count', 0)
-            ->assertJsonPath('data.dough_today.as_nanino_count', 129);
+            ->assertJsonPath('data.dough_today.as_nanino_count', 128);
     }
 
     public function test_the_dough_restatement_is_null_without_a_nanino_weight(): void
