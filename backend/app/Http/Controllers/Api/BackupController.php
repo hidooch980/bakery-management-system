@@ -2,16 +2,15 @@
 
 namespace App\Http\Controllers\Api;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 
 class BackupController extends Controller
 {
     public function upload(Request $request)
     {
         $request->validate([
-            'backup' => 'required|file|max:51200'
+            'backup' => 'required|file|max:51200',
         ]);
 
         $file = $request->file('backup');
@@ -22,7 +21,7 @@ class BackupController extends Controller
 
         return response()->json([
             'success' => true,
-            'file' => $path
+            'file' => $path,
         ]);
     }
 
@@ -30,7 +29,7 @@ class BackupController extends Controller
     {
         return response()->json([
             'success' => true,
-            'message' => 'Backup server ready'
+            'message' => 'Backup server ready',
         ]);
     }
 }

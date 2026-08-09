@@ -1,5 +1,5 @@
 name: bakery_app
-description: اپلیکیشن مدیریت نانوایی — ثبت خمیر، چانه، فروش و حضور و غیاب
+description: Ø§Ù¾Ù„ÛŒÚ©ÛŒØ´Ù† Ù…Ø¯ÛŒØ±ÛŒØª Ù†Ø§Ù†ÙˆØ§ÛŒÛŒ â€” Ø«Ø¨Øª Ø®Ù…ÛŒØ±ØŒ Ú†Ø§Ù†Ù‡ØŒ ÙØ±ÙˆØ´ Ùˆ Ø­Ø¶ÙˆØ± Ùˆ ØºÛŒØ§Ø¨
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -29,7 +29,6 @@ dependencies:
 
   # Unattended backup: a periodic background job. The files land in the
   # app's own documents directory, so no storage permission is involved.
-  workmanager: ^0.5.2
 
   # UI
   cupertino_icons: ^1.0.8
