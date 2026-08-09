@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * The seeder has given the seller these since the shop went live, but the
@@ -43,7 +44,7 @@ return new class extends Migration
             $seller->givePermissionTo($permission);
         }
 
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }
 
     public function down(): void
@@ -58,6 +59,6 @@ return new class extends Migration
             $seller->revokePermissionTo($name);
         }
 
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
     }
 };
