@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/entries.dart';
 import '../utils/formatters.dart';
 
 import '../services/api_client.dart';

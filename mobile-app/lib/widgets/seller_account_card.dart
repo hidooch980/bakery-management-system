@@ -464,22 +464,52 @@ class _SettleablePickerState extends State<_SettleablePicker> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final lines = _lines;
 
     return AlertDialog(
       title: const Text('چه چیزی را تسویه می‌کنید؟'),
       content: SizedBox(
         width: double.maxFinite,
-        child: switch ((lines, _error)) {
-          (_, final String message) => Text(message),
-          (null, _) => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          (final List<SettleableLine> found, _) when found.isEmpty =>
-            const Text('مبلغی برای تسویه وجود ندارد.'),
-          (final List<SettleableLine> found, _) => Column(
+        child: _content(lines),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('انصراف'),
+        ),
+        FilledButton(
+          onPressed: _ticked.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(
+                    _ChosenDebts(
+                      ids: _ticked.toList(),
+                      total: _total,
+                      isEverything: _ticked.length == (lines?.length ?? 0),
+                    ),
+                  ),
+          child: const Text('ادامه'),
+        ),
+      ],
+    );
+  }
+
+  Widget _content(List<SettleableLine>? lines) {
+    final scheme = Theme.of(context).colorScheme;
+
+    if (_error != null) return Text(_error!);
+
+    if (lines == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (lines.isEmpty) return const Text('مبلغی برای تسویه وجود ندارد.');
+
+    final found = lines;
+
+    return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
@@ -541,27 +571,6 @@ class _SettleablePickerState extends State<_SettleablePicker> {
                     ),
                   ],
                 ),
-              ],
-            ),
-        },
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('انصراف'),
-        ),
-        FilledButton(
-          onPressed: _ticked.isEmpty
-              ? null
-              : () => Navigator.of(context).pop(
-                    _ChosenDebts(
-                      ids: _ticked.toList(),
-                      total: _total,
-                      isEverything: _ticked.length == (lines?.length ?? 0),
-                    ),
-                  ),
-          child: const Text('ادامه'),
-        ),
       ],
     );
   }
