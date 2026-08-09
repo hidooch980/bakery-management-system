@@ -9,7 +9,10 @@ set -euo pipefail
 DB_NAME="${DB_NAME:-bakery_db}"
 DB_TEST_NAME="${DB_TEST_NAME:-bakery_db_test}"
 DB_USER="${DB_USER:-bakery_user}"
-DB_PASS="${DB_PASS:-BakeryPass123!}"
+# No default. A committed password is a password everyone has, and this
+# script writes it straight into .env and MySQL. Generated per install
+# unless the caller supplies one.
+DB_PASS="${DB_PASS:-$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)}"
 
 info() { printf '\n\033[1;33m==> %s\033[0m\n' "$1"; }
 fail() { printf '\033[1;31mخطا: %s\033[0m\n' "$1" >&2; exit 1; }
