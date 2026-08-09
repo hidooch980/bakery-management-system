@@ -264,8 +264,11 @@ curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/loca
 
 ### ۱. ساخت دیتابیس
 
+رمز را همین‌جا بسازید و جای دیگری ننویسید — چاپش می‌شود تا در قدم ۳
+داخل `.env` بگذاریدش:
+
 ```bash
-sudo mysql -e "CREATE DATABASE bakery_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER 'bakery_user'@'localhost' IDENTIFIED BY 'BakeryPass123!'; GRANT ALL PRIVILEGES ON bakery_db.* TO 'bakery_user'@'localhost'; FLUSH PRIVILEGES;"
+DB_PASS=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28) && echo "رمز ساخته‌شده: $DB_PASS" && sudo mysql -e "CREATE DATABASE bakery_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER 'bakery_user'@'localhost' IDENTIFIED BY '$DB_PASS'; GRANT ALL PRIVILEGES ON bakery_db.* TO 'bakery_user'@'localhost'; FLUSH PRIVILEGES;"
 ```
 
 ### ۲. نصب وابستگی‌ها
