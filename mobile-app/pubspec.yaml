@@ -1,5 +1,5 @@
 name: bakery_app
-description: Ø§Ù¾Ù„ÛŒÚ©ÛŒØ´Ù† Ù…Ø¯ÛŒØ±ÛŒØª Ù†Ø§Ù†ÙˆØ§ÛŒÛŒ â€” Ø«Ø¨Øª Ø®Ù…ÛŒØ±ØŒ Ú†Ø§Ù†Ù‡ØŒ ÙØ±ÙˆØ´ Ùˆ Ø­Ø¶ÙˆØ± Ùˆ ØºÛŒØ§Ø¨
+description: اپلیکیشن مدیریت نانوایی — ثبت خمیر، چانه، فروش و حضور و غیاب
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -26,9 +26,6 @@ dependencies:
   package_info_plus: ^8.1.2
   path_provider: ^2.1.5
   open_filex: ^4.5.0
-
-  # Unattended backup: a periodic background job. The files land in the
-  # app's own documents directory, so no storage permission is involved.
 
   # UI
   cupertino_icons: ^1.0.8
