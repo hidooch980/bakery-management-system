@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BackupController;
 use App\Http\Controllers\Api\BakeryController;
 use App\Http\Controllers\Api\BakeryShareController;
 use App\Http\Controllers\Api\BalanceSheetController;
@@ -266,5 +267,12 @@ Route::prefix('v1')->group(function () {
             // data — see docs/POWERBI.md.
             Route::get('/reports/export/{dataset}', [PowerBiExportController::class, 'show']);
         });
+
+        // --- Phone-side backup upload ---
+        // Inside auth:sanctum deliberately. These once sat outside every
+        // group, which left a 50 MB unauthenticated write to disk open to
+        // the whole internet — enough to fill the volume and stop the shop.
+        Route::post('/backup/upload', [BackupController::class, 'upload']);
+        Route::get('/backup/status', [BackupController::class, 'status']);
     });
 });

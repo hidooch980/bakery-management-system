@@ -288,8 +288,11 @@ APP_LOCALE=fa
 DB_CONNECTION=mysql
 DB_DATABASE=bakery_db
 DB_USERNAME=bakery_user
-DB_PASSWORD=BakeryPass123!
+DB_PASSWORD=<رمزی که خودتان می‌سازید>
 ```
+
+> رمز واقعی هرگز در این فایل نوشته نمی‌شود. `README` در مخزن عمومی است و
+> هر چه اینجا بیاید برای همه خواندنی است.
 
 ### ۴. اجرای migration و seeder
 

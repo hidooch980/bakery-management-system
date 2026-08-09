@@ -27,6 +27,10 @@ dependencies:
   path_provider: ^2.1.5
   open_filex: ^4.5.0
 
+  # Unattended backup: a periodic background job. The files land in the
+  # app's own documents directory, so no storage permission is involved.
+  workmanager: ^0.5.2
+
   # UI
   cupertino_icons: ^1.0.8
   shimmer: ^3.0.0

@@ -12,6 +12,7 @@ import 'screens/seller/seller_home_screen.dart';
 import 'screens/admin/admin_home_screen.dart';
 import 'screens/shater/shater_home_screen.dart';
 import 'services/api_client.dart';
+import 'services/auto_backup_service.dart';
 import 'services/bakery_api.dart';
 import 'services/connection_status.dart';
 import 'services/server_directory.dart';
@@ -20,6 +21,10 @@ import 'widgets/update_prompt.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Registers the periodic backup job. Safe to call every launch; it
+  // replaces the existing registration rather than stacking a second one.
+  await AutoBackupService.init();
 
   final client = ApiClient();
 
