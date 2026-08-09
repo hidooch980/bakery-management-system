@@ -187,3 +187,41 @@ class AttendanceRecord {
         checkedInAt: DateTime.parse(json['checked_in_at'] as String),
       );
 }
+
+/// One person on the floor, and whether they are in yet.
+///
+/// Used by whoever is ticking the others in — the bakers work with flour on
+/// their hands and their phones in a locker.
+class StaffAttendance {
+  const StaffAttendance({
+    required this.id,
+    required this.name,
+    required this.checkedIn,
+    this.role,
+    this.checkedInAt,
+    this.recordedByAnother = false,
+  });
+
+  final int id;
+  final String name;
+  final bool checkedIn;
+  final String? role;
+
+  /// Wall-clock time, already formatted by the server.
+  final String? checkedInAt;
+
+  /// Someone entered this for them rather than them entering it. Shown so
+  /// the seller can see the tick is theirs, not evidence the person came
+  /// to the phone.
+  final bool recordedByAnother;
+
+  factory StaffAttendance.fromJson(Map<String, dynamic> json) =>
+      StaffAttendance(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        name: '${json['name'] ?? ''}',
+        checkedIn: json['checked_in'] as bool? ?? false,
+        role: json['role'] as String?,
+        checkedInAt: json['checked_in_at'] as String?,
+        recordedByAnother: json['recorded_by_another'] as bool? ?? false,
+      );
+}

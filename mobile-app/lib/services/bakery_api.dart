@@ -93,6 +93,32 @@ class BakeryApi {
     );
   }
 
+  /// The rest of the floor and whether each of them is in yet.
+  Future<List<StaffAttendance>> attendanceRoster() async {
+    final body = await _client.get('/attendance/roster');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return ((data['staff'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(StaffAttendance.fromJson)
+        .toList();
+  }
+
+  /// Records someone else's arrival, for the ones working with flour on
+  /// their hands and a phone in a locker.
+  ///
+  /// Queued like your own check-in: no signal must not cost someone their
+  /// day's attendance.
+  Future<bool> checkInFor(int userId) async {
+    final body = await _client.postOrQueue(
+      '/attendance/check-in/$userId',
+      const {},
+      label: 'حضور و غیاب',
+    );
+
+    return body['queued'] == true;
+  }
+
   Future<({bool checkedIn, DateTime? at})> attendanceToday() async {
     final body = await _client.getCached('/attendance/today');
     final data = body['data'] as Map<String, dynamic>;

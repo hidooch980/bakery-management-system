@@ -9,9 +9,18 @@ import 'common.dart';
 /// The attendance check-in control every staff role sees on their home screen.
 /// The recorded time is what the admin reads in the attendance report.
 class AttendanceCard extends StatefulWidget {
-  const AttendanceCard({super.key, required this.api});
+  const AttendanceCard({
+    super.key,
+    required this.api,
+    this.canRecordForOthers = false,
+  });
 
   final BakeryApi api;
+
+  /// Shows the control for ticking in the rest of the floor. Off by default
+  /// so a role without the permission never sees a button the server would
+  /// refuse.
+  final bool canRecordForOthers;
 
   @override
   State<AttendanceCard> createState() => _AttendanceCardState();
@@ -84,7 +93,10 @@ class _AttendanceCardState extends State<AttendanceCard> {
                   height: 76,
                   child: Center(child: CircularProgressIndicator()),
                 )
-              : Row(
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
                   children: [
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 350),
@@ -147,8 +159,194 @@ class _AttendanceCardState extends State<AttendanceCard> {
                               )
                             : const Text('ثبت'),
                       ),
+                      ],
+                    ),
+                    if (widget.canRecordForOthers) ...[
+                      const Divider(height: 22),
+                      // The bakers are at the oven with flour on their
+                      // hands; whoever holds a phone marks them in.
+                      TextButton.icon(
+                        onPressed: () => showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          builder: (_) => _RosterSheet(api: widget.api),
+                        ),
+                        icon: const Icon(Icons.groups_rounded, size: 18),
+                        label: const Text('ثبت حضور بقیه کارکنان'),
+                      ),
+                    ],
                   ],
                 ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ticks in the staff who are not carrying a phone.
+///
+/// Opened from the attendance card by whoever holds the permission. Each
+/// row is one tap, and the row settles into "in" without closing the sheet
+/// so the whole floor can be marked in one pass.
+class _RosterSheet extends StatefulWidget {
+  const _RosterSheet({required this.api});
+
+  final BakeryApi api;
+
+  @override
+  State<_RosterSheet> createState() => _RosterSheetState();
+}
+
+class _RosterSheetState extends State<_RosterSheet> {
+  List<StaffAttendance>? _staff;
+  String? _error;
+  final Set<int> _busy = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final staff = await widget.api.attendanceRoster();
+      if (!mounted) return;
+      setState(() => _staff = staff);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    }
+  }
+
+  Future<void> _tickIn(StaffAttendance person) async {
+    setState(() => _busy.add(person.id));
+
+    try {
+      final queued = await widget.api.checkInFor(person.id);
+      if (!mounted) return;
+
+      // Replaced rather than reloaded: a reload would lose the other rows
+      // mid-pass and the person doing this is standing on a busy floor.
+      setState(() {
+        _staff = [
+          for (final s in _staff ?? const <StaffAttendance>[])
+            if (s.id == person.id)
+              StaffAttendance(
+                id: s.id,
+                name: s.name,
+                role: s.role,
+                checkedIn: true,
+                checkedInAt: s.checkedInAt,
+                recordedByAnother: true,
+              )
+            else
+              s,
+        ];
+      });
+
+      if (queued) {
+        showMessage(
+          context,
+          'اینترنت وصل نیست؛ حضور ${person.name} ذخیره شد و با اتصال بعدی ثبت می‌شود.',
+        );
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showMessage(context, e.message, isError: true);
+      // 409 means they got there first; the roster is what is stale.
+      if (e.statusCode == 409) _load();
+    } finally {
+      if (mounted) setState(() => _busy.remove(person.id));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    const done = Color(0xFF2E9E6B);
+    final staff = _staff;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'ثبت حضور کارکنان',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'برای هر نفر که سر کار آمده ضربه بزنید.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            if (_error != null)
+              Text(_error!, style: TextStyle(color: scheme.error))
+            else if (staff == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (staff.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Text('کارمند فعال دیگری ثبت نشده است.'),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: staff.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) {
+                    final person = staff[i];
+                    final working = _busy.contains(person.id);
+
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(person.name),
+                      subtitle: person.checkedIn
+                          ? Text(
+                              person.checkedInAt != null
+                                  ? 'ساعت ${person.checkedInAt}'
+                                  : 'ثبت شده',
+                              style: const TextStyle(color: done),
+                            )
+                          : Text(
+                              person.role ?? '',
+                              style: TextStyle(color: scheme.onSurfaceVariant),
+                            ),
+                      trailing: person.checkedIn
+                          ? const Icon(Icons.check_circle_rounded,
+                              color: done, size: 28)
+                          : FilledButton(
+                              onPressed:
+                                  working ? null : () => _tickIn(person),
+                              child: working
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white),
+                                    )
+                                  : const Text('ثبت'),
+                            ),
+                    );
+                  },
+                ),
+              ),
+          ],
         ),
       ),
     );

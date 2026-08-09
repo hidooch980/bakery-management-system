@@ -24,6 +24,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'record-flour-sale',
         'view-own-flour-sales',
         'record-attendance',
+        'record-attendance-for-others',
         'change-password',
         'manage-finance',
         'view-financial-reports',
@@ -98,6 +99,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'record-attendance',
             // Who is in today — the whole floor, not just themselves.
             'view-attendance-reports',
+            // The floor works with flour on their hands and phones in a
+            // locker; the seller is holding one, so they tick people in.
+            'record-attendance-for-others',
             'change-password',
         ]);
 

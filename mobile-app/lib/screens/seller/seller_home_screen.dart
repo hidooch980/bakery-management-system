@@ -232,7 +232,9 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         ],
       ),
       const SizedBox(height: 14),
-      AttendanceCard(api: widget.api),
+      // The seller is the one on the floor holding a phone, so they mark
+      // in the bakers who are not.
+      AttendanceCard(api: widget.api, canRecordForOthers: true),
       const SizedBox(height: 14),
       WorkStartCard(
         api: widget.api,

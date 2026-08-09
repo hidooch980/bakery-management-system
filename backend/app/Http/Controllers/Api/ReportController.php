@@ -222,7 +222,9 @@ class ReportController extends Controller
     {
         [$from, $to] = $this->range($request);
 
-        $records = Attendance::with('user:id,name')
+        // recordedBy comes along so the admin reading the sheet can tell a
+        // tick someone made for themselves from one the seller entered.
+        $records = Attendance::with(['user:id,name', 'recordedBy:id,name'])
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->when($request->query('user_id'), fn ($q, $id) => $q->where('user_id', $id))
             ->orderByDesc('date')

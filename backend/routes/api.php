@@ -64,6 +64,12 @@ Route::prefix('v1')->group(function () {
             Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn']);
             Route::get('/attendance/today', [AttendanceController::class, 'today']);
             Route::get('/attendance/my-history', [AttendanceController::class, 'myHistory']);
+
+            // Whoever is holding a phone ticks in the ones who are not.
+            Route::middleware('permission:record-attendance-for-others')->group(function () {
+                Route::get('/attendance/roster', [AttendanceController::class, 'roster']);
+                Route::post('/attendance/check-in/{user}', [AttendanceController::class, 'checkInFor']);
+            });
         });
 
         // --- Dough maker ---
