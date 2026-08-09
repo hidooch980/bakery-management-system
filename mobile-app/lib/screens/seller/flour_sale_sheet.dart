@@ -105,7 +105,8 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
   double get _quantity =>
       double.tryParse(_quantityController.text.trim()) ?? 0;
 
-  double get _unitPrice => double.tryParse(_priceController.text.trim()) ?? 0;
+  double get _unitPrice =>
+      MoneyFormat.parseInput(_priceController.text.trim()) ?? 0;
 
   double get _weightKg => _unit == FlourUnit.bag
       ? _quantity * (_options?.bagWeightKg ?? 0)
@@ -251,6 +252,7 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
                     controller: _priceController,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: const [GroupedAmountInputFormatter()],
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
                       labelText: 'قیمت هر ${_unit.label} (${_currency.label})',

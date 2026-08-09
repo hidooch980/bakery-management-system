@@ -400,12 +400,12 @@ class FinanceTest extends TestCase
     {
         Bakery::first()->update(['currency' => Money::TOMAN]);
         Money::forgetCache();
-        $this->assertSame('1,000 تومان', Money::format(1000));
+        $this->assertSame('1/000 تومان', Money::format(1000));
 
         Bakery::first()->update(['currency' => Money::RIAL]);
         Money::forgetCache();
         // Stored in Toman, displayed in Rial: ten times the amount.
-        $this->assertSame('10,000 ریال', Money::format(1000));
+        $this->assertSame('10/000 ریال', Money::format(1000));
     }
 
     public function test_admin_can_switch_currency(): void

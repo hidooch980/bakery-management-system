@@ -102,7 +102,10 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
     setState(() => _saving = true);
 
     try {
-      final value = double.parse(_amount.text.trim());
+      // The field carries grouping separators, so it cannot go through
+      // double.parse directly. The validator has already run, so a null here
+      // is not reachable.
+      final value = MoneyFormat.parseInput(_amount.text.trim()) ?? 0;
       final note = _note.text.trim();
 
       final queued = switch (widget.kind) {
@@ -274,13 +277,14 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                   controller: _amount,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: const [GroupedAmountInputFormatter()],
                   decoration: InputDecoration(
                     labelText: _amountLabel,
                     prefixIcon: const Icon(Icons.tag_rounded),
                     suffixText: _amountSuffix,
                   ),
                   validator: (value) {
-                    final parsed = double.tryParse(value?.trim() ?? '');
+                    final parsed = MoneyFormat.parseInput(value?.trim());
                     if (parsed == null) return 'یک عدد معتبر وارد کنید';
                     if (parsed <= 0) return 'مقدار باید بیشتر از صفر باشد';
                     return null;

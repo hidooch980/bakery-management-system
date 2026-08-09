@@ -86,8 +86,15 @@ void main() {
 
   group('MoneyFormat', () {
     test('formats stored Toman in the configured unit', () {
-      expect(MoneyFormat.format(1000), '1,000 تومان');
-      expect(MoneyFormat.format(1000, currency: Currency.rial), '10,000 ریال');
+      expect(MoneyFormat.format(1000), '1/000 تومان');
+      expect(MoneyFormat.format(1000, currency: Currency.rial), '10/000 ریال');
+    });
+
+    test('groups with a slash, the way the shop writes money', () {
+      expect(
+        MoneyFormat.format(10000000, currency: Currency.rial),
+        '100/000/000 ریال',
+      );
     });
 
     test('treats null as zero', () {
@@ -101,8 +108,51 @@ void main() {
     });
 
     test('plain output omits the unit', () {
-      expect(MoneyFormat.plain(1500), '1,500');
-      expect(MoneyFormat.plain(1500, currency: Currency.rial), '15,000');
+      expect(MoneyFormat.plain(1500), '1/500');
+      expect(MoneyFormat.plain(1500, currency: Currency.rial), '15/000');
+    });
+
+    test('reads back what the field shows', () {
+      expect(MoneyFormat.parseInput('100/000/000'), 100000000);
+      expect(MoneyFormat.parseInput('۱۲/۵۰۰'), 12500);
+      expect(MoneyFormat.parseInput('1/250.5'), 1250.5);
+      expect(MoneyFormat.parseInput(''), isNull);
+      expect(MoneyFormat.parseInput(null), isNull);
+    });
+  });
+
+  group('GroupedAmountInputFormatter', () {
+    TextEditingValue typed(String text) => TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+
+    const formatter = GroupedAmountInputFormatter();
+
+    TextEditingValue apply(String text) =>
+        formatter.formatEditUpdate(const TextEditingValue(), typed(text));
+
+    test('groups the whole part as it is typed', () {
+      expect(apply('100000000').text, '100/000/000');
+      expect(apply('1500').text, '1/500');
+      expect(apply('12').text, '12');
+    });
+
+    test('leaves the decimal tail alone', () {
+      expect(apply('1250.75').text, '1/250.75');
+    });
+
+    test('accepts Persian digits from the phone keyboard', () {
+      expect(apply('۱۲۳۴۵۶').text, '123/456');
+    });
+
+    test('keeps the caret at the end while typing', () {
+      final result = apply('100000');
+      expect(result.selection.baseOffset, result.text.length);
+    });
+
+    test('clears to empty rather than showing a stray separator', () {
+      expect(apply('').text, '');
     });
   });
 
@@ -111,7 +161,7 @@ void main() {
       final bakery = Bakery.fromJson({'name': 'x', 'currency': 'rial'});
 
       expect(bakery.currency, Currency.rial);
-      expect(bakery.money(1000), '10,000 ریال');
+      expect(bakery.money(1000), '10/000 ریال');
     });
 
     test('defaults to Toman when the field is absent', () {

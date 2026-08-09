@@ -204,7 +204,7 @@ class SellerAccountTest extends TestCase
         $text = preg_replace('/\s+/u', ' ', strip_tags($component->html()));
 
         // 500,000 plus 200,000 is held by this seller.
-        $this->assertStringContainsString('700,000 تومان', $text);
+        $this->assertStringContainsString('700/000 تومان', $text);
 
         $component->callTableAction('settleSellerAccount', $seller, [
             'paid_cash' => 700_000,

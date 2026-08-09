@@ -44,12 +44,21 @@ class Money
             : $amount;
     }
 
-    /** e.g. "۱٬۲۶۰٬۰۰۰ تومان" — grouped, with the configured unit appended. */
+    /**
+     * The shop writes money the way its ledgers do — 100/000/000, not
+     * 100,000,000. A comma reads as a decimal point to anyone used to those
+     * books, which is the wrong thing to be unsure about on a sum of money.
+     */
+    public const GROUP_SEPARATOR = '/';
+
+    /** e.g. "100/000/000 ریال" — grouped, with the configured unit appended. */
     public static function format(float|int|string|null $toman, ?string $currency = null): string
     {
         $currency ??= self::currency();
 
-        return number_format(self::convert($toman, $currency)).' '.self::label($currency);
+        $grouped = number_format(self::convert($toman, $currency), 0, '.', self::GROUP_SEPARATOR);
+
+        return $grouped.' '.self::label($currency);
     }
 
     /** Converts an amount typed in the display unit back to stored Toman. */

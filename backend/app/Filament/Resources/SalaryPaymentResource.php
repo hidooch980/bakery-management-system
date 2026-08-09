@@ -89,7 +89,8 @@ class SalaryPaymentResource extends Resource
                                 + (float) $get('bonus')
                                 - (float) $get('deduction');
 
-                            return number_format($net).' '.Money::label();
+                            return number_format($net, 0, '.', Money::GROUP_SEPARATOR)
+                                .' '.Money::label();
                         }),
                 ]),
 

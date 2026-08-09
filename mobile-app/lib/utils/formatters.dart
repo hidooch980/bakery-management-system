@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 
@@ -133,22 +134,100 @@ enum Currency {
 class MoneyFormat {
   const MoneyFormat._();
 
-  static final _grouped = NumberFormat.decimalPattern();
+  static final _grouped = NumberFormat.decimalPattern('en');
 
-  /// "۱٬۲۶۰٬۰۰۰ تومان" — grouped, with the configured unit appended.
+  /// The shop writes money the way its ledgers do — 100/000/000, not
+  /// 100,000,000. A comma reads as a decimal point to anyone used to those
+  /// books, which is the wrong thing to be unsure about on a sum of money.
+  static const groupSeparator = '/';
+
+  static String _group(num value) =>
+      _grouped.format(value).replaceAll(',', groupSeparator);
+
+  /// "100/000/000 ریال" — grouped, with the configured unit appended.
   static String format(num? toman, {Currency currency = Currency.toman}) {
     final amount = (toman ?? 0) * currency.multiplier;
 
-    return '${_grouped.format(amount)} ${currency.label}';
+    return '${_group(amount)} ${currency.label}';
   }
 
   /// Grouped digits with no unit, for use inside text fields.
   static String plain(num? toman, {Currency currency = Currency.toman}) {
-    return _grouped.format((toman ?? 0) * currency.multiplier);
+    return _group((toman ?? 0) * currency.multiplier);
   }
 
   /// Converts a figure the user typed in the display unit back to Toman.
   static double toToman(num amount, {Currency currency = Currency.toman}) {
     return amount / currency.multiplier;
+  }
+
+  /// Reads a figure out of a field that [GroupedAmountInputFormatter] has been
+  /// grouping as the user typed.
+  ///
+  /// Separators and Persian digits both have to go: the phones run a Persian
+  /// keyboard, so an amount can arrive as "۱٬۲۶۰٬۰۰۰" and `double.tryParse`
+  /// would call that null and reject a perfectly good entry.
+  static double? parseInput(String? typed) {
+    if (typed == null) return null;
+
+    final bare = _toLatinDigits(typed).replaceAll(RegExp(r'[/,٬\s]'), '');
+
+    return bare.isEmpty ? null : double.tryParse(bare);
+  }
+
+  static String _toLatinDigits(String value) {
+    const persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+    var result = value;
+    for (var i = 0; i < persian.length; i++) {
+      result = result.replaceAll(persian[i], '$i').replaceAll(arabic[i], '$i');
+    }
+
+    return result;
+  }
+}
+
+/// Groups an amount into threes while it is being typed.
+///
+/// In Rial the figures run an extra digit longer than the Toman ones the
+/// shop is used to, and an unbroken "12600000" is read wrong often enough
+/// that entries were being saved off by a factor of ten. Grouping as they
+/// type gives the eye something to count.
+///
+/// The decimal tail is left alone — only the whole part is grouped — and the
+/// caret is kept the same distance from the end of the text, so inserting a
+/// separator does not throw the cursor back to the start.
+class GroupedAmountInputFormatter extends TextInputFormatter {
+  const GroupedAmountInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final bare = MoneyFormat._toLatinDigits(newValue.text)
+        .replaceAll(RegExp(r'[^0-9.]'), '');
+
+    if (bare.isEmpty) return newValue.copyWith(text: '');
+
+    final dot = bare.indexOf('.');
+    final whole = dot == -1 ? bare : bare.substring(0, dot);
+    // Everything after a second dot is dropped; "1.2.3" is not a number.
+    final fraction =
+        dot == -1 ? null : bare.substring(dot + 1).replaceAll('.', '');
+
+    final digits = int.tryParse(whole);
+    final text = StringBuffer(digits == null ? whole : MoneyFormat._group(digits));
+    if (fraction != null) text.write('.$fraction');
+
+    final formatted = text.toString();
+    final fromEnd = newValue.text.length - newValue.selection.baseOffset;
+    final offset = (formatted.length - fromEnd).clamp(0, formatted.length);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: offset),
+    );
   }
 }

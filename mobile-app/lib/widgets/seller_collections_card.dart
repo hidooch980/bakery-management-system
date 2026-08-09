@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
 import '../services/bakery_api.dart';
+import '../utils/formatters.dart';
 import 'common.dart';
 
 typedef _Collections = ({
@@ -66,6 +67,7 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
                 controller: field,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: const [GroupedAmountInputFormatter()],
                 decoration: const InputDecoration(labelText: 'مبلغ دریافتی'),
               ),
               const SizedBox(height: 16),
@@ -103,7 +105,7 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
       ),
     );
 
-    final amount = double.tryParse(field.text.trim()) ?? 0;
+    final amount = MoneyFormat.parseInput(field.text.trim()) ?? 0;
 
     if (ok != true || amount <= 0) return;
 

@@ -4,6 +4,7 @@ import '../models/entries.dart';
 import '../models/seller_account.dart';
 import '../models/settlement_request.dart';
 import '../services/api_client.dart';
+import '../utils/formatters.dart';
 import 'common.dart';
 import '../services/bakery_api.dart';
 
@@ -420,7 +421,7 @@ class _SettlementSplitDialogState extends State<_SettlementSplitDialog> {
   }
 
   double _valueOf(PaymentType type) =>
-      double.tryParse(_fields[type]!.text.trim()) ?? 0;
+      MoneyFormat.parseInput(_fields[type]!.text.trim()) ?? 0;
 
   double get _entered =>
       _types.fold(0.0, (sum, type) => sum + _valueOf(type));
@@ -459,6 +460,7 @@ class _SettlementSplitDialogState extends State<_SettlementSplitDialog> {
                   controller: _fields[type],
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: const [GroupedAmountInputFormatter()],
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     labelText: type.label,
