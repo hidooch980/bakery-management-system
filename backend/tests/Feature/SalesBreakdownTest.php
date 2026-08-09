@@ -83,8 +83,8 @@ class SalesBreakdownTest extends TestCase
 
         $text = $this->widgetText();
 
-        $this->assertStringContainsString('نقد 500,000 تومان 100 نان', $text);
-        $this->assertStringContainsString('کارتخوان 200,000 تومان 40 نان', $text);
+        $this->assertStringContainsString('نقد 500/000 تومان 100 نان', $text);
+        $this->assertStringContainsString('کارتخوان 200/000 تومان 40 نان', $text);
         // A type with no sales today still appears, at zero.
         $this->assertStringContainsString('مدارس 0 تومان 0 نان', $text);
     }
@@ -96,7 +96,7 @@ class SalesBreakdownTest extends TestCase
 
         // 140 loaves across two sales, 700,000 collected.
         $this->assertStringContainsString(
-            'جمع کل فروش 700,000 تومان 140 نان در 2 فقره',
+            'جمع کل فروش 700/000 تومان 140 نان در 2 فقره',
             $this->widgetText()
         );
     }
@@ -108,7 +108,7 @@ class SalesBreakdownTest extends TestCase
         $this->sell('card', 40, 200_000);
 
         $this->assertStringContainsString(
-            'اختلاف 0 تومان نسبت به 700,000 تومان مورد انتظار',
+            'اختلاف 0 تومان نسبت به 700/000 تومان مورد انتظار',
             $this->widgetText()
         );
     }
@@ -119,7 +119,7 @@ class SalesBreakdownTest extends TestCase
         $this->sell('cash', 100, 450_000);
 
         $this->assertStringContainsString(
-            'اختلاف -50,000 تومان نسبت به 500,000 تومان مورد انتظار',
+            'اختلاف -50/000 تومان نسبت به 500/000 تومان مورد انتظار',
             $this->widgetText()
         );
     }
@@ -129,7 +129,7 @@ class SalesBreakdownTest extends TestCase
         // 100 loaves should bring 500,000, but 520,000 was recorded.
         $this->sell('cash', 100, 520_000);
 
-        $this->assertStringContainsString('اختلاف +20,000 تومان', $this->widgetText());
+        $this->assertStringContainsString('اختلاف +20/000 تومان', $this->widgetText());
     }
 
     public function test_yesterdays_sales_do_not_count_towards_today(): void
