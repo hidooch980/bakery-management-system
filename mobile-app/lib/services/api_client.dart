@@ -102,9 +102,44 @@ class ApiClient {
 
   Future<void> clearToken() => _storage.delete(key: _tokenKey);
 
+  /// Identical GETs that overlap in time share one round trip.
+  ///
+  /// A screen builds its widgets independently, so the same figure gets
+  /// asked for more than once as the tree settles — the finance tab was
+  /// fetching the same series twice on every open. Each of those costs a
+  /// full round trip plus ~65ms of server boot, which on a phone over a
+  /// slow link is the difference the shop actually feels.
+  final Map<String, Future<Map<String, dynamic>>> _inFlight = {};
+
   Future<Map<String, dynamic>> get(String path,
-      {Map<String, dynamic>? query}) async {
-    return _unwrap(await _send(() => _dio.get(path, queryParameters: query)));
+      {Map<String, dynamic>? query}) {
+    final key = '$path?${_stableQuery(query)}';
+    final running = _inFlight[key];
+
+    if (running != null) return running;
+
+    final request = _unwrap0(path, query);
+    _inFlight[key] = request;
+
+    // Cleared however it ends, so a failure is retried rather than the
+    // error being handed to every later caller for the life of the app.
+    return request.whenComplete(() => _inFlight.remove(key));
+  }
+
+  Future<Map<String, dynamic>> _unwrap0(
+    String path,
+    Map<String, dynamic>? query,
+  ) async =>
+      _unwrap(await _send(() => _dio.get(path, queryParameters: query)));
+
+  /// Query keys sorted, so the same parameters in a different order are
+  /// recognised as the same request.
+  static String _stableQuery(Map<String, dynamic>? query) {
+    if (query == null || query.isEmpty) return '';
+
+    final keys = query.keys.toList()..sort();
+
+    return [for (final k in keys) '$k=${query[k]}'].join('&');
   }
 
   Future<Map<String, dynamic>> post(String path, [Map<String, dynamic>? body]) async {
