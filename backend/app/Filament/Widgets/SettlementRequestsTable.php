@@ -63,6 +63,12 @@ class SettlementRequestsTable extends BaseWidget
                 Tables\Columns\TextColumn::make('amount')
                     ->label('جمع اعلامی')
                     ->formatStateUsing(fn ($state) => Money::format((float) $state))
+                    // A partial handover leaves the rest owed, and the admin
+                    // confirming it should know that before they agree —
+                    // otherwise they read it as the account clearing.
+                    ->description(fn (SettlementRequest $record) => $record->sale_ids
+                        ? 'تسویه جزئی — '.count($record->sale_ids).' مورد از حساب'
+                        : 'کل حساب')
                     ->weight('bold')
                     ->badge()
                     ->color('warning'),

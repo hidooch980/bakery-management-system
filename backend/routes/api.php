@@ -99,6 +99,9 @@ Route::prefix('v1')->group(function () {
             Route::post('/my-collections/{customer}/collect', [SellerCollectionController::class, 'collect']);
 
             Route::get('/settlement-requests', [SettlementRequestController::class, 'index']);
+            // The open debts, one line each, for a seller handing over only
+            // part of what they owe.
+            Route::get('/settlement-requests/settleable', [SettlementRequestController::class, 'settleable']);
             Route::post('/settlement-requests', [SettlementRequestController::class, 'store']);
         });
 

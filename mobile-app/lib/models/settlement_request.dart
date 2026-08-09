@@ -51,3 +51,35 @@ class SettlementRequest {
         paidCardFormatted: json['paid_card_formatted'] as String?,
       );
 }
+
+/// One open debt the seller may hand over. They tick the ones this money
+/// covers rather than settling the whole account at once.
+class SettleableLine {
+  const SettleableLine({
+    required this.id,
+    required this.amount,
+    required this.amountFormatted,
+    required this.paymentLabel,
+    this.soldOnDisplay,
+    this.customer,
+  });
+
+  final int id;
+
+  /// Kept as a number so the sheet can total the ticked lines without
+  /// parsing the formatted string back apart.
+  final double amount;
+  final String amountFormatted;
+  final String paymentLabel;
+  final String? soldOnDisplay;
+  final String? customer;
+
+  factory SettleableLine.fromJson(Map<String, dynamic> json) => SettleableLine(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        amount: (json['amount'] as num?)?.toDouble() ?? 0,
+        amountFormatted: '${json['amount_formatted'] ?? ''}',
+        paymentLabel: '${json['payment_label'] ?? ''}',
+        soldOnDisplay: json['sold_on_display'] as String?,
+        customer: json['customer'] as String?,
+      );
+}

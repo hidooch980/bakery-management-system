@@ -290,11 +290,15 @@ class BakeryApi {
     double? paidCash,
     double? paidCard,
     Map<PaymentType, double>? payments,
+    List<int>? saleIds,
   }) async {
     final body = await _client.post('/settlement-requests', {
       if (note != null && note.isNotEmpty) 'note': note,
       if (paidCash != null) 'paid_cash': paidCash,
       if (paidCard != null) 'paid_card': paidCard,
+      // Naming the debts settles only those. Sending none means the whole
+      // account, which is what the app did before this existed.
+      if (saleIds != null && saleIds.isNotEmpty) 'sale_ids': saleIds,
       // An amount per payment type, so the admin counts what the seller
       // counted out rather than one lump sum.
       if (payments != null && payments.isNotEmpty)
@@ -323,6 +327,22 @@ class BakeryApi {
           .cast<Map<String, dynamic>>()
           .map(SettlementRequest.fromJson)
           .toList(),
+    );
+  }
+
+  /// The open debts the seller may hand over, one line each, so they can
+  /// settle part of the account instead of all of it.
+  Future<({List<SettleableLine> lines, String totalFormatted})>
+      settleableLines() async {
+    final body = await _client.get('/settlement-requests/settleable');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return (
+      lines: ((data['lines'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(SettleableLine.fromJson)
+          .toList(),
+      totalFormatted: '${data['total_formatted'] ?? ''}',
     );
   }
 

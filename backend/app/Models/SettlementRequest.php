@@ -29,6 +29,7 @@ class SettlementRequest extends Model
         'paid_cash',
         'paid_card',
         'paid_breakdown',
+        'sale_ids',
         'bank_account_id',
         'note',
         'confirmed_at',
@@ -47,6 +48,9 @@ class SettlementRequest extends Model
             'paid_cash' => 'decimal:2',
             'paid_card' => 'decimal:2',
             'paid_breakdown' => 'array',
+            // Null means the whole account, which is what every request
+            // made before partial settlement existed meant.
+            'sale_ids' => 'array',
             'confirmed_at' => 'datetime',
             'rejected_at' => 'datetime',
         ];

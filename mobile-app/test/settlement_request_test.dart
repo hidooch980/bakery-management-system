@@ -51,4 +51,41 @@ void main() {
       expect(request.rejectionReason, isNull);
     });
   });
+
+  group('SettleableLine', () {
+    test('reads one open debt the seller could hand over', () {
+      final line = SettleableLine.fromJson({
+        'id': 12,
+        'amount': 300000,
+        'amount_formatted': '۳۰۰/۰۰۰ تومان',
+        'payment_type': 'cash',
+        'payment_label': 'نقدی',
+        'sold_on_display': '۱۴۰۵/۰۵/۰۳ ۰۹:۱۰',
+        'customer': 'مدرسه شهید بهشتی',
+      });
+
+      expect(line.id, 12);
+      expect(line.amount, 300000);
+      expect(line.paymentLabel, 'نقدی');
+      expect(line.customer, 'مدرسه شهید بهشتی');
+    });
+
+    test('keeps the amount as a number so ticked lines can be totalled', () {
+      // The picker sums the selection itself rather than parsing the
+      // formatted string back apart.
+      final lines = [
+        SettleableLine.fromJson({'id': 1, 'amount': 300000}),
+        SettleableLine.fromJson({'id': 2, 'amount': 200000}),
+      ];
+
+      expect(lines.fold<double>(0, (sum, l) => sum + l.amount), 500000);
+    });
+
+    test('survives a line with nothing but an id', () {
+      final line = SettleableLine.fromJson({'id': 9});
+
+      expect(line.amount, 0);
+      expect(line.customer, isNull);
+    });
+  });
 }

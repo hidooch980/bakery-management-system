@@ -19,13 +19,16 @@ use Illuminate\Support\Facades\DB;
  */
 class SellerSettlement
 {
-    /** What the seller can hand over today, by component. */
-    public static function outstandingFor(User $seller): array
+    /**
+     * What the seller can hand over today, by component.
+     *
+     * @param  array<int>|null  $saleIds  Restricts the figure to these sales,
+     *                                    for a seller settling only part of
+     *                                    what they owe. Null means all of it.
+     */
+    public static function outstandingFor(User $seller, ?array $saleIds = null): array
     {
-        $sales = Sale::query()
-            ->where('user_id', $seller->id)
-            ->sellerAccountOutstanding()
-            ->get();
+        $sales = self::outstandingSales($seller, $saleIds)->get();
 
         $cash = round($sales->sum(fn (Sale $s) => $s->cash_held), 2);
         $difference = round($sales->sum(fn (Sale $s) => $s->open_difference), 2);
@@ -43,26 +46,57 @@ class SellerSettlement
     }
 
     /**
-     * Marks everything the seller can settle as settled. Credit is left
-     * alone deliberately — see the class comment.
+     * The seller's open sales, newest first, optionally narrowed to a
+     * chosen few.
+     *
+     * The id filter is applied to the seller's own rows only, so a seller
+     * cannot reach another's sale by putting its id in the request.
+     *
+     * @param  array<int>|null  $saleIds
      */
-    public static function settle(User $seller): void
+    public static function outstandingSales(User $seller, ?array $saleIds = null)
     {
-        DB::transaction(function () use ($seller) {
-            Sale::query()
+        $query = Sale::query()
+            ->where('user_id', $seller->id)
+            ->sellerAccountOutstanding();
+
+        if ($saleIds !== null) {
+            $query->whereIn('id', $saleIds);
+        }
+
+        return $query->latest('sold_at');
+    }
+
+    /**
+     * Marks what the seller can settle as settled. Credit is left alone
+     * deliberately — see the class comment.
+     *
+     * @param  array<int>|null  $saleIds  Only these sales are closed, for a
+     *                                    partial handover. Null closes all.
+     */
+    public static function settle(User $seller, ?array $saleIds = null): void
+    {
+        DB::transaction(function () use ($seller, $saleIds) {
+            $cash = Sale::query()
                 ->where('user_id', $seller->id)
                 ->whereNull('cash_settled_on')
                 ->where(function ($q) {
                     $q->whereIn('payment_type', Sale::CASH_TYPES)
                         ->orWhere('amount_difference', '!=', 0);
-                })
-                ->update(['cash_settled_on' => now()]);
+                });
 
-            Sale::query()
+            $shortfall = Sale::query()
                 ->where('user_id', $seller->id)
                 ->whereNull('shortfall_settled_on')
-                ->where('shortfall_count', '>', 0)
-                ->update(['shortfall_settled_on' => now()]);
+                ->where('shortfall_count', '>', 0);
+
+            if ($saleIds !== null) {
+                $cash->whereIn('id', $saleIds);
+                $shortfall->whereIn('id', $saleIds);
+            }
+
+            $cash->update(['cash_settled_on' => now()]);
+            $shortfall->update(['shortfall_settled_on' => now()]);
         });
     }
 
@@ -78,6 +112,8 @@ class SellerSettlement
      * @param  mixed  $source  What the movement is recorded against — a
      *                         settlement request, or null when an admin
      *                         settled the account directly.
+     * @param  array<int>|null  $saleIds  Only these sales are closed, for a
+     *                                    partial handover. Null closes all.
      * @return BankAccount|null The account the card share went to, if any.
      */
     public static function settleWithMethod(
@@ -86,9 +122,10 @@ class SellerSettlement
         float $card,
         ?BankAccount $account = null,
         mixed $source = null,
+        ?array $saleIds = null,
     ): ?BankAccount {
-        return DB::transaction(function () use ($seller, $admin, $card, $account, $source) {
-            self::settle($seller);
+        return DB::transaction(function () use ($seller, $admin, $card, $account, $source, $saleIds) {
+            self::settle($seller, $saleIds);
 
             $account ??= BankAccount::where('is_default', true)->first();
 
@@ -118,12 +155,15 @@ class SellerSettlement
         ?BankAccount $account = null,
     ): void {
         DB::transaction(function () use ($request, $admin, $account) {
+            // A request that named its sales closes only those; one from an
+            // older copy of the app named none and still means all of them.
             $banked = self::settleWithMethod(
                 $request->user,
                 $admin,
                 (float) $request->paid_card,
                 $account,
                 $request,
+                $request->sale_ids,
             );
 
             $request->update([

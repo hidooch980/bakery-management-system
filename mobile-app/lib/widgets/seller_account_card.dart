@@ -59,11 +59,24 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
   }
 
   Future<void> _requestSettlement() async {
+    // A seller who cannot hand over the whole account today ticks the debts
+    // this money covers. Settling the lot is still one tap: everything
+    // starts ticked.
+    final chosen = await showDialog<_ChosenDebts>(
+      context: context,
+      builder: (_) => _SettleablePicker(api: widget.api),
+    );
+
+    if (chosen == null || !mounted) return;
+
     // Cash and card clear the same debt but land in different places, so
     // the seller says how the handover was split before it is sent.
     final split = await showDialog<Map<PaymentType, double>>(
       context: context,
-      builder: (_) => _SettlementSplitDialog(account: _account!),
+      builder: (_) => _SettlementSplitDialog(
+        owed: chosen.total,
+        owedFormatted: MoneyFormat.format(chosen.total),
+      ),
     );
 
     if (split == null || !mounted) return;
@@ -71,7 +84,12 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
     setState(() => _sending = true);
 
     try {
-      await widget.api.requestSettlement(payments: split);
+      await widget.api.requestSettlement(
+        payments: split,
+        // Null when every line was ticked, so the server settles the whole
+        // account the way it always did.
+        saleIds: chosen.isEverything ? null : chosen.ids,
+      );
 
       if (!mounted) return;
       showMessage(context, 'درخواست تسویه ثبت شد و در انتظار تأیید مدیر است.');
@@ -381,15 +399,189 @@ class _RejectionNotice extends StatelessWidget {
 }
 
 
+/// The debts the seller picked, and what they add up to.
+class _ChosenDebts {
+  const _ChosenDebts({
+    required this.ids,
+    required this.total,
+    required this.isEverything,
+  });
+
+  final List<int> ids;
+  final double total;
+
+  /// Every open line was ticked, so the request can leave the ids out and
+  /// settle the whole account — the same thing an older app sends.
+  final bool isEverything;
+}
+
+/// Lets the seller tick the debts this money covers.
+///
+/// A seller who has 500,000 to hand over against an 800,000 account used to
+/// have to hand over all of it or none. They now settle what they can, and
+/// the rest stays on their account rather than quietly clearing.
+class _SettleablePicker extends StatefulWidget {
+  const _SettleablePicker({required this.api});
+
+  final BakeryApi api;
+
+  @override
+  State<_SettleablePicker> createState() => _SettleablePickerState();
+}
+
+class _SettleablePickerState extends State<_SettleablePicker> {
+  List<SettleableLine>? _lines;
+  final Set<int> _ticked = {};
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final result = await widget.api.settleableLines();
+
+      if (!mounted) return;
+      setState(() {
+        _lines = result.lines;
+        // Settling everything is the common case, so it stays one tap.
+        _ticked
+          ..clear()
+          ..addAll(result.lines.map((l) => l.id));
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    }
+  }
+
+  double get _total => (_lines ?? const <SettleableLine>[])
+      .where((l) => _ticked.contains(l.id))
+      .fold(0.0, (sum, l) => sum + l.amount);
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final lines = _lines;
+
+    return AlertDialog(
+      title: const Text('چه چیزی را تسویه می‌کنید؟'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: switch ((lines, _error)) {
+          (_, final String message) => Text(message),
+          (null, _) => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          (final List<SettleableLine> found, _) when found.isEmpty =>
+            const Text('مبلغی برای تسویه وجود ندارد.'),
+          (final List<SettleableLine> found, _) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => setState(() => _ticked
+                        ..clear()
+                        ..addAll(found.map((l) => l.id))),
+                      child: const Text('همه'),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(_ticked.clear),
+                      child: const Text('هیچ‌کدام'),
+                    ),
+                  ],
+                ),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: found.length,
+                    itemBuilder: (_, i) {
+                      final line = found[i];
+
+                      return CheckboxListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: _ticked.contains(line.id),
+                        onChanged: (on) => setState(() {
+                          if (on ?? false) {
+                            _ticked.add(line.id);
+                          } else {
+                            _ticked.remove(line.id);
+                          }
+                        }),
+                        title: Text(line.amountFormatted),
+                        subtitle: Text(
+                          [
+                            line.paymentLabel,
+                            if (line.customer != null) line.customer!,
+                            if (line.soldOnDisplay != null) line.soldOnDisplay!,
+                          ].join(' · '),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const Divider(),
+                Row(
+                  children: [
+                    const Expanded(child: Text('جمع انتخابی')),
+                    Text(
+                      MoneyFormat.format(_total),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('انصراف'),
+        ),
+        FilledButton(
+          onPressed: _ticked.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(
+                    _ChosenDebts(
+                      ids: _ticked.toList(),
+                      total: _total,
+                      isEverything: _ticked.length == (lines?.length ?? 0),
+                    ),
+                  ),
+          child: const Text('ادامه'),
+        ),
+      ],
+    );
+  }
+}
+
 /// Asks the seller how the handover was made, type by type.
 ///
 /// The shop settles in more ways than one — some by hand, some through the
 /// reader, some left at the house — and the admin counting it wants the
 /// same breakdown the seller counted out, not one lump sum.
 class _SettlementSplitDialog extends StatefulWidget {
-  const _SettlementSplitDialog({required this.account});
+  const _SettlementSplitDialog({
+    required this.owed,
+    required this.owedFormatted,
+  });
 
-  final SellerAccount account;
+  /// What this handover covers. The whole account when the seller settled
+  /// the lot, or the ticked lines when they settled part of it.
+  final double owed;
+  final String owedFormatted;
 
   @override
   State<_SettlementSplitDialog> createState() => _SettlementSplitDialogState();
@@ -406,8 +598,8 @@ class _SettlementSplitDialogState extends State<_SettlementSplitDialog> {
       type: TextEditingController(
         // The usual case is the whole amount in cash, so only the
         // exceptions have to be typed.
-        text: type == PaymentType.cash && widget.account.settleable > 0
-            ? widget.account.settleable.toStringAsFixed(0)
+        text: type == PaymentType.cash && widget.owed > 0
+            ? widget.owed.toStringAsFixed(0)
             : '',
       ),
   };
@@ -429,7 +621,7 @@ class _SettlementSplitDialogState extends State<_SettlementSplitDialog> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final owed = widget.account.settleable;
+    final owed = widget.owed;
     final mismatch = (_entered - owed).abs() > 0.5;
 
     return AlertDialog(
@@ -440,7 +632,7 @@ class _SettlementSplitDialogState extends State<_SettlementSplitDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'مبلغ قابل تسویه: ${widget.account.settleableFormatted}',
+              'مبلغ قابل تسویه: ${widget.owedFormatted}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
