@@ -64,7 +64,7 @@ class SellerSettlement
             $query->whereIn('id', $saleIds);
         }
 
-        return $query->latest('sold_at');
+        return $query->latest();
     }
 
     /**

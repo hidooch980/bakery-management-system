@@ -39,7 +39,7 @@ class SellerWorksTheWholeFloorTest extends TestCase
     public function test_the_seller_can_record_the_dough_they_kneaded(): void
     {
         $this->actingAs($this->seller, 'sanctum')
-            ->postJson('/api/v1/dough-entries', ['bags' => 2])
+            ->postJson('/api/v1/dough-entries', ['bag_count' => 2])
             ->assertCreated();
     }
 
@@ -55,7 +55,7 @@ class SellerWorksTheWholeFloorTest extends TestCase
     public function test_the_seller_can_record_the_chane_they_shaped(): void
     {
         $this->actingAs($this->seller, 'sanctum')
-            ->postJson('/api/v1/dough-entries', ['bags' => 2])
+            ->postJson('/api/v1/dough-entries', ['bag_count' => 2])
             ->assertCreated();
 
         $pending = $this->actingAs($this->seller, 'sanctum')

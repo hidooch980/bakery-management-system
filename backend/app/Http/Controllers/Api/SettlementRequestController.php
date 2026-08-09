@@ -192,7 +192,7 @@ class SettlementRequestController extends Controller
                 'amount_formatted' => Money::format($sale->seller_account_amount),
                 'payment_type' => $sale->payment_type,
                 'payment_label' => SaleResource::PAYMENT_LABELS[$sale->payment_type] ?? $sale->payment_type,
-                'sold_on_display' => AppCalendar::dateTime($sale->sold_at),
+                'sold_on_display' => AppCalendar::dateTime($sale->created_at),
                 'customer' => $sale->customer?->name,
                 // What the line is made of, so the seller can tell a cash
                 // sale apart from bread nobody paid for.
