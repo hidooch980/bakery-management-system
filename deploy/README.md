@@ -60,6 +60,36 @@ curl -s http://194.5.176.140:8000/api/v1/health
 sudo systemctl stop nginx && sudo systemctl enable --now bakery.service
 ```
 
+## پشتیبان‌ها
+
+سرور هر شب ساعت ۲ یک نسخه می‌گیرد (`backup:database`، نگهداری ۳۰ روز). آن
+نسخه‌ها روی **همان دیسکی** هستند که دیتابیس روی آن است، پس اگر آن دیسک برود
+همه با هم می‌روند.
+
+[pull-backups.ps1](pull-backups.ps1) روی ویندوز مدیر همین نسخه‌ها را هر شب
+ساعت ۹ می‌کشد و در `D:\aziz\backups` نگه می‌دارد. جهت **کشیدن** است نه
+فرستادن: سرور به کامپیوتر پشت مودم خانگی دسترسی ندارد.
+
+هر فایل بعد از انتقال باز می‌شود تا از سالم بودنش مطمئن شویم؛ کپی ناقص دور
+انداخته می‌شود تا دفعه‌ی بعد دوباره کشیده شود. یک آرشیو خرابِ خوش‌نام، تا روزی
+که به آن نیاز باشد بی‌سروصدا سالم به نظر می‌رسد.
+
+اجرای دستی:
+
+```bash
+powershell -ExecutionPolicy Bypass -File deploy/pull-backups.ps1
+```
+
+آزمودن اینکه یک نسخه واقعاً برمی‌گردد — روی دیتابیس موقت، نه روی `bakery_db`:
+
+```bash
+mysql -e 'CREATE DATABASE bakery_restore_check' && gunzip -c backend/storage/app/backups/آخرین.sql.gz | mysql bakery_restore_check
+```
+
+> ارسال ایمیلِ پشتیبان با `--no-mail` خاموش است چون رمز SMTP پذیرفته نمی‌شود
+> (`535 BadCredentials`). با یک رمز معتبر در `MAIL_PASSWORD` و برداشتن
+> `--no-mail` از crontab دوباره کار می‌کند.
+
 ## بعد از هر بار فرستادن کد تازه
 
 ```bash
