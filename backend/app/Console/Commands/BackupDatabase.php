@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\MailSetting;
 use App\Support\Jalali;
+use App\Support\MailConfigurator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\Process\Process;
@@ -109,16 +111,30 @@ class BackupDatabase extends Command
 
     private function mail(string $path, int $size): void
     {
-        $recipients = (array) config('backup.mail_to');
+        // The panel is the source of truth now; .env is the fallback for an
+        // install whose admin has not opened the mail page yet.
+        $settings = MailSetting::query()->first();
 
-        if ($recipients === []) {
-            $this->warn('BACKUP_MAIL_TO تنظیم نشده — فایل فقط روی دیسک ماند.');
+        if ($settings && ! $settings->backup_mail_enabled) {
+            $this->line('ارسال شبانه در پنل خاموش است — فایل فقط روی دیسک ماند.');
 
             return;
         }
 
-        if (config('mail.default') === 'log') {
-            $this->warn('MAIL_MAILER روی log است؛ نامه ارسال نمی‌شود. تنظیمات SMTP را وارد کنید.');
+        $configured = MailConfigurator::apply();
+
+        $recipients = $settings && $settings->recipients() !== []
+            ? $settings->recipients()
+            : (array) config('backup.mail_to');
+
+        if ($recipients === []) {
+            $this->warn('گیرنده‌ای تنظیم نشده — فایل فقط روی دیسک ماند.');
+
+            return;
+        }
+
+        if (! $configured && config('mail.default') === 'log') {
+            $this->warn('سرور ایمیل تنظیم نشده؛ نامه ارسال نمی‌شود. صفحه‌ی «سرور ایمیل» در پنل را پر کنید.');
 
             return;
         }
