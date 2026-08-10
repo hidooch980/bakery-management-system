@@ -33,6 +33,11 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Gradle writes here, and /build/ above only covers the root one — a
+# problems report from someone's local build had already been committed.
+/android/build/
+/android/.gradle/
+
 # Symbolication related
 app.*.symbols
 
