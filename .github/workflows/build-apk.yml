@@ -138,9 +138,22 @@ jobs:
           # abi * 1000 + base, so a phone that installed the arm64 file
           # could never install a universal one again — Android reads the
           # lower versionCode as a downgrade and refuses it.
+          #
+          # Two ARM targets rather than three platforms: x86_64 is emulators
+          # and a handful of Chromebooks, none of which are in the shop, and
+          # it was a third of the native payload. Staff download this over
+          # mobile data, so the size is a cost they actually pay.
+          #
+          # Obfuscation is here for the same reason — it strips the Dart
+          # symbol table out of the binary. The symbols are kept as an
+          # artifact so a future crash report can still be read.
           flutter build apk --release \
+            --target-platform android-arm,android-arm64 \
+            --obfuscate --split-debug-info=build/symbols \
             --dart-define=API_BASE_URL=${{ steps.config.outputs.api_base_url }} \
             --dart-define=UPDATE_REPO=${{ github.repository }}
+
+          echo "APK size: $(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)"
 
       - name: Verify the APK is signed with the release key
         working-directory: mobile-app
@@ -173,6 +186,16 @@ jobs:
           name: bakery-app-apk
           path: ${{ steps.apk.outputs.path }}
           retention-days: 30
+
+      # An obfuscated binary reports crashes as hex addresses. Without the
+      # matching symbols kept from the build that produced it, a stack trace
+      # from a staff phone is unreadable.
+      - name: Upload debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: bakery-app-symbols${{ steps.config.outputs.release_tag && format('-{0}', steps.config.outputs.release_tag) || '' }}
+          path: mobile-app/build/symbols
+          retention-days: 90
 
       - name: Publish GitHub Release
         if: steps.config.outputs.release_tag != ''
