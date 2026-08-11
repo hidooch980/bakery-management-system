@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Support\CurrentBakery;
+use App\Support\Money;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use RuntimeException;
 
@@ -23,6 +24,12 @@ abstract class TestCase extends BaseTestCase
         // Held statically for the life of a request; a test process runs
         // many, against a database that is wiped between them.
         CurrentBakery::forget();
+
+        // Same reason. A test that switches the shop to Rial leaves the unit
+        // cached in this process while the next test gets a fresh database
+        // saying Toman — so amounts came back ten times over in a test that
+        // had never mentioned Rial.
+        Money::forgetCache();
 
         $connection = config('database.default');
         $database = config("database.connections.{$connection}.database");
