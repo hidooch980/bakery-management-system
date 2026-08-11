@@ -137,7 +137,7 @@ class SalaryController extends Controller
             ->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
-                'monthly_salary' => (float) $u->monthly_salary,
+                'monthly_salary' => Money::convert($u->monthly_salary),
                 'monthly_salary_formatted' => Money::format($u->monthly_salary),
             ]);
 
@@ -151,10 +151,13 @@ class SalaryController extends Controller
             'user' => $payment->relationLoaded('user') ? $payment->user?->only(['id', 'name']) : null,
             'period_start' => $payment->period_start?->toDateString(),
             'period_label' => $payment->period_label,
-            'base_amount' => (float) $payment->base_amount,
-            'bonus' => (float) $payment->bonus,
-            'deduction' => (float) $payment->deduction,
-            'net_amount' => (float) $payment->net_amount,
+            // In the display unit, matching what was typed. The stored
+            // figures are Toman; handing those back put the wrong numbers
+            // into a Rial shop's edit form.
+            'base_amount' => Money::convert($payment->base_amount),
+            'bonus' => Money::convert($payment->bonus),
+            'deduction' => Money::convert($payment->deduction),
+            'net_amount' => Money::convert($payment->net_amount),
             'net_amount_formatted' => Money::format($payment->net_amount),
             'paid_on' => $payment->paid_on?->toDateString(),
             'paid_on_jalali' => Jalali::date($payment->paid_on),

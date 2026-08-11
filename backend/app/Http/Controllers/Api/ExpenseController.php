@@ -136,7 +136,10 @@ class ExpenseController extends Controller
             'category' => $expense->category,
             'category_label' => $expense->category_label,
             'title' => $expense->title,
-            'amount' => (float) $expense->amount,
+            // In the display unit, matching what was typed and what every
+            // other endpoint returns. Handing back the stored Toman figure
+            // put the wrong number into the edit form of a Rial shop.
+            'amount' => Money::convert($expense->amount),
             'amount_formatted' => Money::format($expense->amount),
             'spent_on' => $expense->spent_on?->toDateString(),
             'spent_on_jalali' => $expense->spent_on_jalali,
