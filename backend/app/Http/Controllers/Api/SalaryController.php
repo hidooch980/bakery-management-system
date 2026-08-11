@@ -62,9 +62,11 @@ class SalaryController extends Controller
             'user_id' => $data['user_id'],
             'period_start' => $periodStart,
             'period_label' => Jalali::monthLabel($periodStart),
-            'base_amount' => $data['base_amount'],
-            'bonus' => $data['bonus'] ?? 0,
-            'deduction' => $data['deduction'] ?? 0,
+            // Typed in the shop's display unit, stored in Toman. A shop set
+            // to Rial was having every payslip saved ten times over.
+            'base_amount' => Money::toToman($data['base_amount']),
+            'bonus' => Money::toToman($data['bonus'] ?? 0),
+            'deduction' => Money::toToman($data['deduction'] ?? 0),
             'paid_on' => Jalali::parseFlexible($data['paid_on'] ?? null),
             'note' => $data['note'] ?? null,
         ]);
@@ -84,6 +86,12 @@ class SalaryController extends Controller
 
         if (array_key_exists('paid_on', $data)) {
             $data['paid_on'] = Jalali::parseFlexible($data['paid_on']);
+        }
+
+        foreach (['base_amount', 'bonus', 'deduction'] as $field) {
+            if (isset($data[$field])) {
+                $data[$field] = Money::toToman($data[$field]);
+            }
         }
 
         $salary->update($data);

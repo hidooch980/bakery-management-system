@@ -48,7 +48,11 @@ class ExpenseController extends Controller
             'user_id' => $request->user()->id,
             'category' => $data['category'],
             'title' => $data['title'],
-            'amount' => $data['amount'],
+            // Typed in whatever unit the shop is set to, stored in Toman.
+            // Without this a shop working in Rial had its costs saved ten
+            // times over: the figure went in raw and came back out through
+            // the display conversion, one zero longer every time it was read.
+            'amount' => Money::toToman($data['amount']),
             // Accepts either a Jalali date or a Gregorian one; defaults to today.
             'spent_on' => Jalali::parseFlexible($data['spent_on'] ?? null) ?? now(),
             'note' => $data['note'] ?? null,
@@ -75,6 +79,10 @@ class ExpenseController extends Controller
 
         if (isset($data['spent_on'])) {
             $data['spent_on'] = Jalali::parseFlexible($data['spent_on']) ?? $expense->spent_on;
+        }
+
+        if (isset($data['amount'])) {
+            $data['amount'] = Money::toToman($data['amount']);
         }
 
         $expense->update($data);
