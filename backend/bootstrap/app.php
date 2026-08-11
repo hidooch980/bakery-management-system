@@ -33,9 +33,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // Keep every API failure in the same envelope the controllers use.
         $exceptions->render(function (ValidationException $e, Request $request) {
             if ($request->is('api/*')) {
+                // The first real message rather than a fixed sentence. The
+                // app shows `message` and nothing else, so replacing it
+                // threw away the only useful part: a seller with the wrong
+                // password was told the app had sent invalid data, which
+                // reads as a broken app rather than a typo.
+                $first = collect($e->errors())->flatten()->first();
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'اطلاعات ارسالی نامعتبر است.',
+                    'message' => $first ?: 'اطلاعات ارسالی نامعتبر است.',
                     'errors' => $e->errors(),
                 ], 422);
             }

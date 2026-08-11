@@ -15,7 +15,12 @@ param(
     [string]$User        = 'root',
     [string]$RemoteDir   = '/home/ubuntu/bakery-management-system/backend/storage/app/backups',
     # Roughly a month, matching what the server keeps.
-    [int]   $Keep        = 30
+    [int]   $Keep        = 30,
+    # Named outright rather than left to ssh-agent. The agent belongs to a
+    # logged-in desktop session; Task Scheduler has none, so the first
+    # nightly run authenticated against nothing and exited having copied
+    # nothing — while reporting only an exit code nobody was reading.
+    [string]$KeyFile     = "$env:USERPROFILE\.ssh\id_ed25519_new"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,8 +59,25 @@ if (-not (Test-Path $Destination)) {
 
 $target = "$User@$ServerHost"
 
+if (-not (Test-Path $KeyFile)) {
+    Say "no ssh key at $KeyFile - cannot reach the server"
+    exit 1
+}
+
+# IdentitiesOnly stops ssh wandering off to the agent or to default key
+# names; IdentityAgent=none makes the scheduled run behave the same way as
+# a desktop one, rather than passing by luck when someone happens to be
+# logged in.
+$sshArgs = @(
+    '-i', $KeyFile,
+    '-o', 'IdentitiesOnly=yes',
+    '-o', 'IdentityAgent=none',
+    '-o', 'BatchMode=yes',
+    '-o', 'ConnectTimeout=20'
+)
+
 Say 'asking the server what it has'
-$remote = & ssh -p $Port -o BatchMode=yes -o ConnectTimeout=20 $target "ls -1 $RemoteDir/*.sql.gz 2>/dev/null"
+$remote = & ssh -p $Port @sshArgs $target "ls -1 $RemoteDir/*.sql.gz 2>/dev/null"
 
 if ($LASTEXITCODE -ne 0 -or -not $remote) {
     Say 'could not reach the server, or it has no backups yet'
@@ -79,7 +101,7 @@ foreach ($path in $remote) {
         continue
     }
 
-    & scp -P $Port -o BatchMode=yes "${target}:$path" $local 2>&1 | Out-Null
+    & scp -P $Port @sshArgs "${target}:$path" $local 2>&1 | Out-Null
 
     if (-not (Test-Path $local)) {
         Say "FAILED to copy $name"
