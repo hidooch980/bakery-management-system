@@ -54,7 +54,10 @@ class RialAmountsSurviveTheRoundTripTest extends TestCase
                 'amount' => 1_000_000,
             ])
             ->assertCreated()
-            ->assertJsonPath('data.amount', 1_000_000.0);
+            // Compared as a number: JSON carries 1000000 with no decimal
+            // point, so a float literal here fails on type alone while the
+            // figure is right.
+            ->assertJsonPath('data.amount', fn ($value) => (float) $value === 1_000_000.0);
     }
 
     public function test_and_is_stored_in_toman_underneath(): void
@@ -87,7 +90,7 @@ class RialAmountsSurviveTheRoundTripTest extends TestCase
         $this->actingAs($this->admin, 'sanctum')
             ->putJson("/api/v1/expenses/{$expense->id}", ['amount' => 2_000_000])
             ->assertOk()
-            ->assertJsonPath('data.amount', 2_000_000.0);
+            ->assertJsonPath('data.amount', fn ($value) => (float) $value === 2_000_000.0);
 
         $this->assertEquals(200_000.0, (float) $expense->fresh()->amount);
     }
