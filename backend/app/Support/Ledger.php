@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Bakery;
 use App\Models\Expense;
+use App\Models\FlourPrice;
 use App\Models\FlourSale;
 use App\Models\Income;
 use App\Models\InventoryItem;
@@ -86,25 +87,42 @@ class Ledger
      */
     public static function flourConsumedCost(Carbon $from, Carbon $to): float
     {
-        $bakery = Bakery::query()->first();
-        $perKg = (float) ($bakery?->flour_purchase_price_per_kg ?? 0);
-
-        if ($perKg <= 0) {
-            return 0.0;
-        }
-
         // Kneading spends flour as 'production' and dusting the chane as
         // 'spray'; both end up in the bread. A withdrawal for any other
         // reason — a sale, a loan to a partner — is not bread and carries
         // its own cost elsewhere.
-        $kg = (float) InventoryMovement::query()
+        $movements = InventoryMovement::query()
             ->whereHas('item', fn ($q) => $q->where('key', InventoryItem::FLOUR))
             ->where('direction', 'out')
             ->whereIn('reason', ['production', 'spray'])
             ->whereBetween('created_at', [$from, $to])
-            ->sum('quantity');
+            ->get(['quantity', 'created_at']);
 
-        return round($kg * $perKg, 2);
+        if ($movements->isEmpty()) {
+            return 0.0;
+        }
+
+        // Each bake at the price in force the day it happened, so a price
+        // rise today cannot reach back and change what last month's bread
+        // cost to make. The prices are read once per distinct day rather
+        // than per movement — a busy day is many movements and one price.
+        $prices = [];
+        $total = 0.0;
+
+        foreach ($movements as $movement) {
+            $day = $movement->created_at->toDateString();
+
+            if (! array_key_exists($day, $prices)) {
+                $prices[$day] = FlourPrice::onDate($movement->created_at)
+                    // Falls back to the shop's single figure for an install
+                    // that has not recorded a dated price yet.
+                    ?? (float) (Bakery::query()->value('flour_purchase_price_per_kg') ?? 0);
+            }
+
+            $total += (float) $movement->quantity * $prices[$day];
+        }
+
+        return round($total, 2);
     }
 
     /**

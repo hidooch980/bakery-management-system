@@ -37,6 +37,8 @@ class IssueScanner
             ...$this->sellerAccounts(),
             ...$this->unsettledShortfalls(),
             ...$this->stalePending(),
+            ...$this->longUnsettledSellers(),
+            ...$this->tradingAtALoss(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -265,6 +267,101 @@ class IssueScanner
         }
 
         return $issues;
+    }
+
+    /**
+     * A seller carrying the shop's money for longer than a week.
+     *
+     * The plain unsettled-account notice above says what is owed; this says
+     * how long it has been owed, which is the part that turns an ordinary
+     * balance into a problem. A day or two is the normal rhythm of the
+     * shop — a fortnight is money nobody is chasing.
+     */
+    private function longUnsettledSellers(): array
+    {
+        // Long enough that a weekend or a day off cannot explain it.
+        $limit = now()->subDays(7);
+
+        $sellers = User::query()->ofCurrentBakery()
+            ->whereHas('sales', fn ($q) => $q->sellerAccountOutstanding())
+            ->get();
+
+        $issues = [];
+
+        foreach ($sellers as $seller) {
+            $sales = Sale::query()
+                ->where('user_id', $seller->id)
+                ->sellerAccountOutstanding()
+                ->oldest('created_at')
+                ->get();
+
+            $oldest = $sales->first();
+
+            if (! $oldest || $oldest->created_at->gt($limit)) {
+                continue;
+            }
+
+            $days = (int) $oldest->created_at->diffInDays(now());
+            $total = round($sales->sum(fn (Sale $s) => $s->seller_account_amount), 2);
+
+            $issues[] = new SystemIssue(
+                key: "seller-account-stale-{$seller->id}",
+                severity: $days >= 14 ? SystemIssue::CRITICAL : SystemIssue::WARNING,
+                title: "حساب {$seller->name} {$days} روز است تسویه نشده",
+                detail: 'قدیمی‌ترین بدهی از '.AppCalendar::date($oldest->created_at)
+                    .' مانده، جمعاً '.Money::format($total).'.',
+                cause: 'پول فروش نزد فروشنده مانده و به صندوق نرسیده است.',
+                suggestion: $days >= 14
+                    ? 'همین امروز پیگیری کنید؛ دو هفته برای پول نقد نزد یک نفر زیاد است.'
+                    : 'از فروشنده بخواهید حساب را تسویه کند.',
+                url: '/admin/sales',
+                urlLabel: 'تسویه حساب فروشنده',
+            );
+        }
+
+        return $issues;
+    }
+
+    /**
+     * The shop spending more than it takes, this Jalali month.
+     *
+     * Read from the ledger rather than counted here, so it cannot disagree
+     * with the financial report. Only raised once there is enough of the
+     * month behind it to mean anything: a loss on the second of the month
+     * is usually just a delivery paid for before the bread it becomes.
+     */
+    private function tradingAtALoss(): array
+    {
+        [$from, $to] = Jalali::currentMonthRange();
+
+        // A week in, so a single large purchase at the start of the month
+        // does not raise an alarm every time. Measured from the start of
+        // the month forwards: the other way round Carbon returns a negative
+        // and the check never fires at all.
+        if ($from->copy()->startOfDay()->diffInDays(now()) < 7) {
+            return [];
+        }
+
+        $income = Ledger::totalIncome($from, $to);
+        $expenses = Ledger::totalExpenses($from, $to);
+        $loss = round($expenses - $income, 2);
+
+        if ($loss <= 0) {
+            return [];
+        }
+
+        return [new SystemIssue(
+            key: 'trading-at-a-loss',
+            severity: SystemIssue::WARNING,
+            title: 'این ماه بیش از درآمد خرج شده',
+            detail: 'درآمد '.Money::format($income).' در برابر هزینه '
+                .Money::format($expenses).' — اختلاف '.Money::format($loss).'.',
+            cause: 'هزینه‌های ثبت‌شده و حقوق پرداختی از فروش ماه بیشتر است.',
+            suggestion: 'اگر خرید عمده‌ای انجام شده طبیعی است؛ وگرنه'
+                .' گزارش مالی را برای یافتن هزینه‌ی غیرمنتظره ببینید.',
+            url: '/admin/reports',
+            urlLabel: 'گزارش مالی',
+        )];
     }
 
     private function unsettledShortfalls(): array

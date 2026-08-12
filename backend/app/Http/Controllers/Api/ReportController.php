@@ -379,7 +379,79 @@ class ReportController extends Controller
                 'formatted' => Money::format($unpaidSalaries),
                 'count' => SalaryPayment::unpaid()->count(),
             ],
+            // A figure on its own says nothing about whether the shop is
+            // doing better or worse. The same span immediately before is
+            // the comparison the owner makes in their head anyway.
+            'compared_to_previous' => $this->comparison($from, $to),
         ]);
+    }
+
+    /**
+     * The same length of time immediately before this window, and how the
+     * headline figures moved between them.
+     *
+     * A month is compared against the month before, a week against the week
+     * before, and a single day against yesterday — whatever range was asked
+     * for, shifted back by its own length.
+     */
+    private function comparison(Carbon $from, Carbon $to): array
+    {
+        // Whole days, counted from midnight to midnight: `to` is the end of
+        // its day, so measuring it directly gives 1.99… for a single day and
+        // a window one day too long. Inclusive, so one day counts as one.
+        $days = (int) $from->copy()->startOfDay()
+            ->diffInDays($to->copy()->startOfDay()) + 1;
+
+        $previousTo = $from->copy()->subDay()->endOfDay();
+        $previousFrom = $previousTo->copy()->subDays($days - 1)->startOfDay();
+
+        $income = Ledger::totalIncome($previousFrom, $previousTo);
+        $expenses = Ledger::totalExpenses($previousFrom, $previousTo);
+        $profit = $income - $expenses;
+
+        $nowIncome = Ledger::totalIncome($from, $to);
+        $nowExpenses = Ledger::totalExpenses($from, $to);
+        $nowProfit = $nowIncome - $nowExpenses;
+
+        return [
+            'from' => $previousFrom->toDateString(),
+            'to' => $previousTo->toDateString(),
+            'from_jalali' => Jalali::date($previousFrom),
+            'to_jalali' => Jalali::date($previousTo),
+            'days' => $days,
+            'income' => $this->movement($nowIncome, $income),
+            'expenses' => $this->movement($nowExpenses, $expenses),
+            'profit' => $this->movement($nowProfit, $profit),
+        ];
+    }
+
+    /**
+     * One figure against its predecessor.
+     *
+     * The percentage is left null rather than shown as a jump from nothing
+     * when the previous period was empty: a first week of trading has not
+     * improved by infinity, and saying so would be nonsense on the screen.
+     */
+    private function movement(float $now, float $before): array
+    {
+        $change = round($now - $before, 2);
+
+        return [
+            'now' => round($now, 2),
+            'now_formatted' => Money::format($now),
+            'before' => round($before, 2),
+            'before_formatted' => Money::format($before),
+            'change' => $change,
+            'change_formatted' => Money::format(abs($change)),
+            'percent' => abs($before) > 0.01
+                ? round($change / abs($before) * 100, 1)
+                : null,
+            'direction' => match (true) {
+                $change > 0.01 => 'up',
+                $change < -0.01 => 'down',
+                default => 'flat',
+            },
+        ];
     }
 
     /**
