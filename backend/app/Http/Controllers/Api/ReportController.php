@@ -316,6 +316,12 @@ class ReportController extends Controller
         $totalExpenses = $recordedExpenses + $paidSalaries;
         $profit = $income - $totalExpenses;
 
+        // The flour the sold bread was baked from, costed as it is consumed
+        // rather than on whatever day a purchase was recorded.
+        $costOfGoods = Ledger::costOfGoodsSold($from, $to);
+        $grossProfit = $income - $costOfGoods;
+        $netProfit = $grossProfit - $totalExpenses;
+
         return $this->success([
             'from' => $from->toDateString(),
             'to' => $to->toDateString(),
@@ -347,6 +353,26 @@ class ReportController extends Controller
                 'formatted' => Money::format($profit),
                 'is_positive' => $profit >= 0,
                 'margin_percent' => $income > 0 ? round($profit / $income * 100, 1) : 0,
+            ],
+            // The proper statement, beside the cash figure rather than in
+            // its place. `profit` above is money in less money out, and the
+            // partners' split is paid on it — changing what it means is the
+            // owner's call, not a report's. This block adds what that figure
+            // never knew: the flour the bread was baked from.
+            'profit_and_loss' => [
+                'income' => round($income, 2),
+                'income_formatted' => Money::format($income),
+                'cost_of_goods' => round($costOfGoods, 2),
+                'cost_of_goods_formatted' => Money::format($costOfGoods),
+                'gross_profit' => round($grossProfit, 2),
+                'gross_profit_formatted' => Money::format($grossProfit),
+                'gross_margin_percent' => $income > 0 ? round($grossProfit / $income * 100, 1) : 0,
+                'operating_expenses' => round($totalExpenses, 2),
+                'operating_expenses_formatted' => Money::format($totalExpenses),
+                'net_profit' => round($netProfit, 2),
+                'net_profit_formatted' => Money::format($netProfit),
+                'net_margin_percent' => $income > 0 ? round($netProfit / $income * 100, 1) : 0,
+                'is_positive' => $netProfit >= 0,
             ],
             'outstanding_salaries' => [
                 'amount' => round($unpaidSalaries, 2),

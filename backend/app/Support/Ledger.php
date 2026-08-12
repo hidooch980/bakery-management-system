@@ -2,7 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\Bakery;
 use App\Models\Expense;
+use App\Models\InventoryItem;
+use App\Models\InventoryMovement;
 use App\Models\FlourSale;
 use App\Models\Income;
 use App\Models\SalaryPayment;
@@ -66,6 +69,61 @@ class Ledger
         return round((float) SalaryPayment::paid()->whereBetween('paid_on', [
             $from->toDateString(), $to->toDateString(),
         ])->sum('net_amount'), 2);
+    }
+
+
+    /**
+     * What the flour baked in this window cost to buy.
+     *
+     * The shop's profit was money in less money out, which counts the flour
+     * only on the day a purchase happened to be recorded. Bake through a
+     * sack bought last month and the bread looked pure profit; buy a lorry
+     * load on the last day of the month and the month looked like a loss.
+     * Costing the flour as it is consumed puts the bread and the flour it
+     * came from in the same period.
+     *
+     * Flour sold on rather than baked is excluded: its cost belongs to that
+     * sale, which already carries its own purchase price.
+     */
+    public static function flourConsumedCost(Carbon $from, Carbon $to): float
+    {
+        $bakery = Bakery::query()->first();
+        $perKg = (float) ($bakery?->flour_purchase_price_per_kg ?? 0);
+
+        if ($perKg <= 0) {
+            return 0.0;
+        }
+
+        // Kneading spends flour as 'production' and dusting the chane as
+        // 'spray'; both end up in the bread. A withdrawal for any other
+        // reason — a sale, a loan to a partner — is not bread and carries
+        // its own cost elsewhere.
+        $kg = (float) InventoryMovement::query()
+            ->whereHas('item', fn ($q) => $q->where('key', InventoryItem::FLOUR))
+            ->where('direction', 'out')
+            ->whereIn('reason', ['production', 'spray'])
+            ->whereBetween('created_at', [$from, $to])
+            ->sum('quantity');
+
+        return round($kg * $perKg, 2);
+    }
+
+    /**
+     * Cost of goods sold: what the bread sold in this window cost to make.
+     *
+     * Only flour for now — salt and yeast are pennies beside it, and
+     * guessing at them would make the figure look more precise than the
+     * shop's own records support.
+     */
+    public static function costOfGoodsSold(Carbon $from, Carbon $to): float
+    {
+        return self::flourConsumedCost($from, $to);
+    }
+
+    /** Income less what the goods cost, before wages and overheads. */
+    public static function grossProfit(Carbon $from, Carbon $to): float
+    {
+        return round(self::totalIncome($from, $to) - self::costOfGoodsSold($from, $to), 2);
     }
 
     public static function totalExpenses(Carbon $from, Carbon $to): float
