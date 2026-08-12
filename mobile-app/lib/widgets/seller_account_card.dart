@@ -59,23 +59,23 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
   }
 
   Future<void> _requestSettlement() async {
-    // A seller who cannot hand over the whole account today ticks the debts
-    // this money covers. Settling the lot is still one tap: everything
-    // starts ticked.
-    final chosen = await showDialog<_ChosenDebts>(
+    // What is owed, as one figure. The seller hands over what they have and
+    // the shop works out which debts that covers — arithmetic nobody should
+    // be doing at the counter with a queue waiting.
+    final handover = await showDialog<_Handover>(
       context: context,
-      builder: (_) => _SettleablePicker(api: widget.api),
+      builder: (_) => _AmountToHandOver(api: widget.api),
     );
 
-    if (chosen == null || !mounted) return;
+    if (handover == null || !mounted) return;
 
     // Cash and card clear the same debt but land in different places, so
     // the seller says how the handover was split before it is sent.
     final split = await showDialog<Map<PaymentType, double>>(
       context: context,
       builder: (_) => _SettlementSplitDialog(
-        owed: chosen.total,
-        owedFormatted: MoneyFormat.format(chosen.total),
+        owed: handover.amount,
+        owedFormatted: MoneyFormat.format(handover.amount),
       ),
     );
 
@@ -86,9 +86,10 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
     try {
       await widget.api.requestSettlement(
         payments: split,
-        // Null when every line was ticked, so the server settles the whole
-        // account the way it always did.
-        saleIds: chosen.isEverything ? null : chosen.ids,
+        // Null when the whole balance is going over, so the server takes
+        // the path it always has rather than a partial one that happens to
+        // add up to the same figure.
+        amount: handover.isEverything ? null : handover.amount,
       );
 
       if (!mounted) return;
@@ -399,40 +400,36 @@ class _RejectionNotice extends StatelessWidget {
 }
 
 
-/// The debts the seller picked, and what they add up to.
-class _ChosenDebts {
-  const _ChosenDebts({
-    required this.ids,
-    required this.total,
-    required this.isEverything,
-  });
+/// What the seller is handing over, and whether it is the lot.
+class _Handover {
+  const _Handover({required this.amount, required this.isEverything});
 
-  final List<int> ids;
-  final double total;
+  final double amount;
 
-  /// Every open line was ticked, so the request can leave the ids out and
-  /// settle the whole account — the same thing an older app sends.
+  /// The whole balance. Sent as no amount at all, so the server takes the
+  /// path it has always taken rather than a partial one that happens to
+  /// add up to the same figure.
   final bool isEverything;
 }
 
-/// Lets the seller tick the debts this money covers.
+/// Shows the running account and asks how much of it is being handed over.
 ///
-/// A seller who has 500,000 to hand over against an 800,000 account used to
-/// have to hand over all of it or none. They now settle what they can, and
-/// the rest stays on their account rather than quietly clearing.
-class _SettleablePicker extends StatefulWidget {
-  const _SettleablePicker({required this.api});
+/// The seller used to tick individual sales, which meant working out which
+/// of them their cash added up to. They now read one number and type what
+/// they have.
+class _AmountToHandOver extends StatefulWidget {
+  const _AmountToHandOver({required this.api});
 
   final BakeryApi api;
 
   @override
-  State<_SettleablePicker> createState() => _SettleablePickerState();
+  State<_AmountToHandOver> createState() => _AmountToHandOverState();
 }
 
-class _SettleablePickerState extends State<_SettleablePicker> {
-  List<SettleableLine>? _lines;
-  final Set<int> _ticked = {};
+class _AmountToHandOverState extends State<_AmountToHandOver> {
+  SellerRunningAccount? _account;
   String? _error;
+  final _amount = TextEditingController();
 
   @override
   void initState() {
@@ -440,17 +437,22 @@ class _SettleablePickerState extends State<_SettleablePicker> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _amount.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     try {
-      final result = await widget.api.settleableLines();
+      final account = await widget.api.sellerAccount();
 
       if (!mounted) return;
       setState(() {
-        _lines = result.lines;
-        // Settling everything is the common case, so it stays one tap.
-        _ticked
-          ..clear()
-          ..addAll(result.lines.map((l) => l.id));
+        _account = account;
+        // Handing over the lot is the common case, so it stays one tap.
+        _amount.text =
+            account.balance > 0 ? account.balance.toStringAsFixed(0) : '';
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -458,34 +460,31 @@ class _SettleablePickerState extends State<_SettleablePicker> {
     }
   }
 
-  double get _total => (_lines ?? const <SettleableLine>[])
-      .where((l) => _ticked.contains(l.id))
-      .fold(0.0, (sum, l) => sum + l.amount);
+  double get _typed => MoneyFormat.parseInput(_amount.text.trim()) ?? 0;
+
+  /// Within half a unit of the whole balance — a rounding difference is not
+  /// a partial payment.
+  bool get _isEverything => (_typed - (_account?.balance ?? 0)).abs() < 0.5;
+
+  bool get _tooMuch => _typed > (_account?.balance ?? 0) + 0.5;
 
   @override
   Widget build(BuildContext context) {
-    final lines = _lines;
+    final account = _account;
 
     return AlertDialog(
-      title: const Text('چه چیزی را تسویه می‌کنید؟'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: _content(lines),
-      ),
+      title: const Text('تسویه حساب'),
+      content: SizedBox(width: double.maxFinite, child: _body(account)),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('انصراف'),
         ),
         FilledButton(
-          onPressed: _ticked.isEmpty
+          onPressed: account == null || _typed <= 0 || _tooMuch
               ? null
               : () => Navigator.of(context).pop(
-                    _ChosenDebts(
-                      ids: _ticked.toList(),
-                      total: _total,
-                      isEverything: _ticked.length == (lines?.length ?? 0),
-                    ),
+                    _Handover(amount: _typed, isEverything: _isEverything),
                   ),
           child: const Text('ادامه'),
         ),
@@ -493,85 +492,118 @@ class _SettleablePickerState extends State<_SettleablePicker> {
     );
   }
 
-  Widget _content(List<SettleableLine>? lines) {
+  Widget _body(SellerRunningAccount? account) {
     final scheme = Theme.of(context).colorScheme;
 
     if (_error != null) return Text(_error!);
 
-    if (lines == null) {
+    if (account == null) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (lines.isEmpty) return const Text('مبلغی برای تسویه وجود ندارد.');
-
-    final found = lines;
+    if (account.hasNothingToSettle) {
+      return const Text('مبلغی برای تسویه وجود ندارد.');
+    }
 
     return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: () => setState(() => _ticked
-                        ..clear()
-                        ..addAll(found.map((l) => l.id))),
-                      child: const Text('همه'),
-                    ),
-                    TextButton(
-                      onPressed: () => setState(_ticked.clear),
-                      child: const Text('هیچ‌کدام'),
-                    ),
-                  ],
-                ),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: found.length,
-                    itemBuilder: (_, i) {
-                      final line = found[i];
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _BalanceLine(label: 'بدهی شما', value: account.debtFormatted),
 
-                      return CheckboxListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: _ticked.contains(line.id),
-                        onChanged: (on) => setState(() {
-                          if (on ?? false) {
-                            _ticked.add(line.id);
-                          } else {
-                            _ticked.remove(line.id);
-                          }
-                        }),
-                        title: Text(line.amountFormatted),
-                        subtitle: Text(
-                          [
-                            line.paymentLabel,
-                            if (line.customer != null) line.customer!,
-                            if (line.soldOnDisplay != null) line.soldOnDisplay!,
-                          ].join(' · '),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const Divider(),
-                Row(
-                  children: [
-                    const Expanded(child: Text('جمع انتخابی')),
-                    Text(
-                      MoneyFormat.format(_total),
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                  ],
-                ),
+        // Only when there is any: a nil line reads as something gone wrong.
+        if (account.hasCredit)
+          _BalanceLine(
+            label: 'اعتبار نزد نانوایی',
+            value: account.creditFormatted,
+            good: true,
+          ),
+
+        const Divider(height: 20),
+
+        _BalanceLine(
+          label: 'قابل پرداخت',
+          value: account.balanceFormatted,
+          bold: true,
+        ),
+
+        const SizedBox(height: 14),
+
+        TextField(
+          controller: _amount,
+          keyboardType: const TextInputType.numberWithOptions(decimal: false),
+          inputFormatters: const [GroupedAmountInputFormatter()],
+          textDirection: TextDirection.ltr,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: 'مبلغی که تحویل می‌دهید',
+            border: const OutlineInputBorder(),
+            errorText: _tooMuch ? 'بیشتر از بدهی شماست' : null,
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        // The remainder said plainly, so nobody does the subtraction in
+        // their head with a queue waiting.
+        if (_typed > 0 && !_tooMuch && !_isEverything)
+          Text(
+            'باقی‌مانده پس از این پرداخت: '
+            '${MoneyFormat.format(account.balance - _typed)}',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+
+        if (account.uncollectedCredit > 0) ...[
+          const SizedBox(height: 10),
+          Text(
+            'نسیه وصول‌نشده: ${account.uncollectedCreditFormatted} — نزد مشتری '
+            'است و در تسویه شما حساب نمی‌شود.',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+/// One labelled figure in the balance summary.
+class _BalanceLine extends StatelessWidget {
+  const _BalanceLine({
+    required this.label,
+    required this.value,
+    this.bold = false,
+    this.good = false,
+  });
+
+  final String label;
+  final String value;
+  final bool bold;
+  final bool good;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
+          color: good ? const Color(0xFF2E9E6B) : null,
+        );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: style)),
+          Text(value, style: style),
+        ],
+      ),
     );
   }
 }

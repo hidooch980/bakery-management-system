@@ -83,3 +83,54 @@ class SettleableLine {
         customer: json['customer'] as String?,
       );
 }
+
+
+/// The seller's running account: one figure they can pay against.
+///
+/// [balance] is what they owe after the credit the shop is already holding
+/// for them; [debt] is before it. Paying is against the balance, so a
+/// seller with credit is never asked for money the shop already has.
+class SellerRunningAccount {
+  const SellerRunningAccount({
+    required this.debt,
+    required this.credit,
+    required this.balance,
+    required this.debtFormatted,
+    required this.creditFormatted,
+    required this.balanceFormatted,
+    this.uncollectedCredit = 0,
+    this.uncollectedCreditFormatted = '',
+  });
+
+  final double debt;
+  final double credit;
+  final double balance;
+
+  final String debtFormatted;
+  final String creditFormatted;
+  final String balanceFormatted;
+
+  /// Money still with the customers rather than the seller. Shown apart,
+  /// because the seller cannot hand over what they never collected.
+  final double uncollectedCredit;
+  final String uncollectedCreditFormatted;
+
+  bool get hasCredit => credit > 0;
+
+  bool get hasNothingToSettle => balance <= 0;
+
+  factory SellerRunningAccount.fromJson(Map<String, dynamic> json) {
+    double num_(String key) => (json[key] as num?)?.toDouble() ?? 0;
+
+    return SellerRunningAccount(
+      debt: num_('debt'),
+      credit: num_('credit'),
+      balance: num_('balance'),
+      debtFormatted: '${json['debt_formatted'] ?? ''}',
+      creditFormatted: '${json['credit_formatted'] ?? ''}',
+      balanceFormatted: '${json['balance_formatted'] ?? ''}',
+      uncollectedCredit: num_('uncollected_credit'),
+      uncollectedCreditFormatted: '${json['uncollected_credit_formatted'] ?? ''}',
+    );
+  }
+}

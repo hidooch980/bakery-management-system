@@ -324,6 +324,7 @@ class BakeryApi {
     double? paidCard,
     Map<PaymentType, double>? payments,
     List<int>? saleIds,
+    double? amount,
   }) async {
     final body = await _client.post('/settlement-requests', {
       if (note != null && note.isNotEmpty) 'note': note,
@@ -332,6 +333,9 @@ class BakeryApi {
       // Naming the debts settles only those. Sending none means the whole
       // account, which is what the app did before this existed.
       if (saleIds != null && saleIds.isNotEmpty) 'sale_ids': saleIds,
+      // An amount pays the running account down oldest debt first, so
+      // it does not have to line up with any particular sale.
+      if (amount != null) 'amount': amount,
       // An amount per payment type, so the admin counts what the seller
       // counted out rather than one lump sum.
       if (payments != null && payments.isNotEmpty)
@@ -361,6 +365,13 @@ class BakeryApi {
           .map(SettlementRequest.fromJson)
           .toList(),
     );
+  }
+
+  /// The seller's running account: one figure to pay against.
+  Future<SellerRunningAccount> sellerAccount() async {
+    final body = await _client.get('/settlement-requests/account');
+
+    return SellerRunningAccount.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   /// The open debts the seller may hand over, one line each, so they can
