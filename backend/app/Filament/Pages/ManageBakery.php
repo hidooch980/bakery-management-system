@@ -106,6 +106,27 @@ class ManageBakery extends Page implements HasForms
                             ->live(onBlur: true)
                             ->helperText('مثلاً ۰٫۳۸۰'),
 
+                        Forms\Components\TextInput::make('nanino_per_bag')
+                            ->label('تعداد نانینو در هر کیسه')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(1000)
+                            ->default(64)
+                            ->live(onBlur: true)
+                            // The authority sets this, not the bench. When it
+                            // changes the shop follows it, without a new build.
+                            ->helperText('عددی که سامانه با آن حساب می‌کند — معمولاً ۶۴.'),
+
+                        Forms\Components\TextInput::make('diesel_litres_per_bag')
+                            ->label('گازوئیل هر کیسه')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(1000)
+                            ->step(0.01)
+                            ->default(5)
+                            ->suffix('لیتر')
+                            ->helperText('سهمیه گازوئیل ماه از روی همین نرخ و سهمیه آرد حساب می‌شود.'),
+
                         Forms\Components\TextInput::make('chane_per_tray')
                             ->label('تعداد چانه در هر تشتک')
                             ->numeric()
@@ -264,6 +285,7 @@ class ManageBakery extends Page implements HasForms
                                     normalChaneWeightKg: ((float) $get('normal_chane_weight_kg')) ?: null,
                                     naninoChaneWeightKg: ((float) $get('nanino_chane_weight_kg')) ?: null,
                                     proofGainRatio: (float) ($get('proof_gain_ratio') ?: 0),
+                                    naninoPerBag: (int) ($get('nanino_per_bag') ?: DoughFormula::NANINO_PER_BAG),
                                 );
 
                                 $normal = $formula->normalChaneWeightKg ?? 0;

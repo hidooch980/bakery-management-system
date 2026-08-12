@@ -40,6 +40,8 @@ class DoughFormula
         public readonly ?float $naninoChaneWeightKg,
         /** How much more the dough yields once it has proved. */
         public readonly float $proofGainRatio = 0.0,
+        /** Loaves a sack counts for in the nanino system. */
+        public readonly int $naninoPerBag = self::NANINO_PER_BAG,
     ) {}
 
     public static function fromBakery(?Bakery $bakery = null): self
@@ -59,6 +61,7 @@ class DoughFormula
                 ? (float) $bakery->nanino_chane_weight_kg
                 : null,
             proofGainRatio: (float) ($bakery?->proof_gain_ratio ?? 0.115),
+            naninoPerBag: (int) ($bakery?->nanino_per_bag ?: self::NANINO_PER_BAG),
         );
     }
 
@@ -132,6 +135,7 @@ class DoughFormula
      * board, the quota — quietly disagreed with the system the shop is
      * actually measured by.
      */
+    /** What the sāmāne has worked to; a shop may set its own. */
     public const NANINO_PER_BAG = 64;
 
     public function naninoChaneCount(float $bags): ?int
@@ -140,7 +144,7 @@ class DoughFormula
             return null;
         }
 
-        return (int) floor($bags * self::NANINO_PER_BAG);
+        return (int) floor($bags * $this->naninoPerBag);
     }
 
     /**

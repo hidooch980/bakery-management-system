@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\BankAccount;
 use App\Models\ChaneEntry;
+use App\Models\DieselAllocation;
 use App\Models\DoughEntry;
 use App\Models\FlourAllocation;
 use App\Models\InventoryItem;
@@ -39,6 +40,7 @@ class IssueScanner
             ...$this->stalePending(),
             ...$this->longUnsettledSellers(),
             ...$this->tradingAtALoss(),
+            ...$this->dieselRunningOut(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -361,6 +363,47 @@ class IssueScanner
                 .' گزارش مالی را برای یافتن هزینه‌ی غیرمنتظره ببینید.',
             url: '/admin/reports',
             urlLabel: 'گزارش مالی',
+        )];
+    }
+
+    /**
+     * The month's diesel quota nearly gone, or already overdrawn.
+     *
+     * An oven that runs dry mid-bake loses the batch in it and the batch
+     * behind it, so this is worth saying while there is still time to order
+     * rather than at the end of the month with the rest of the figures.
+     */
+    private function dieselRunningOut(): array
+    {
+        $quota = DieselAllocation::current();
+
+        if (! $quota) {
+            return [];
+        }
+
+        $remaining = $quota->remaining_litres;
+
+        // Comfortable: nothing to say.
+        if (! $quota->is_overdrawn && $quota->used_percent < 80) {
+            return [];
+        }
+
+        return [new SystemIssue(
+            key: 'diesel-running-out',
+            severity: $quota->is_overdrawn ? SystemIssue::CRITICAL : SystemIssue::WARNING,
+            title: $quota->is_overdrawn
+                ? 'سهمیه گازوئیل این ماه تمام شده'
+                : 'سهمیه گازوئیل رو به اتمام است',
+            detail: $quota->is_overdrawn
+                ? number_format(abs($remaining), 0).' لیتر بیش از سهمیه تحویل گرفته شده.'
+                : number_format($remaining, 0).' لیتر مانده — '
+                    .$quota->used_percent.'٪ سهمیه مصرف شده.',
+            cause: 'تحویل‌های ثبت‌شده به سقف سهمیه ماه رسیده است.',
+            suggestion: $quota->is_overdrawn
+                ? 'برای ادامه‌ی کار باید سوخت آزاد تهیه شود یا سهمیه اضافه گرفته شود.'
+                : 'پیش از تمام شدن، تحویل بعدی را هماهنگ کنید.',
+            url: '/admin/diesel-allocations',
+            urlLabel: 'سهمیه گازوئیل',
         )];
     }
 

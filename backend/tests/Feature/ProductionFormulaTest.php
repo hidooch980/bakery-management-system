@@ -82,6 +82,16 @@ class ProductionFormulaTest extends TestCase
         $this->assertSame(116.64, DoughFormula::fromBakery()->doughKg(2));
     }
 
+    public function test_the_nanino_rate_is_a_setting_the_shop_can_change(): void
+    {
+        // Sixty-four is what the samane works to today, but it is a rule the
+        // authority sets - the shop must be able to follow a change without
+        // waiting for a new build.
+        Bakery::first()->update(['nanino_per_bag' => 70]);
+
+        $this->assertSame(140, DoughFormula::fromBakery(Bakery::first())->naninoChaneCount(2));
+    }
+
     public function test_formula_counts_chane_by_weight(): void
     {
         $formula = DoughFormula::fromBakery();

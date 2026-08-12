@@ -58,6 +58,8 @@ class BakeryController extends Controller
             'flour_price_per_bag' => ['nullable', 'numeric', 'min:0'],
             'flour_purchase_price_per_kg' => ['nullable', 'numeric', 'min:0'],
             'flour_transport_by_factory' => ['nullable', 'boolean'],
+            'diesel_litres_per_bag' => ['nullable', 'numeric', 'min:0', 'max:1000'],
+            'nanino_per_bag' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'chane_start_deadline' => ['nullable', 'date_format:H:i'],
             'baking_start_deadline' => ['nullable', 'date_format:H:i'],
             'late_free_days' => ['nullable', 'integer', 'min:0'],
