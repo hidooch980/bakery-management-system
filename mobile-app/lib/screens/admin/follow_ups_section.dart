@@ -32,9 +32,14 @@ class _FollowUpsSectionState extends State<FollowUpsSection> {
 
   Future<void> _complete(Map<String, dynamic> followUp) async {
     try {
-      await widget.api.completeFollowUp(followUp['id'] as int);
+      final queued = await widget.api.completeFollowUp(followUp['id'] as int);
       if (!mounted) return;
-      showMessage(context, 'پیگیری انجام شد.');
+      showMessage(
+        context,
+        queued
+            ? 'ذخیره شد و با وصل شدن اینترنت ارسال می‌شود.'
+            : 'پیگیری انجام شد.',
+      );
       _reload();
     } on ApiException catch (e) {
       if (!mounted) return;

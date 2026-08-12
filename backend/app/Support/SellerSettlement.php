@@ -268,7 +268,7 @@ class SellerSettlement
 
             // Oldest first: the debt that has been waiting longest is the
             // one the shop wants off the books.
-            foreach (self::outstandingSales($seller)->reorder()->oldest('sold_at')->oldest('id')->get() as $sale) {
+            foreach (self::outstandingSales($seller)->reorder()->oldest('created_at')->oldest('id')->get() as $sale) {
                 $cost = round($sale->seller_account_amount, 2);
 
                 if ($cost <= 0) {

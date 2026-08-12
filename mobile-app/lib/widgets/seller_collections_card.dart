@@ -110,13 +110,21 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
     if (ok != true || amount <= 0) return;
 
     try {
-      await widget.api.collectFromCustomer(
+      final queued = await widget.api.collectFromCustomer(
         customer['customer_id'] as int,
         amount,
         method: method,
       );
       if (!mounted) return;
-      showMessage(context, 'دریافت ثبت شد.');
+      // Told plainly when it is only on the phone so far: the seller is
+      // standing in front of the customer and needs to know whether the
+      // shop has it yet.
+      showMessage(
+        context,
+        queued
+            ? 'دریافت ذخیره شد و با وصل شدن اینترنت ارسال می‌شود.'
+            : 'دریافت ثبت شد.',
+      );
       await _load();
     } on ApiException catch (e) {
       if (!mounted) return;

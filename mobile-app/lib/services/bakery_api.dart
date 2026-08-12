@@ -298,15 +298,22 @@ class BakeryApi {
   ///
   /// [method] is how it arrived: 'cash' stays in the till, 'card' is banked,
   /// because that money really did reach the account.
-  Future<void> collectFromCustomer(
+  /// Queued when offline: the seller is standing at the customer's door
+  /// with the money in their hand, and asking them to remember it until
+  /// there is signal is how a collection goes unrecorded.
+  Future<bool> collectFromCustomer(
     int customerId,
     double amount, {
     String method = 'cash',
-  }) =>
-      _client.post('/my-collections/$customerId/collect', {
-        'amount': amount,
-        'method': method,
-      });
+  }) async {
+    final body = await _client.postOrQueue(
+      '/my-collections/$customerId/collect',
+      {'amount': amount, 'method': method},
+      label: 'وصولی از مشتری',
+    );
+
+    return body['queued'] == true;
+  }
 
   /// Asks the admin to confirm the seller has handed their account over.
   /// The account only clears once the admin agrees, so this returns the
@@ -503,21 +510,35 @@ class BakeryApi {
         .toList();
   }
 
-  Future<void> recordInteraction(
+  Future<bool> recordInteraction(
     int customerId, {
     required String type,
     required String summary,
     String? followUpOn,
-  }) =>
-      _client.post('/customers/$customerId/interactions', {
+  }) async {
+    final body = await _client.postOrQueue(
+      '/customers/$customerId/interactions',
+      {
         'type': type,
         'summary': summary,
         if (followUpOn != null && followUpOn.isNotEmpty)
           'follow_up_on': followUpOn,
-      });
+      },
+      label: 'ثبت تماس با مشتری',
+    );
 
-  Future<void> completeFollowUp(int interactionId) =>
-      _client.post('/interactions/$interactionId/complete', const {});
+    return body['queued'] == true;
+  }
+
+  Future<bool> completeFollowUp(int interactionId) async {
+    final body = await _client.postOrQueue(
+      '/interactions/$interactionId/complete',
+      const {},
+      label: 'تکمیل پیگیری',
+    );
+
+    return body['queued'] == true;
+  }
 
   Future<void> settleCustomerDebt(int customerId) =>
       _client.post('/customer-debts/$customerId/settle', const {});
