@@ -10,9 +10,9 @@
 
 param(
     [string]$Destination = 'D:\aziz\backups',
-    [string]$ServerHost  = '194.5.176.140',
-    [int]   $Port        = 1669,
-    [string]$User        = 'root',
+    [string]$ServerHost  = '37.32.21.125',
+    [int]   $Port        = 22,
+    [string]$User        = 'ubuntu',
     [string]$RemoteDir   = '/home/ubuntu/bakery-management-system/backend/storage/app/backups',
     # Roughly a month, matching what the server keeps.
     [int]   $Keep        = 30,
