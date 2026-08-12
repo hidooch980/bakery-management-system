@@ -43,6 +43,11 @@ class SettlementRequestController extends Controller
             // what every older copy of the app sends.
             'sale_ids' => ['nullable', 'array'],
             'sale_ids.*' => ['integer'],
+
+            // A seller paying against their running balance names an
+            // amount instead of picking sales. The two are exclusive:
+            // one says how much, the other says which.
+            'amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $seller = $request->user();
@@ -74,6 +79,21 @@ class SettlementRequestController extends Controller
             return $this->error('مبلغی برای تسویه وجود ندارد.', 422);
         }
 
+        // A named amount is what the seller is actually handing over. It
+        // pays down the running account oldest debt first, so it does not
+        // have to match any particular sale.
+        $paying = isset($data['amount'])
+            ? Money::toToman($data['amount'])
+            : $owed['total'];
+
+        if ($paying <= 0) {
+            return $this->error('مبلغ تسویه باید بیشتر از صفر باشد.', 422);
+        }
+
+        if ($paying > $owed['total'] + 0.01) {
+            return $this->error('مبلغ واردشده از بدهی شما بیشتر است.', 422);
+        }
+
         $breakdown = $this->breakdownFrom($data);
 
         // The figures are captured now rather than read back at
@@ -81,7 +101,7 @@ class SettlementRequestController extends Controller
         // change what the two of them agreed on.
         $settlement = SettlementRequest::create([
             'user_id' => $seller->id,
-            'amount' => $owed['total'],
+            'amount' => $paying,
             'cash_amount' => $owed['cash'],
             'difference_amount' => $owed['difference'],
             'shortfall_amount' => $owed['shortfall'],
@@ -90,7 +110,7 @@ class SettlementRequestController extends Controller
             // what an older copy of the app sends.
             'paid_cash' => isset($data['paid_cash'])
                 ? Money::toToman($data['paid_cash'])
-                : ($data['paid_card'] ?? null ? 0 : $owed['total']),
+                : ($data['paid_card'] ?? null ? 0 : $paying),
             'paid_card' => isset($data['paid_card'])
                 ? Money::toToman($data['paid_card'])
                 : ($breakdown['card'] ?? 0),
@@ -210,6 +230,28 @@ class SettlementRequestController extends Controller
             'lines' => $lines,
             'total' => Money::convert((float) $lines->sum('amount')),
             'total_formatted' => Money::format((float) $lines->sum('amount')),
+        ]);
+    }
+
+    /**
+     * The seller's running account: one figure they can pay against.
+     */
+    public function account(Request $request): JsonResponse
+    {
+        $account = SellerSettlement::runningBalanceFor($request->user());
+
+        return $this->success([
+            'debt' => Money::convert($account['debt']),
+            'debt_formatted' => Money::format($account['debt']),
+            'credit' => Money::convert($account['credit']),
+            'credit_formatted' => Money::format($account['credit']),
+            'balance' => Money::convert($account['balance']),
+            'balance_formatted' => Money::format($account['balance']),
+            'cash' => Money::convert($account['components']['cash']),
+            'shortfall' => Money::convert($account['components']['shortfall']),
+            'difference' => Money::convert($account['components']['difference']),
+            'uncollected_credit' => Money::convert($account['components']['credit']),
+            'uncollected_credit_formatted' => Money::format($account['components']['credit']),
         ]);
     }
 }

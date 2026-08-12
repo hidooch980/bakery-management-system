@@ -108,6 +108,9 @@ Route::prefix('v1')->group(function () {
             // The open debts, one line each, for a seller handing over only
             // part of what they owe.
             Route::get('/settlement-requests/settleable', [SettlementRequestController::class, 'settleable']);
+            // One figure the seller can pay against, rather than a list
+            // of sales to reconcile.
+            Route::get('/settlement-requests/account', [SettlementRequestController::class, 'account']);
             Route::post('/settlement-requests', [SettlementRequestController::class, 'store']);
         });
 
