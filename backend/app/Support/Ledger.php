@@ -4,10 +4,10 @@ namespace App\Support;
 
 use App\Models\Bakery;
 use App\Models\Expense;
-use App\Models\InventoryItem;
-use App\Models\InventoryMovement;
 use App\Models\FlourSale;
 use App\Models\Income;
+use App\Models\InventoryItem;
+use App\Models\InventoryMovement;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use Illuminate\Support\Carbon;
@@ -70,7 +70,6 @@ class Ledger
             $from->toDateString(), $to->toDateString(),
         ])->sum('net_amount'), 2);
     }
-
 
     /**
      * What the flour baked in this window cost to buy.
