@@ -1,33 +1,73 @@
 import 'package:flutter/material.dart';
 
-/// The shop's palette.
+/// The shop's palette — "the kiln".
 ///
-/// The ground is a cool neutral and the only warm note is the colour of a
-/// baked top, so the accent carries every button and figure that matters
-/// instead of competing with a warm background for attention. Screens are
-/// read at arm's length in a bright shop, so contrast is kept high in both
-/// brightnesses rather than softened.
+/// Iron and ember. The ground is the dark of a cold oven and the warm
+/// notes are the colours iron actually passes through as it heats, which
+/// is why they are a ramp rather than a single accent: [emberCool] through
+/// [emberPale] is a scale, and where a figure sits on it is the reading.
+/// A quota nearly spent glows; one barely touched is dull. That saves the
+/// eye a number at arm's length across a hot, bright room, which is where
+/// most of these screens are read.
+///
+/// Dark is the design; light is the same identity in daylight, for the
+/// owner reading figures at a desk rather than the floor reading them
+/// beside an oven. Both keep contrast high rather than softening it.
 class AppColors {
-  static const Color crust = Color(0xFFC2740F); // baked top — the accent
-  static const Color wheat = Color(0xFFE9A03C); // the same, lifted for dark
+  // ---------------------------------------------------- the ember ramp
 
-  static const Color paper = Color(0xFFEEF1F4); // cool light ground
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color line = Color(0xFFDCE2E8);
+  /// Dullest — plenty left, nothing to attend to.
+  static const Color emberCool = Color(0xFF7A1F12);
 
-  static const Color darkBase = Color(0xFF0B0F14); // cool dark ground
-  static const Color darkSurface = Color(0xFF151B23);
-  static const Color darkCard = Color(0xFF1B222B);
-  static const Color darkLine = Color(0xFF28313C);
+  /// Warming — worth noticing.
+  static const Color emberWarm = Color(0xFFC24A16);
 
-  /// Semantic, and deliberately not the accent: a settled account and a
+  /// Hot — the accent proper, and the one buttons carry.
+  static const Color emberHot = Color(0xFFE8952D);
+
+  /// Palest — nearly spent, or the figure of the moment.
+  static const Color emberPale = Color(0xFFF5D08A);
+
+  /// The ramp in order, for anything mapping a proportion onto it.
+  static const List<Color> ember = [emberCool, emberWarm, emberHot, emberPale];
+
+  /// Where a fraction of 0..1 falls on the ramp.
+  static Color emberAt(double fraction) {
+    final f = fraction.clamp(0.0, 1.0);
+
+    if (f >= 1) return emberPale;
+
+    final span = 1 / (ember.length - 1);
+    final index = (f / span).floor();
+
+    return Color.lerp(ember[index], ember[index + 1], (f - index * span) / span)!;
+  }
+
+  // ------------------------------------------------------------ iron
+
+  static const Color iron = Color(0xFF12161C); // cold oven — the dark ground
+  static const Color ironSurface = Color(0xFF1A2029);
+  static const Color ironCard = Color(0xFF212936);
+  static const Color ironLine = Color(0xFF2A333F);
+
+  // ----------------------------------------------------------- ash
+
+  /// Daylight: ash and flour rather than white, so the ember still reads.
+  static const Color ash = Color(0xFFEDEEF0);
+  static const Color ashSurface = Color(0xFFFAFAFB);
+  static const Color ashLine = Color(0xFFD9DDE2);
+
+  /// The accent has to darken for a pale ground or it turns to highlighter.
+  static const Color crust = Color(0xFFA8501A);
+
+  /// Semantic, and deliberately off the ramp: a settled account and a
   /// primary button must never be told apart by shade alone.
   static const Color success = Color(0xFF0B7A54);
-  static const Color successDark = Color(0xFF35C793);
+  static const Color successDark = Color(0xFF3FB98B);
   static const Color info = Color(0xFF2C6FA8);
   static const Color danger = Color(0xFFC5373C);
   static const Color dangerDark = Color(0xFFF1666B);
-  static const Color warning = Color(0xFFC2740F);
+  static const Color warning = Color(0xFFC24A16);
 }
 
 class AppTheme {
@@ -39,30 +79,30 @@ class AppTheme {
       brightness: Brightness.light,
       primary: AppColors.crust,
       secondary: AppColors.info,
-      surface: AppColors.surface,
+      surface: AppColors.ashSurface,
       error: AppColors.danger,
-      outlineVariant: AppColors.line,
+      outlineVariant: AppColors.ashLine,
     );
 
     return _base(scheme).copyWith(
-      scaffoldBackgroundColor: AppColors.paper,
+      scaffoldBackgroundColor: AppColors.ash,
     );
   }
 
   static ThemeData dark() {
     final scheme = ColorScheme.fromSeed(
-      seedColor: AppColors.wheat,
+      seedColor: AppColors.emberHot,
       brightness: Brightness.dark,
-      primary: AppColors.wheat,
+      primary: AppColors.emberHot,
       secondary: AppColors.info,
-      surface: AppColors.darkSurface,
+      surface: AppColors.ironSurface,
       error: AppColors.dangerDark,
-      outlineVariant: AppColors.darkLine,
+      outlineVariant: AppColors.ironLine,
     );
 
     return _base(scheme).copyWith(
-      scaffoldBackgroundColor: AppColors.darkBase,
-      cardTheme: _base(scheme).cardTheme.copyWith(color: AppColors.darkCard),
+      scaffoldBackgroundColor: AppColors.iron,
+      cardTheme: _base(scheme).cardTheme.copyWith(color: AppColors.ironCard),
     );
   }
 
@@ -98,7 +138,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
-        color: isDark ? AppColors.darkCard : Colors.white,
+        color: isDark ? AppColors.ironCard : AppColors.ashSurface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
@@ -137,7 +177,7 @@ class AppTheme {
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? AppColors.darkCard : Colors.white,
+        fillColor: isDark ? AppColors.ironCard : AppColors.ashSurface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),

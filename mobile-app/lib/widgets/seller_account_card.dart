@@ -4,9 +4,10 @@ import '../models/entries.dart';
 import '../models/seller_account.dart';
 import '../models/settlement_request.dart';
 import '../services/api_client.dart';
+import '../services/bakery_api.dart';
+import '../theme/app_theme.dart';
 import '../utils/formatters.dart';
 import 'common.dart';
-import '../services/bakery_api.dart';
 
 /// What the seller still answers for, shown to them rather than only to the
 /// admin — so a shortfall or an uncollected debt is something they can act
@@ -113,7 +114,7 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
     }
 
     final scheme = Theme.of(context).colorScheme;
-    const warn = Color(0xFFE8952D);
+    const warn = AppColors.emberHot;
 
     return Container(
       padding: const EdgeInsets.all(14),

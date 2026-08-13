@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/bakery.dart';
 import '../../models/chane_board.dart';
 import '../../providers/auth_provider.dart';
-import '../../models/bakery.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/attendance_card.dart';
-import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
+import '../../widgets/role_home_scaffold.dart';
 
 /// The shater works the oven, so this screen answers one question at a
 /// glance: how many chane are waiting. Everything else is secondary.
@@ -196,11 +197,11 @@ class _QueueCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFFE8952D).withValues(alpha: 0.14),
+                color: AppColors.emberHot.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Icon(Icons.inventory_2_rounded,
-                  color: Color(0xFFE8952D), size: 24),
+                  color: AppColors.emberHot, size: 24),
             ),
             const SizedBox(width: 14),
             Expanded(

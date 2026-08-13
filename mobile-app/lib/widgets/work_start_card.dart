@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/work_start.dart';
 import '../services/api_client.dart';
 import '../services/bakery_api.dart';
+import '../theme/app_theme.dart';
 import 'common.dart';
 
 /// The daily start ticks for shaping and baking, with the deadline and the
@@ -192,7 +193,7 @@ class _StartRow extends StatelessWidget {
 
   static const _late = Color(0xFFD1495B);
   static const _done = Color(0xFF2E9E6B);
-  static const _soon = Color(0xFFE8952D);
+  static const _soon = AppColors.emberHot;
 
   Color _tone(ColorScheme scheme) {
     if (item.isLate || item.overdue) return _late;

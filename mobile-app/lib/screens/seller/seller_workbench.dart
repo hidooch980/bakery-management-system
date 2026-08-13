@@ -4,6 +4,7 @@ import '../../models/bakery.dart';
 import '../../models/entries.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import '../admin/admin_record_sheet.dart';
@@ -272,11 +273,11 @@ class _ProductionSectionState extends State<_ProductionSection> {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
                       leading: CircleAvatar(
-                        backgroundColor: const Color(0xFFE8952D)
+                        backgroundColor: AppColors.emberHot
                             .withValues(alpha: 0.16),
                         child: const Icon(
                           Icons.inventory_2_rounded,
-                          color: Color(0xFFE8952D),
+                          color: AppColors.emberHot,
                         ),
                       ),
                       title: Text(
@@ -352,7 +353,7 @@ class _DoughSheetState extends State<_DoughSheet> {
     return _SheetShell(
       title: 'ثبت خمیر',
       icon: Icons.inventory_2_rounded,
-      color: const Color(0xFFE8952D),
+      color: AppColors.emberHot,
       child: Form(
         key: _formKey,
         child: Column(

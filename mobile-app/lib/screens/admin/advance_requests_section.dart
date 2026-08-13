@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/quota_and_advance.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 
@@ -121,7 +122,7 @@ class _AdvanceRequestsSectionState extends State<AdvanceRequestsSection> {
             '${requests.length} در انتظار',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFFE8952D),
+                  color: AppColors.emberHot,
                 ),
           ),
           children: [

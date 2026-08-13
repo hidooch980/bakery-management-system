@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/bakery.dart';
 import '../../models/chane_board.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
@@ -92,7 +93,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                       label: 'کیسه خمیر',
                       value: '${_num(today['dough_bags'])}',
                       icon: Icons.inventory_2_rounded,
-                      color: const Color(0xFFE8952D),
+                      color: AppColors.emberHot,
                     ),
                   ),
                   const SizedBox(width: 12),

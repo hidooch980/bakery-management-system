@@ -15,6 +15,7 @@ import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
+import '../../theme/app_theme.dart';
 
 /// Home screen for the chane gir. One scrolling page: the dough waiting to be
 /// shaped, today's production split, and the entries already recorded.
@@ -192,7 +193,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
               if (entry.createdAt != null) JalaliFormat.dateTime(entry.createdAt),
             ].join('  •  '),
             icon: Icons.inventory_2_rounded,
-            color: const Color(0xFFE8952D),
+            color: AppColors.emberHot,
             onTap: () => _openRecordSheet(entry),
             trailing: const Icon(Icons.add_circle_outline_rounded),
           ),
@@ -334,7 +335,7 @@ class _ChaneTile extends StatelessWidget {
                   label: Text(entry.isPending ? 'در انتظار فروش' : 'فروخته شده'),
                   visualDensity: VisualDensity.compact,
                   backgroundColor: (entry.isPending
-                          ? const Color(0xFFE8952D)
+                          ? AppColors.emberHot
                           : const Color(0xFF2E9E6B))
                       .withValues(alpha: 0.15),
                 ),
@@ -681,7 +682,7 @@ class _ExpectedBanner extends StatelessWidget {
     final short = expected - actual;
     final isShort = short > expected * 0.05;
 
-    final color = isShort ? const Color(0xFFD1495B) : const Color(0xFFE8952D);
+    final color = isShort ? const Color(0xFFD1495B) : AppColors.emberHot;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

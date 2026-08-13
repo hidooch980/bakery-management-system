@@ -4,6 +4,7 @@ import '../../models/bakery.dart';
 import '../../models/ledger_entry.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 
@@ -11,7 +12,7 @@ import '../../widgets/common.dart';
 enum AdminRecordKind {
   expense('هزینه', Icons.trending_down_rounded, Color(0xFFD1495B)),
   income('درآمد', Icons.trending_up_rounded, Color(0xFF2E9E6B)),
-  flourIntake('آرد ورودی', Icons.local_shipping_rounded, Color(0xFFE8952D)),
+  flourIntake('آرد ورودی', Icons.local_shipping_rounded, AppColors.emberHot),
   consignment('آرد همکار', Icons.swap_horiz_rounded, Color(0xFF6C63FF));
 
   const AdminRecordKind(this.label, this.icon, this.color);

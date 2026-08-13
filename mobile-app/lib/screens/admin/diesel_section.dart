@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/quota_and_advance.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 
@@ -221,11 +222,14 @@ class _QuotaMeter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fraction = (quota.usedPercent / 100).clamp(0.0, 1.0);
-    final colour = switch (quota.usedPercent) {
-      >= 100 => const Color(0xFFD1495B),
-      >= 80 => const Color(0xFFE8952D),
-      _ => const Color(0xFF2E9E6B),
-    };
+
+    // Straight off the ember ramp: how far along the quota is *is* how hot
+    // the bar reads, so the proportion is legible before the number is.
+    // Overdrawn leaves the ramp entirely — past the end of the scale is a
+    // different kind of fact, not a hotter shade of the same one.
+    final colour = quota.isOverdrawn
+        ? Theme.of(context).colorScheme.error
+        : AppColors.emberAt(fraction);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

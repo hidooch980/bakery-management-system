@@ -22,6 +22,7 @@ import '../../widgets/common.dart';
 import '../../models/flour_sale.dart';
 import 'flour_sale_sheet.dart';
 import 'seller_workbench.dart';
+import '../../theme/app_theme.dart';
 
 /// Home screen for the seller.
 ///
@@ -328,7 +329,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                   '${data.flour!.totalWeightKg.toStringAsFixed(1)} کیلوگرم  •  '
                   '${data.flour!.totalFormatted}',
           icon: Icons.local_shipping_rounded,
-          color: const Color(0xFFE8952D),
+          color: AppColors.emberHot,
           onTap: _openFlourSaleSheet,
           trailing: const Icon(Icons.add_rounded),
         ),
@@ -779,7 +780,7 @@ class _RemainingBanner extends StatelessWidget {
           '${-unassigned} نان بیشتر از این چانه وارد شده است.',
         ),
       _ => (
-          const Color(0xFFE8952D),
+          AppColors.emberHot,
           Icons.info_rounded,
           '$unassigned نان باقی مانده — اگر ثبت نشود، بدهی موقت فروشنده می‌شود.',
         ),
@@ -1029,7 +1030,7 @@ class _FlourSaleTile extends StatelessWidget {
                 ? Icons.shopping_bag_rounded
                 : Icons.scale_rounded,
             size: 20,
-            color: const Color(0xFFE8952D),
+            color: AppColors.emberHot,
           ),
           const SizedBox(width: 10),
           Expanded(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/shared/update_screen.dart';
 import '../services/update_service.dart';
+import '../theme/app_theme.dart';
 
 /// Warns, once per launch and then persistently, that a newer build is out.
 ///
@@ -61,7 +62,7 @@ class _UpdatePromptState extends State<UpdatePrompt> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const Icon(Icons.warning_amber_rounded,
-            size: 34, color: Color(0xFFE8952D)),
+            size: 34, color: AppColors.emberHot),
         title: const Text('بروزرسانی لازم است'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -104,8 +105,8 @@ class _UpdatePromptState extends State<UpdatePrompt> {
 
     ScaffoldMessenger.of(context).showMaterialBanner(
       MaterialBanner(
-        backgroundColor: const Color(0xFFE8952D).withValues(alpha: 0.15),
-        leading: const Icon(Icons.warning_amber_rounded, color: Color(0xFFE8952D)),
+        backgroundColor: AppColors.emberHot.withValues(alpha: 0.15),
+        leading: const Icon(Icons.warning_amber_rounded, color: AppColors.emberHot),
         content: Text('نسخه ${update.version} منتشر شده — بروزرسانی نکرده‌اید.'),
         actions: [
           TextButton(

@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../models/bakery.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
-import 'customer_debts_section.dart';
-import 'follow_ups_section.dart';
 import 'balance_sheet_section.dart';
 import 'bank_balances_section.dart';
+import 'customer_debts_section.dart';
+import 'follow_ups_section.dart';
 import 'income_expense_chart.dart';
 import 'seller_debts_section.dart';
 
@@ -331,7 +332,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
             label: '${outstanding['count'] ?? 0} مورد در انتظار',
             value: '${outstanding['formatted'] ?? '—'}',
             icon: Icons.schedule_rounded,
-            color: const Color(0xFFE8952D),
+            color: AppColors.emberHot,
           ),
         ],
       ),

@@ -126,7 +126,7 @@ class _SplashScreen extends StatelessWidget {
               height: 92,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [AppColors.wheat, AppColors.crust],
+                  colors: [AppColors.emberHot, AppColors.emberWarm],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),

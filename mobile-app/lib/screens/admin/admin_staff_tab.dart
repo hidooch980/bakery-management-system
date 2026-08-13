@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../services/bakery_api.dart';
-import 'advance_requests_section.dart';
-import 'staff_report_section.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
+import 'advance_requests_section.dart';
+import 'staff_report_section.dart';
 
 /// Who checked in today, and at what time.
 class AdminStaffTab extends StatefulWidget {

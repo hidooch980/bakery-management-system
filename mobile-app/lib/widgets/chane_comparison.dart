@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/chane_board.dart';
+import '../theme/app_theme.dart';
 
 /// Side-by-side comparison of today's nanino and normal chane output.
 /// Shown to the chane gir and the seller so they can see the split at a glance.
@@ -9,7 +10,7 @@ class ChaneComparison extends StatelessWidget {
 
   final ChaneBoard board;
 
-  static const _normalColor = Color(0xFFE8952D);
+  static const _normalColor = AppColors.emberHot;
   static const _naninoColor = Color(0xFF3B82C4);
 
   @override

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 
@@ -82,7 +83,7 @@ class _FollowUpsSectionState extends State<FollowUpsSection> {
             '${followUps.length} مورد',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFFE8952D),
+                  color: AppColors.emberHot,
                 ),
           ),
           children: [
@@ -111,7 +112,7 @@ class _FollowUpTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final overdue = followUp['is_overdue'] == true;
-    final accent = overdue ? const Color(0xFFD1495B) : const Color(0xFFE8952D);
+    final accent = overdue ? const Color(0xFFD1495B) : AppColors.emberHot;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

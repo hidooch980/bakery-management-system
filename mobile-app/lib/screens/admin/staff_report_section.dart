@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import 'admin_home_screen.dart';
 
 /// How the shop was staffed over the last month, and what it owes for it.
@@ -97,7 +98,7 @@ class _StaffReportSectionState extends State<StaffReportSection> {
               // Below three-quarters is worth noticing: either people are
               // not turning up or they are not recording it, and both
               // matter before payday.
-              color: coverage < 75 ? const Color(0xFFE8952D) : null,
+              color: coverage < 75 ? AppColors.emberHot : null,
             ),
 
             const Divider(height: 1),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../services/bakery_api.dart';
 import '../services/connection_status.dart';
+import '../theme/app_theme.dart';
 import 'common.dart';
 
 /// Shows whether the shop is talking to its server, what is still waiting to
@@ -82,7 +83,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
     if (online && _pending == 0) return const SizedBox.shrink();
 
     final scheme = Theme.of(context).colorScheme;
-    final color = online ? const Color(0xFFE8952D) : const Color(0xFFD1495B);
+    final color = online ? AppColors.emberHot : const Color(0xFFD1495B);
 
     return Card(
       color: color.withValues(alpha: 0.08),

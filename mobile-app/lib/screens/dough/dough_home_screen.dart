@@ -11,6 +11,7 @@ import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
 import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/common.dart';
+import '../../theme/app_theme.dart';
 
 /// Home screen for the dough maker: record bag counts and review own history.
 class DoughHomeScreen extends StatefulWidget {
@@ -207,7 +208,7 @@ class _DoughTile extends StatelessWidget {
               label: Text(entry.isPending ? 'در انتظار چانه' : 'چانه شده'),
               visualDensity: VisualDensity.compact,
               backgroundColor: (entry.isPending
-                      ? const Color(0xFFE8952D)
+                      ? AppColors.emberHot
                       : const Color(0xFF2E9E6B))
                   .withValues(alpha: 0.15),
             ),

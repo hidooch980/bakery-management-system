@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/flour_sale.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import 'diesel_section.dart';
@@ -123,7 +124,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                           : '${flour.totalWeightKg.toStringAsFixed(1)} کیلوگرم'
                               '  •  ${flour.totalFormatted}',
                       icon: Icons.inventory_2_rounded,
-                      color: const Color(0xFFE8952D),
+                      color: AppColors.emberHot,
                       emphasise: true,
                     ),
                     for (final sale in flour.sales) ...[
@@ -227,7 +228,7 @@ class _PeriodCard extends StatelessWidget {
     final color = isOver
         ? const Color(0xFFD1495B)
         : percent > 80
-            ? const Color(0xFFE8952D)
+            ? AppColors.emberHot
             : const Color(0xFF2E9E6B);
 
     return Card(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/quota_and_advance.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 
 typedef _AdvanceData = ({
@@ -190,7 +191,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colour =
-        owesSomething ? const Color(0xFFE8952D) : const Color(0xFF2E9E6B);
+        owesSomething ? AppColors.emberHot : const Color(0xFF2E9E6B);
 
     return Card(
       child: Padding(
@@ -241,7 +242,7 @@ class _AdvanceTile extends StatelessWidget {
               : Icons.schedule_rounded,
           color: advance.isSettled
               ? const Color(0xFF2E9E6B)
-              : const Color(0xFFE8952D),
+              : AppColors.emberHot,
         ),
       ),
     );
@@ -259,7 +260,7 @@ class _RequestTile extends StatelessWidget {
     final colour = switch (request.status) {
       'approved' => const Color(0xFF2E9E6B),
       'rejected' => const Color(0xFFD1495B),
-      _ => const Color(0xFFE8952D),
+      _ => AppColors.emberHot,
     };
 
     return Card(

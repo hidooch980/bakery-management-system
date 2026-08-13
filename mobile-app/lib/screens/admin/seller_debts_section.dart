@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 
@@ -248,7 +249,7 @@ class _SellerTile extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: settleable > 0
-                          ? const Color(0xFFE8952D)
+                          ? AppColors.emberHot
                           : scheme.onSurfaceVariant,
                     ),
               ),
