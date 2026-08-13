@@ -128,6 +128,55 @@ class DieselAllocation extends Model
     }
 
     /**
+     * Litres burned baking this month's flour.
+     *
+     * The rate is the same one the quota is derived from — the depot
+     * allows 6.5 a sack because a sack takes 6.5 to bake — so consumption
+     * follows the sacks that went into dough rather than being metered.
+     * That is an estimate and reads as one, which is why it is kept apart
+     * from the delivered figure rather than folded into it.
+     */
+    public function getConsumedLitresAttribute(): float
+    {
+        [$from, $to] = Jalali::monthRangeFor($this->month_start);
+
+        $bags = (float) DoughEntry::query()
+            ->whereBetween('created_at', [$from->startOfDay(), $to->endOfDay()])
+            ->sum('bag_count');
+
+        return round($bags * (float) ($this->litres_per_bag ?? self::rateInForce()), 2);
+    }
+
+    /** Sacks that went into dough this month, which the estimate rests on. */
+    public function getBagsBakedAttribute(): float
+    {
+        [$from, $to] = Jalali::monthRangeFor($this->month_start);
+
+        return round((float) DoughEntry::query()
+            ->whereBetween('created_at', [$from->startOfDay(), $to->endOfDay()])
+            ->sum('bag_count'), 2);
+    }
+
+    /**
+     * What should still be in the tank: fuel that arrived, less fuel burned.
+     *
+     * A different question from [[getRemainingLitresAttribute]], which is
+     * how much more the depot will still issue. A month can be out of
+     * quota with a full tank, or in credit with an empty one, and running
+     * dry mid-bake is the one of the two that stops the oven.
+     */
+    public function getInTankLitresAttribute(): float
+    {
+        return round($this->delivered_litres - $this->consumed_litres, 2);
+    }
+
+    /** The tank is estimated to be dry, whatever the quota still allows. */
+    public function getIsTankEmptyAttribute(): bool
+    {
+        return $this->in_tank_litres <= 0;
+    }
+
+    /**
      * How much of the quota is gone, as a percentage.
      *
      * Capped at 100 for the bar that shows it: a shop that somehow drew more

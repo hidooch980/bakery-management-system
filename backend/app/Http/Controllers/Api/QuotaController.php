@@ -175,6 +175,12 @@ class QuotaController extends Controller
             'available_litres' => $d->available_litres,
             'delivered_litres' => $d->delivered_litres,
             'remaining_litres' => $d->remaining_litres,
+            // What was burned baking, and what that leaves in the tank —
+            // a different question from what the depot will still issue.
+            'consumed_litres' => $d->consumed_litres,
+            'bags_baked' => $d->bags_baked,
+            'in_tank_litres' => $d->in_tank_litres,
+            'is_tank_empty' => $d->is_tank_empty,
             'litres_per_bag' => $d->litres_per_bag === null ? null : (float) $d->litres_per_bag,
             'derivation_label' => $d->derivation_label,
             'used_percent' => $d->used_percent,

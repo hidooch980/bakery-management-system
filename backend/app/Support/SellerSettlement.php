@@ -8,6 +8,7 @@ use App\Models\SellerAccountCredit;
 use App\Models\SettlementRequest;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * Closing out what a seller owes.
@@ -35,6 +36,16 @@ class SellerSettlement
         $difference = round($sales->sum(fn (Sale $s) => $s->open_difference), 2);
         $shortfall = round($sales->sum(fn (Sale $s) => $s->open_shortfall), 2);
 
+        // Counted, not divided: the seller settles in loaves, and the
+        // loaves are on the sales already. Dividing the money by today's
+        // price would restate an old debt every time the price moved.
+        $cashLoaves = (int) $sales->sum(
+            fn (Sale $s) => $s->cash_held > 0 ? (int) $s->bread_count : 0
+        );
+        $shortfallLoaves = (int) $sales->sum(
+            fn (Sale $s) => $s->open_shortfall > 0 ? (int) $s->shortfall_count : 0
+        );
+
         return [
             'cash' => $cash,
             'difference' => $difference,
@@ -43,6 +54,9 @@ class SellerSettlement
             // handed over adds to the total rather than reducing it.
             'total' => round($cash + $shortfall - $difference, 2),
             'credit' => round($sales->sum(fn (Sale $s) => $s->open_credit), 2),
+            'cash_loaves' => $cashLoaves,
+            'shortfall_loaves' => $shortfallLoaves,
+            'loaves' => $cashLoaves + $shortfallLoaves,
         ];
     }
 
@@ -244,6 +258,42 @@ class SellerSettlement
      *
      * @return array{settled: array<int>, credit_left: float}
      */
+    /**
+     * What one loaf is worth to the seller's account today.
+     *
+     * The shop settles in loaves — "I have accounted for five hundred" —
+     * so the count has to become money somewhere, and this is the only
+     * place it does.
+     */
+    public static function loafPrice(): float
+    {
+        return (float) (CurrentBakery::get()?->bread_price ?? 0);
+    }
+
+    /**
+     * Settles a number of loaves rather than an amount.
+     *
+     * The loaves become money at today's price and are applied exactly as
+     * a payment would be — oldest sale first, remainder held as credit.
+     * Nothing downstream needs to know it arrived as a count, so there is
+     * one settlement path rather than two that can drift apart.
+     */
+    public static function applyLoaves(
+        User $seller,
+        int $loaves,
+        ?SettlementRequest $request = null,
+    ): array {
+        $price = self::loafPrice();
+
+        // No price means no honest conversion. Settling at zero would mark
+        // the debt paid and take nothing off it.
+        if ($price <= 0) {
+            throw new RuntimeException('قیمت نان در تنظیمات تعیین نشده است.');
+        }
+
+        return self::applyPayment($seller, round($loaves * $price, 2), $request);
+    }
+
     public static function applyPayment(
         User $seller,
         float $amount,

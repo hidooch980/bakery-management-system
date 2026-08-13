@@ -7,6 +7,10 @@ class DieselQuota {
     required this.remainingLitres,
     required this.usedPercent,
     required this.isOverdrawn,
+    required this.consumedLitres,
+    required this.bagsBaked,
+    required this.inTankLitres,
+    required this.isTankEmpty,
     this.litresPerBag,
     this.derivationLabel,
   });
@@ -18,6 +22,10 @@ class DieselQuota {
         remainingLitres: _d(json['remaining_litres']),
         usedPercent: _d(json['used_percent']),
         isOverdrawn: json['is_overdrawn'] as bool? ?? false,
+        consumedLitres: _d(json['consumed_litres']),
+        bagsBaked: _d(json['bags_baked']),
+        inTankLitres: _d(json['in_tank_litres']),
+        isTankEmpty: json['is_tank_empty'] as bool? ?? false,
         litresPerBag: json['litres_per_bag'] == null
             ? null
             : _d(json['litres_per_bag']),
@@ -29,7 +37,21 @@ class DieselQuota {
   final double deliveredLitres;
   final double remainingLitres;
   final double usedPercent;
+
+  /// True when the depot will issue no more this month.
   final bool isOverdrawn;
+
+  /// Litres burned baking, estimated from the sacks that went into dough
+  /// at the same rate the quota is built on.
+  final double consumedLitres;
+  final double bagsBaked;
+
+  /// What should still be in the tank: what arrived, less what was burned.
+  /// A different question from how much the depot will still issue — a
+  /// month can be in credit with an empty tank, and only the empty tank
+  /// stops the oven.
+  final double inTankLitres;
+  final bool isTankEmpty;
 
   /// What a sack earns this month. It moves: the depot allows more some
   /// months and less others.

@@ -285,7 +285,11 @@ class IssueScanner
      */
     private function longUnsettledSellers(): array
     {
-        // Long enough that a weekend or a day off cannot explain it.
+        // The shop's rule is settle by month end, so anything still open
+        // from a month already finished is late by the shop's own standard
+        // rather than by a number this scanner invented. A week is kept as
+        // the softer warning inside the current month.
+        [$monthStart] = Jalali::currentMonthRange();
         $limit = now()->subDays(7);
 
         $sellers = User::query()->ofCurrentBakery()
@@ -303,23 +307,41 @@ class IssueScanner
 
             $oldest = $sales->first();
 
-            if (! $oldest || $oldest->created_at->gt($limit)) {
+            if (! $oldest) {
+                continue;
+            }
+
+            // Inside the current month a week is the threshold; across a
+            // month end there is none, because the month end was the
+            // deadline. A sale on the 29th is late on the 1st.
+            if ($oldest->created_at->gte($monthStart) && $oldest->created_at->gt($limit)) {
                 continue;
             }
 
             $days = (int) $oldest->created_at->diffInDays(now());
             $total = round($sales->sum(fn (Sale $s) => $s->seller_account_amount), 2);
+            $owed = SellerSettlement::outstandingFor($seller);
+
+            // Carried past a month end the shop said it would settle by.
+            $fromLastMonth = $oldest->created_at->lt($monthStart);
 
             $issues[] = new SystemIssue(
                 key: "seller-account-stale-{$seller->id}",
-                severity: $days >= 14 ? SystemIssue::CRITICAL : SystemIssue::WARNING,
-                title: "حساب {$seller->name} {$days} روز است تسویه نشده",
+                severity: $fromLastMonth || $days >= 14
+                    ? SystemIssue::CRITICAL
+                    : SystemIssue::WARNING,
+                title: $fromLastMonth
+                    ? "حساب {$seller->name} از ماه گذشته تسویه نشده"
+                    : "حساب {$seller->name} {$days} روز است تسویه نشده",
                 detail: 'قدیمی‌ترین بدهی از '.AppCalendar::date($oldest->created_at)
-                    .' مانده، جمعاً '.Money::format($total).'.',
+                    .' مانده — '.number_format($owed['loaves']).' نان، '
+                    .Money::format($total).'.',
                 cause: 'پول فروش نزد فروشنده مانده و به صندوق نرسیده است.',
-                suggestion: $days >= 14
-                    ? 'همین امروز پیگیری کنید؛ دو هفته برای پول نقد نزد یک نفر زیاد است.'
-                    : 'از فروشنده بخواهید حساب را تسویه کند.',
+                suggestion: $fromLastMonth
+                    ? 'قرار بود تا پایان ماه تسویه شود؛ حساب ماه گذشته هنوز باز است.'
+                    : ($days >= 14
+                        ? 'همین امروز پیگیری کنید؛ دو هفته برای پول نقد نزد یک نفر زیاد است.'
+                        : 'از فروشنده بخواهید تا پایان ماه تسویه کند.'),
                 url: '/admin/sales',
                 urlLabel: 'تسویه حساب فروشنده',
             );
@@ -387,7 +409,30 @@ class IssueScanner
 
         $remaining = $quota->remaining_litres;
 
-        // Comfortable: nothing to say.
+        // An empty tank stops the oven; an exhausted quota only stops the
+        // next delivery. The first is worth saying even in a month with
+        // quota left to draw.
+        if ($quota->is_tank_empty && $quota->delivered_litres > 0) {
+            return [new SystemIssue(
+                key: 'diesel-tank-empty',
+                severity: SystemIssue::CRITICAL,
+                title: 'سوخت تحویلی این ماه مصرف شده',
+                detail: number_format($quota->delivered_litres, 0).' لیتر تحویل گرفته‌اید و '
+                    .number_format($quota->consumed_litres, 0).' لیتر بابت '
+                    .number_format($quota->bags_baked, 0).' کیسه پخت مصرف شده.',
+                cause: 'مصرف تخمینی بر پایه‌ی '
+                    .rtrim(rtrim(number_format((float) ($quota->litres_per_bag ?? 0), 2), '0'), '.')
+                    .' لیتر برای هر کیسه آرد است.',
+                suggestion: $quota->remaining_litres > 0
+                    ? number_format($quota->remaining_litres, 0)
+                        .' لیتر از سهمیه‌ی ماه باقی است — تحویل بعدی را هماهنگ کنید.'
+                    : 'سهمیه‌ی ماه هم تمام شده؛ برای ادامه‌ی کار سوخت آزاد لازم است.',
+                url: '/admin/diesel-deliveries',
+                urlLabel: 'تحویل گازوئیل',
+            )];
+        }
+
+        // Comfortable on quota: nothing more to say.
         if (! $quota->is_overdrawn && $quota->used_percent < 80) {
             return [];
         }

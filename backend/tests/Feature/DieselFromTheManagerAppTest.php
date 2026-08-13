@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Bakery;
 use App\Models\DieselAllocation;
 use App\Models\DieselDelivery;
+use App\Models\DoughEntry;
 use App\Models\FlourAllocation;
 use App\Models\User;
 use App\Support\Jalali;
@@ -59,6 +60,16 @@ class DieselFromTheManagerAppTest extends TestCase
             'month_start' => $monthStart,
             'month_label' => Jalali::monthLabel($monthStart),
             'total_bags' => $bags,
+        ]);
+    }
+
+    /** Sacks into dough — what the consumption estimate rests on. */
+    private function mixDough(int $bags): void
+    {
+        DoughEntry::create([
+            'user_id' => $this->admin->id,
+            'bag_count' => $bags,
+            'status' => 'shaped',
         ]);
     }
 
@@ -317,6 +328,90 @@ class DieselFromTheManagerAppTest extends TestCase
             ->assertForbidden();
 
         $this->assertEquals(6.5, (float) DieselAllocation::first()->litres_per_bag);
+    }
+
+    public function test_baking_burns_the_same_rate_the_quota_is_built_on(): void
+    {
+        $this->flourQuota(343);
+        $this->mixDough(10);
+
+        // The depot allows 6.5 a sack because a sack takes 6.5 to bake.
+        $quota = DieselAllocation::current();
+
+        $this->assertEquals(10.0, $quota->bags_baked);
+        $this->assertEquals(65.0, $quota->consumed_litres);
+    }
+
+    public function test_the_tank_is_what_arrived_less_what_was_burned(): void
+    {
+        $this->flourQuota(343);
+        $this->mixDough(10); // 65 litres burned
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/v1/diesel/deliveries', ['litres' => 200])
+            ->assertCreated();
+
+        $quota = DieselAllocation::current();
+
+        $this->assertEquals(135.0, $quota->in_tank_litres);
+        $this->assertFalse($quota->is_tank_empty);
+    }
+
+    public function test_quota_left_and_fuel_left_are_different_questions(): void
+    {
+        $this->flourQuota(343);
+        $this->mixDough(40); // 260 litres burned
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/v1/diesel/deliveries', ['litres' => 200])
+            ->assertCreated();
+
+        $quota = DieselAllocation::current();
+
+        // Plenty of quota left to draw, and nothing in the tank to bake
+        // with. Only one of the two stops the oven.
+        $this->assertEquals(2030.0, $quota->remaining_litres);
+        $this->assertEquals(-60.0, $quota->in_tank_litres);
+        $this->assertTrue($quota->is_tank_empty);
+    }
+
+    public function test_the_app_is_told_both_figures(): void
+    {
+        $this->flourQuota(343);
+        $this->mixDough(10);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/v1/diesel/deliveries', ['litres' => 200])
+            ->assertCreated();
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/diesel/quota')
+            ->assertOk();
+
+        $this->assertEquals(65, $response->json('data.allocation.consumed_litres'));
+        $this->assertEquals(10, $response->json('data.allocation.bags_baked'));
+        $this->assertEquals(135, $response->json('data.allocation.in_tank_litres'));
+        $this->assertEquals(2030, $response->json('data.allocation.remaining_litres'));
+    }
+
+    public function test_a_month_with_no_baking_burns_nothing(): void
+    {
+        $this->flourQuota(343);
+
+        $this->assertEquals(0.0, DieselAllocation::current()->consumed_litres);
+    }
+
+    public function test_a_changed_rate_moves_the_estimate_with_it(): void
+    {
+        $this->flourQuota(343);
+        $this->mixDough(10);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->patchJson('/api/v1/diesel/quota', ['litres_per_bag' => 7])
+            ->assertOk();
+
+        // The month's own rate drives the estimate, not the setting.
+        $this->assertEquals(70.0, DieselAllocation::current()->consumed_litres);
     }
 
     public function test_staff_cannot_record_a_delivery(): void

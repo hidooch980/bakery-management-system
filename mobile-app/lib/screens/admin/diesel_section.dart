@@ -143,13 +143,43 @@ class _DieselSectionState extends State<DieselSection> {
               value: '${_litres(quota.deliveredLitres)} لیتر',
             ),
             AdminRow(
-              label: 'باقی‌مانده',
+              label: 'مانده سهمیه',
               value: quota.isOverdrawn
                   ? '${_litres(quota.remainingLitres.abs())} لیتر بیش از سهمیه'
                   : '${_litres(quota.remainingLitres)} لیتر',
             ),
             if (quota.derivationLabel != null)
-              AdminRow(label: 'محاسبه', value: quota.derivationLabel!),
+              AdminRow(label: 'محاسبه سهمیه', value: quota.derivationLabel!),
+            const Divider(height: 20),
+            // What the depot will still issue and what is actually in the
+            // tank are different questions, and only the second one stops
+            // the oven — so it is labelled rather than left to be inferred.
+            AdminRow(
+              label: 'پخت این ماه',
+              value: '${_litres(quota.bagsBaked)} کیسه'
+                  ' · ${_litres(quota.consumedLitres)} لیتر سوخته',
+            ),
+            AdminRow(
+              label: 'مانده باک (تخمینی)',
+              value: quota.isTankEmpty
+                  ? 'تمام شده'
+                  : '${_litres(quota.inTankLitres)} لیتر',
+            ),
+            if (quota.isTankEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
+                child: Text(
+                  quota.remainingLitres > 0
+                      ? 'سوخت تحویلی تمام شده، ولی '
+                          '${_litres(quota.remainingLitres)} لیتر از سهمیه مانده — '
+                          'تحویل بعدی را هماهنگ کنید.'
+                      : 'هم سوخت تحویلی و هم سهمیه‌ی ماه تمام شده.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFFD1495B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
               child: Align(
