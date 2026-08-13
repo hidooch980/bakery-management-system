@@ -27,7 +27,9 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->brandName('سیستم مدیریت نانوایی')
+            // Short, because it sits in the sidebar beside every page and
+            // a full sentence there is a sentence read a hundred times a day.
+            ->brandName('نانوایی')
             // Warm, bread-inspired palette that reads well in both themes.
             // The same hexes the phone app is built from, rather than
             // Filament's generic ramps. Staff move between the two all day;

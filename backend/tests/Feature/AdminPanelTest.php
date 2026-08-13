@@ -52,7 +52,7 @@ class AdminPanelTest extends TestCase
     {
         $this->get('/admin/login')
             ->assertOk()
-            ->assertSee('سیستم مدیریت نانوایی');
+            ->assertSee('نانوایی');
     }
 
     public function test_guest_is_redirected_from_panel(): void

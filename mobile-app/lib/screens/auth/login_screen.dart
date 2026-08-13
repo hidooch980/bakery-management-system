@@ -112,14 +112,19 @@ class _LoginScreenState extends State<LoginScreen>
 
     return Scaffold(
       body: Container(
+        // A warm wash at the top rather than a flat page: the first screen
+        // of the day is opened in a dark shop before the oven is lit, and a
+        // sheet of plain white at that hour is a torch in the face.
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
             colors: [
-              scheme.primary.withValues(alpha: 0.12),
+              scheme.primary.withValues(alpha: 0.18),
+              scheme.primary.withValues(alpha: 0.04),
               scheme.surface.withValues(alpha: 0.0),
             ],
+            stops: const [0, 0.45, 1],
           ),
         ),
         child: SafeArea(
@@ -151,25 +156,52 @@ class _LoginScreenState extends State<LoginScreen>
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               _Logo(scheme: scheme),
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 26),
                               Text(
-                                'سیستم مدیریت نانوایی',
+                                'نانوایی',
                                 textAlign: TextAlign.center,
                                 style: Theme.of(context)
                                     .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(fontWeight: FontWeight.w800),
+                                    .headlineMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.5,
+                                    ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Text(
-                                'برای ورود، اطلاعات حساب خود را وارد کنید',
+                                'صبح بخیر — برای شروع کار وارد شوید',
                                 textAlign: TextAlign.center,
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodyMedium
                                     ?.copyWith(color: scheme.onSurfaceVariant),
                               ),
-                              const SizedBox(height: 32),
+                              const SizedBox(height: 26),
+
+                              // The fields sit on a raised card rather than
+                              // loose on the page: it gives the eye one place
+                              // to land at five in the morning, and separates
+                              // the form from the warm ground behind it.
+                              Container(
+                                padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+                                decoration: BoxDecoration(
+                                  color: scheme.surface,
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: scheme.outlineVariant.withValues(alpha: 0.6),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.06),
+                                      blurRadius: 24,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
                               TextFormField(
                                 controller: _loginController,
                                 textInputAction: TextInputAction.next,
@@ -243,7 +275,11 @@ class _LoginScreenState extends State<LoginScreen>
                                   label: Text('ورود با $_biometricLabel'),
                                 ),
                               ],
-                              const SizedBox(height: 20),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(height: 18),
                               Text(
                                 'حساب کاربری فقط توسط مدیر ساخته می‌شود',
                                 textAlign: TextAlign.center,
@@ -268,6 +304,14 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
+/// The mark on the sign-in screen: a sangak loaf, drawn rather than taken
+/// from an icon set.
+///
+/// Icons.bakery_dining is a French roll — the wrong bread for a shop that
+/// bakes flatbread on stones, and the first thing every member of staff
+/// saw each morning. This is drawn to the shape they actually pull off the
+/// oven floor, and being a painter it stays sharp at any size and needs no
+/// asset shipped beside it.
 class _Logo extends StatelessWidget {
   const _Logo({required this.scheme});
 
@@ -277,26 +321,73 @@ class _Logo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 104,
-        height: 104,
+        width: 116,
+        height: 116,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             colors: [AppColors.wheat, AppColors.crust],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(34),
           boxShadow: [
             BoxShadow(
-              color: AppColors.crust.withValues(alpha: 0.3),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
+              color: AppColors.crust.withValues(alpha: 0.34),
+              blurRadius: 28,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
-        child: const Icon(Icons.bakery_dining_rounded,
-            size: 54, color: Colors.white),
+        child: const Padding(
+          padding: EdgeInsets.all(26),
+          child: CustomPaint(painter: _SangakPainter()),
+        ),
       ),
     );
   }
+}
+
+/// A flatbread with the ridges a baker's fingers leave down it.
+class _SangakPainter extends CustomPainter {
+  const _SangakPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // The loaf: a long oval, wider at the shoulders than the ends, the way
+    // it spreads on the stones.
+    final loaf = Path()
+      ..moveTo(w * 0.14, h * 0.50)
+      ..cubicTo(w * 0.12, h * 0.20, w * 0.34, h * 0.06, w * 0.52, h * 0.10)
+      ..cubicTo(w * 0.74, h * 0.14, w * 0.92, h * 0.28, w * 0.88, h * 0.52)
+      ..cubicTo(w * 0.85, h * 0.78, w * 0.62, h * 0.94, w * 0.42, h * 0.90)
+      ..cubicTo(w * 0.22, h * 0.86, w * 0.16, h * 0.72, w * 0.14, h * 0.50)
+      ..close();
+
+    canvas.drawPath(loaf, Paint()..color = Colors.white);
+
+    // The ridges, pressed down the length of it. Drawn as translucent
+    // knocks-out rather than a second colour, so the mark stays one solid
+    // shape at the size a launcher icon is seen.
+    final ridge = Paint()
+      ..color = AppColors.crust.withValues(alpha: 0.55)
+      ..strokeWidth = w * 0.055
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    for (var i = 0; i < 3; i++) {
+      final t = 0.34 + i * 0.18;
+
+      canvas.drawLine(
+        Offset(w * (t - 0.10), h * 0.30),
+        Offset(w * (t + 0.02), h * 0.74),
+        ridge,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
