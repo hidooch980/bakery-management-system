@@ -19,6 +19,13 @@ class BakeryController extends Controller
     /**
      * Bakery profile — readable by any authenticated user so the app can
      * display the shop name and logo.
+     *
+     * Note the asymmetry, which is deliberate: prices go OUT in stored
+     * Toman and come back IN through update() in the shop's display unit.
+     * The app multiplies bread_price by a loaf count and lets the formatter
+     * convert once at the point of rendering; handing it a Rial figure here
+     * would show every total ten times over. Anything that reads a price
+     * and writes it straight back must convert it first.
      */
     public function show(): JsonResponse
     {
@@ -31,6 +38,11 @@ class BakeryController extends Controller
             'formula' => DoughFormula::fromBakery($bakery)->toArray(),
             'calendar_label' => AppCalendar::label($bakery?->calendar),
             'currency_label' => Money::label($bakery?->currency),
+            // Ready to show, for anything that just wants to print them.
+            'bread_price_formatted' => Money::format((float) ($bakery?->bread_price ?? 0)),
+            'flour_purchase_price_per_kg_formatted' => Money::format(
+                (float) ($bakery?->flour_purchase_price_per_kg ?? 0)
+            ),
         ]);
     }
 
@@ -67,6 +79,23 @@ class BakeryController extends Controller
             'late_tier1_amount' => ['nullable', 'numeric', 'min:0'],
             'late_tier2_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        // Money arrives in whatever unit the shop displays, like every other
+        // endpoint, and is stored in Toman. This one filled the columns raw:
+        // a Rial shop setting the flour price to 12,000 stored 12,000 Toman
+        // and every loaf was costed at ten times what the factory charged.
+        foreach ([
+            'bread_price',
+            'flour_price_per_kg',
+            'flour_price_per_bag',
+            'flour_purchase_price_per_kg',
+            'late_tier1_amount',
+            'late_tier2_amount',
+        ] as $field) {
+            if (isset($data[$field])) {
+                $data[$field] = Money::toToman($data[$field]);
+            }
+        }
 
         $bakery = CurrentBakery::get() ?? new Bakery;
         $bakery->fill($data)->save();
