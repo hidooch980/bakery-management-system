@@ -19,7 +19,7 @@ class ConsignmentFlourResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
 
-    protected static ?string $navigationGroup = 'انبار';
+    protected static ?string $navigationGroup = 'انبار و سهمیه';
 
     protected static ?string $navigationLabel = 'آرد امانی';
 

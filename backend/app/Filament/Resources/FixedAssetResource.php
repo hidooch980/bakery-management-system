@@ -21,7 +21,7 @@ class FixedAssetResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-storefront';
 
-    protected static ?string $navigationGroup = 'مالی';
+    protected static ?string $navigationGroup = 'امور مالی';
 
     protected static ?string $navigationLabel = 'دارایی ثابت';
 

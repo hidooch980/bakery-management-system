@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Widgets\BakeryStatsOverview;
 use App\Filament\Widgets\FlourQuotaOverview;
 use App\Filament\Widgets\InventoryOverview;
+use App\Filament\Widgets\MoneyAtAGlance;
 use App\Filament\Widgets\ProductionTrendChart;
 use Filament\Pages\Dashboard as BaseDashboard;
 
@@ -20,6 +21,9 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
+            // The four figures the owner opens the panel to find, before
+            // the production detail underneath them.
+            MoneyAtAGlance::class,
             BakeryStatsOverview::class,
             ProductionTrendChart::class,
             InventoryOverview::class,

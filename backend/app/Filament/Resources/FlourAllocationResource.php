@@ -21,7 +21,7 @@ class FlourAllocationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
 
-    protected static ?string $navigationGroup = 'انبار';
+    protected static ?string $navigationGroup = 'انبار و سهمیه';
 
     protected static ?string $navigationLabel = 'سهمیه آرد';
 

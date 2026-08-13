@@ -18,7 +18,7 @@ class InventoryMovementResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-arrows-right-left';
 
-    protected static ?string $navigationGroup = 'انبار';
+    protected static ?string $navigationGroup = 'انبار و سهمیه';
 
     protected static ?string $navigationLabel = 'گردش انبار';
 

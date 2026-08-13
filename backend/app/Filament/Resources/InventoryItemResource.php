@@ -20,7 +20,7 @@ class InventoryItemResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cube-transparent';
 
-    protected static ?string $navigationGroup = 'انبار';
+    protected static ?string $navigationGroup = 'انبار و سهمیه';
 
     protected static ?string $navigationLabel = 'موجودی انبار';
 

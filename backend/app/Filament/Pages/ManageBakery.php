@@ -82,9 +82,46 @@ class ManageBakery extends Page implements HasForms
                             ->columnSpanFull(),
                     ]),
 
-                Forms\Components\Section::make('تعاریف تولید و قیمت')
-                    ->description('این مقادیر در اپلیکیشن برای پیش‌پر کردن وزن‌ها و پیشنهاد مبلغ فروش استفاده می‌شوند.')
+                Forms\Components\Section::make('قیمت‌های جاری')
+                    ->description('آنچه ماه به ماه عوض می‌شود. بقیه تنظیمات پایین‌تر و بسته‌اند.')
+                    ->icon('heroicon-o-banknotes')
+                    ->columns(2)
+                    ->schema([
+                        MoneyInput::make('bread_price', 'قیمت هر نان')
+                            ->live(onBlur: true)
+                            ->helperText(function ($state) {
+                                $price = (float) ($state ?: 0);
+
+                                return $price > 0
+                                    ? 'مبلغ پیشنهادی صد نان: '.Money::format(Money::toToman($price) * 100)
+                                    : 'برای پیشنهاد مبلغ فروش در اپلیکیشن';
+                            }),
+
+                        MoneyInput::make('flour_purchase_price_per_kg', 'قیمت خرید هر کیلو آرد')
+                            ->live(onBlur: true)
+                            // Says what a sack costs, which is the figure the
+                            // shop actually argues about with the factory.
+                            ->helperText(function ($state, Forms\Get $get) {
+                                $perKg = Money::toToman((float) ($state ?: 0));
+                                $bag = (float) ($get('flour_bag_weight_kg') ?: 0);
+
+                                return $perKg > 0 && $bag > 0
+                                    ? 'هر کیسه: '.Money::format($perKg * $bag)
+                                        .' — مبنای بهای تمام‌شده در گزارش سود و زیان'
+                                    : 'مبنای بهای تمام‌شده؛ جدا از قیمت فروش آرد به مشتری';
+                            }),
+
+                        MoneyInput::make('flour_price_per_kg', 'قیمت فروش هر کیلو آرد')
+                            ->helperText('برای فروش آرد به مشتری'),
+
+                        MoneyInput::make('flour_price_per_bag', 'قیمت فروش هر کیسه آرد')
+                            ->helperText('خالی بماند، از قیمت کیلویی × وزن کیسه حساب می‌شود'),
+                    ]),
+
+                Forms\Components\Section::make('قواعد شمارش و وزن')
+                    ->description('چانه، نانینو و سهمیه گازوئیل از روی این مقادیر حساب می‌شوند. سالی یکی دو بار عوض می‌شود.')
                     ->icon('heroicon-o-calculator')
+                    ->collapsed()
                     ->columns(3)
                     ->schema([
                         Forms\Components\TextInput::make('normal_chane_weight_kg')
@@ -135,9 +172,6 @@ class ManageBakery extends Page implements HasForms
                             ->suffix('عدد')
                             ->helperText('چانه‌گیر تشتک‌به‌تشتک ثبت می‌کند؛ این عدد پیش‌فرض هر تشتک است و تشتک آخر معمولاً کمتر می‌شود.'),
 
-                        MoneyInput::make('bread_price', 'قیمت هر نان')
-                            ->helperText('برای پیشنهاد مبلغ فروش در اپلیکیشن'),
-
                         Forms\Components\TextInput::make('flour_bag_weight_kg')
                             ->label('وزن هر کیسه آرد')
                             ->numeric()
@@ -145,15 +179,6 @@ class ManageBakery extends Page implements HasForms
                             ->required()
                             ->suffix('کیلوگرم')
                             ->helperText('پایه فرمول تولید'),
-
-                        MoneyInput::make('flour_price_per_kg', 'قیمت هر کیلو آرد')
-                            ->helperText('برای فروش آرد به‌صورت کیلویی'),
-
-                        MoneyInput::make('flour_price_per_bag', 'قیمت هر کیسه آرد')
-                            ->helperText('اگر خالی بماند، از قیمت کیلویی × وزن کیسه محاسبه می‌شود'),
-
-                        MoneyInput::make('flour_purchase_price_per_kg', 'قیمت خرید هر کیلو آرد از کارخانه')
-                            ->helperText('برای محاسبه بهای تمام‌شده؛ جدا از قیمت فروش آرد به مشتری'),
 
                         Forms\Components\Toggle::make('flour_transport_by_factory')
                             ->label('حمل توسط کارخانه')
@@ -175,8 +200,9 @@ class ManageBakery extends Page implements HasForms
                     ]),
 
                 Forms\Components\Section::make('قوانین تأخیر و کسر حقوق')
-                    ->description('این قوانین به همه کارکنان در اپلیکیشن اعلام می‌شود. جریمه به‌ازای هر «روز» تأخیر است، نه هر مورد؛ اگر در یک روز هم چانه‌گیری و هم پخت دیر شود، یک بار حساب می‌شود.')
+                    ->description('جریمه به‌ازای هر «روز» تأخیر است، نه هر مورد؛ اگر در یک روز هم چانه‌گیری و هم پخت دیر شود، یک بار حساب می‌شود.')
                     ->icon('heroicon-o-exclamation-triangle')
+                    ->collapsed()
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('late_free_days')
@@ -208,8 +234,9 @@ class ManageBakery extends Page implements HasForms
                     ]),
 
                 Forms\Components\Section::make('فرمول تولید خمیر')
-                    ->description('سیستم از این نسبت‌ها تعداد و وزن چانه را خودکار حساب می‌کند؛ کارکنان نمی‌توانند وزن را دستی تغییر دهند.')
+                    ->description('نسبت‌های خمیر. یک بار تنظیم می‌شود و معمولاً دیگر دست نمی‌خورد.')
                     ->icon('heroicon-o-beaker')
+                    ->collapsed()
                     ->columns(3)
                     ->schema([
                         Forms\Components\TextInput::make('water_ratio')
@@ -388,7 +415,9 @@ class ManageBakery extends Page implements HasForms
                     ]),
 
                 Forms\Components\Section::make('نمایش و واحدها')
+                    ->description('واحد پول و تقویم. یک بار در ابتدای کار.')
                     ->icon('heroicon-o-adjustments-horizontal')
+                    ->collapsed()
                     ->columns(2)
                     ->schema([
                         Forms\Components\Select::make('currency')
