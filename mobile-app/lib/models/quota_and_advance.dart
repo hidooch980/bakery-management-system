@@ -1,0 +1,165 @@
+/// The month's diesel quota, and what is left of it.
+class DieselQuota {
+  const DieselQuota({
+    required this.monthLabel,
+    required this.totalLitres,
+    required this.deliveredLitres,
+    required this.remainingLitres,
+    required this.usedPercent,
+    required this.isOverdrawn,
+    this.litresPerBag,
+    this.derivationLabel,
+  });
+
+  factory DieselQuota.fromJson(Map<String, dynamic> json) => DieselQuota(
+        monthLabel: json['month_label'] as String? ?? '',
+        totalLitres: _d(json['total_litres']),
+        deliveredLitres: _d(json['delivered_litres']),
+        remainingLitres: _d(json['remaining_litres']),
+        usedPercent: _d(json['used_percent']),
+        isOverdrawn: json['is_overdrawn'] as bool? ?? false,
+        litresPerBag: json['litres_per_bag'] == null
+            ? null
+            : _d(json['litres_per_bag']),
+        derivationLabel: json['derivation_label'] as String?,
+      );
+
+  final String monthLabel;
+  final double totalLitres;
+  final double deliveredLitres;
+  final double remainingLitres;
+  final double usedPercent;
+  final bool isOverdrawn;
+
+  /// What a sack earns this month. It moves: the depot allows more some
+  /// months and less others.
+  final double? litresPerBag;
+
+  /// How the figure was arrived at, in words — "343 کیسه × 6.5 لیتر".
+  final String? derivationLabel;
+}
+
+/// A tanker's worth of diesel arriving.
+class DieselDelivery {
+  const DieselDelivery({
+    required this.id,
+    required this.litres,
+    required this.amountFormatted,
+    required this.wasPaidFor,
+    required this.receivedOnLabel,
+    this.docketNumber,
+    this.recordedBy,
+    this.note,
+  });
+
+  factory DieselDelivery.fromJson(Map<String, dynamic> json) => DieselDelivery(
+        id: json['id'] as int,
+        litres: _d(json['litres']),
+        amountFormatted: json['amount_formatted'] as String? ?? '',
+        wasPaidFor: json['was_paid_for'] as bool? ?? false,
+        receivedOnLabel: json['received_on_label'] as String? ?? '',
+        docketNumber: json['docket_number'] as String?,
+        recordedBy: json['recorded_by'] as String?,
+        note: json['note'] as String?,
+      );
+
+  final int id;
+  final double litres;
+  final String amountFormatted;
+  final bool wasPaidFor;
+  final String receivedOnLabel;
+  final String? docketNumber;
+  final String? recordedBy;
+  final String? note;
+}
+
+/// Money handed to a member of staff before payday.
+class StaffAdvance {
+  const StaffAdvance({
+    required this.id,
+    required this.userName,
+    required this.amountFormatted,
+    required this.recoveredFormatted,
+    required this.outstanding,
+    required this.outstandingFormatted,
+    required this.isSettled,
+    required this.paidOnLabel,
+    this.note,
+  });
+
+  factory StaffAdvance.fromJson(Map<String, dynamic> json) => StaffAdvance(
+        id: json['id'] as int,
+        userName: json['user_name'] as String? ?? '',
+        amountFormatted: json['amount_formatted'] as String? ?? '',
+        recoveredFormatted: json['recovered_formatted'] as String? ?? '',
+        outstanding: _d(json['outstanding']),
+        outstandingFormatted: json['outstanding_formatted'] as String? ?? '',
+        isSettled: json['is_settled'] as bool? ?? false,
+        paidOnLabel: json['paid_on_label'] as String? ?? '',
+        note: json['note'] as String?,
+      );
+
+  final int id;
+  final String userName;
+  final String amountFormatted;
+  final String recoveredFormatted;
+  final double outstanding;
+  final String outstandingFormatted;
+  final bool isSettled;
+  final String paidOnLabel;
+  final String? note;
+}
+
+/// A request for pay early, and the answer to it.
+class AdvanceRequest {
+  const AdvanceRequest({
+    required this.id,
+    required this.userName,
+    required this.amountFormatted,
+    required this.status,
+    required this.statusLabel,
+    required this.isPending,
+    required this.requestedAtLabel,
+    this.reason,
+    this.decisionNote,
+    this.decidedByName,
+  });
+
+  factory AdvanceRequest.fromJson(Map<String, dynamic> json) => AdvanceRequest(
+        id: json['id'] as int,
+        userName: json['user_name'] as String? ?? '',
+        amountFormatted: json['amount_formatted'] as String? ?? '',
+        status: json['status'] as String? ?? 'pending',
+        statusLabel: json['status_label'] as String? ?? '',
+        isPending: json['is_pending'] as bool? ?? false,
+        requestedAtLabel: json['requested_at_label'] as String? ?? '',
+        reason: json['reason'] as String?,
+        decisionNote: json['decision_note'] as String?,
+        decidedByName: json['decided_by_name'] as String?,
+      );
+
+  final int id;
+  final String userName;
+  final String amountFormatted;
+  final String status;
+  final String statusLabel;
+  final bool isPending;
+  final String requestedAtLabel;
+  final String? reason;
+
+  /// Why it was turned down. A bare "no" to someone asking for money early
+  /// is worse than no answer at all, so this is shown wherever the status is.
+  final String? decisionNote;
+  final String? decidedByName;
+
+  bool get wasApproved => status == 'approved';
+
+  bool get wasRejected => status == 'rejected';
+}
+
+/// Server numbers arrive as int or double depending on the value.
+double _d(Object? value) => switch (value) {
+      final num n => n.toDouble(),
+      final String s => double.tryParse(s) ?? 0,
+      _ => 0,
+    };

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../services/bakery_api.dart';
+import 'advance_requests_section.dart';
 import 'staff_report_section.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
@@ -53,6 +54,8 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
               children: [
+                AdvanceRequestsSection(api: widget.api),
+                const SizedBox(height: 12),
                 StaffReportSection(api: widget.api),
                 const SizedBox(height: 40),
                 const EmptyState(
@@ -74,7 +77,13 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
               if (index == 0) {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: StaffReportSection(api: widget.api),
+                  child: Column(
+                    children: [
+                      AdvanceRequestsSection(api: widget.api),
+                      const SizedBox(height: 12),
+                      StaffReportSection(api: widget.api),
+                    ],
+                  ),
                 );
               }
 

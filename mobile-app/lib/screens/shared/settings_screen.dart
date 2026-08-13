@@ -3,9 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../services/bakery_api.dart';
 import '../../widgets/biometric_tile.dart';
-
 import 'change_password_screen.dart';
+import 'my_advances_screen.dart';
 import 'update_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -147,6 +148,24 @@ class SettingsScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const ChangePasswordScreen(),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Reachable by every role: the person whose pay an
+                  // advance comes out of is whoever took it, not only the
+                  // seller whose home screen happens to have room.
+                  ListTile(
+                    leading: const Icon(Icons.wallet_rounded),
+                    title: const Text('علی‌الحساب من'),
+                    subtitle: const Text('دریافتی‌ها و درخواست جدید'),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MyAdvancesScreen(
+                          api: context.read<BakeryApi>(),
+                        ),
                       ),
                     ),
                   ),

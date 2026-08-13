@@ -43,6 +43,7 @@ class BakeryApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<BakeryApi>.value(value: api),
         ChangeNotifierProvider(create: (_) => AuthProvider(api)..bootstrap()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()..load()),
         // Whether the backend answers — asked once at startup and then on

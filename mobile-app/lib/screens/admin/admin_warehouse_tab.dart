@@ -5,6 +5,7 @@ import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
+import 'diesel_section.dart';
 
 typedef _FlourSalesToday = ({
   List<FlourSale> sales,
@@ -87,6 +88,8 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
             children: [
+              DieselSection(api: widget.api),
+              const SizedBox(height: 12),
               AdminSection(
                 title: 'موجودی انبار',
                 icon: Icons.warehouse_rounded,

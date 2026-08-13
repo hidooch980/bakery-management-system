@@ -150,6 +150,15 @@ class ApiClient {
     return _unwrap(await _send(() => _dio.put(path, data: body)));
   }
 
+  Future<Map<String, dynamic>> patch(String path,
+      [Map<String, dynamic>? body]) async {
+    return _unwrap(await _send(() => _dio.patch(path, data: body)));
+  }
+
+  Future<Map<String, dynamic>> delete(String path) async {
+    return _unwrap(await _send(() => _dio.delete(path)));
+  }
+
   OfflineQueue get queue => _queue;
 
   /// When the shown copy of [path] was last fetched, or null if it is live.

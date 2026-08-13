@@ -13,6 +13,7 @@ import '../models/user.dart';
 import '../models/work_start.dart';
 import 'api_client.dart';
 import 'offline_queue.dart';
+import '../models/quota_and_advance.dart';
 
 /// Typed wrapper over every endpoint the mobile app uses.
 class BakeryApi {
@@ -864,6 +865,153 @@ class BakeryApi {
   /// queued it is a no-op, and mid-sync it just picks up where it left off.
   Future<({int sent, int failed, int remaining})> syncPending() =>
       _client.syncQueue();
+
+  // ------------------------------------------------- diesel quota
+
+  /// This month's diesel quota and the tankers drawn against it.
+  ///
+  /// The allocation is null when no quota has been registered — the shop
+  /// is told so rather than shown a guessed figure.
+  Future<({DieselQuota? quota, List<DieselDelivery> deliveries})>
+      dieselQuota() async {
+    final body = await _client.get('/diesel/quota');
+    final data = body['data'] as Map<String, dynamic>;
+    final allocation = data['allocation'] as Map<String, dynamic>?;
+
+    return (
+      quota: allocation == null ? null : DieselQuota.fromJson(allocation),
+      deliveries: ((data['deliveries'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(DieselDelivery.fromJson)
+          .toList(),
+    );
+  }
+
+  /// Records a tanker. The warning comes back set when it took the month
+  /// past its quota, so it can be said while the driver is still there.
+  Future<({DieselQuota? quota, String? warning})> recordDieselDelivery({
+    required double litres,
+    double? amount,
+    String? docketNumber,
+    String? note,
+  }) async {
+    final body = await _client.post('/diesel/deliveries', {
+      'litres': litres,
+      if (amount != null) 'amount': amount,
+      if (docketNumber != null && docketNumber.isNotEmpty)
+        'docket_number': docketNumber,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+
+    final data = body['data'] as Map<String, dynamic>;
+    final allocation = data['allocation'] as Map<String, dynamic>?;
+
+    return (
+      quota: allocation == null ? null : DieselQuota.fromJson(allocation),
+      warning: data['warning'] as String?,
+    );
+  }
+
+  Future<void> removeDieselDelivery(int id) =>
+      _client.delete('/diesel/deliveries/$id');
+
+  /// Changes what a sack earns this month, and with it the default the
+  /// next month starts from.
+  Future<DieselQuota?> setDieselRate({
+    double? litresPerBag,
+    double? totalLitres,
+  }) async {
+    final body = await _client.patch('/diesel/quota', {
+      if (litresPerBag != null) 'litres_per_bag': litresPerBag,
+      if (totalLitres != null) 'total_litres': totalLitres,
+    });
+
+    final allocation =
+        (body['data'] as Map<String, dynamic>)['allocation'] as Map<String, dynamic>?;
+
+    return allocation == null ? null : DieselQuota.fromJson(allocation);
+  }
+
+  /// Registers the month's flour quota. The diesel quota follows it, so
+  /// this is what a new month starts from.
+  Future<void> setFlourQuota({
+    required double totalBags,
+    double? carryoverBags,
+    String? note,
+  }) =>
+      _client.post('/flour-allocations', {
+        'total_bags': totalBags,
+        if (carryoverBags != null) 'carryover_bags': carryoverBags,
+        if (note != null && note.isNotEmpty) 'note': note,
+      });
+
+  // --------------------------------------------- advances on pay
+
+  /// What this person has drawn against their pay, and what next month
+  /// will be short by.
+  Future<({List<StaffAdvance> advances, String summary, double outstanding})>
+      myAdvances() async {
+    final body = await _client.get('/staff-advances/mine');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return (
+      advances: ((data['advances'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(StaffAdvance.fromJson)
+          .toList(),
+      summary: data['summary'] as String? ?? '',
+      outstanding: switch (data['outstanding']) {
+        final num n => n.toDouble(),
+        _ => 0.0,
+      },
+    );
+  }
+
+  Future<({List<AdvanceRequest> requests, bool hasPending})>
+      myAdvanceRequests() async {
+    final body = await _client.get('/advance-requests/mine');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return (
+      requests: ((data['requests'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(AdvanceRequest.fromJson)
+          .toList(),
+      hasPending: data['has_pending'] as bool? ?? false,
+    );
+  }
+
+  Future<AdvanceRequest> requestAdvance({
+    required double amount,
+    String? reason,
+  }) async {
+    final body = await _client.post('/advance-requests', {
+      'amount': amount,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    });
+
+    return AdvanceRequest.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> withdrawAdvanceRequest(int id) =>
+      _client.delete('/advance-requests/$id');
+
+  /// The requests waiting on an answer, for whoever gives it.
+  Future<List<AdvanceRequest>> pendingAdvanceRequests() async {
+    final body = await _client.get('/advance-requests');
+
+    return _paginated(body).map(AdvanceRequest.fromJson).toList();
+  }
+
+  Future<void> approveAdvanceRequest(int id, {String? note}) =>
+      _client.patch('/advance-requests/$id/approve', {
+        if (note != null && note.isNotEmpty) 'note': note,
+      });
+
+  /// Turning one down needs a reason: a bare "no" to someone asking for
+  /// money early is worse than no answer at all.
+  Future<void> rejectAdvanceRequest(int id, {required String note}) =>
+      _client.patch('/advance-requests/$id/reject', {'note': note});
 
   /// Laravel paginators nest the rows under `data.data`; plain lists don't.
   List<Map<String, dynamic>> _paginated(Map<String, dynamic> body) {
