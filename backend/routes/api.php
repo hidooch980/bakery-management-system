@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SellerCollectionController;
 use App\Http\Controllers\Api\SettlementRequestController;
+use App\Http\Controllers\Api\StaffAdvanceController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\WorkStartController;
 use Illuminate\Support\Facades\Route;
@@ -214,6 +215,10 @@ Route::prefix('v1')->group(function () {
         // salaries resource so `/salaries/{salary}` does not swallow "mine".
         Route::get('/salaries/mine', [SalaryController::class, 'mine']);
 
+        // And what they have drawn against them. Whoever took the advance
+        // is the person who most needs to know what next month is short by.
+        Route::get('/staff-advances/mine', [StaffAdvanceController::class, 'mine']);
+
         // --- Admin: finance (expenses & payroll) ---
         Route::middleware('permission:manage-finance')->group(function () {
             Route::get('/expenses/categories', [ExpenseController::class, 'categories']);
@@ -222,6 +227,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/salaries/employees', [SalaryController::class, 'employees']);
             Route::patch('/salaries/{salary}/mark-paid', [SalaryController::class, 'markPaid']);
             Route::apiResource('salaries', SalaryController::class)->except(['show']);
+
+            Route::get('/staff-advances/outstanding', [StaffAdvanceController::class, 'outstanding']);
+            Route::apiResource('staff-advances', StaffAdvanceController::class)
+                ->parameters(['staff-advances' => 'advance'])
+                ->only(['index', 'store', 'destroy']);
         });
 
         // --- Admin: miscellaneous income ---
