@@ -414,6 +414,118 @@ class DieselFromTheManagerAppTest extends TestCase
         $this->assertEquals(70.0, DieselAllocation::current()->consumed_litres);
     }
 
+    // ------------------------------- the period is the 5th to the 4th
+
+    public function test_the_quota_period_runs_from_the_fifth(): void
+    {
+        $allocation = $this->flourQuota(343);
+        $quota = DieselAllocation::current();
+
+        [$from, $to] = $quota->quotaRange();
+
+        // Not the calendar month: the mill issues flour against a period
+        // that starts on the 5th and the depot follows it.
+        $this->assertSame('05', Jalali::format($from, 'd'));
+        $this->assertSame('04', Jalali::format($to, 'd'));
+        $this->assertTrue($from->gt($allocation->month_start));
+    }
+
+    public function test_a_delivery_before_the_period_belongs_to_the_last_one(): void
+    {
+        $this->flourQuota(343);
+        $quota = DieselAllocation::current();
+        [$from] = $quota->quotaRange();
+
+        DieselDelivery::create([
+            'user_id' => $this->admin->id,
+            'received_on' => $from->copy()->subDay(),
+            'litres' => 500,
+        ]);
+
+        // The 4th is the last day of the period before. Counting it here
+        // would charge one period for fuel drawn against another.
+        $this->assertEquals(0.0, DieselAllocation::current()->delivered_litres);
+    }
+
+    public function test_a_delivery_on_the_first_day_of_the_period_counts(): void
+    {
+        $this->flourQuota(343);
+        [$from] = DieselAllocation::current()->quotaRange();
+
+        DieselDelivery::create([
+            'user_id' => $this->admin->id,
+            'received_on' => $from,
+            'litres' => 500,
+        ]);
+
+        $this->assertEquals(500.0, DieselAllocation::current()->delivered_litres);
+    }
+
+    public function test_baking_before_the_period_is_not_charged_to_it(): void
+    {
+        $this->flourQuota(343);
+        [$from] = DieselAllocation::current()->quotaRange();
+
+        DoughEntry::create([
+            'user_id' => $this->admin->id,
+            'bag_count' => 10,
+            'status' => 'shaped',
+        ])->forceFill(['created_at' => $from->copy()->subDay()])->save();
+
+        $this->assertEquals(0.0, DieselAllocation::current()->consumed_litres);
+    }
+
+    public function test_the_month_is_split_across_the_three_flour_periods(): void
+    {
+        $this->flourQuota(343)->syncPeriods();
+
+        $periods = DieselAllocation::current()->periods();
+
+        // The fuel is issued against flour that arrives in three lots, so
+        // it belongs to those same three periods.
+        $this->assertCount(3, $periods);
+        $this->assertSame(1, $periods[0]['period_number']);
+        $this->assertSame(3, $periods[2]['period_number']);
+
+        // Roughly a third of the month's litres each, and they come to the
+        // month's own figure rather than drifting from it.
+        $this->assertEqualsWithDelta(
+            2230,
+            array_sum(array_column($periods, 'litres')),
+            3,
+        );
+    }
+
+    public function test_exactly_one_period_is_the_current_one(): void
+    {
+        $this->flourQuota(343)->syncPeriods();
+
+        $current = array_filter(
+            DieselAllocation::current()->periods(),
+            fn (array $p) => $p['is_current'],
+        );
+
+        $this->assertCount(1, $current);
+    }
+
+    public function test_a_delivery_lands_in_the_period_it_was_drawn_in(): void
+    {
+        $this->flourQuota(343)->syncPeriods();
+        $quota = DieselAllocation::current();
+        [$from] = $quota->quotaRange();
+
+        DieselDelivery::create([
+            'user_id' => $this->admin->id,
+            'received_on' => $from,
+            'litres' => 700,
+        ]);
+
+        $periods = DieselAllocation::current()->periods();
+
+        $this->assertEquals(700, $periods[0]['delivered_litres']);
+        $this->assertEquals(0, $periods[1]['delivered_litres']);
+    }
+
     public function test_staff_cannot_record_a_delivery(): void
     {
         $this->flourQuota(343);

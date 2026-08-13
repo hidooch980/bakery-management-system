@@ -185,6 +185,10 @@ class QuotaController extends Controller
             'derivation_label' => $d->derivation_label,
             'used_percent' => $d->used_percent,
             'is_overdrawn' => $d->is_overdrawn,
+            // The fuel is issued against flour that arrives in three lots,
+            // so it belongs to those same three periods even when the shop
+            // draws the whole month in one go.
+            'periods' => $d->periods(),
         ];
     }
 

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Support\AppCalendar;
+use App\Support\DoughFormula;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -106,6 +108,82 @@ class DieselAllocation extends Model
             .' لیتر';
     }
 
+    /**
+     * The window this quota covers: the 5th to the 4th of the month after.
+     *
+     * Not the calendar month. The mill issues flour against a period that
+     * starts on the 5th, the depot issues diesel against the same period,
+     * and the shop reads both off the same dockets. Counting a calendar
+     * month put four days at each end into the wrong quota — a tanker on
+     * the 2nd came off the month that had just ended, and was charged to
+     * the one that had just begun.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    public function quotaRange(): array
+    {
+        [$from] = FlourAllocation::periodRange($this->month_start, 1);
+        [, $to] = FlourAllocation::periodRange($this->month_start, 3);
+
+        return [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
+    }
+
+    /**
+     * The month's diesel split across the three flour delivery periods.
+     *
+     * The fuel is issued against the flour, and the flour arrives in three
+     * lots rather than one, so the litres belong to those same three
+     * periods. The shop may still draw the lot in one go — and does — but
+     * a single month-wide figure cannot say which part of the month a
+     * tanker was drawn against, nor which period is running today.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function periods(): array
+    {
+        $flour = FlourAllocation::query()
+            ->whereDate('month_start', $this->month_start->toDateString())
+            ->first();
+
+        if (! $flour) {
+            return [];
+        }
+
+        $rate = (float) ($this->litres_per_bag ?? self::rateInForce());
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+        $today = now();
+        $out = [];
+
+        foreach (FlourAllocation::PERIODS as $number => $definition) {
+            [$from, $to] = FlourAllocation::periodRange($this->month_start, $number);
+
+            $period = $flour->periods->firstWhere('period_number', $number);
+            $bags = $period && $bagWeight > 0
+                ? round((float) $period->allocated_kg / $bagWeight, 2)
+                : 0.0;
+
+            $out[] = [
+                'period_number' => $number,
+                'label' => $definition['label'],
+                'starts_on' => $from->toDateString(),
+                'ends_on' => $to->toDateString(),
+                'starts_on_label' => AppCalendar::date($from),
+                'ends_on_label' => AppCalendar::date($to),
+                'bags' => $bags,
+                'litres' => round($bags * $rate),
+                'delivered_litres' => round((float) DieselDelivery::query()
+                    ->whereBetween('received_on', [$from->toDateString(), $to->toDateString()])
+                    ->sum('litres'), 2),
+                'is_current' => $today->betweenIncluded(
+                    $from->copy()->startOfDay(),
+                    $to->copy()->endOfDay(),
+                ),
+            ];
+        }
+
+        return $out;
+    }
+
     /** Quota plus anything carried over: what the shop may draw this month. */
     public function getAvailableLitresAttribute(): float
     {
@@ -115,7 +193,7 @@ class DieselAllocation extends Model
     /** Litres actually delivered inside this month. */
     public function getDeliveredLitresAttribute(): float
     {
-        [$from, $to] = Jalali::monthRangeFor($this->month_start);
+        [$from, $to] = $this->quotaRange();
 
         return round((float) DieselDelivery::query()
             ->whereBetween('received_on', [$from->toDateString(), $to->toDateString()])
@@ -138,10 +216,10 @@ class DieselAllocation extends Model
      */
     public function getConsumedLitresAttribute(): float
     {
-        [$from, $to] = Jalali::monthRangeFor($this->month_start);
+        [$from, $to] = $this->quotaRange();
 
         $bags = (float) DoughEntry::query()
-            ->whereBetween('created_at', [$from->startOfDay(), $to->endOfDay()])
+            ->whereBetween('created_at', [$from, $to])
             ->sum('bag_count');
 
         return round($bags * (float) ($this->litres_per_bag ?? self::rateInForce()), 2);
@@ -150,10 +228,10 @@ class DieselAllocation extends Model
     /** Sacks that went into dough this month, which the estimate rests on. */
     public function getBagsBakedAttribute(): float
     {
-        [$from, $to] = Jalali::monthRangeFor($this->month_start);
+        [$from, $to] = $this->quotaRange();
 
         return round((float) DoughEntry::query()
-            ->whereBetween('created_at', [$from->startOfDay(), $to->endOfDay()])
+            ->whereBetween('created_at', [$from, $to])
             ->sum('bag_count'), 2);
     }
 
@@ -198,12 +276,20 @@ class DieselAllocation extends Model
         return $this->remaining_litres < 0;
     }
 
-    /** The quota covering a given day, if one was ever registered. */
+    /**
+     * The quota covering a given day, if one was ever registered.
+     *
+     * Matched on the period the day falls in, not the calendar month it
+     * sits in: the 2nd of a month belongs to the quota that started on the
+     * 5th of the month before and has four days left to run. Asking by
+     * calendar month on that day would hand back a quota that has not
+     * begun, or none at all.
+     */
     public static function forDate(Carbon $day): ?self
     {
-        [$from] = Jalali::monthRangeFor($day);
-
-        return static::query()->whereDate('month_start', $from->toDateString())->first();
+        return static::query()->get()->first(
+            fn (self $allocation) => $day->betweenIncluded(...$allocation->quotaRange())
+        );
     }
 
     public static function current(): ?self
