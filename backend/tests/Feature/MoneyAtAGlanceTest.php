@@ -112,7 +112,7 @@ class MoneyAtAGlanceTest extends TestCase
         Livewire::test(MoneyAtAGlance::class)->assertSee('سهمیه این ماه ثبت نشده');
     }
 
-    public function test_the_diesel_line_shows_what_is_left(): void
+    public function test_the_diesel_line_leads_with_the_tank(): void
     {
         DieselAllocation::create([
             'month_start' => Jalali::currentMonthRange()[0],
@@ -124,9 +124,27 @@ class MoneyAtAGlanceTest extends TestCase
             'litres' => 400,
         ]);
 
+        // The tank is what stops the oven; the quota only says whether
+        // more can be ordered, so it goes in the description.
         Livewire::test(MoneyAtAGlance::class)
-            ->assertSee('گازوئیل مانده')
+            ->assertSee('گازوئیل در باک')
+            ->assertSee('400')
             ->assertSee('600');
+    }
+
+    public function test_before_the_first_tanker_the_tank_is_not_called_empty(): void
+    {
+        DieselAllocation::create([
+            'month_start' => Jalali::currentMonthRange()[0],
+            'total_litres' => 1000,
+        ]);
+
+        // Nothing delivered yet, so nothing in the tank — but that is a
+        // period which has not started drawing, not a shop about to run
+        // dry, and raising it as one would cry wolf every month.
+        Livewire::test(MoneyAtAGlance::class)
+            ->assertSee('هنوز تحویلی ثبت نشده')
+            ->assertDontSee('گازوئیل در باک');
     }
 
     public function test_it_shows_the_month_net_profit(): void

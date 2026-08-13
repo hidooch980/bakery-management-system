@@ -225,11 +225,15 @@ class _PeriodCard extends StatelessWidget {
     final isCurrent = period['is_current'] == true;
     final isOver = period['is_over'] == true;
 
+    // The same reading as the diesel meter, so the two are read the same
+    // way: how far along the period is *is* how hot the bar runs. Three
+    // steps could only say "fine / nearly / over", and the useful question
+    // in the middle of a period is how far along, not which bucket.
+    // Over-quota leaves the ramp — past the end of a scale is a different
+    // kind of fact, not a hotter shade of the same one.
     final color = isOver
-        ? const Color(0xFFD1495B)
-        : percent > 80
-            ? AppColors.emberHot
-            : const Color(0xFF2E9E6B);
+        ? Theme.of(context).colorScheme.error
+        : AppColors.emberAt((percent / 100).clamp(0.0, 1.0));
 
     return Card(
       // The period in progress is the one that matters most.
@@ -278,7 +282,9 @@ class _PeriodCard extends StatelessWidget {
                 value: (percent / 100).clamp(0.0, 1.0),
                 minHeight: 10,
                 color: color,
-                backgroundColor: color.withValues(alpha: 0.15),
+                backgroundColor: Theme.of(context)
+                    .dividerColor
+                    .withValues(alpha: 0.4),
               ),
             ),
             const SizedBox(height: 10),

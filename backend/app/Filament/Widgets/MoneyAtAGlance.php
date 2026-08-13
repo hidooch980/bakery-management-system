@@ -106,13 +106,30 @@ class MoneyAtAGlance extends BaseWidget
                 ->color('gray');
         }
 
-        $remaining = $quota->remaining_litres;
+        // Two different questions, and the tank is the one that stops the
+        // oven: a period can be well inside its quota with nothing left to
+        // bake with. The quota goes in the description, where it answers
+        // "can I order more" rather than "can I bake today".
+        //
+        // Only once something has been delivered, though — before the
+        // first tanker the tank reads zero because nothing has arrived,
+        // and calling that empty would raise an alarm about a period that
+        // has not started drawing yet.
+        $drawing = $quota->delivered_litres > 0;
 
-        return Stat::make('گازوئیل مانده', number_format($remaining, 0).' لیتر')
-            ->description($quota->used_percent.'٪ سهمیه ماه مصرف شده')
+        if (! $drawing) {
+            return Stat::make('گازوئیل', number_format($quota->remaining_litres, 0).' لیتر')
+                ->description('سهمیه دوره — هنوز تحویلی ثبت نشده')
+                ->descriptionIcon('heroicon-m-fire')
+                ->color('gray');
+        }
+
+        return Stat::make('گازوئیل در باک', number_format($quota->in_tank_litres, 0).' لیتر')
+            ->description(number_format($quota->remaining_litres, 0)
+                .' لیتر از سهمیه دوره مانده')
             ->descriptionIcon('heroicon-m-fire')
             ->color(match (true) {
-                $quota->is_overdrawn => 'danger',
+                $quota->is_tank_empty => 'danger',
                 $quota->used_percent >= 80 => 'warning',
                 default => 'success',
             });
