@@ -12,6 +12,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Carbon;
 
 /**
  * The month's diesel quota, and how much of it is left.
@@ -63,7 +64,7 @@ class DieselAllocationResource extends Resource
                             }
 
                             $derived = DieselAllocation::litresFor(
-                                \Illuminate\Support\Carbon::parse($month)
+                                Carbon::parse($month)
                             );
 
                             return $derived === null
