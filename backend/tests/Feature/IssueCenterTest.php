@@ -6,8 +6,10 @@ use App\Filament\Pages\IssueCenter;
 use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
+use App\Models\Expense;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
+use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\User;
 use App\Support\IssueScanner;
@@ -259,5 +261,115 @@ class IssueCenterTest extends TestCase
 
         Livewire::test(IssueCenter::class)
             ->assertActionHidden('autoFix');
+    }
+
+    /**
+     * A month of trading with no wages in it. Payroll is the biggest
+     * running cost there is, so its absence has to be said out loud rather
+     * than quietly inflating every profit figure.
+     */
+    private function sellSomething(): Sale
+    {
+        $dough = DoughEntry::create([
+            'user_id' => $this->admin->id,
+            'bag_count' => 1,
+            'status' => 'shaped',
+        ]);
+
+        $chane = ChaneEntry::create([
+            'dough_entry_id' => $dough->id,
+            'user_id' => $this->admin->id,
+            'chane_count' => 100,
+            'normal_weight_kg' => 85,
+            'nanino_weight_kg' => 0,
+            'spray_flour_kg' => 0,
+            'status' => 'sold',
+        ]);
+
+        return Sale::create([
+            'user_id' => $this->admin->id,
+            'chane_entry_id' => $chane->id,
+            'payment_type' => 'cash',
+            'bread_count' => 10,
+            'amount' => 50_000,
+        ]);
+    }
+
+    public function test_trading_with_no_wages_recorded_is_critical(): void
+    {
+        $this->sellSomething();
+
+        $issue = $this->issue('wages-never-recorded');
+
+        $this->assertNotNull($issue);
+        $this->assertSame(SystemIssue::CRITICAL, $issue->severity);
+    }
+
+    public function test_a_recorded_wage_payment_settles_it(): void
+    {
+        $this->sellSomething();
+
+        SalaryPayment::create([
+            'user_id' => $this->admin->id,
+            'period_start' => now()->startOfMonth(),
+            'period_label' => 'این ماه',
+            'base_amount' => 1_000_000,
+            'net_amount' => 1_000_000,
+            'paid_on' => now(),
+        ]);
+
+        $this->assertNull($this->issue('wages-never-recorded'));
+    }
+
+    public function test_a_month_with_no_sales_says_nothing_about_wages(): void
+    {
+        // No trading is not the same as unrecorded payroll.
+        $this->assertNull($this->issue('wages-never-recorded'));
+    }
+
+    public function test_expenses_piled_into_other_are_flagged(): void
+    {
+        Expense::create([
+            'user_id' => $this->admin->id,
+            'category' => 'other',
+            'title' => 'متفرقه',
+            'amount' => 800_000,
+            'spent_on' => now(),
+        ]);
+
+        Expense::create([
+            'user_id' => $this->admin->id,
+            'category' => 'utilities',
+            'title' => 'برق',
+            'amount' => 200_000,
+            'spent_on' => now(),
+        ]);
+
+        $issue = $this->issue('expenses-mostly-other');
+
+        $this->assertNotNull($issue);
+        $this->assertSame(SystemIssue::WARNING, $issue->severity);
+        $this->assertStringContainsString('80', $issue->detail);
+    }
+
+    public function test_well_filed_expenses_are_left_alone(): void
+    {
+        Expense::create([
+            'user_id' => $this->admin->id,
+            'category' => 'utilities',
+            'title' => 'برق',
+            'amount' => 800_000,
+            'spent_on' => now(),
+        ]);
+
+        Expense::create([
+            'user_id' => $this->admin->id,
+            'category' => 'other',
+            'title' => 'متفرقه',
+            'amount' => 200_000,
+            'spent_on' => now(),
+        ]);
+
+        $this->assertNull($this->issue('expenses-mostly-other'));
     }
 }

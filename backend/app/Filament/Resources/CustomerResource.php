@@ -5,11 +5,13 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CustomerResource\Pages;
 use App\Filament\Resources\CustomerResource\RelationManagers;
 use App\Models\Customer;
+use App\Support\Money;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class CustomerResource extends Resource
 {
@@ -111,6 +113,24 @@ class CustomerResource extends Resource
                     ->badge()
                     ->color('success'),
 
+                Tables\Columns\TextColumn::make('debt_amount')
+                    ->label('مانده بدهی')
+                    ->placeholder('—')
+                    ->weight('bold')
+                    ->color('danger')
+                    ->sortable()
+                    ->formatStateUsing(fn ($state) => (float) $state > 0
+                        ? Money::format((float) $state)
+                        : null),
+
+                Tables\Columns\TextColumn::make('open_follow_ups_count')
+                    ->label('پیگیری باز')
+                    ->counts('openFollowUps')
+                    ->badge()
+                    ->color('warning')
+                    ->formatStateUsing(fn ($state) => (int) $state > 0 ? $state : null)
+                    ->placeholder('—'),
+
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('فعال')
                     ->boolean(),
@@ -138,9 +158,16 @@ class CustomerResource extends Resource
             ->striped();
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->withSum(['sales as debt_amount' => fn ($q) => $q->outstanding()], 'amount');
+    }
+
     public static function getRelations(): array
     {
         return [
+            RelationManagers\SalesRelationManager::class,
             RelationManagers\InteractionsRelationManager::class,
         ];
     }

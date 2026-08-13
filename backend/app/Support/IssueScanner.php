@@ -6,8 +6,10 @@ use App\Models\BankAccount;
 use App\Models\ChaneEntry;
 use App\Models\DieselAllocation;
 use App\Models\DoughEntry;
+use App\Models\Expense;
 use App\Models\FlourAllocation;
 use App\Models\InventoryItem;
+use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -41,6 +43,8 @@ class IssueScanner
             ...$this->longUnsettledSellers(),
             ...$this->tradingAtALoss(),
             ...$this->dieselRunningOut(),
+            ...$this->wagesNeverRecorded(),
+            ...$this->expensesMostlyUncategorised(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -404,6 +408,92 @@ class IssueScanner
                 : 'پیش از تمام شدن، تحویل بعدی را هماهنگ کنید.',
             url: '/admin/diesel-allocations',
             urlLabel: 'سهمیه گازوئیل',
+        )];
+    }
+
+    /**
+     * Bread sold all month and not one wage paid through the system.
+     *
+     * Wages are the largest running cost a bakery has. When none are
+     * recorded, every profit figure the panel prints is overstated by the
+     * whole payroll, and it is overstated silently — the reports have no
+     * way to know the difference between a month with no wages and a
+     * month whose wages were never entered.
+     */
+    private function wagesNeverRecorded(): array
+    {
+        $from = now()->startOfMonth();
+
+        $sales = Sale::where('created_at', '>=', $from)->count();
+
+        // Nothing sold yet this month: nothing to conclude.
+        if ($sales === 0) {
+            return [];
+        }
+
+        $paid = SalaryPayment::paid()
+            ->where('paid_on', '>=', $from->toDateString())
+            ->count();
+
+        if ($paid > 0) {
+            return [];
+        }
+
+        $everPaid = SalaryPayment::paid()->count() > 0;
+
+        return [new SystemIssue(
+            key: 'wages-never-recorded',
+            severity: SystemIssue::CRITICAL,
+            title: 'حقوق این ماه ثبت نشده است',
+            detail: $everPaid
+                ? 'در این ماه '.number_format($sales).' فروش ثبت شده اما هیچ پرداخت حقوقی ثبت نشده است.'
+                : 'تا امروز هیچ پرداخت حقوقی در سامانه ثبت نشده است، در حالی که '
+                    .number_format($sales).' فروش این ماه ثبت شده.',
+            cause: 'حقوق کارکنان خارج از سامانه پرداخت شده و در بخش حقوق وارد نشده است.',
+            suggestion: 'تا زمانی که حقوق ثبت نشود، سود گزارش‌شده به اندازه‌ی کل حقوق بیشتر از واقعیت است.'
+                .' پرداخت‌ها را در بخش حقوق وارد کنید.',
+            url: '/admin/salary-payments',
+            urlLabel: 'حقوق',
+        )];
+    }
+
+    /**
+     * Expenses piled into the catch-all category.
+     *
+     * "Other" is where an expense goes when nobody chose a category, and
+     * an expense report made mostly of it cannot answer what the money
+     * went on — which is the only question the report exists to answer.
+     */
+    private function expensesMostlyUncategorised(): array
+    {
+        $from = now()->subDays(90)->toDateString();
+
+        $total = (float) Expense::where('spent_on', '>=', $from)->sum('amount');
+
+        if ($total <= 0) {
+            return [];
+        }
+
+        $other = (float) Expense::where('spent_on', '>=', $from)
+            ->where('category', 'other')
+            ->sum('amount');
+
+        $share = (int) round($other / $total * 100);
+
+        if ($share < 50) {
+            return [];
+        }
+
+        return [new SystemIssue(
+            key: 'expenses-mostly-other',
+            severity: SystemIssue::WARNING,
+            title: 'بیشتر هزینه‌ها در دسته‌ی «سایر» ثبت شده',
+            detail: $share.'٪ از هزینه‌های سه ماه گذشته ('
+                .Money::format($other).') بدون دسته‌بندی ثبت شده است.',
+            cause: 'هنگام ثبت هزینه، دسته‌ی مناسب انتخاب نشده است.',
+            suggestion: 'دسته‌ی این هزینه‌ها را اصلاح کنید تا گزارش هزینه‌ها معنا پیدا کند.',
+            url: '/admin/expenses',
+            urlLabel: 'هزینه‌ها',
         )];
     }
 

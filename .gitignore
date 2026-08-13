@@ -56,7 +56,9 @@ Thumbs.db
 # --- Build artifacts kept out of source control ---
 dist/
 *.log
-graphify-out/
 
 # نقشه دانش پروژه — با /graphify ساخته می‌شود
 graphify-out/
+
+# تنظیمات محلی Claude Code — مخصوص همین دستگاه است
+.claude/settings.local.json
