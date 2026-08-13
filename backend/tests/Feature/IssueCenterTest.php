@@ -321,6 +321,24 @@ class IssueCenterTest extends TestCase
         $this->assertNull($this->issue('wages-never-recorded'));
     }
 
+    public function test_wages_paid_as_an_expense_settle_it_too(): void
+    {
+        $this->sellSomething();
+
+        // This shop has no payroll run: wages are handed over as advances
+        // and entered straight on the expense sheet. Looking only at
+        // payslips called that a missing payroll every month.
+        Expense::create([
+            'user_id' => $this->admin->id,
+            'category' => 'salary',
+            'title' => 'علی الحساب عبدالله',
+            'amount' => 2_000_000,
+            'spent_on' => now(),
+        ]);
+
+        $this->assertNull($this->issue('wages-never-recorded'));
+    }
+
     public function test_a_month_with_no_sales_says_nothing_about_wages(): void
     {
         // No trading is not the same as unrecorded payroll.

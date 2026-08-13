@@ -412,7 +412,7 @@ class IssueScanner
     }
 
     /**
-     * Bread sold all month and not one wage paid through the system.
+     * Bread sold all month and not one wage recorded anywhere.
      *
      * Wages are the largest running cost a bakery has. When none are
      * recorded, every profit figure the panel prints is overstated by the
@@ -435,11 +435,19 @@ class IssueScanner
             ->where('paid_on', '>=', $from->toDateString())
             ->count();
 
-        if ($paid > 0) {
+        // Not every shop runs a payroll: this one pays wages as advances
+        // entered straight on the expense sheet. Counting only payslips
+        // called that a missing payroll and cried wolf every month.
+        $asExpense = Expense::where('category', 'salary')
+            ->where('spent_on', '>=', $from->toDateString())
+            ->count();
+
+        if ($paid > 0 || $asExpense > 0) {
             return [];
         }
 
-        $everPaid = SalaryPayment::paid()->count() > 0;
+        $everPaid = SalaryPayment::paid()->count() > 0
+            || Expense::where('category', 'salary')->exists();
 
         return [new SystemIssue(
             key: 'wages-never-recorded',
@@ -449,9 +457,9 @@ class IssueScanner
                 ? 'در این ماه '.number_format($sales).' فروش ثبت شده اما هیچ پرداخت حقوقی ثبت نشده است.'
                 : 'تا امروز هیچ پرداخت حقوقی در سامانه ثبت نشده است، در حالی که '
                     .number_format($sales).' فروش این ماه ثبت شده.',
-            cause: 'حقوق کارکنان خارج از سامانه پرداخت شده و در بخش حقوق وارد نشده است.',
+            cause: 'حقوق کارکنان خارج از سامانه پرداخت شده و نه در بخش حقوق و نه در هزینه‌ها وارد نشده است.',
             suggestion: 'تا زمانی که حقوق ثبت نشود، سود گزارش‌شده به اندازه‌ی کل حقوق بیشتر از واقعیت است.'
-                .' پرداخت‌ها را در بخش حقوق وارد کنید.',
+                .' پرداخت‌ها را در بخش حقوق، یا به‌عنوان هزینه‌ی دسته‌ی «حقوق کارکنان»، وارد کنید.',
             url: '/admin/salary-payments',
             urlLabel: 'حقوق',
         )];
