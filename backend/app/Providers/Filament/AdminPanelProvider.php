@@ -29,13 +29,17 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->brandName('سیستم مدیریت نانوایی')
             // Warm, bread-inspired palette that reads well in both themes.
+            // The same hexes the phone app is built from, rather than
+            // Filament's generic ramps. Staff move between the two all day;
+            // when the panel's amber and the app's crust are almost but not
+            // quite the same colour, the pair reads as two products.
             ->colors([
-                'primary' => Color::Amber,
-                'gray' => Color::Stone,
-                'success' => Color::Emerald,
-                'warning' => Color::Orange,
-                'danger' => Color::Rose,
-                'info' => Color::Sky,
+                'primary' => Color::hex('#C2740F'),  // baked top
+                'gray' => Color::hex('#64748B'),
+                'success' => Color::hex('#0B7A54'),
+                'warning' => Color::hex('#C2740F'),
+                'danger' => Color::hex('#C5373C'),
+                'info' => Color::hex('#2C6FA8'),
             ])
             ->font('Vazirmatn')
             ->darkMode(true)
