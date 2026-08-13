@@ -163,11 +163,12 @@ class DieselQuotaTest extends TestCase
             'total_bags' => 100,
         ]);
 
-        $quota = DieselAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
-        ]);
-
-        $this->assertEquals(500.0, (float) $quota->total_litres);
+        // Registering the flour quota registers the diesel that follows
+        // it, so there is nothing left to create here.
+        $this->assertEquals(
+            500.0,
+            (float) DieselAllocation::current()->total_litres,
+        );
     }
 
     public function test_the_rate_is_a_setting_rather_than_a_constant(): void
@@ -180,11 +181,10 @@ class DieselQuotaTest extends TestCase
             'total_bags' => 10,
         ]);
 
-        $quota = DieselAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
-        ]);
-
-        $this->assertEquals(70.0, (float) $quota->total_litres);
+        $this->assertEquals(
+            70.0,
+            (float) DieselAllocation::current()->total_litres,
+        );
     }
 
     public function test_a_typed_figure_wins_over_the_formula(): void
@@ -197,11 +197,9 @@ class DieselQuotaTest extends TestCase
             'total_bags' => 100,
         ]);
 
-        $quota = DieselAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
-            'total_litres' => 420,
-        ]);
+        $quota = DieselAllocation::current();
+        $quota->update(['total_litres' => 420]);
 
-        $this->assertEquals(420.0, (float) $quota->total_litres);
+        $this->assertEquals(420.0, (float) $quota->fresh()->total_litres);
     }
 }

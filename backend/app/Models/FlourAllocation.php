@@ -62,6 +62,30 @@ class FlourAllocation extends Model
             // Carry-over is entered in sacks too, for the same reason.
             $allocation->carryover_kg = round((float) $allocation->carryover_bags * $bagWeight, 3);
         });
+
+        // The diesel quota is not negotiated separately - it follows this
+        // one at a fixed rate per sack. Left to be created by hand it
+        // simply was not: the shop ran a whole month with a flour quota on
+        // file and no diesel quota at all, so nothing could say how much
+        // fuel was left. Only ever created, never updated, because a month
+        // already drawn against must not be restated underneath the shop.
+        static::created(function (self $allocation) {
+            if (DieselAllocation::forDate($allocation->month_start)) {
+                return;
+            }
+
+            $litres = DieselAllocation::litresFor($allocation->month_start);
+
+            if ($litres === null) {
+                return;
+            }
+
+            DieselAllocation::create([
+                'month_start' => $allocation->month_start,
+                'month_label' => $allocation->month_label,
+                'total_litres' => $litres,
+            ]);
+        });
     }
 
     public function periods()

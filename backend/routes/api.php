@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\IncomeController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\PowerBiExportController;
+use App\Http\Controllers\Api\QuotaController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
 use App\Http\Controllers\Api\SaleController;
@@ -170,6 +171,14 @@ Route::prefix('v1')->group(function () {
             Route::post('/flour-allocations', [FlourAllocationController::class, 'store']);
             Route::put('/flour-allocations/{allocation}', [FlourAllocationController::class, 'update']);
             Route::delete('/flour-allocations/{allocation}', [FlourAllocationController::class, 'destroy']);
+
+            // Diesel follows the flour quota above, and was panel-only:
+            // the litres off a docket had to be carried back to a desk to
+            // be entered, and by then the docket was in somebody's pocket.
+            Route::get('/diesel/quota', [QuotaController::class, 'dieselQuota']);
+            Route::patch('/diesel/quota', [QuotaController::class, 'updateDieselQuota']);
+            Route::post('/diesel/deliveries', [QuotaController::class, 'storeDieselDelivery']);
+            Route::delete('/diesel/deliveries/{delivery}', [QuotaController::class, 'destroyDieselDelivery']);
 
             Route::get('/consignment-flour/balance', [ConsignmentFlourController::class, 'balance']);
             Route::get('/consignment-flour', [ConsignmentFlourController::class, 'index']);

@@ -23,6 +23,7 @@ class DieselAllocation extends Model
         'month_start',
         'month_label',
         'total_litres',
+        'litres_per_bag',
         'carryover_litres',
         'note',
     ];
@@ -32,6 +33,7 @@ class DieselAllocation extends Model
         return [
             'month_start' => 'date',
             'total_litres' => 'decimal:2',
+            'litres_per_bag' => 'decimal:2',
             'carryover_litres' => 'decimal:2',
         ];
     }
@@ -50,6 +52,7 @@ class DieselAllocation extends Model
             // The quota is not negotiated each month — it follows the flour
             // allocation at a fixed rate per sack. Left to be typed, the two
             // drift apart, and the wrong one is always the one nobody checked.
+            $allocation->litres_per_bag ??= self::rateInForce();
             $allocation->total_litres ??= self::litresFor($allocation->month_start);
         });
     }
@@ -71,9 +74,36 @@ class DieselAllocation extends Model
             return null;
         }
 
-        $perBag = (float) (Bakery::query()->value('diesel_litres_per_bag') ?? 5);
+        // Whole litres: the depot issues them that way, so a fraction on
+        // screen is a figure no docket will ever match.
+        return round((float) $flour->total_bags * self::rateInForce());
+    }
 
-        return round((float) $flour->total_bags * $perBag, 2);
+    /** The litres a sack currently earns — the default a new month starts from. */
+    public static function rateInForce(): float
+    {
+        return (float) (Bakery::query()->value('diesel_litres_per_bag') ?? 5);
+    }
+
+    /**
+     * How this month's figure was arrived at, in words.
+     *
+     * The rate moves month to month, so a bare litre count invites the
+     * question this answers.
+     */
+    public function getDerivationLabelAttribute(): ?string
+    {
+        $flour = FlourAllocation::query()
+            ->whereDate('month_start', $this->month_start->toDateString())
+            ->first();
+
+        if (! $flour || $this->litres_per_bag === null) {
+            return null;
+        }
+
+        return number_format((float) $flour->total_bags, 0).' کیسه × '
+            .rtrim(rtrim(number_format((float) $this->litres_per_bag, 2), '0'), '.')
+            .' لیتر';
     }
 
     /** Quota plus anything carried over: what the shop may draw this month. */
