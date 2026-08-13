@@ -319,8 +319,18 @@ class ReportController extends Controller
         // The flour the sold bread was baked from, costed as it is consumed
         // rather than on whatever day a purchase was recorded.
         $costOfGoods = Ledger::costOfGoodsSold($from, $to);
+
+        // Flour bought is the same money as flour baked, recognised at a
+        // different moment. Counting the purchase as an overhead as well as
+        // the consumption as a cost charged the shop twice for one sack and
+        // made a profitable month read as a loss.
+        $flourPurchases = round((float) Expense::whereBetween('spent_on', [
+            $from->toDateString(), $to->toDateString(),
+        ])->where('category', 'flour')->sum('amount'), 2);
+
+        $operatingExpenses = round($totalExpenses - $flourPurchases, 2);
         $grossProfit = $income - $costOfGoods;
-        $netProfit = $grossProfit - $totalExpenses;
+        $netProfit = $grossProfit - $operatingExpenses;
 
         return $this->success([
             'from' => $from->toDateString(),
@@ -367,8 +377,13 @@ class ReportController extends Controller
                 'gross_profit' => round($grossProfit, 2),
                 'gross_profit_formatted' => Money::format($grossProfit),
                 'gross_margin_percent' => $income > 0 ? round($grossProfit / $income * 100, 1) : 0,
-                'operating_expenses' => round($totalExpenses, 2),
-                'operating_expenses_formatted' => Money::format($totalExpenses),
+                'operating_expenses' => round($operatingExpenses, 2),
+                'operating_expenses_formatted' => Money::format($operatingExpenses),
+                // Shown so the difference from the cash figure above is
+                // legible rather than mysterious: this is the flour that
+                // moved out of overheads and into cost of goods.
+                'flour_purchases_excluded' => $flourPurchases,
+                'flour_purchases_excluded_formatted' => Money::format($flourPurchases),
                 'net_profit' => round($netProfit, 2),
                 'net_profit_formatted' => Money::format($netProfit),
                 'net_margin_percent' => $income > 0 ? round($netProfit / $income * 100, 1) : 0,

@@ -105,7 +105,7 @@ class ProfitAndLossTest extends TestCase
 
         Expense::create([
             'user_id' => $this->admin->id,
-            'category' => array_key_first(Expense::CATEGORIES),
+            'category' => 'utilities',
             'title' => 'برق',
             'amount' => 400_000,
             'spent_on' => now(),
@@ -122,6 +122,59 @@ class ProfitAndLossTest extends TestCase
         $this->assertEquals(3_400_000, $pnl['gross_profit']);
         $this->assertEquals(400_000, $pnl['operating_expenses']);
         $this->assertEquals(3_000_000, $pnl['net_profit']);
+    }
+
+    public function test_flour_is_not_charged_twice(): void
+    {
+        // The shop records what it pays the factory as an expense, and the
+        // statement costs the same flour again as it is baked. Counting
+        // both made a profitable month read as a loss.
+        $this->bakeFlour(80); // 1,600,000 of flour into bread
+
+        Expense::create([
+            'user_id' => $this->admin->id,
+            'category' => 'flour',
+            'title' => 'خرید آرد',
+            'amount' => 1_600_000,
+            'spent_on' => now(),
+        ]);
+
+        Income::create([
+            'user_id' => $this->admin->id,
+            'category' => 'other',
+            'title' => 'فروش روز',
+            'amount' => 5_000_000,
+            'received_on' => now(),
+        ]);
+
+        $pnl = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/reports/financial')
+            ->assertOk()
+            ->json('data.profit_and_loss');
+
+        $this->assertEquals(1_600_000, $pnl['cost_of_goods']);
+        // The purchase leaves overheads, because it is the same money.
+        $this->assertEquals(0, $pnl['operating_expenses']);
+        $this->assertEquals(1_600_000, $pnl['flour_purchases_excluded']);
+        $this->assertEquals(3_400_000, $pnl['net_profit']);
+    }
+
+    public function test_other_expenses_still_count_in_full(): void
+    {
+        Expense::create([
+            'user_id' => $this->admin->id,
+            'category' => 'fuel',
+            'title' => 'گازوئیل',
+            'amount' => 500_000,
+            'spent_on' => now(),
+        ]);
+
+        $pnl = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/reports/financial')
+            ->assertOk()
+            ->json('data.profit_and_loss');
+
+        $this->assertEquals(500_000, $pnl['operating_expenses']);
     }
 
     public function test_the_old_profit_figure_is_left_exactly_as_it_was(): void
