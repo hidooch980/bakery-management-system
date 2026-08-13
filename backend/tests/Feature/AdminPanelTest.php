@@ -48,6 +48,23 @@ class AdminPanelTest extends TestCase
         return $user;
     }
 
+    /**
+     * The kiln ground reaches the page.
+     *
+     * It is injected by a render hook rather than a compiled theme, which
+     * means nothing fails loudly if the hook stops firing — a rename in
+     * Filament, a moved view, a cached config — and the panel would simply
+     * go back to its default blue-grey with no error anywhere. The one
+     * thing worth asserting is that the block is in the HTML.
+     */
+    public function test_the_panel_carries_the_kiln_ground(): void
+    {
+        $response = $this->actingAs($this->admin())->get('/admin');
+
+        $response->assertOk();
+        $response->assertSee('--gray-950: 18 22 28', escape: false);
+    }
+
     public function test_login_page_is_reachable(): void
     {
         $this->get('/admin/login')
