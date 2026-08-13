@@ -263,6 +263,7 @@ Route::prefix('v1')->group(function () {
             // --- Seller accounts: what each seller still owes ---
             Route::get('/seller-accounts', [SellerAccountController::class, 'index']);
             Route::post('/seller-accounts/{seller}/settle', [SellerAccountController::class, 'settle']);
+            Route::post('/seller-accounts/{seller}/settle-loaves', [SellerAccountController::class, 'settleLoaves']);
             Route::post('/settlement-requests/{settlement}/confirm', [SellerAccountController::class, 'confirm']);
             Route::post('/settlement-requests/{settlement}/reject', [SellerAccountController::class, 'reject']);
 

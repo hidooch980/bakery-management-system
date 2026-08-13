@@ -100,6 +100,10 @@ class SellerRunningAccount {
     required this.balanceFormatted,
     this.uncollectedCredit = 0,
     this.uncollectedCreditFormatted = '',
+    this.loaves = 0,
+    this.cashLoaves = 0,
+    this.shortfallLoaves = 0,
+    this.loafPrice = 0,
   });
 
   final double debt;
@@ -114,6 +118,14 @@ class SellerRunningAccount {
   /// because the seller cannot hand over what they never collected.
   final double uncollectedCredit;
   final String uncollectedCreditFormatted;
+
+  /// The same debt counted in bread, which is how the shop settles it.
+  /// Counted off the sales rather than divided out of the money, so a
+  /// change in the bread price cannot restate a debt already on the books.
+  final int loaves;
+  final int cashLoaves;
+  final int shortfallLoaves;
+  final double loafPrice;
 
   bool get hasCredit => credit > 0;
 
@@ -131,6 +143,10 @@ class SellerRunningAccount {
       balanceFormatted: '${json['balance_formatted'] ?? ''}',
       uncollectedCredit: num_('uncollected_credit'),
       uncollectedCreditFormatted: '${json['uncollected_credit_formatted'] ?? ''}',
+      loaves: (json['loaves'] as num?)?.toInt() ?? 0,
+      cashLoaves: (json['cash_loaves'] as num?)?.toInt() ?? 0,
+      shortfallLoaves: (json['shortfall_loaves'] as num?)?.toInt() ?? 0,
+      loafPrice: num_('loaf_price'),
     );
   }
 }

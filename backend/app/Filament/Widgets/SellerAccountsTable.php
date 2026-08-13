@@ -114,6 +114,61 @@ class SellerAccountsTable extends BaseWidget
                     ->color('danger'),
             ])
             ->actions([
+                // The shop counts this debt in bread, so a part settlement
+                // is "three hundred loaves" rather than an amount somebody
+                // has already done the arithmetic on. Full settlement keeps
+                // its own action below, because that one also has to split
+                // cash from card.
+                Tables\Actions\Action::make('settleLoaves')
+                    ->label('تسویه نانی')
+                    ->icon('heroicon-o-calculator')
+                    ->color('warning')
+                    ->modalHeading('تسویه به تعداد نان')
+                    ->modalDescription(fn (User $record) => $record->name.' بابت '
+                        .number_format(SellerSettlement::outstandingFor($record)['loaves'])
+                        .' نان بدهکار است ('
+                        .Money::format(self::settleableFor($record)).').')
+                    ->modalSubmitActionLabel('تسویه شد')
+                    ->visible(fn (User $record) => SellerSettlement::outstandingFor($record)['loaves'] > 0)
+                    ->form(fn (User $record) => [
+                        Forms\Components\TextInput::make('loaves')
+                            ->label('تعداد نان تحویل‌شده')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(SellerSettlement::outstandingFor($record)['loaves'])
+                            ->default(SellerSettlement::outstandingFor($record)['loaves'])
+                            ->suffix('نان')
+                            ->required()
+                            ->helperText('هر نان '
+                                .Money::format(SellerSettlement::loafPrice())
+                                .' حساب می‌شود.'),
+                    ])
+                    ->action(function (User $record, array $data) {
+                        $loaves = (int) $data['loaves'];
+
+                        try {
+                            $result = SellerSettlement::applyLoaves($record, $loaves);
+                        } catch (\RuntimeException $e) {
+                            Notification::make()
+                                ->title($e->getMessage())
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        $left = SellerSettlement::outstandingFor($record);
+
+                        Notification::make()
+                            ->title(number_format($loaves).' نان تسویه شد')
+                            ->body($left['loaves'] > 0
+                                ? number_format($left['loaves']).' نان مانده — '
+                                    .Money::format($left['total']).'.'
+                                : 'حساب تسویه شد.')
+                            ->success()
+                            ->send();
+                    }),
+
                 Tables\Actions\Action::make('settleSellerAccount')
                     ->label('تسویه حساب')
                     ->icon('heroicon-o-check-badge')

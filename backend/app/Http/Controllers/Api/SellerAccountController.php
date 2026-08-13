@@ -118,6 +118,45 @@ class SellerAccountController extends Controller
      * Settles a seller directly, for when they hand the money over without
      * having sent a request from their own app.
      */
+    /**
+     * Settles a number of loaves rather than the whole account.
+     *
+     * The shop counts this debt in bread, so a part settlement is "three
+     * hundred loaves" rather than an amount somebody has already done the
+     * arithmetic on — and doing it here means the arithmetic is done once,
+     * with the price the system holds.
+     */
+    public function settleLoaves(Request $request, User $seller): JsonResponse
+    {
+        $data = $request->validate([
+            'loaves' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $owed = SellerSettlement::outstandingFor($seller);
+
+        if ($owed['loaves'] <= 0) {
+            return $this->error('نانی برای تسویه وجود ندارد.', 422);
+        }
+
+        if ($data['loaves'] > $owed['loaves']) {
+            return $this->error(
+                'بیش از بدهی است: '.number_format($owed['loaves']).' نان بدهکار است.',
+                422,
+            );
+        }
+
+        $result = SellerSettlement::applyLoaves($seller, $data['loaves']);
+        $left = SellerSettlement::outstandingFor($seller);
+
+        return $this->success([
+            'settled_sales' => count($result['settled']),
+            'credit_left' => Money::convert($result['credit_left']),
+            'loaves_left' => $left['loaves'],
+            'total_left' => Money::convert($left['total']),
+            'total_left_formatted' => Money::format($left['total']),
+        ], number_format($data['loaves']).' نان از حساب '.$seller->name.' تسویه شد.');
+    }
+
     public function settle(Request $request, User $seller): JsonResponse
     {
         $owed = SellerSettlement::outstandingFor($seller);

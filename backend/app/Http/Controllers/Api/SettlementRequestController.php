@@ -252,6 +252,12 @@ class SettlementRequestController extends Controller
             'difference' => Money::convert($account['components']['difference']),
             'uncollected_credit' => Money::convert($account['components']['credit']),
             'uncollected_credit_formatted' => Money::format($account['components']['credit']),
+            // The shop counts this debt in loaves — "I have accounted for
+            // five hundred" — so the count travels beside the money.
+            'loaves' => $account['components']['loaves'],
+            'cash_loaves' => $account['components']['cash_loaves'],
+            'shortfall_loaves' => $account['components']['shortfall_loaves'],
+            'loaf_price' => Money::convert(SellerSettlement::loafPrice()),
         ]);
     }
 }

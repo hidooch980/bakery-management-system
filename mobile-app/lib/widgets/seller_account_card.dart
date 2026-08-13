@@ -514,6 +514,19 @@ class _AmountToHandOverState extends State<_AmountToHandOver> {
       children: [
         _BalanceLine(label: 'بدهی شما', value: account.debtFormatted),
 
+        // The shop settles in bread, so the count leads and the money
+        // explains it rather than the other way round.
+        if (account.loaves > 0)
+          _BalanceLine(
+            label: 'تعداد نان',
+            value: '${account.loaves} نان',
+          ),
+        if (account.shortfallLoaves > 0)
+          _BalanceLine(
+            label: 'از آن، کسری نان',
+            value: '${account.shortfallLoaves} نان',
+          ),
+
         // Only when there is any: a nil line reads as something gone wrong.
         if (account.hasCredit)
           _BalanceLine(
