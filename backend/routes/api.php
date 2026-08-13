@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SellerCollectionController;
 use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\StaffAdvanceController;
+use App\Http\Controllers\Api\StaffAdvanceRequestController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\WorkStartController;
 use Illuminate\Support\Facades\Route;
@@ -219,6 +220,13 @@ Route::prefix('v1')->group(function () {
         // is the person who most needs to know what next month is short by.
         Route::get('/staff-advances/mine', [StaffAdvanceController::class, 'mine']);
 
+        // Asking for one, which used to happen in the doorway and left no
+        // record of who asked or what was said back. Open to every
+        // employee: asking is not the same as granting.
+        Route::get('/advance-requests/mine', [StaffAdvanceRequestController::class, 'mine']);
+        Route::post('/advance-requests', [StaffAdvanceRequestController::class, 'store']);
+        Route::delete('/advance-requests/{advanceRequest}', [StaffAdvanceRequestController::class, 'destroy']);
+
         // --- Admin: finance (expenses & payroll) ---
         Route::middleware('permission:manage-finance')->group(function () {
             Route::get('/expenses/categories', [ExpenseController::class, 'categories']);
@@ -229,6 +237,10 @@ Route::prefix('v1')->group(function () {
             Route::apiResource('salaries', SalaryController::class)->except(['show']);
 
             Route::get('/staff-advances/outstanding', [StaffAdvanceController::class, 'outstanding']);
+
+            Route::get('/advance-requests', [StaffAdvanceRequestController::class, 'index']);
+            Route::patch('/advance-requests/{advanceRequest}/approve', [StaffAdvanceRequestController::class, 'approve']);
+            Route::patch('/advance-requests/{advanceRequest}/reject', [StaffAdvanceRequestController::class, 'reject']);
             Route::apiResource('staff-advances', StaffAdvanceController::class)
                 ->parameters(['staff-advances' => 'advance'])
                 ->only(['index', 'store', 'destroy']);
