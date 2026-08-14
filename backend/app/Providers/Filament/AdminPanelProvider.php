@@ -54,7 +54,13 @@ class AdminPanelProvider extends PanelProvider
                 fn (): string => view('filament.kiln-theme')->render(),
             )
             ->darkMode(true)
-            ->sidebarCollapsibleOnDesktop()
+            // Fully, not to a strip of icons. Collapsed to icons the menu
+            // still holds its column and the reports beside it still wrap;
+            // gone, the tables get the whole width, which is what the wide
+            // ones — bank statement, sales, payroll — were short of. It
+            // reopens over the page and closes again, and remembers which
+            // way the owner left it.
+            ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth('full')
             // Shop settings sit at the top: the formula, bag weight and
             // currency there drive every other screen's numbers. Only the

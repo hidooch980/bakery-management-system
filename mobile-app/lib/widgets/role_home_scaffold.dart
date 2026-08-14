@@ -18,7 +18,7 @@ class HomeTab {
     required this.builder,
   });
 
-  /// What the bottom bar calls it — a word, not a sentence.
+  /// What the menu calls it — a word, not a sentence.
   final String label;
 
   /// What the app bar calls it, which can be longer.
@@ -35,9 +35,15 @@ class HomeTab {
 ///
 /// Only the admin had it: a title bar naming the shop and the person, the
 /// connection state where it cannot be missed, and the work divided into
-/// pages along the bottom. Every other role got one long scroll instead —
-/// the seller's ran to a thousand lines, and finding the day's sales meant
-/// scrolling past attendance, stock and the account.
+/// pages. Every other role got one long scroll instead — the seller's ran
+/// to a thousand lines, and finding the day's sales meant scrolling past
+/// attendance, stock and the account.
+///
+/// The pages are chosen from a drawer rather than a bar along the bottom.
+/// A bar spends eighty pixels of a phone held in a bakery on something
+/// looked at a few times an hour, and it caps the useful number of pages at
+/// about five before the labels stop fitting. The drawer costs one tap and
+/// gives the height back to the work.
 ///
 /// Written once here so a shop's roles do not each drift into their own
 /// idea of where things live.
@@ -54,7 +60,8 @@ class RoleHomeScaffold extends StatefulWidget {
   final BakeryApi api;
 
   /// At least one. A role with a single page still gets the same title bar
-  /// and connection card, just no bar along the bottom to choose from.
+  /// and connection card, just no menu to choose from — and so no button
+  /// offering to open one.
   final List<HomeTab> tabs;
 
   /// Named in the title bar. Null until the settings have loaded.
@@ -64,8 +71,8 @@ class RoleHomeScaffold extends StatefulWidget {
   final List<Widget> actions;
 
   /// The role's one primary action — recording a batch, say. Kept on the
-  /// scaffold rather than inside a page so it sits above the bottom bar
-  /// instead of behind it.
+  /// scaffold rather than inside a page so a page that scrolls cannot carry
+  /// it off the screen.
   final Widget? floatingActionButton;
 
   @override
@@ -153,20 +160,40 @@ class _RoleHomeScaffoldState extends State<RoleHomeScaffold> {
           ],
         ),
       ),
-      bottomNavigationBar: tabs.length < 2
-          ? null
-          : NavigationBar(
-              selectedIndex: _tab.clamp(0, tabs.length - 1),
-              onDestinationSelected: (index) => setState(() => _tab = index),
-              destinations: [
-                for (final tab in tabs)
-                  NavigationDestination(
-                    icon: Icon(tab.icon),
-                    selectedIcon: Icon(tab.selectedIcon),
-                    label: tab.label,
-                  ),
-              ],
-            ),
+      // Absent when there is nothing to choose between, which also takes
+      // away the button that would offer to open it.
+      drawer: tabs.length < 2 ? null : _menu(context, tabs),
+    );
+  }
+
+  Widget _menu(BuildContext context, List<HomeTab> tabs) {
+    final theme = Theme.of(context);
+
+    return NavigationDrawer(
+      selectedIndex: _tab.clamp(0, tabs.length - 1),
+      onDestinationSelected: (index) {
+        setState(() => _tab = index);
+
+        // Closed on the way out. Leaving it open over the page it just
+        // chose hides the thing the tap was for.
+        Navigator.pop(context);
+      },
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(28, 20, 28, 10),
+          child: Text(
+            'بخش‌ها',
+            style: theme.textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ),
+        for (final tab in tabs)
+          NavigationDrawerDestination(
+            icon: Icon(tab.icon),
+            selectedIcon: Icon(tab.selectedIcon),
+            label: Text(tab.label),
+          ),
+      ],
     );
   }
 }
