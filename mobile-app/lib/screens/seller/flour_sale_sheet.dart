@@ -276,7 +276,7 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
                       prefixIcon: Icon(Icons.payments_rounded),
                     ),
                     items: [
-                      for (final type in PaymentType.values)
+                      for (final type in PaymentType.choices)
                         DropdownMenuItem(value: type, child: Text(type.label)),
                     ],
                     onChanged: (value) => setState(

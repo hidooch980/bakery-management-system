@@ -509,7 +509,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   /// One field per payment type. A sale can run to hundreds of loaves,
   /// so the count is typed rather than stepped.
   final Map<PaymentType, TextEditingController> _fields = {
-    for (final type in PaymentType.values) type: TextEditingController(),
+    for (final type in PaymentType.choices) type: TextEditingController(),
   };
 
   /// Buyer per payment type, needed for نسیه and مدارس.
@@ -556,7 +556,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
   Currency get _unit => widget.bakery?.currency ?? Currency.toman;
 
-  int get _totalCount => PaymentType.values
+  int get _totalCount => PaymentType.choices
       .fold(0, (sum, type) => sum + _countFor(type));
 
   /// In Toman, the unit everything is stored in. MoneyFormat converts
@@ -583,7 +583,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
   /// Payment types actually used, so the summary names only what was paid.
   Iterable<PaymentType> get _usedTypes =>
-      PaymentType.values.where((type) => _countFor(type) > 0);
+      PaymentType.choices.where((type) => _countFor(type) > 0);
 
   String? _blockingProblem() {
     if (_totalCount == 0) return 'برای حداقل یک نوع پرداخت تعداد نان وارد کنید.';
@@ -703,7 +703,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
               ),
               const SizedBox(height: 10),
 
-              for (final type in PaymentType.values)
+              for (final type in PaymentType.choices)
                 _PaymentRow(
                   key: ValueKey(type),
                   type: type,

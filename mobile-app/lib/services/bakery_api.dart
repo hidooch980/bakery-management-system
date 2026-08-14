@@ -761,22 +761,28 @@ class BakeryApi {
     return body['queued'] == true;
   }
 
-  /// Flour bought into the warehouse, recorded in sacks rather than kilos
-  /// because that is how it arrives.
-  Future<bool> recordFlourIntake({
-    required double bags,
+  /// Stock bought into the warehouse.
+  ///
+  /// Flour is counted in sacks because that is how it arrives; salt and
+  /// yeast are weighed, and the server refuses a sack count for them
+  /// rather than converting at a figure nobody measures. So the caller
+  /// says which it has and this sends that field alone.
+  Future<bool> recordStockIntake({
+    required String item,
+    required double quantity,
+    required bool inSacks,
     String? note,
   }) async {
     final body = await _client.postOrQueue(
       '/inventory/movements',
       {
-        'item': 'flour',
+        'item': item,
         'direction': 'in',
-        'bags': bags,
+        if (inSacks) 'bags': quantity else 'quantity': quantity,
         'reason': 'purchase',
         if (note != null && note.isNotEmpty) 'note': note,
       },
-      label: 'ورود آرد — $bags کیسه',
+      label: 'ورودی انبار — $quantity ${inSacks ? 'کیسه' : 'کیلو'}',
     );
 
     return body['queued'] == true;

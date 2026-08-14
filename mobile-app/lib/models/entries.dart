@@ -97,6 +97,26 @@ enum PaymentType {
         orElse: () => PaymentType.other,
       );
 
+  /// What the counter offers.
+  ///
+  /// A shortfall is worked out from the batch — the chane count less what
+  /// was accounted for — and lands on the seller's own account without
+  /// anyone naming it, so asking them to pick it invited a second, hand-made
+  /// figure beside the derived one. `other` named nothing at all. Neither
+  /// was chosen once in this shop's history.
+  ///
+  /// Both stay in the enum: an older sale still has to render as words, and
+  /// [fromApi] falls back to `other` for a value this build has never heard
+  /// of.
+  static List<PaymentType> get choices => const [
+        PaymentType.cash,
+        PaymentType.card,
+        PaymentType.credit,
+        PaymentType.home,
+        PaymentType.schools,
+        PaymentType.charity,
+      ];
+
   /// Types the shop must know the buyer for before it can record the sale.
   bool get needsCustomer =>
       this == PaymentType.credit || this == PaymentType.schools;

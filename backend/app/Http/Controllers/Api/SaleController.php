@@ -20,7 +20,20 @@ class SaleController extends Controller
     // anyone in need. It moves real bread but brings in no money, so it
     // is a payment type of its own rather than a sale recorded at zero,
     // which would read as a shortfall the seller has to answer for.
-    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'charity', 'shortfall', 'other'];
+    /**
+     * What a seller may choose when recording a sale.
+     *
+     * 'shortfall' and 'other' are gone from here, not from the system. A
+     * shortfall is worked out on its own — the batch's chane count less
+     * what was accounted for — so offering it as a payment type asked the
+     * seller to name something the shop already knows, and in the whole
+     * history of this shop neither was ever picked once.
+     *
+     * Sale::SHORTFALL_TYPES stays: rows of that type could exist on an
+     * older installation, and the queries that exclude them must keep
+     * excluding them.
+     */
+    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'charity'];
 
     /**
      * Seller records the sale of a pending chane batch.

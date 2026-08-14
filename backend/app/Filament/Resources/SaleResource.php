@@ -32,6 +32,11 @@ class SaleResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    /**
+     * Every type that has ever existed, so an older row still reads as
+     * words. What a person may choose is [PAYMENT_CHOICES], which is
+     * shorter.
+     */
     public const PAYMENT_LABELS = [
         'cash' => 'نقد',
         'card' => 'کارتخوان',
@@ -41,6 +46,20 @@ class SaleResource extends Resource
         'charity' => 'خیرات و کمک',
         'shortfall' => 'کسری نان',
         'other' => 'سایر',
+    ];
+
+    /**
+     * What the form offers. A shortfall is worked out from the batch
+     * rather than chosen, and 'other' told nobody anything — neither was
+     * picked once in this shop's history.
+     */
+    public const PAYMENT_CHOICES = [
+        'cash' => 'نقد',
+        'card' => 'کارتخوان',
+        'credit' => 'نسیه',
+        'home' => 'منزل',
+        'schools' => 'مدارس',
+        'charity' => 'خیرات و کمک',
     ];
 
     public static function form(Form $form): Form
@@ -80,7 +99,7 @@ class SaleResource extends Resource
                         ->schema([
                             Forms\Components\Select::make('payment_type')
                                 ->label('نوع پرداخت')
-                                ->options(self::PAYMENT_LABELS)
+                                ->options(self::PAYMENT_CHOICES)
                                 ->default('cash')
                                 ->required()
                                 ->native(false)
@@ -140,7 +159,11 @@ class SaleResource extends Resource
                     // that is what a sale row is once it has been written.
                     Forms\Components\Select::make('payment_type')
                         ->label('نوع پرداخت')
-                        ->options(self::PAYMENT_LABELS)
+                        // Choices, not labels: editing a sale must not be a
+                        // way back to a type the form no longer offers.
+                        // The filter below keeps the full list, so an older
+                        // row stays findable.
+                        ->options(self::PAYMENT_CHOICES)
                         ->required()
                         ->native(false)
                         ->visibleOn('edit')

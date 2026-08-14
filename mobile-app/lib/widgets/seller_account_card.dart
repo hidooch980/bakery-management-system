@@ -644,7 +644,7 @@ class _SettlementSplitDialog extends StatefulWidget {
 
 class _SettlementSplitDialogState extends State<_SettlementSplitDialog> {
   /// Bread given away brings in no money, so it is never handed over.
-  static final List<PaymentType> _types = PaymentType.values
+  static final List<PaymentType> _types = PaymentType.choices
       .where((type) => !type.expectsNoAmount)
       .toList();
 

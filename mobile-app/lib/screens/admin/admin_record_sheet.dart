@@ -12,7 +12,7 @@ import '../../widgets/common.dart';
 enum AdminRecordKind {
   expense('هزینه', Icons.trending_down_rounded, Color(0xFFD1495B)),
   income('درآمد', Icons.trending_up_rounded, Color(0xFF2E9E6B)),
-  flourIntake('آرد ورودی', Icons.local_shipping_rounded, AppColors.emberHot),
+  intake('ورودی', Icons.local_shipping_rounded, AppColors.emberHot),
   consignment('آرد همکار', Icons.swap_horiz_rounded, Color(0xFF6C63FF));
 
   const AdminRecordKind(this.label, this.icon, this.color);
@@ -20,6 +20,26 @@ enum AdminRecordKind {
   final String label;
   final IconData icon;
   final Color color;
+}
+
+/// What the warehouse can take in, and the unit each arrives in.
+///
+/// Flour comes in sacks and is counted that way; salt and yeast are
+/// weighed. The server enforces this — a sack count for salt is refused
+/// rather than converted at a weight nobody measures — so the form asks
+/// for whichever the chosen item actually uses.
+enum StockItem {
+  flour('flour', 'آرد', true, 'کیسه'),
+  salt('salt', 'نمک', false, 'کیلوگرم'),
+  yeastDry('yeast_dry', 'خمیرمایه خشک', false, 'کیلوگرم'),
+  yeastWet('yeast_wet', 'خمیرمایه تر', false, 'کیلوگرم');
+
+  const StockItem(this.apiValue, this.label, this.inSacks, this.unit);
+
+  final String apiValue;
+  final String label;
+  final bool inSacks;
+  final String unit;
 }
 
 /// A single sheet that records money in, money out, flour bought, or flour
@@ -52,6 +72,9 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
 
   /// Which way the flour went, for a consignment entry.
   String _direction = 'lent';
+
+  /// What is being brought in. Flour first: it is most of what arrives.
+  StockItem _item = StockItem.flour;
 
   bool _saving = false;
 
@@ -122,8 +145,10 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
             amount: value,
             note: note,
           ),
-        AdminRecordKind.flourIntake => await widget.api.recordFlourIntake(
-            bags: value,
+        AdminRecordKind.intake => await widget.api.recordStockIntake(
+            item: _item.apiValue,
+            quantity: value,
+            inSacks: _item.inSacks,
             note: note.isEmpty ? _title.text.trim() : note,
           ),
         AdminRecordKind.consignment => await widget.api.recordConsignmentFlour(
@@ -151,24 +176,25 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
   }
 
   String get _amountLabel => switch (widget.kind) {
-        AdminRecordKind.flourIntake => 'تعداد کیسه',
+        AdminRecordKind.intake =>
+          _item.inSacks ? 'تعداد کیسه' : 'مقدار به کیلوگرم',
         AdminRecordKind.consignment => 'تعداد کیسه',
         _ => 'مبلغ',
       };
 
   String get _amountSuffix => switch (widget.kind) {
-        AdminRecordKind.flourIntake => 'کیسه',
+        AdminRecordKind.intake => _item.unit,
         AdminRecordKind.consignment => 'کیسه',
         _ => _unit.label,
       };
 
   String get _titleLabel => switch (widget.kind) {
         AdminRecordKind.consignment => 'نام نانوایی همکار',
-        AdminRecordKind.flourIntake => 'توضیح (مثلاً نام تأمین‌کننده)',
+        AdminRecordKind.intake => 'توضیح (مثلاً نام تأمین‌کننده)',
         _ => 'عنوان',
       };
 
-  bool get _titleRequired => widget.kind != AdminRecordKind.flourIntake;
+  bool get _titleRequired => widget.kind != AdminRecordKind.intake;
 
   @override
   Widget build(BuildContext context) {
@@ -227,6 +253,34 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                         ),
                     ],
                     onChanged: (value) => setState(() => _category = value),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                if (widget.kind == AdminRecordKind.intake) ...[
+                  DropdownButtonFormField<StockItem>(
+                    initialValue: _item,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'چه چیزی وارد شد',
+                      prefixIcon: Icon(Icons.inventory_2_rounded),
+                    ),
+                    items: [
+                      for (final item in StockItem.values)
+                        DropdownMenuItem(
+                          value: item,
+                          child: Text('${item.label} — ${item.unit}'),
+                        ),
+                    ],
+                    // The amount field's label and suffix follow the item,
+                    // and a count typed for one unit means something else
+                    // in the other, so it is cleared rather than carried.
+                    onChanged: (value) => setState(() {
+                      if (value == null || value == _item) return;
+
+                      _item = value;
+                      _amount.clear();
+                    }),
                   ),
                   const SizedBox(height: 16),
                 ],

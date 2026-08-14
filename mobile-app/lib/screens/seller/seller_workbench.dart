@@ -571,7 +571,7 @@ class _FlourSection extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () =>
-                    _open(context, AdminRecordKind.flourIntake),
+                    _open(context, AdminRecordKind.intake),
                 icon: const Icon(Icons.local_shipping_rounded, size: 18),
                 label: const Text('ورود آرد'),
                 style: OutlinedButton.styleFrom(
