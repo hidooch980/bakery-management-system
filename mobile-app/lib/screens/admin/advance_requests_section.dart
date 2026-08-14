@@ -37,10 +37,48 @@ class _AdvanceRequestsSectionState extends State<AdvanceRequestsSection> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('تأیید علی‌الحساب'),
-        content: Text(
-          '${request.userName} — ${request.amountFormatted}\n\n'
-          'با تأیید، این مبلغ به‌عنوان علی‌الحساب ثبت می‌شود و از '
-          'حقوق بعدی کسر خواهد شد.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${request.userName} — ${request.amountFormatted}\n\n'
+              'با تأیید، این مبلغ به‌عنوان علی‌الحساب ثبت می‌شود و از '
+              'حقوق بعدی کسر خواهد شد.',
+            ),
+            // Said before the money goes out. The server reported the same
+            // thing after approving, which is the wrong moment to learn
+            // that this person had drawn most of their month already.
+            if (request.outstandingFormatted != null) ...[
+              const SizedBox(height: 14),
+              _StandingLine(
+                label: 'علی‌الحساب فعلی',
+                value: request.outstandingFormatted!,
+              ),
+              if (request.monthlySalaryFormatted != null)
+                _StandingLine(
+                  label: 'حقوق ماهانه',
+                  value: request.monthlySalaryFormatted!,
+                ),
+              if (request.totalAfterFormatted != null)
+                _StandingLine(
+                  label: 'جمع پس از تأیید',
+                  value: request.totalAfterFormatted!,
+                  emphasised: true,
+                ),
+            ],
+            if (request.exceedsSalary) ...[
+              const SizedBox(height: 12),
+              Text(
+                'با این تأیید، جمع علی‌الحساب از حقوق یک ماه بیشتر می‌شود و'
+                ' باقی‌اش به ماه بعد می‌افتد.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.emberHot,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
@@ -207,6 +245,39 @@ class _RequestTile extends StatelessWidget {
         ),
         const Divider(height: 16),
       ],
+    );
+  }
+}
+
+/// One line of "here is where this person stands" in the approval dialog.
+class _StandingLine extends StatelessWidget {
+  const _StandingLine({
+    required this.label,
+    required this.value,
+    this.emphasised = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasised;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
+          Text(
+            value,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: emphasised ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

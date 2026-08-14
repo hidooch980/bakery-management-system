@@ -145,6 +145,10 @@ class AdvanceRequest {
     this.reason,
     this.decisionNote,
     this.decidedByName,
+    this.outstandingFormatted,
+    this.monthlySalaryFormatted,
+    this.totalAfterFormatted,
+    this.exceedsSalary = false,
   });
 
   factory AdvanceRequest.fromJson(Map<String, dynamic> json) => AdvanceRequest(
@@ -158,6 +162,10 @@ class AdvanceRequest {
         reason: json['reason'] as String?,
         decisionNote: json['decision_note'] as String?,
         decidedByName: json['decided_by_name'] as String?,
+        outstandingFormatted: json['outstanding_formatted'] as String?,
+        monthlySalaryFormatted: json['monthly_salary_formatted'] as String?,
+        totalAfterFormatted: json['total_after_formatted'] as String?,
+        exceedsSalary: json['exceeds_salary'] as bool? ?? false,
       );
 
   final int id;
@@ -173,6 +181,22 @@ class AdvanceRequest {
   /// is worse than no answer at all, so this is shown wherever the status is.
   final String? decisionNote;
   final String? decidedByName;
+
+  /// What this person already owes, before this request is answered.
+  ///
+  /// The approve response used to report the consequence afterwards, which
+  /// is the wrong moment to learn that someone had drawn most of their
+  /// month already.
+  final String? outstandingFormatted;
+  final String? monthlySalaryFormatted;
+
+  /// Their outstanding advances plus the amount being asked for.
+  final String? totalAfterFormatted;
+
+  /// Granting this would put them past a month's wage. Not a refusal --
+  /// the shop lends past a month sometimes -- but not something to find
+  /// out afterwards either.
+  final bool exceedsSalary;
 
   bool get wasApproved => status == 'approved';
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\StaffAdvance;
 use App\Models\StaffAdvanceRequest;
+use App\Models\User;
 use App\Support\AppCalendar;
 use App\Support\Money;
 use App\Traits\ApiResponse;
@@ -148,12 +149,16 @@ class StaffAdvanceRequestController extends Controller
 
     private function payload(StaffAdvanceRequest $r): array
     {
+        $amount = (float) $r->amount;
+        $standing = $this->standingFor($r->user_id);
+        $totalAfter = $standing['outstanding'] + $amount;
+
         return [
             'id' => $r->id,
             'user_id' => $r->user_id,
             'user_name' => $r->user?->name,
-            'amount' => (float) $r->amount,
-            'amount_formatted' => Money::format((float) $r->amount),
+            'amount' => $amount,
+            'amount_formatted' => Money::format($amount),
             'reason' => $r->reason,
             'status' => $r->status,
             'status_label' => $r->status_label,
@@ -163,6 +168,45 @@ class StaffAdvanceRequestController extends Controller
             'decision_note' => $r->decision_note,
             'staff_advance_id' => $r->staff_advance_id,
             'requested_at_label' => AppCalendar::date($r->created_at),
+
+            // What granting this would mean, said before it is granted. The
+            // approve response already reported the consequence — but by
+            // then the money is out, which is the wrong moment to learn that
+            // this person had drawn most of their month already.
+            'outstanding' => Money::convert($standing['outstanding']),
+            'outstanding_formatted' => Money::format($standing['outstanding']),
+            'monthly_salary_formatted' => $standing['salary'] === null
+                ? null
+                : Money::format($standing['salary']),
+            'total_after_formatted' => Money::format($totalAfter),
+            'exceeds_salary' => $standing['salary'] !== null
+                && $totalAfter > $standing['salary'],
+        ];
+    }
+
+    /**
+     * What one person already owes and is paid.
+     *
+     * Memoised for the length of the request: the manager's list holds one
+     * row per person and the employee's own list holds many rows for one
+     * person, so working it out per row would be a query per row in both.
+     *
+     * @var array<int, array{outstanding: float, salary: float|null}>
+     */
+    private array $standings = [];
+
+    /** @return array{outstanding: float, salary: float|null} */
+    private function standingFor(?int $userId): array
+    {
+        if ($userId === null) {
+            return ['outstanding' => 0.0, 'salary' => null];
+        }
+
+        return $this->standings[$userId] ??= [
+            'outstanding' => StaffAdvance::outstandingFor($userId),
+            'salary' => ($salary = User::find($userId)?->monthly_salary) === null
+                ? null
+                : (float) $salary,
         ];
     }
 }
