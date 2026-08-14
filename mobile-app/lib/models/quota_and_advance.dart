@@ -185,3 +185,65 @@ double _d(Object? value) => switch (value) {
       final String s => double.tryParse(s) ?? 0,
       _ => 0,
     };
+
+/// What one person is owed, as their own home screen shows it.
+///
+/// Two figures rather than one total, because they are different kinds of
+/// truth: an issued payslip is a debt the shop has already accepted, and
+/// what is left of this month's wage is a forecast that the month can still
+/// change. Adding them would produce a number that is neither.
+class PaySummary {
+  const PaySummary({
+    required this.periodLabel,
+    required this.advanceOutstandingFormatted,
+    required this.advanceOutstanding,
+    required this.unpaidPayslipsFormatted,
+    required this.unpaidPayslipsCount,
+    required this.carriesOver,
+    required this.hasPendingRequest,
+    required this.summary,
+    this.monthlySalaryFormatted,
+    this.remainingFormatted,
+  });
+
+  factory PaySummary.fromJson(Map<String, dynamic> json) => PaySummary(
+        periodLabel: json['period_label'] as String? ?? '',
+        monthlySalaryFormatted: json['monthly_salary_formatted'] as String?,
+        advanceOutstanding: _d(json['advance_outstanding']),
+        advanceOutstandingFormatted:
+            json['advance_outstanding_formatted'] as String? ?? '',
+        unpaidPayslipsFormatted:
+            json['unpaid_payslips_total_formatted'] as String? ?? '',
+        unpaidPayslipsCount: json['unpaid_payslips_count'] as int? ?? 0,
+        remainingFormatted: json['remaining_formatted'] as String?,
+        carriesOver: json['carries_over'] as bool? ?? false,
+        hasPendingRequest: json['has_pending_request'] as bool? ?? false,
+        summary: json['summary'] as String? ?? '',
+      );
+
+  final String periodLabel;
+
+  /// Null until an admin has set what this person is paid.
+  final String? monthlySalaryFormatted;
+
+  final double advanceOutstanding;
+  final String advanceOutstandingFormatted;
+
+  final String unpaidPayslipsFormatted;
+  final int unpaidPayslipsCount;
+
+  /// What is left of this month's wage. Null when no wage is on record.
+  final String? remainingFormatted;
+
+  /// The advances already exceed a month's wage, so the rest comes off the
+  /// month after. Said outright, because a remainder of zero otherwise
+  /// reads as "nothing more is owed".
+  final bool carriesOver;
+
+  final bool hasPendingRequest;
+  final String summary;
+
+  bool get owesAdvance => advanceOutstanding > 0;
+
+  bool get hasUnpaidPayslips => unpaidPayslipsCount > 0;
+}

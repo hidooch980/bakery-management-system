@@ -225,6 +225,10 @@ Route::prefix('v1')->group(function () {
         // salaries resource so `/salaries/{salary}` does not swallow "mine".
         Route::get('/salaries/mine', [SalaryController::class, 'mine']);
 
+        // The same money as one figure, for the card on their home screen.
+        // Their pay was visible to everyone but them.
+        Route::get('/salaries/my-summary', [SalaryController::class, 'mySummary']);
+
         // And what they have drawn against them. Whoever took the advance
         // is the person who most needs to know what next month is short by.
         Route::get('/staff-advances/mine', [StaffAdvanceController::class, 'mine']);

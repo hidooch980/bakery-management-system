@@ -12,6 +12,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/pay_card.dart';
 import '../../widgets/seller_account_card.dart';
 import '../../widgets/seller_collections_card.dart';
 import '../../widgets/station_rail.dart';
@@ -236,6 +237,8 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
       // The seller is the one on the floor holding a phone, so they mark
       // in the bakers who are not.
       AttendanceCard(api: widget.api, canRecordForOthers: true),
+      const SizedBox(height: 14),
+      PayCard(api: widget.api),
       const SizedBox(height: 14),
       WorkStartCard(
         api: widget.api,

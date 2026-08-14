@@ -11,6 +11,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/pay_card.dart';
 import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/work_start_card.dart';
 import '../../widgets/chane_comparison.dart';
@@ -155,6 +156,8 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
       ),
       const SizedBox(height: 14),
       AttendanceCard(api: widget.api),
+      const SizedBox(height: 14),
+      PayCard(api: widget.api),
       const SizedBox(height: 14),
       WorkStartCard(
         api: widget.api,

@@ -8,6 +8,7 @@ import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/pay_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
 import '../../widgets/role_home_scaffold.dart';
@@ -75,6 +76,8 @@ class _ShaterHomeScreenState extends State<ShaterHomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 AttendanceCard(api: widget.api),
+                const SizedBox(height: 14),
+                PayCard(api: widget.api),
                 const SizedBox(height: 20),
                 FutureBuilder<ChaneBoard>(
                   future: _board,

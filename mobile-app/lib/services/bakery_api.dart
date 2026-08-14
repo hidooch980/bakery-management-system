@@ -973,6 +973,14 @@ class BakeryApi {
     );
   }
 
+  /// What this person is owed, in one call, for the card on their home
+  /// screen — their pay was visible to everyone but them.
+  Future<PaySummary> myPaySummary() async {
+    final body = await _client.get('/salaries/my-summary');
+
+    return PaySummary.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
   Future<({List<AdvanceRequest> requests, bool hasPending})>
       myAdvanceRequests() async {
     final body = await _client.get('/advance-requests/mine');

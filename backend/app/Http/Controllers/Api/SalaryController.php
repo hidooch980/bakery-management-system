@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SalaryPayment;
+use App\Models\StaffAdvance;
+use App\Models\StaffAdvanceRequest;
 use App\Models\User;
 use App\Support\Jalali;
 use App\Support\Money;
@@ -127,6 +129,100 @@ class SalaryController extends Controller
             ->through(fn (SalaryPayment $p) => $this->payload($p));
 
         return $this->success($payments);
+    }
+
+    /**
+     * What this person is owed, in one call, for the card on their home
+     * screen.
+     *
+     * Their pay was visible to everyone but them. The one whose month is
+     * about to be short is the one who most needs to know by how much, and
+     * asking the office is how a wrong figure survives for months.
+     *
+     * Two different truths are reported rather than one blended one:
+     * payslips already issued and not yet paid, which is what the shop owes
+     * outright; and what is left of this month's wage after the advances
+     * drawn against it, which is a forecast and is labelled as one. Adding
+     * them together would produce a number that is neither.
+     */
+    public function mySummary(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $salary = $user->monthly_salary === null ? null : (float) $user->monthly_salary;
+        $outstanding = StaffAdvance::outstandingFor($user->id);
+
+        $unpaid = SalaryPayment::where('user_id', $user->id)
+            ->unpaid()
+            ->get(['net_amount']);
+
+        $unpaidTotal = (float) $unpaid->sum('net_amount');
+
+        // Floored at zero: an advance larger than a month's wage is not a
+        // negative wage, it is recovered over as many months as it takes —
+        // which is what the payslip itself does.
+        $remaining = $salary === null ? null : max(0.0, $salary - $outstanding);
+        $carriesOver = $salary !== null && $outstanding > $salary;
+
+        return $this->success([
+            'period_label' => Jalali::monthLabel(now()),
+
+            'monthly_salary' => $salary === null ? null : Money::convert($salary),
+            'monthly_salary_formatted' => $salary === null ? null : Money::format($salary),
+
+            'advance_outstanding' => Money::convert($outstanding),
+            'advance_outstanding_formatted' => Money::format($outstanding),
+
+            'unpaid_payslips_total' => Money::convert($unpaidTotal),
+            'unpaid_payslips_total_formatted' => Money::format($unpaidTotal),
+            'unpaid_payslips_count' => $unpaid->count(),
+
+            'remaining' => $remaining === null ? null : Money::convert($remaining),
+            'remaining_formatted' => $remaining === null ? null : Money::format($remaining),
+            'carries_over' => $carriesOver,
+
+            // One open request at a time, so the card can say so instead of
+            // offering a button the server is going to refuse.
+            'has_pending_request' => StaffAdvanceRequest::where('user_id', $user->id)
+                ->where('status', StaffAdvanceRequest::PENDING)
+                ->exists(),
+
+            'summary' => $this->summarise($salary, $outstanding, $remaining, $unpaidTotal, $carriesOver),
+        ]);
+    }
+
+    /**
+     * The same figures said in a sentence.
+     *
+     * A row of numbers is read by whoever already knows what they mean. The
+     * person this is for may not, and a wage they cannot read is a wage they
+     * still have to ask about.
+     */
+    private function summarise(
+        ?float $salary,
+        float $outstanding,
+        ?float $remaining,
+        float $unpaidTotal,
+        bool $carriesOver,
+    ): string {
+        if ($unpaidTotal > 0) {
+            return 'فیش حقوقی پرداخت‌نشده دارید: '.Money::format($unpaidTotal).'.';
+        }
+
+        if ($salary === null) {
+            return 'حقوق ماهانه شما هنوز ثبت نشده است. از مدیر بخواهید ثبتش کند.';
+        }
+
+        if ($outstanding <= 0) {
+            return 'تا امروز از حقوق این ماه چیزی نگرفته‌اید.';
+        }
+
+        if ($carriesOver) {
+            return 'علی‌الحساب گرفته‌شده از حقوق این ماه بیشتر است؛'
+                .' باقی‌اش از ماه بعد کسر می‌شود.';
+        }
+
+        return 'اگر امروز تسویه شود، '.Money::format($remaining).' به شما می‌رسد.';
     }
 
     /** Staff list with their configured monthly pay, to pre-fill the form. */

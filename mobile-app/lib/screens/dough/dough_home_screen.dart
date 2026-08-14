@@ -9,6 +9,7 @@ import '../../services/api_client.dart';
 import '../../models/bakery.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/pay_card.dart';
 import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/common.dart';
 import '../../theme/app_theme.dart';
@@ -90,6 +91,8 @@ class _DoughHomeScreenState extends State<DoughHomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 AttendanceCard(api: widget.api),
+                const SizedBox(height: 14),
+                PayCard(api: widget.api),
                 const SizedBox(height: 24),
                 Text(
                   'ثبت‌های من',
