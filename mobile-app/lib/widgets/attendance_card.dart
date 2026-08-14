@@ -29,6 +29,10 @@ class AttendanceCard extends StatefulWidget {
 
 class _AttendanceCardState extends State<AttendanceCard> {
   bool _loading = true;
+
+  /// Today's state could not be read. The card still draws — a seller who
+  /// cannot see whether they ticked in must at least be able to try.
+  bool _failed = false;
   bool _submitting = false;
   bool _checkedIn = false;
   DateTime? _checkedInAt;
@@ -47,10 +51,20 @@ class _AttendanceCardState extends State<AttendanceCard> {
         _checkedIn = status.checkedIn;
         _checkedInAt = status.at;
         _loading = false;
+        _failed = false;
       });
-    } on ApiException {
+    } catch (_) {
+      // Every failure, not only ApiException. This caught ApiException
+      // alone, so a dropped connection or a timeout escaped, _loading was
+      // never cleared, and the whole card stayed a spinner — which also
+      // hid the button for marking everyone else in, since that sits
+      // inside the loaded branch. The seller saw an empty card until
+      // their own check-in warmed the cache.
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _failed = true;
+      });
     }
   }
 
@@ -89,15 +103,20 @@ class _AttendanceCardState extends State<AttendanceCard> {
         padding: const EdgeInsets.all(18),
         child: AnimatedSize(
           duration: const Duration(milliseconds: 250),
-          child: _loading
-              ? const SizedBox(
-                  height: 76,
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : Column(
+          // The two halves are independent: whether this person ticked in
+          // has nothing to do with whether the others have, and nesting
+          // the roster inside the loaded branch meant one failed request
+          // took away a button about somebody else entirely.
+          child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
+                    if (_loading)
+                      const SizedBox(
+                        height: 76,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else
+                      Row(
                   children: [
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 350),
@@ -122,7 +141,9 @@ class _AttendanceCardState extends State<AttendanceCard> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _checkedIn ? 'حضور ثبت شده' : 'تیک حضور امروز',
+                            _failed
+                                ? 'وضعیت امروز خوانده نشد'
+                                : (_checkedIn ? 'حضور ثبت شده' : 'تیک حضور امروز'),
                             style: Theme.of(context)
                                 .textTheme
                                 .titleMedium
@@ -130,9 +151,11 @@ class _AttendanceCardState extends State<AttendanceCard> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _checkedIn && _checkedInAt != null
-                                ? 'ساعت ${JalaliFormat.time(_checkedInAt!)}'
-                                : 'برای ثبت ساعت ورود ضربه بزنید',
+                            _failed
+                                ? 'اینترنت وصل نشد — دوباره بزنید'
+                                : (_checkedIn && _checkedInAt != null
+                                    ? 'ساعت ${JalaliFormat.time(_checkedInAt!)}'
+                                    : 'برای ثبت ساعت ورود ضربه بزنید'),
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
@@ -142,7 +165,19 @@ class _AttendanceCardState extends State<AttendanceCard> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    if (_checkedIn)
+                    if (_failed)
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _loading = true;
+                            _failed = false;
+                          });
+                          _refresh();
+                        },
+                        tooltip: 'دوباره',
+                        icon: const Icon(Icons.refresh_rounded),
+                      )
+                    else if (_checkedIn)
                       const Icon(Icons.check_circle_rounded,
                           color: done, size: 32)
                     else
@@ -213,10 +248,19 @@ class _RosterSheetState extends State<_RosterSheet> {
     try {
       final staff = await widget.api.attendanceRoster();
       if (!mounted) return;
-      setState(() => _staff = staff);
+      setState(() {
+        _staff = staff;
+        _error = null;
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
+    } catch (_) {
+      // Anything that is not the server talking is the connection, and
+      // catching only ApiException left this sheet spinning for ever with
+      // nothing to say and no way to try again.
+      if (!mounted) return;
+      setState(() => _error = 'اینترنت وصل نشد. دوباره تلاش کنید.');
     }
   }
 
@@ -292,7 +336,21 @@ class _RosterSheetState extends State<_RosterSheet> {
             ),
             const SizedBox(height: 12),
             if (_error != null)
-              Text(_error!, style: TextStyle(color: scheme.error))
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(_error!, style: TextStyle(color: scheme.error)),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() => _error = null);
+                      _load();
+                    },
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('دوباره'),
+                  ),
+                ],
+              )
             else if (staff == null)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 28),
