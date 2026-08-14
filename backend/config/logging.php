@@ -58,10 +58,25 @@ return [
             'ignore_exceptions' => false,
         ],
 
+        /*
+         * 0664 rather than Monolog's default 0644.
+         *
+         * Two users write this log: www-data serving the site, and the
+         * deploy user running artisan and the nightly backup. Whichever
+         * writes first owns the day's file, and at 0644 the other one is
+         * locked out of it for the rest of the day — which showed up as
+         * every artisan command dying on "could not be opened in append
+         * mode" the moment a request had beaten it to the file.
+         *
+         * The group is shared, so making the file group-writable is what
+         * lets both keep writing. Not world-writable: the log carries
+         * request payloads.
+         */
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
+            'permission' => 0664,
             'replace_placeholders' => true,
         ],
 
@@ -70,6 +85,7 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 14),
+            'permission' => 0664,
             'replace_placeholders' => true,
         ],
 

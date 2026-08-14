@@ -35,10 +35,16 @@ sudo chmod o+x /home/ubuntu /home/ubuntu/bakery-management-system /home/ubuntu/b
 اجازهٔ نوشتن روی مسیرهایی که لاراول به آن‌ها می‌نویسد:
 
 ```bash
-sudo usermod -a -G ubuntu www-data && sudo chmod -R g+w /home/ubuntu/bakery-management-system/backend/storage /home/ubuntu/bakery-management-system/backend/bootstrap/cache
+sudo usermod -a -G ubuntu www-data && bash deploy/fix-storage-permissions.sh
 ```
 
 > عضویت گروه با `reload` اعمال نمی‌شود؛ `restart` لازم است.
+
+دو کاربر روی `storage` می‌نویسند: `www-data` که سایت را سرو می‌کند، و کاربر استقرار که `artisan` و بک‌آپ شبانه را اجرا می‌کند. هرکدام زودتر بنویسد مالک فایل می‌شود و دیگری تا ساخته‌شدن فایل بعدی از آن بیرون می‌ماند.
+
+یک `chmod -R g+w` این را فقط تا نیمه‌شب درست می‌کند: لاگ روز بعد دوباره با گروهِ سازنده‌اش ساخته می‌شود و مشکل برمی‌گردد. `fix-storage-permissions.sh` علاوه بر دسترسی، `setgid` را هم روی پوشه‌ها می‌گذارد تا هر فایل تازه گروه پوشه را به ارث ببرد. نیمهٔ دوم کار در `config/logging.php` است (`'permission' => 0664`).
+
+بعد از هر استقراری که فایل تازه می‌سازد، دوباره اجرایش کنید — بی‌خطر است.
 
 ```bash
 sudo nginx -t && sudo systemctl restart nginx php8.3-fpm && sudo systemctl enable nginx php8.3-fpm
