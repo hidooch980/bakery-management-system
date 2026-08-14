@@ -7,6 +7,7 @@ use App\Models\SalaryPayment;
 use App\Models\StaffAdvance;
 use App\Models\StaffAdvanceRequest;
 use App\Models\User;
+use App\Support\AppCalendar;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Traits\ApiResponse;
@@ -165,7 +166,10 @@ class SalaryController extends Controller
         $carriesOver = $salary !== null && $outstanding > $salary;
 
         return $this->success([
-            'period_label' => Jalali::monthLabel(now()),
+            // Through AppCalendar, not Jalali outright: the shop chooses its
+            // calendar, and a card headed with a month it does not use is a
+            // label for the wrong month.
+            'period_label' => AppCalendar::monthLabel(now()),
 
             'monthly_salary' => $salary === null ? null : Money::convert($salary),
             'monthly_salary_formatted' => $salary === null ? null : Money::format($salary),
