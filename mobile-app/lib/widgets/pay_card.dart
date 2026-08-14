@@ -183,8 +183,12 @@ class _PayCardState extends State<PayCard> {
           p.unpaidPayslipsFormatted,
           const Color(0xFF2E9E6B),
         ),
+      // Not "this month's": the shop issues no payslips, so an advance is
+      // a standing debt and is still being deducted months after it was
+      // taken. Calling the result this month's remainder would blame the
+      // current month for money drawn in an earlier one.
       final p when p.remainingFormatted != null => (
-          'مانده حقوق این ماه',
+          'مانده حقوق پس از کسر بدهی',
           p.remainingFormatted!,
           AppColors.emberHot,
         ),

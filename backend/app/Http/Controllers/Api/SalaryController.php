@@ -217,13 +217,17 @@ class SalaryController extends Controller
             return 'حقوق ماهانه شما هنوز ثبت نشده است. از مدیر بخواهید ثبتش کند.';
         }
 
+        // None of these say "this month". This shop issues no payslips, so
+        // an advance is not settled at month end — it stands as a debt and
+        // is still being deducted long after the month it was taken in.
+        // Saying "this month" would blame the current month for money drawn
+        // in an earlier one, and promise a settlement that never comes.
         if ($outstanding <= 0) {
-            return 'تا امروز از حقوق این ماه چیزی نگرفته‌اید.';
+            return 'بدهی علی‌الحسابی ندارید.';
         }
 
         if ($carriesOver) {
-            return 'علی‌الحساب گرفته‌شده از حقوق این ماه بیشتر است؛'
-                .' باقی‌اش از ماه بعد کسر می‌شود.';
+            return 'بدهی علی‌الحساب شما از حقوق یک ماه بیشتر است.';
         }
 
         return 'اگر امروز تسویه شود، '.Money::format($remaining).' به شما می‌رسد.';

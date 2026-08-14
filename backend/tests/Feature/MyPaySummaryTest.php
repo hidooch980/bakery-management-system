@@ -88,12 +88,15 @@ class MyPaySummaryTest extends TestCase
 
         $data = $this->summary();
 
-        // The payslip recovers no more than the pay itself and carries the
-        // rest forward, so a negative remainder here would contradict what
-        // actually happens at the end of the month.
+        // A payslip would recover no more than the pay itself, so a negative
+        // remainder would contradict what settling actually does.
         $this->assertEquals(0, $data['remaining']);
         $this->assertTrue($data['carries_over']);
-        $this->assertStringContainsString('ماه بعد', $data['summary']);
+
+        // And it is not promised to next month's payslip: this shop issues
+        // none, so the debt simply stands.
+        $this->assertStringContainsString('بدهی', $data['summary']);
+        $this->assertStringNotContainsString('ماه بعد', $data['summary']);
     }
 
     public function test_an_issued_payslip_that_is_unpaid_is_reported_outright(): void
