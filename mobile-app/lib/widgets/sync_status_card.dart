@@ -6,10 +6,12 @@ import '../services/connection_status.dart';
 import '../theme/app_theme.dart';
 import 'common.dart';
 
-/// Shows whether the shop is talking to its server, what is still waiting to
-/// be sent, and sends it the moment the connection comes back — so a dough
-/// or chane entry recorded with no signal never has to be remembered and
-/// resubmitted by hand.
+/// Shows whether the shop is talking to its server and what is still
+/// waiting to be sent, so a dough or chane entry recorded with no signal
+/// never has to be remembered and resubmitted by hand.
+///
+/// The sending itself belongs to [ConnectionStatus], which knows the moment
+/// the server comes back whether or not this card is on screen.
 ///
 /// Online is read from [ConnectionStatus], which asks the server rather than
 /// the radio. A phone on café wifi, or on a server that has moved, reports
@@ -30,10 +32,6 @@ class SyncStatusCard extends StatefulWidget {
 class _SyncStatusCardState extends State<SyncStatusCard> {
   int _pending = 0;
   bool _syncing = false;
-
-  /// What the connection was last time this card looked, so a reconnect can
-  /// be told apart from an ordinary rebuild.
-  bool? _wasOnline;
 
   @override
   void initState() {
@@ -71,13 +69,20 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
     final connection = context.watch<ConnectionStatus>();
     final online = connection.online;
 
-    // Coming back from offline is the moment to empty the queue, and it has
-    // to wait for the frame: sending during build would setState mid-paint.
-    if (online && _wasOnline == false && _pending > 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
-    }
+    // Sending on reconnect used to live here, and only worked while this
+    // card happened to be on screen with a count it had read at mount —
+    // so anything queued after that read left _pending at zero and the
+    // send never fired. ConnectionStatus does it now, whatever is being
+    // looked at. This card reports and offers the manual retry.
+    final justSynced = connection.takeJustSynced();
 
-    _wasOnline = online;
+    if (justSynced > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showMessage(context, '$justSynced مورد ارسال شد.');
+        _refreshCount();
+      });
+    }
 
     // Nothing to say: the server is answering and nothing is waiting.
     if (online && _pending == 0) return const SizedBox.shrink();

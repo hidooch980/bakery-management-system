@@ -251,8 +251,24 @@ class ApiClient {
       final response = await post(path, body);
       return {...response, 'queued': false};
     } on ApiException catch (e) {
+      // The server answered and said no. Queueing a validation error or a
+      // 409 would only replay the same refusal for ever.
       if (!e.isConnectivityError) rethrow;
 
+      await _queue.enqueue(QueuedRequest(
+        id: _uuid.v4(),
+        path: path,
+        body: body,
+        label: label,
+        createdAt: DateTime.now(),
+      ));
+
+      return {'success': true, 'queued': true, 'data': body};
+    } catch (_) {
+      // Never reached the server, but arrived as something other than an
+      // ApiException — a raw timeout, a socket or DNS failure. This used
+      // to escape, and the entry the seller had just typed was lost with
+      // it. Anything that is not the server talking is the connection.
       await _queue.enqueue(QueuedRequest(
         id: _uuid.v4(),
         path: path,
@@ -287,6 +303,12 @@ class ApiClient {
         // it would just fail forever and hide anything queued after it.
         await _queue.remove(item.id);
         failed++;
+      } catch (_) {
+        // Not the server talking, so the connection went again mid-flush.
+        // Stop and keep the rest: an unrecognised throw used to escape the
+        // loop entirely, leaving this item neither sent nor removed and
+        // everything behind it unexamined.
+        break;
       }
     }
 
