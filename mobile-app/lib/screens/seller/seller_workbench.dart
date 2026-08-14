@@ -565,7 +565,7 @@ class _FlourSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Heading(title: 'آرد', icon: Icons.grain_rounded),
+        _Heading(title: 'انبار', icon: Icons.grain_rounded),
         Row(
           children: [
             Expanded(
@@ -573,7 +573,7 @@ class _FlourSection extends StatelessWidget {
                 onPressed: () =>
                     _open(context, AdminRecordKind.intake),
                 icon: const Icon(Icons.local_shipping_rounded, size: 18),
-                label: const Text('ورود آرد'),
+                label: const Text('ورودی انبار'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(50),
                 ),

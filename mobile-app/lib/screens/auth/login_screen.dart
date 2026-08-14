@@ -205,14 +205,24 @@ class _LoginScreenState extends State<LoginScreen>
                               TextFormField(
                                 controller: _loginController,
                                 textInputAction: TextInputAction.next,
-                                keyboardType: TextInputType.emailAddress,
+                                // Not the email keyboard: most of the floor
+                                // signs in with a phone number, and an "@"
+                                // key where the digits should be is a
+                                // keyboard fighting the person using it.
+                                keyboardType: TextInputType.text,
+                                autocorrect: false,
+                                enableSuggestions: false,
                                 decoration: const InputDecoration(
-                                  labelText: 'ایمیل یا شماره تلفن',
+                                  labelText: 'نام کاربری',
+                                  // The server matches on either, so the
+                                  // field says what to type rather than
+                                  // naming the two columns behind it.
+                                  helperText: 'ایمیل یا شماره تلفن',
                                   prefixIcon: Icon(Icons.person_outline_rounded),
                                 ),
                                 validator: (value) =>
                                     (value == null || value.trim().isEmpty)
-                                        ? 'ایمیل یا شماره تلفن را وارد کنید'
+                                        ? 'نام کاربری را وارد کنید'
                                         : null,
                               ),
                               const SizedBox(height: 16),
