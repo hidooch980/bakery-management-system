@@ -27,7 +27,8 @@ class CreateBakery extends Command
         {--admin-name= : The first admin\'s name}
         {--admin-email= : The email they sign in with}
         {--admin-phone= : The phone they may sign in with instead}
-        {--admin-password= : Their password; asked for if omitted}';
+        {--admin-password= : Their password; asked for if omitted}
+        {--like= : Copy the formula, weights and prices from this bakery id}';
 
     protected $description = 'ساخت نانوایی جدید به همراه مدیر آن';
 
@@ -55,7 +56,10 @@ class CreateBakery extends Command
         }
 
         $bakery = DB::transaction(function () use ($name, $adminName, $email, $phone, $password) {
-            $bakery = Bakery::create(['name' => $name]);
+            $bakery = Bakery::create([
+                'name' => $name,
+                ...$this->settingsToCopy(),
+            ]);
 
             // Created inside the new shop, so the user and everything the
             // panel later sets up for them is stamped with it rather than
@@ -79,9 +83,42 @@ class CreateBakery extends Command
         $this->info("نانوایی «{$bakery->name}» با شناسه {$bakery->id} ساخته شد.");
         $this->line("مدیر: {$adminName} — {$email}");
         $this->newLine();
-        $this->comment('تنظیمات نانوایی (وزن کیسه، فرمول خمیر، قیمت نان) را مدیر'
-            .' از پنل، بخش «اطلاعات نانوایی» وارد می‌کند.');
+        if ($this->option('like')) {
+            $this->comment('فرمول، وزن‌ها و قیمت‌ها از نانوایی '
+                .$this->option('like').' کپی شد. مدیر می‌تواند از پنل تغییرشان دهد.');
+        } else {
+            $this->comment('تنظیمات نانوایی (وزن کیسه، فرمول خمیر، قیمت نان) را مدیر'
+                .' از پنل، بخش «اطلاعات نانوایی» وارد می‌کند.');
+        }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The recipe from another shop, if one was named.
+     *
+     * Identity is never copied — a new shop's name, address, phone, logo
+     * and description are its own, and inheriting them would produce two
+     * shops that look like the same shop.
+     */
+    private function settingsToCopy(): array
+    {
+        $id = $this->option('like');
+
+        if (! $id) {
+            return [];
+        }
+
+        $source = Bakery::find($id);
+
+        if (! $source) {
+            $this->warn("نانوایی با شناسه {$id} پیدا نشد؛ تنظیمات کپی نشد.");
+
+            return [];
+        }
+
+        return collect($source->only($source->getFillable()))
+            ->except(['name', 'address', 'phone', 'logo', 'description'])
+            ->all();
     }
 }

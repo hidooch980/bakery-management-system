@@ -89,6 +89,82 @@ class MultipleBakeriesTest extends TestCase
         $this->assertTrue($admin->hasRole('admin'));
     }
 
+    public function test_the_recipe_can_be_copied_from_an_existing_shop(): void
+    {
+        $first = Bakery::first();
+        $first->update([
+            'flour_bag_weight_kg' => 45,
+            'normal_chane_weight_kg' => 0.85,
+            'bread_price' => 10_000,
+            'water_ratio' => 0.62,
+            'currency' => 'rial',
+        ]);
+
+        $this->artisan('bakery:create', [
+            'name' => 'نانوایی چهارم',
+            '--admin-name' => 'مدیر دوم',
+            '--admin-email' => 'recipe@bakery.test',
+            '--admin-phone' => '09121110001',
+            '--admin-password' => 'secret-enough',
+            '--like' => $first->id,
+        ])->assertSuccessful();
+
+        $second = Bakery::where('name', 'نانوایی چهارم')->firstOrFail();
+
+        // Shops under one owner bake the same bread to the same formula and
+        // differ only in how much, so retyping twenty figures for each is
+        // twenty chances to mistype one.
+        $this->assertEquals(45, $second->flour_bag_weight_kg);
+        $this->assertEquals(0.85, $second->normal_chane_weight_kg);
+        $this->assertEquals(10_000, $second->bread_price);
+        $this->assertEquals(0.62, $second->water_ratio);
+        $this->assertSame('rial', $second->currency);
+    }
+
+    public function test_copying_a_recipe_leaves_the_new_shops_identity_its_own(): void
+    {
+        $first = Bakery::first();
+        $first->update([
+            'address' => 'خیابان اول',
+            'phone' => '05433000000',
+            'description' => 'نانوایی اصلی',
+        ]);
+
+        $this->artisan('bakery:create', [
+            'name' => 'نانوایی سوم',
+            '--admin-name' => 'مدیر سوم',
+            '--admin-email' => 'identity@bakery.test',
+            '--admin-phone' => '09121110002',
+            '--admin-password' => 'secret-enough',
+            '--like' => $first->id,
+        ])->assertSuccessful();
+
+        $third = Bakery::where('name', 'نانوایی سوم')->firstOrFail();
+
+        // Two shops wearing the same address and phone would read as one.
+        $this->assertNull($third->address);
+        $this->assertNull($third->phone);
+        $this->assertNull($third->description);
+    }
+
+    public function test_an_unknown_source_warns_rather_than_copying_nothing_silently(): void
+    {
+        $this->artisan('bakery:create', [
+            'name' => 'نانوایی چهارم',
+            '--admin-name' => 'مدیر چهارم',
+            '--admin-email' => 'unknown@bakery.test',
+            '--admin-phone' => '09121110003',
+            '--admin-password' => 'secret-enough',
+            '--like' => 9999,
+        ])
+            ->expectsOutputToContain('پیدا نشد')
+            ->assertSuccessful();
+
+        // The shop is still made: a wrong id is a reason to say so, not a
+        // reason to leave the owner without the shop they asked for.
+        $this->assertNotNull(Bakery::where('name', 'نانوایی چهارم')->first());
+    }
+
     public function test_a_login_already_in_use_is_refused(): void
     {
         $this->artisan('bakery:create', [
