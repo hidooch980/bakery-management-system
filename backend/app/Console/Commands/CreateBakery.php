@@ -2,23 +2,22 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\OpenBakery;
 use App\Models\Bakery;
-use App\Models\User;
-use App\Support\CurrentBakery;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 /**
- * Opens a second shop on the same installation.
+ * Opens another shop on the same installation, from the server.
  *
- * Deliberately not in the panel. An admin belongs to one bakery and sees
- * only theirs, which is what keeps two shops' takings apart — so nobody
- * inside the panel is in a position to create a third. Whoever runs the
- * server is, and this is how they do it.
+ * The panel can do this too now, from the head shop — see
+ * [App\Filament\Pages\OpenBakery]. Both go through the same action, so a
+ * shop opened here and a shop opened there are the same shop; the failure
+ * that would matter is the two drifting apart by one field and quietly
+ * keeping different books.
  *
- * The new shop starts with its own admin and nothing else: no staff, no
- * stock, no history. Everything it records from here belongs to it alone.
+ * This one stays because it works before there is anyone to sign in as,
+ * which is how the first shop of an install gets made.
  */
 class CreateBakery extends Command
 {
@@ -41,48 +40,29 @@ class CreateBakery extends Command
 
         $password = $this->option('admin-password') ?: $this->secret('رمز عبور مدیر');
 
-        if (blank($password)) {
-            $this->error('رمز عبور نمی‌تواند خالی باشد.');
+        try {
+            $bakery = app(OpenBakery::class)->run(
+                name: $name,
+                adminName: (string) $adminName,
+                email: (string) $email,
+                phone: filled($phone) ? $phone : null,
+                password: (string) $password,
+                copyFrom: $this->shopToCopy(),
+            );
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $messages) {
+                foreach ($messages as $message) {
+                    $this->error($message);
+                }
+            }
 
             return self::FAILURE;
         }
-
-        // Checked before anything is written: a login is unique across the
-        // whole installation, because signing in names a person, not a shop.
-        if (User::where('email', $email)->orWhere('phone', $phone)->exists()) {
-            $this->error('کاربری با این ایمیل یا شماره تلفن از قبل وجود دارد.');
-
-            return self::FAILURE;
-        }
-
-        $bakery = DB::transaction(function () use ($name, $adminName, $email, $phone, $password) {
-            $bakery = Bakery::create([
-                'name' => $name,
-                ...$this->settingsToCopy(),
-            ]);
-
-            // Created inside the new shop, so the user and everything the
-            // panel later sets up for them is stamped with it rather than
-            // with whichever shop happened to be first in the table.
-            return CurrentBakery::for($bakery->id, function () use ($bakery, $adminName, $email, $phone, $password) {
-                $admin = User::create([
-                    'name' => $adminName,
-                    'email' => $email,
-                    'phone' => $phone,
-                    'password' => Hash::make($password),
-                    'is_active' => true,
-                    'bakery_id' => $bakery->id,
-                ]);
-
-                $admin->assignRole('admin');
-
-                return $bakery;
-            });
-        });
 
         $this->info("نانوایی «{$bakery->name}» با شناسه {$bakery->id} ساخته شد.");
         $this->line("مدیر: {$adminName} — {$email}");
         $this->newLine();
+
         if ($this->option('like')) {
             $this->comment('فرمول، وزن‌ها و قیمت‌ها از نانوایی '
                 .$this->option('like').' کپی شد. مدیر می‌تواند از پنل تغییرشان دهد.');
@@ -95,30 +75,28 @@ class CreateBakery extends Command
     }
 
     /**
-     * The recipe from another shop, if one was named.
+     * The shop whose recipe was asked for, if one was.
      *
-     * Identity is never copied — a new shop's name, address, phone, logo
-     * and description are its own, and inheriting them would produce two
-     * shops that look like the same shop.
+     * An id that matches nothing warns and carries on with the defaults,
+     * rather than refusing: the shop is still wanted, and its settings can
+     * be typed in afterwards. Silence is the thing to avoid — a shop opened
+     * with no recipe and no word said about it reports a flour loss that
+     * never happened.
      */
-    private function settingsToCopy(): array
+    private function shopToCopy(): ?Bakery
     {
         $id = $this->option('like');
 
         if (! $id) {
-            return [];
+            return null;
         }
 
         $source = Bakery::find($id);
 
         if (! $source) {
             $this->warn("نانوایی با شناسه {$id} پیدا نشد؛ تنظیمات کپی نشد.");
-
-            return [];
         }
 
-        return collect($source->only($source->getFillable()))
-            ->except(['name', 'address', 'phone', 'logo', 'description'])
-            ->all();
+        return $source;
     }
 }

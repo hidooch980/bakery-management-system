@@ -71,4 +71,16 @@ class Bakery extends Model
             'dough_loss_ratio' => 'decimal:4',
         ];
     }
+
+    /**
+     * Everyone who signs in to this shop.
+     *
+     * Deliberately unscoped by the shop the *reader* belongs to: the point
+     * of the relation is to answer for a named shop, and the only screen
+     * that asks belongs to the head shop looking at the others.
+     */
+    public function users()
+    {
+        return $this->hasMany(User::class);
+    }
 }
