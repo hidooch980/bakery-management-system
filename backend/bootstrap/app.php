@@ -28,6 +28,23 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
+
+        // Where an unauthenticated visitor is sent. Laravel's default asks
+        // for a route named `login`, which this app does not have — the
+        // panel's is `filament.admin.auth.login` — and the guest redirect
+        // is resolved *while building* the AuthenticationException, so it
+        // threw before the handler below could turn it into a 401. Every
+        // unauthenticated API request from anything that did not send
+        // `Accept: application/json` got a 500 error page instead.
+        //
+        // Null for the API: there is nowhere to send a phone, and without
+        // a redirect the exception reaches the renderer and comes back as
+        // the JSON 401 the app knows how to handle.
+        $middleware->redirectGuestsTo(
+            fn (Request $request) => $request->is('api/*')
+                ? null
+                : route('filament.admin.auth.login'),
+        );
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // Keep every API failure in the same envelope the controllers use.
