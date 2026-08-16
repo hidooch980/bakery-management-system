@@ -4,6 +4,7 @@ import '../../models/bakery.dart';
 import '../../models/entries.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../services/last_used.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
@@ -197,7 +198,7 @@ class _ProductionSectionState extends State<_ProductionSection> {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _DoughSheet(api: widget.api),
+      builder: (_) => _DoughSheet(api: widget.api, bakery: widget.bakery),
     );
 
     if (saved == true) _reload();
@@ -207,7 +208,11 @@ class _ProductionSectionState extends State<_ProductionSection> {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _ChaneSheet(api: widget.api, dough: dough),
+      builder: (_) => _ChaneSheet(
+        api: widget.api,
+        dough: dough,
+        bakery: widget.bakery,
+      ),
     );
 
     if (saved == true) _reload();
@@ -276,7 +281,7 @@ class _ProductionSectionState extends State<_ProductionSection> {
                         backgroundColor: AppColors.emberHot
                             .withValues(alpha: 0.16),
                         child: const Icon(
-                          Icons.inventory_2_rounded,
+                          Icons.water_drop_rounded,
                           color: AppColors.emberHot,
                         ),
                       ),
@@ -302,37 +307,58 @@ class _ProductionSectionState extends State<_ProductionSection> {
 
 /// Recording a batch of dough: the bag count, and nothing else.
 class _DoughSheet extends StatefulWidget {
-  const _DoughSheet({required this.api});
+  const _DoughSheet({required this.api, this.bakery});
 
   final BakeryApi api;
+  final Bakery? bakery;
 
   @override
   State<_DoughSheet> createState() => _DoughSheetState();
 }
 
 class _DoughSheetState extends State<_DoughSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _bags = TextEditingController();
   final _note = TextEditingController();
+
+  /// Held as a number, not text. The count is stepped rather than typed:
+  /// this shop has put in ten bags on nearly every batch of the last
+  /// month, and the few that differed differed by one or two.
+  int _bags = 10;
+
+  bool _ready = false;
   bool _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+    _restore();
+  }
+
+  Future<void> _restore() async {
+    final bags = await LastUsed.doughBags();
+
+    if (!mounted) return;
+    setState(() {
+      _bags = bags;
+      _ready = true;
+    });
+  }
+
+  @override
   void dispose() {
-    _bags.dispose();
     _note.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-
     setState(() => _saving = true);
 
     try {
       final queued = await widget.api.recordDough(
-        bagCount: int.parse(_bags.text.trim()),
+        bagCount: _bags,
         note: _note.text,
       );
+
+      await LastUsed.rememberDoughBags(_bags);
 
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -350,57 +376,66 @@ class _DoughSheetState extends State<_DoughSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final expected = widget.bakery?.expectedChaneFor(_bags);
+
     return _SheetShell(
       title: 'ثبت خمیر',
-      icon: Icons.inventory_2_rounded,
+      icon: Icons.water_drop_rounded,
       color: AppColors.emberHot,
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextFormField(
-              controller: _bags,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'تعداد کیسه',
-                prefixIcon: Icon(Icons.inventory_2_outlined),
-              ),
-              validator: (value) {
-                final bags = int.tryParse((value ?? '').trim());
+      child: !_ready
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Stepper(
+                  label: 'تعداد کیسه',
+                  value: _bags,
+                  onChanged: (value) => setState(() => _bags = value),
+                ),
 
-                return bags == null || bags <= 0
-                    ? 'تعداد کیسه را وارد کنید.'
-                    : null;
-              },
+                // What that many bags should come to. A mistyped count is
+                // otherwise invisible until the chane are counted hours
+                // later and the yield looks wrong for reasons nobody can
+                // reconstruct.
+                if (expected != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'حدود ${expected.toString()} چانه از این خمیر درمی‌آید.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _note,
+                  decoration: const InputDecoration(
+                    labelText: 'توضیح (اختیاری)',
+                    prefixIcon: Icon(Icons.notes_rounded),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                  ),
+                  child: _saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text('ثبت $_bags کیسه'),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _note,
-              decoration: const InputDecoration(
-                labelText: 'توضیح (اختیاری)',
-                prefixIcon: Icon(Icons.notes_rounded),
-              ),
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-              ),
-              child: _saving
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('ثبت'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -408,10 +443,11 @@ class _DoughSheetState extends State<_DoughSheet> {
 /// Shaping a batch. Only counts are entered — the weights come back from
 /// the server's formula, so what is recorded can never contradict it.
 class _ChaneSheet extends StatefulWidget {
-  const _ChaneSheet({required this.api, required this.dough});
+  const _ChaneSheet({required this.api, required this.dough, this.bakery});
 
   final BakeryApi api;
   final DoughEntry dough;
+  final Bakery? bakery;
 
   @override
   State<_ChaneSheet> createState() => _ChaneSheetState();
@@ -421,8 +457,35 @@ class _ChaneSheetState extends State<_ChaneSheet> {
   final _formKey = GlobalKey<FormState>();
   final _count = TextEditingController();
   final _nanino = TextEditingController(text: '0');
-  final _spray = TextEditingController(text: '0');
+  final _spray = TextEditingController(text: '5');
+
+  /// Nanino and spray flour are folded away. This shop has shaped no
+  /// nanino at all and put on five kilos of spray flour every single time,
+  /// so two of the three boxes were asking a question already answered —
+  /// and a form of three identical-looking number fields is where the
+  /// wrong one gets filled in.
+  bool _showMore = false;
+
+  bool _ready = false;
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+  }
+
+  Future<void> _restore() async {
+    final spray = await LastUsed.sprayFlourKg();
+    final nanino = await LastUsed.naninoCount();
+
+    if (!mounted) return;
+    setState(() {
+      _spray.text = spray.toStringAsFixed(spray % 1 == 0 ? 0 : 1);
+      _nanino.text = nanino.toString();
+      _ready = true;
+    });
+  }
 
   @override
   void dispose() {
@@ -432,18 +495,38 @@ class _ChaneSheetState extends State<_ChaneSheet> {
     super.dispose();
   }
 
+  int? get _expected => widget.bakery?.expectedChaneFor(widget.dough.bagCount);
+
+  /// Far enough off the formula to be worth a second look before saving.
+  /// A fifth either way is wide — a real day varies by a tenth — so this
+  /// catches a digit dropped or added, not an ordinary good or bad batch.
+  bool get _looksWrong {
+    final expected = _expected;
+    final typed = int.tryParse(_count.text.trim());
+
+    if (expected == null || typed == null || typed <= 0) return false;
+
+    return typed < expected * 0.8 || typed > expected * 1.2;
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
 
     try {
+      final nanino = int.tryParse(_nanino.text.trim()) ?? 0;
+      final spray = double.tryParse(_spray.text.trim()) ?? 0;
+
       final result = await widget.api.recordChane(
         doughEntryId: widget.dough.id,
         chaneCount: int.parse(_count.text.trim()),
-        naninoChaneCount: int.tryParse(_nanino.text.trim()) ?? 0,
-        sprayFlourKg: double.tryParse(_spray.text.trim()) ?? 0,
+        naninoChaneCount: nanino,
+        sprayFlourKg: spray,
       );
+
+      await LastUsed.rememberSprayFlourKg(spray);
+      await LastUsed.rememberNaninoCount(nanino);
 
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -463,72 +546,218 @@ class _ChaneSheetState extends State<_ChaneSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final expected = _expected;
+
     return _SheetShell(
       title: 'ثبت چانه — ${widget.dough.bagCount} کیسه',
-      icon: Icons.grain_rounded,
+      icon: Icons.blur_circular_rounded,
       color: const Color(0xFF3B82C4),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextFormField(
-              controller: _count,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'تعداد چانه عادی',
-                prefixIcon: Icon(Icons.grain_rounded),
-              ),
-              validator: (value) {
-                final count = int.tryParse((value ?? '').trim());
+      child: !_ready
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: _count,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                    decoration: InputDecoration(
+                      labelText: 'تعداد چانه',
+                      // The formula's own answer, offered rather than
+                      // imposed: the oven, not the arithmetic, decides how
+                      // many actually came out.
+                      hintText: expected?.toString(),
+                      helperText: expected == null
+                          ? null
+                          : 'از ${widget.dough.bagCount} کیسه معمولاً حدود $expected چانه',
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    validator: (value) {
+                      final count = int.tryParse((value ?? '').trim());
 
-                return count == null || count <= 0
-                    ? 'تعداد چانه را وارد کنید.'
-                    : null;
-              },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _nanino,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'تعداد چانه نانینو',
-                prefixIcon: Icon(Icons.bakery_dining_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _spray,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'آرد پاششی (کیلوگرم)',
-                prefixIcon: Icon(Icons.scatter_plot_rounded),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'وزن‌ها از فرمول نانوایی محاسبه می‌شوند.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      return count == null || count <= 0
+                          ? 'تعداد چانه را وارد کنید.'
+                          : null;
+                    },
                   ),
-            ),
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
+
+                  if (_looksWrong) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            size: 18, color: AppColors.emberHot),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'این عدد از حالت عادی این نانوایی خیلی دور است.'
+                            ' اگر درست است ثبتش کنید.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.emberHot,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _showMore = !_showMore),
+                      icon: Icon(
+                        _showMore
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        size: 20,
+                      ),
+                      label: Text(_showMore ? 'بستن' : 'نانینو و آرد پاششی'),
+                    ),
+                  ),
+
+                  if (_showMore) ...[
+                    const SizedBox(height: 4),
+                    TextFormField(
+                      controller: _nanino,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'تعداد چانه نانینو',
+                        prefixIcon: Icon(Icons.bakery_dining_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _spray,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'آرد پاششی (کیلوگرم)',
+                        prefixIcon: Icon(Icons.scatter_plot_rounded),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 8),
+                  Text(
+                    'وزن‌ها از فرمول نانوایی حساب می‌شوند.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton(
+                    onPressed: _saving ? null : _save,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(56),
+                    ),
+                    child: _saving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('ثبت'),
+                  ),
+                ],
               ),
-              child: _saving
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('ثبت'),
+            ),
+    );
+  }
+}
+
+/// A count that is nearly always the same, changed by tapping rather than
+/// typing. Ten bags on almost every batch of the last month; the keypad
+/// was six taps and a chance to mistype for a number that rarely moves.
+class _Stepper extends StatelessWidget {
+  const _Stepper({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    this.min = 1,
+    this.max = 99,
+  });
+
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+  final int min;
+  final int max;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        Text(label, style: theme.textTheme.bodyMedium),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _Round(
+              icon: Icons.remove_rounded,
+              onTap: value > min ? () => onChanged(value - 1) : null,
+            ),
+            SizedBox(
+              width: 96,
+              child: Text(
+                value.toString(),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.emberHot,
+                ),
+              ),
+            ),
+            _Round(
+              icon: Icons.add_rounded,
+              onTap: value < max ? () => onChanged(value + 1) : null,
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _Round extends StatelessWidget {
+  const _Round({required this.icon, this.onTap});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // Deliberately large: this is tapped with a floury thumb, standing up.
+    return SizedBox(
+      height: 56,
+      width: 56,
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Icon(
+            icon,
+            size: 28,
+            color: onTap == null
+                ? Theme.of(context).disabledColor
+                : Theme.of(context).colorScheme.onSurface,
+          ),
         ),
       ),
     );
