@@ -402,9 +402,7 @@ class _DoughSheetState extends State<_DoughSheet> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('این خمیر را همین الان ثبت کردید'),
-        content: Text('$message
-
-اگر دستهٔ تازه‌ای است، تأیید کنید.'),
+        content: Text('$message\n\nاگر دستهٔ تازه‌ای است، تأیید کنید.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
