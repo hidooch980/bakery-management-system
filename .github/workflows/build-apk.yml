@@ -134,7 +134,11 @@ jobs:
             while IFS= read -r line; do
               [ -z "$line" ] && continue
               echo "::error::${line}"
-            done < <(head -40 /tmp/analyze.txt)
+            # The tail, not the head: `flutter analyze` resolves packages
+            # first and prints a screenful of version numbers before it says
+            # anything about the code, so the first forty lines are all
+            # preamble and the findings are at the end.
+            done < <(tail -40 /tmp/analyze.txt)
           fi
           exit "$status"
 
