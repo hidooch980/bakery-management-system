@@ -7,6 +7,7 @@ use App\Filament\Widgets\FlourQuotaOverview;
 use App\Filament\Widgets\InventoryOverview;
 use App\Filament\Widgets\MoneyAtAGlance;
 use App\Filament\Widgets\ProductionTrendChart;
+use App\Filament\Widgets\SystemVersusOvenOverview;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 /**
@@ -28,6 +29,10 @@ class Dashboard extends BaseDashboard
             ProductionTrendChart::class,
             InventoryOverview::class,
             FlourQuotaOverview::class,
+            // Beside the quota on purpose: the quota follows what the
+            // national system saw, and this is the only place that says
+            // how much of the month's baking it did not.
+            SystemVersusOvenOverview::class,
         ];
     }
 
