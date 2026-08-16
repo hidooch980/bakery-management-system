@@ -2,9 +2,11 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\IssueAcknowledgement;
 use App\Support\IssueScanner;
 use App\Support\SystemIssue;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
@@ -14,6 +16,16 @@ use Illuminate\Support\Collection;
  *
  * Issues are recomputed on every visit rather than stored, so a problem
  * disappears from here the moment the underlying data is put right.
+ *
+ * Not every issue is a mistake, though. This shop pays no wages through the
+ * system and keeps rent and utilities at zero on purpose; those are
+ * reported every single time, one of them as «بحرانی», and always will be.
+ * So an issue can be answered — «می‌دانم، تصمیمم همین است» — and moves to a
+ * decided list with the reason beside it. It is still on the page. It just
+ * stops counting as open, which is what keeps the badge worth looking at.
+ *
+ * An answer covers the problem at the size it was. If it grows past that,
+ * it comes back at the top with what changed — see IssueAcknowledgement.
  */
 class IssueCenter extends Page
 {
@@ -29,15 +41,97 @@ class IssueCenter extends Page
 
     protected static string $view = 'filament.pages.issue-center';
 
+    /**
+     * Scanning reads a good part of the shop's ledger. The page asks for
+     * the list several times over one render — the badge, the header
+     * actions, each section — so it is scanned once and held for the
+     * request.
+     *
+     * @var Collection<int, SystemIssue>|null
+     */
+    private ?Collection $scanned = null;
+
+    /** @var Collection<string, IssueAcknowledgement>|null */
+    private ?Collection $answers = null;
+
     /** @return Collection<int, SystemIssue> */
     public function getIssues(): Collection
     {
-        return app(IssueScanner::class)->scan();
+        return $this->scanned ??= app(IssueScanner::class)->scan();
+    }
+
+    /** @return Collection<string, IssueAcknowledgement> */
+    private function answers(): Collection
+    {
+        return $this->answers ??= IssueAcknowledgement::with('acknowledgedBy')
+            ->get()
+            ->keyBy('issue_key');
+    }
+
+    /**
+     * The ones still wanting attention: never answered, or answered when
+     * they were smaller than they are now.
+     *
+     * @return Collection<int, SystemIssue>
+     */
+    public function getOpenIssues(): Collection
+    {
+        return $this->getIssues()->reject(
+            fn (SystemIssue $i) => $this->answers()->get($i->key)?->stillCovers($i) ?? false
+        )->values();
+    }
+
+    /** @return Collection<int, SystemIssue> */
+    public function getAnsweredIssues(): Collection
+    {
+        return $this->getIssues()->filter(
+            fn (SystemIssue $i) => $this->answers()->get($i->key)?->stillCovers($i) ?? false
+        )->values();
+    }
+
+    public function answerFor(SystemIssue $issue): ?IssueAcknowledgement
+    {
+        return $this->answers()->get($issue->key);
+    }
+
+    /**
+     * How much worse it got since it was answered, as a percentage —
+     * shown on an issue that has come back, so the owner can see why.
+     */
+    public function growthFor(SystemIssue $issue): ?int
+    {
+        $growth = $this->answers()->get($issue->key)?->growthSince($issue);
+
+        return $growth !== null && $growth > 0 ? (int) round($growth * 100) : null;
     }
 
     public function getFixableCount(): int
     {
-        return $this->getIssues()->filter->isAutoFixable()->count();
+        return $this->getOpenIssues()->filter->isAutoFixable()->count();
+    }
+
+    /**
+     * For the sidebar. Only open issues count — a badge that includes
+     * decided ones never goes away, and a badge that never goes away is
+     * not read.
+     */
+    public static function getNavigationBadge(): ?string
+    {
+        $page = app(static::class);
+        $open = $page->getOpenIssues()->count();
+
+        return $open > 0 ? (string) $open : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        $open = app(static::class)->getOpenIssues();
+
+        if ($open->contains(fn (SystemIssue $i) => $i->severity === SystemIssue::CRITICAL)) {
+            return 'danger';
+        }
+
+        return $open->isEmpty() ? null : 'warning';
     }
 
     protected function getHeaderActions(): array
@@ -69,11 +163,84 @@ class IssueCenter extends Page
         ];
     }
 
+    /**
+     * «می‌دانم، تصمیمم همین است» — with a reason, because an answer nobody
+     * explained is indistinguishable six months later from someone having
+     * clicked it to make the red go away.
+     */
+    public function acknowledgeAction(): Action
+    {
+        return Action::make('acknowledge')
+            ->label('می‌دانم، تصمیمم همین است')
+            ->icon('heroicon-o-hand-thumb-up')
+            ->color('gray')
+            ->size('sm')
+            ->modalHeading('پاسخ به این مورد')
+            ->modalDescription(
+                'این مورد از فهرست باز بیرون می‌رود و در فهرست «تصمیم گرفته‌شده»'
+                .' همین صفحه می‌ماند. اگر مشکل بزرگ‌تر شود دوباره برمی‌گردد.'
+            )
+            ->form([
+                Textarea::make('note')
+                    ->label('چرا؟')
+                    ->placeholder('مثلاً: حقوق بیرون از سامانه پرداخت می‌شود.')
+                    ->helperText('برای خودتان و هرکسی که بعداً این صفحه را باز می‌کند.')
+                    ->rows(3)
+                    ->maxLength(500),
+            ])
+            ->modalSubmitActionLabel('ثبت پاسخ')
+            ->action(function (array $arguments, array $data): void {
+                $issue = $this->getIssues()->firstWhere('key', $arguments['key'] ?? null);
+
+                if (! $issue) {
+                    return;
+                }
+
+                IssueAcknowledgement::updateOrCreate(
+                    ['issue_key' => $issue->key],
+                    [
+                        'title' => $issue->title,
+                        'severity' => $issue->severity,
+                        'note' => $data['note'] ?: null,
+                        'magnitude' => $issue->magnitude,
+                        'acknowledged_by' => auth()->id(),
+                    ],
+                );
+
+                $this->answers = null;
+
+                Notification::make()
+                    ->title('ثبت شد')
+                    ->body($issue->title.' دیگر در فهرست باز شمرده نمی‌شود.')
+                    ->success()
+                    ->send();
+            });
+    }
+
+    public function reopenAction(): Action
+    {
+        return Action::make('reopen')
+            ->label('دوباره یادآوری کن')
+            ->icon('heroicon-o-bell-alert')
+            ->color('warning')
+            ->size('sm')
+            ->action(function (array $arguments): void {
+                IssueAcknowledgement::where('issue_key', $arguments['key'] ?? '')->delete();
+
+                $this->answers = null;
+
+                Notification::make()
+                    ->title('به فهرست باز برگشت')
+                    ->success()
+                    ->send();
+            });
+    }
+
     private function applyAutoFixes(): void
     {
         $applied = [];
 
-        foreach ($this->getIssues()->filter->isAutoFixable() as $issue) {
+        foreach ($this->getOpenIssues()->filter->isAutoFixable() as $issue) {
             $applied[] = ($issue->autoFix)();
         }
 
@@ -85,6 +252,9 @@ class IssueCenter extends Page
 
             return;
         }
+
+        // The fix changed the data the list was built from.
+        $this->scanned = null;
 
         Notification::make()
             ->title(count($applied).' مورد اصلاح شد')

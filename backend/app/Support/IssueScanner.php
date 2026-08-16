@@ -9,6 +9,7 @@ use App\Models\DoughEntry;
 use App\Models\Expense;
 use App\Models\FlourAllocation;
 use App\Models\InventoryItem;
+use App\Models\Loan;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\User;
@@ -42,6 +43,7 @@ class IssueScanner
             ...$this->stalePending(),
             ...$this->longUnsettledSellers(),
             ...$this->tradingAtALoss(),
+            ...$this->loanInstalmentDue(),
             ...$this->dieselRunningOut(),
             ...$this->wagesNeverRecorded(),
             ...$this->expensesMostlyUncategorised(),
@@ -87,6 +89,7 @@ class IssueScanner
                     .' اصلاح خودکار فقط کسری را صفر می‌کند و علت اصلی را برطرف نمی‌کند.',
                 url: '/admin/inventory-items',
                 urlLabel: 'ثبت ورودی انبار',
+                magnitude: $missing,
                 autoFix: function () use ($item, $missing) {
                     $item->move(
                         'in',
@@ -140,6 +143,7 @@ class IssueScanner
                 .' قابل انجام نیست و به‌جای عدد، خط تیره نمایش داده می‌شود.',
             url: '/admin/manage-bakery',
             urlLabel: 'تکمیل اطلاعات نانوایی',
+            magnitude: (float) $missing->count(),
         )];
     }
 
@@ -165,6 +169,9 @@ class IssueScanner
                 suggestion: 'برای جلوگیری از توقف تولید، تأمین کنید.',
                 url: '/admin/inventory-items',
                 urlLabel: 'مشاهده انبار',
+                // How far under the line, not the balance: a threshold
+                // raised later must not read as the stock falling.
+                magnitude: (float) $item->low_threshold - (float) $item->balance,
             );
         }
 
@@ -196,6 +203,7 @@ class IssueScanner
                 suggestion: 'اگر آرد امانی یا سنوات دارید ثبت کنید تا تراز درست شود.',
                 url: '/admin/flour-allocations',
                 urlLabel: 'مدیریت سهمیه',
+                magnitude: (float) $period->used_kg - (float) $period->allocated_kg,
             );
         }
 
@@ -229,6 +237,7 @@ class IssueScanner
                     .' اگر واریزی جا مانده، آن را با تاریخ خودش ثبت کنید.',
                 url: '/admin/bank-accounts',
                 urlLabel: 'مشاهده حساب‌ها',
+                magnitude: abs((float) $account->balance),
             );
         }
 
@@ -269,6 +278,7 @@ class IssueScanner
                     : 'پس از دریافت وجه، حساب را تسویه کنید.',
                 url: '/admin/sales',
                 urlLabel: 'تسویه حساب فروشنده',
+                magnitude: $total,
             );
         }
 
@@ -344,6 +354,7 @@ class IssueScanner
                         : 'از فروشنده بخواهید تا پایان ماه تسویه کند.'),
                 url: '/admin/sales',
                 urlLabel: 'تسویه حساب فروشنده',
+                magnitude: (float) $days,
             );
         }
 
@@ -389,7 +400,66 @@ class IssueScanner
                 .' گزارش مالی را برای یافتن هزینه‌ی غیرمنتظره ببینید.',
             url: '/admin/reports',
             urlLabel: 'گزارش مالی',
+            magnitude: $loss,
         )];
+    }
+
+    /**
+     * A loan instalment that has come due, or is about to.
+     *
+     * The shop pays its machine loan in one transfer on the 10th of each
+     * month, and until now nothing anywhere said so — the loan page knew
+     * the date and nobody was looking at the loan page. A missed bank
+     * instalment costs a penalty and, worse, is the kind of thing that is
+     * noticed a month late.
+     *
+     * Warned about a week out rather than on the day, because the money
+     * has to be in the account before the transfer, not after.
+     */
+    private function loanInstalmentDue(): array
+    {
+        $issues = [];
+        $soon = now()->addDays(7);
+
+        foreach (Loan::outstanding()->get() as $loan) {
+            $due = $loan->next_due_on;
+
+            if ($due === null || $due->gt($soon)) {
+                continue;
+            }
+
+            $overdue = $loan->is_overdue;
+            $days = (int) abs($due->diffInDays(now()));
+
+            $issues[] = new SystemIssue(
+                key: "loan-due-{$loan->id}",
+                severity: $overdue ? SystemIssue::CRITICAL : SystemIssue::WARNING,
+                title: $overdue
+                    ? "قسط «{$loan->title}» عقب افتاده است"
+                    : "قسط «{$loan->title}» نزدیک است",
+                detail: 'قسط '.Money::format((float) $loan->instalment_amount)
+                    .' سررسید '.$loan->next_due_on_display
+                    .($overdue
+                        ? " — {$days} روز گذشته و هنوز ثبت نشده."
+                        : " — {$days} روز مانده.")
+                    .' مانده‌ی وام '.$loan->remaining_formatted.'.',
+                cause: $overdue
+                    ? 'یا قسط پرداخت نشده، یا پرداخت شده و در سامانه ثبت نشده است.'
+                    : 'موعد ماهانه‌ی این وام نزدیک شده است.',
+                suggestion: $overdue
+                    ? 'اگر پرداخت شده آن را ثبت کنید تا مانده‌ی وام درست بماند؛'
+                        .' وگرنه پیش از جریمه پرداخت کنید.'
+                    : 'پیش از سررسید مطمئن شوید موجودی حساب کافی است.',
+                url: '/admin/loans',
+                urlLabel: 'وام‌ها',
+                // Days late. A loan a month overdue is a different problem
+                // from one a day overdue, so an answer about the second
+                // must not cover the first. Not yet due counts as zero.
+                magnitude: $overdue ? (float) $days : 0.0,
+            );
+        }
+
+        return $issues;
     }
 
     /**
@@ -429,6 +499,7 @@ class IssueScanner
                     : 'سهمیه‌ی ماه هم تمام شده؛ برای ادامه‌ی کار سوخت آزاد لازم است.',
                 url: '/admin/diesel-deliveries',
                 urlLabel: 'تحویل گازوئیل',
+                magnitude: (float) $quota->consumed_litres,
             )];
         }
 
@@ -453,6 +524,9 @@ class IssueScanner
                 : 'پیش از تمام شدن، تحویل بعدی را هماهنگ کنید.',
             url: '/admin/diesel-allocations',
             urlLabel: 'سهمیه گازوئیل',
+            // Overdrawn counts up from zero; still in credit counts down
+            // to it. Either way a bigger number is a worse position.
+            magnitude: $quota->is_overdrawn ? abs((float) $remaining) : (float) $quota->used_percent,
         )];
     }
 
@@ -507,6 +581,7 @@ class IssueScanner
                 .' پرداخت‌ها را در بخش حقوق، یا به‌عنوان هزینه‌ی دسته‌ی «حقوق کارکنان»، وارد کنید.',
             url: '/admin/salary-payments',
             urlLabel: 'حقوق',
+            magnitude: (float) $sales,
         )];
     }
 
@@ -547,6 +622,7 @@ class IssueScanner
             suggestion: 'دسته‌ی این هزینه‌ها را اصلاح کنید تا گزارش هزینه‌ها معنا پیدا کند.',
             url: '/admin/expenses',
             urlLabel: 'هزینه‌ها',
+            magnitude: (float) $share,
         )];
     }
 
@@ -570,6 +646,7 @@ class IssueScanner
                 .' وگرنه از فروشنده پیگیری شود.',
             url: '/admin/sales',
             urlLabel: 'بررسی کسری‌ها',
+            magnitude: (float) $sales->sum('shortfall_count'),
         )];
     }
 
@@ -596,6 +673,7 @@ class IssueScanner
                     .' تا موجودی خمیر انبار درست بماند.',
                 url: '/admin/dough-entries',
                 urlLabel: 'مشاهده خمیرها',
+                magnitude: (float) $dough,
             );
         }
 
@@ -611,6 +689,7 @@ class IssueScanner
                 suggestion: 'فروش ثبت‌نشده باعث می‌شود درآمد روز کمتر از واقع دیده شود.',
                 url: '/admin/sales',
                 urlLabel: 'ثبت فروش',
+                magnitude: (float) $chane,
             );
         }
 

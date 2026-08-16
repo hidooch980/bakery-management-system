@@ -38,6 +38,18 @@ class SystemIssue
          */
         public readonly ?\Closure $autoFix = null,
         public readonly ?string $autoFixLabel = null,
+        /**
+         * How big the problem is, in whatever unit suits it — money owed,
+         * loaves short, days late. Only ever compared against itself, so
+         * the unit matters to no one but this issue.
+         *
+         * This is what lets an owner answer an issue without muting it
+         * forever: an answer covers the problem at the size it was, and a
+         * problem that grows past that comes back. Leave it null where
+         * there is nothing to measure — a missing setting is present or it
+         * is not.
+         */
+        public readonly ?float $magnitude = null,
     ) {}
 
     public function isAutoFixable(): bool
