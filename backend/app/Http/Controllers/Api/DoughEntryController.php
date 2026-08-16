@@ -15,6 +15,17 @@ class DoughEntryController extends Controller
     use ApiResponse;
 
     /**
+     * How long an identical batch counts as a double tap.
+     *
+     * On 24 Mordad the same thirteen bags went in three times in thirty-five
+     * minutes -- the seller pressed again when the first did not look like
+     * it had landed -- and each one took flour, salt and yeast out of the
+     * store. Two batches of the same size within a quarter of an hour is
+     * not how this shop bakes; the oven is not free again that fast.
+     */
+    private const DOUBLE_TAP_MINUTES = 15;
+
+    /**
      * Dough maker records how many flour bags were kneaded.
      */
     public function store(Request $request): JsonResponse
@@ -25,7 +36,29 @@ class DoughEntryController extends Controller
             // for; dry is the rest of the year.
             'yeast_type' => ['nullable', 'in:dry,wet'],
             'note' => ['nullable', 'string', 'max:500'],
+            // Set only after the person has been shown the batch they
+            // already recorded and said it is a second one.
+            'force' => ['nullable', 'boolean'],
         ]);
+
+        if (! $request->boolean('force')) {
+            $justRecorded = DoughEntry::where('user_id', $request->user()->id)
+                ->where('bag_count', (int) $data['bag_count'])
+                ->where('created_at', '>=', now()->subMinutes(self::DOUBLE_TAP_MINUTES))
+                ->latest('created_at')
+                ->first();
+
+            if ($justRecorded) {
+                return $this->error(
+                    sprintf(
+                        'همین %s پیش %d کیسه ثبت کرده‌اید. اگر این دستهٔ تازه‌ای است دوباره تأیید کنید.',
+                        $justRecorded->created_at->diffForHumans(null, true),
+                        $justRecorded->bag_count,
+                    ),
+                    409,
+                );
+            }
+        }
 
         $type = $data['yeast_type'] ?? DoughFormula::DRY;
         $formula = DoughFormula::fromBakery();

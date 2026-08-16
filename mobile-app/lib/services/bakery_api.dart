@@ -137,15 +137,24 @@ class BakeryApi {
 
   // --------------------------------------------------------------- dough
 
-  /// Returns true when there was no signal and the entry was saved to the
-  /// offline queue instead of sent — the caller shows a different message
-  /// but the flow is otherwise identical.
-  Future<bool> recordDough({required int bagCount, String? note}) async {
+  /// Records a batch. Returns true when it went into the offline queue
+  /// rather than to the server.
+  ///
+  /// [force] repeats a batch the server refused as a double tap. It is set
+  /// only after the person has been shown what they already recorded and
+  /// said this is a second one — never automatically, which would put the
+  /// guard back where it started.
+  Future<bool> recordDough({
+    required int bagCount,
+    String? note,
+    bool force = false,
+  }) async {
     final body = await _client.postOrQueue(
       '/dough-entries',
       {
         'bag_count': bagCount,
         if (note != null && note.isNotEmpty) 'note': note,
+        if (force) 'force': true,
       },
       label: 'خمیر — $bagCount کیسه',
     );

@@ -359,13 +359,14 @@ class _DoughSheetState extends State<_DoughSheet> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool force = false}) async {
     setState(() => _saving = true);
 
     try {
       final queued = await widget.api.recordDough(
         bagCount: _bags,
         note: _note.text,
+        force: force,
       );
 
       await LastUsed.rememberDoughBags(_bags);
@@ -377,11 +378,47 @@ class _DoughSheetState extends State<_DoughSheet> {
         queued ? 'بدون اینترنت ذخیره شد و بعداً ارسال می‌شود.' : 'خمیر ثبت شد.',
       );
     } on ApiException catch (e) {
-      if (mounted) {
-        setState(() => _saving = false);
-        showMessage(context, e.message, isError: true);
+      if (!mounted) return;
+
+      setState(() => _saving = false);
+
+      // The server refused it as a repeat of a batch just recorded. On 24
+      // Mordad the same thirteen bags went in three times because the
+      // first two did not look like they had landed, and each one took
+      // flour out of the store. Ask, rather than refuse outright: a second
+      // batch of the same size is unusual, not impossible.
+      if (e.statusCode == 409) {
+        await _confirmRepeat(e.message);
+
+        return;
       }
+
+      showMessage(context, e.message, isError: true);
     }
+  }
+
+  Future<void> _confirmRepeat(String message) async {
+    final again = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('این خمیر را همین الان ثبت کردید'),
+        content: Text('$message
+
+اگر دستهٔ تازه‌ای است، تأیید کنید.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('نه، اشتباه شد'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('بله، دستهٔ تازه است'),
+          ),
+        ],
+      ),
+    );
+
+    if (again == true) await _save(force: true);
   }
 
   @override
