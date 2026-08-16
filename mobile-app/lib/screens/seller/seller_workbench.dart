@@ -43,6 +43,7 @@ class _SellerWorkbenchState extends State<SellerWorkbench> {
       children: [
         _ProductionSection(
           api: widget.api,
+          bakery: widget.bakery,
           onChanged: widget.onChanged,
         ),
         const SizedBox(height: 22),
@@ -162,9 +163,18 @@ class _SheetShell extends StatelessWidget {
 
 /// Kneading and shaping: record a batch, then shape whatever is waiting.
 class _ProductionSection extends StatefulWidget {
-  const _ProductionSection({required this.api, required this.onChanged});
+  const _ProductionSection({
+    required this.api,
+    required this.onChanged,
+    this.bakery,
+  });
 
   final BakeryApi api;
+
+  /// The shop's formula, so a batch can be checked against what it should
+  /// yield while it is still being typed.
+  final Bakery? bakery;
+
   final VoidCallback onChanged;
 
   @override
