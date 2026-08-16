@@ -1,34 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="loaf" x1="0.25" y1="0" x2="0.75" y2="1">
-      <stop offset="0%" stop-color="#FFF6E4"/>
-      <stop offset="42%" stop-color="#F6DCAF"/>
-      <stop offset="100%" stop-color="#E0B268"/>
+    <!--
+      The adaptive foreground: the same loaf in the same oven, on nothing.
+      Android masks this layer to whatever shape the launcher uses and
+      crops roughly a third away at the edges, so everything sits well
+      inside the middle — the old foreground ran to the corners and lost
+      its wheat to the mask on round launchers.
+    -->
+    <linearGradient id="crust" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#F5D08A"/>
+      <stop offset="45%" stop-color="#E8952D"/>
+      <stop offset="100%" stop-color="#C24A16"/>
     </linearGradient>
   </defs>
 
-  <!-- Android crops adaptive icons to ~66% of the canvas, so the loaf is
-       scaled down and centred to survive every mask shape. -->
-  <g transform="translate(256 256) scale(0.62) translate(-256 -256)">
-    <ellipse cx="256" cy="256" rx="146" ry="118" fill="url(#loaf)"/>
-    <ellipse cx="256" cy="256" rx="146" ry="118" fill="none"
-             stroke="#C98B33" stroke-width="7" opacity="0.55"/>
+  <!-- Lighter than on the flat icon. This layer is masked onto the iron
+       background, and #3A424F on #12161C is one dark shape on another —
+       the arch simply vanished. -->
+  <path d="M140 280 A116 116 0 0 1 372 280 L372 360 L140 360 Z"
+        fill="none" stroke="#8E99AB" stroke-width="13" stroke-linejoin="round"/>
 
-    <g stroke="#B0731F" stroke-width="14" stroke-linecap="round" fill="none" opacity="0.85">
-      <path d="M176 214 C 192 240, 192 272, 176 298"/>
-      <path d="M256 198 C 274 232, 274 280, 256 314"/>
-      <path d="M336 214 C 320 240, 320 272, 336 298"/>
-    </g>
+  <ellipse cx="256" cy="268" rx="96" ry="70" fill="url(#crust)"/>
 
-    <g fill="#FFFFFF" opacity="0.95">
-      <ellipse cx="212" cy="180" rx="8" ry="5" transform="rotate(-24 212 180)"/>
-      <ellipse cx="298" cy="184" rx="8" ry="5" transform="rotate(20 298 184)"/>
-      <ellipse cx="256" cy="166" rx="8" ry="5"/>
-      <ellipse cx="158" cy="246" rx="8" ry="5" transform="rotate(-70 158 246)"/>
-      <ellipse cx="354" cy="246" rx="8" ry="5" transform="rotate(70 354 246)"/>
-      <ellipse cx="206" cy="330" rx="8" ry="5" transform="rotate(14 206 330)"/>
-      <ellipse cx="306" cy="330" rx="8" ry="5" transform="rotate(-14 306 330)"/>
-      <ellipse cx="256" cy="346" rx="8" ry="5"/>
-    </g>
+  <g stroke="#7A1F12" stroke-width="11" stroke-linecap="round" fill="none" opacity="0.72">
+    <path d="M208 238 A38 38 0 0 1 208 298"/>
+    <path d="M256 230 A41 41 0 0 1 256 306"/>
+    <path d="M304 238 A38 38 0 0 1 304 298"/>
   </g>
+
+  <rect x="140" y="356" width="232" height="13" rx="6" fill="#8E99AB"/>
+  <rect x="172" y="388" width="168" height="11" rx="5" fill="#E8952D" opacity="0.95"/>
 </svg>

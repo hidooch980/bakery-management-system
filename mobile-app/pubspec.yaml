@@ -56,7 +56,9 @@ flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/icon/icon.png"
-  adaptive_icon_background: "#C2761A"
+  # The kiln's iron, so the round-masked icon matches the flat one
+  # instead of showing a different app on a different launcher.
+  adaptive_icon_background: "#12161C"
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"
   min_sdk_android: 21
 

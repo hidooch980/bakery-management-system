@@ -404,7 +404,7 @@ class _DoughSheetState extends State<_DoughSheet> {
                 if (expected != null) ...[
                   const SizedBox(height: 12),
                   Text(
-                    'حدود ${expected.toString()} چانه از این خمیر درمی‌آید.',
+                    'حدود $expected چانه از این خمیر درمی‌آید.',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,

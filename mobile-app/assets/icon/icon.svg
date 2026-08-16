@@ -1,75 +1,62 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <!-- Deep oven gradient so the pale loaf reads clearly at small sizes. -->
-    <linearGradient id="bg" x1="0" y1="0" x2="0.85" y2="1">
-      <stop offset="0%" stop-color="#E9A227"/>
-      <stop offset="48%" stop-color="#C2761A"/>
-      <stop offset="100%" stop-color="#8A4A0B"/>
+    <!--
+      The kiln, seen from the front: iron ground, and the loaf lit by the
+      fire behind it.
+
+      The old icon put a pale loaf on amber. Both were warm and close in
+      value, so at launcher size the whole thing collapsed into one brown
+      shape and the wheat at the bottom disappeared entirely. This one
+      keeps the shop's own palette but spends it where it counts — dark
+      ground, bright bread — so the silhouette survives being 48 pixels on
+      a crowded home screen.
+    -->
+    <linearGradient id="iron" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#2A2F3A"/>
+      <stop offset="55%" stop-color="#12161C"/>
+      <stop offset="100%" stop-color="#0B0E13"/>
     </linearGradient>
 
-    <linearGradient id="loaf" x1="0.25" y1="0" x2="0.75" y2="1">
-      <stop offset="0%" stop-color="#FFF6E4"/>
-      <stop offset="42%" stop-color="#F6DCAF"/>
-      <stop offset="100%" stop-color="#E0B268"/>
-    </linearGradient>
-
-    <radialGradient id="glow" cx="0.5" cy="0.3" r="0.7">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.26"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    <!-- The ember ramp the app itself uses for every reading. -->
+    <radialGradient id="fire" cx="0.5" cy="0.78" r="0.62">
+      <stop offset="0%" stop-color="#E8952D" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#C24A16" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#7A1F12" stop-opacity="0"/>
     </radialGradient>
 
-    <filter id="soft" x="-25%" y="-25%" width="150%" height="150%">
-      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#4A2A06" flood-opacity="0.4"/>
-    </filter>
+    <linearGradient id="crust" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#F5D08A"/>
+      <stop offset="45%" stop-color="#E8952D"/>
+      <stop offset="100%" stop-color="#C24A16"/>
+    </linearGradient>
   </defs>
 
-  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
-  <rect width="512" height="512" rx="116" fill="url(#glow)"/>
+  <rect width="512" height="512" rx="112" fill="url(#iron)"/>
+  <rect width="512" height="512" rx="112" fill="url(#fire)"/>
 
-  <!-- Two wheat sprigs, placed clear of the loaf so they stay legible. -->
-  <g opacity="0.3">
-    <g stroke="#FFF1D6" stroke-width="8" stroke-linecap="round" fill="none">
-      <path d="M92 428 C 92 372, 96 340, 104 312"/>
-      <path d="M420 428 C 420 372, 416 340, 408 312"/>
-    </g>
-    <g fill="#FFF1D6">
-      <ellipse cx="90" cy="336" rx="11" ry="21" transform="rotate(-26 90 336)"/>
-      <ellipse cx="116" cy="330" rx="11" ry="21" transform="rotate(26 116 330)"/>
-      <ellipse cx="103" cy="304" rx="10" ry="19"/>
-      <ellipse cx="422" cy="336" rx="11" ry="21" transform="rotate(26 422 336)"/>
-      <ellipse cx="396" cy="330" rx="11" ry="21" transform="rotate(-26 396 330)"/>
-      <ellipse cx="409" cy="304" rx="10" ry="19"/>
-    </g>
+  <!--
+    The oven mouth. An arch rather than a rectangle, because that is what
+    a bread oven looks like from the floor, and because the curve reads as
+    a shape at small sizes where a thin rectangle reads as a smudge.
+  -->
+  <path d="M104 288 A152 152 0 0 1 408 288 L408 396 L104 396 Z"
+        fill="none" stroke="#3A424F" stroke-width="14" stroke-linejoin="round"/>
+
+  <!-- The loaf, sitting on the oven floor. -->
+  <ellipse cx="256" cy="272" rx="126" ry="92" fill="url(#crust)"/>
+
+  <!--
+    Three slashes, the way a shater scores a loaf before it goes in. Kept
+    thick and few: at launcher size anything finer turns to noise.
+  -->
+  <g stroke="#7A1F12" stroke-width="15" stroke-linecap="round" fill="none" opacity="0.72">
+    <path d="M194 234 A50 50 0 0 1 194 312"/>
+    <path d="M256 222 A54 54 0 0 1 256 324"/>
+    <path d="M318 234 A50 50 0 0 1 318 312"/>
   </g>
 
-  <!-- The loaf -->
-  <g filter="url(#soft)">
-    <ellipse cx="256" cy="248" rx="146" ry="118" fill="url(#loaf)"/>
-
-    <!-- Crust rim, for definition against the background -->
-    <ellipse cx="256" cy="248" rx="146" ry="118" fill="none"
-             stroke="#C98B33" stroke-width="7" opacity="0.55"/>
-
-    <!-- Scoring cuts -->
-    <g stroke="#B0731F" stroke-width="14" stroke-linecap="round" fill="none" opacity="0.85">
-      <path d="M176 206 C 192 232, 192 264, 176 290"/>
-      <path d="M256 190 C 274 224, 274 272, 256 306"/>
-      <path d="M336 206 C 320 232, 320 264, 336 290"/>
-    </g>
-
-    <!-- Sesame seeds -->
-    <g fill="#FFFFFF" opacity="0.95">
-      <ellipse cx="212" cy="172" rx="8" ry="5" transform="rotate(-24 212 172)"/>
-      <ellipse cx="298" cy="176" rx="8" ry="5" transform="rotate(20 298 176)"/>
-      <ellipse cx="256" cy="158" rx="8" ry="5"/>
-      <ellipse cx="158" cy="238" rx="8" ry="5" transform="rotate(-70 158 238)"/>
-      <ellipse cx="354" cy="238" rx="8" ry="5" transform="rotate(70 354 238)"/>
-      <ellipse cx="206" cy="322" rx="8" ry="5" transform="rotate(14 206 322)"/>
-      <ellipse cx="306" cy="322" rx="8" ry="5" transform="rotate(-14 306 322)"/>
-      <ellipse cx="256" cy="338" rx="8" ry="5"/>
-    </g>
-  </g>
-
-  <!-- Peel / shelf under the loaf -->
-  <rect x="140" y="392" width="232" height="22" rx="11" fill="#FFF1D6" opacity="0.42"/>
+  <!-- The oven floor, and the ember line under it. -->
+  <rect x="104" y="390" width="304" height="16" rx="8" fill="#3A424F"/>
+  <rect x="142" y="428" width="228" height="12" rx="6" fill="#C24A16" opacity="0.85"/>
+  <rect x="192" y="458" width="128" height="10" rx="5" fill="#E8952D" opacity="0.6"/>
 </svg>
