@@ -24,6 +24,7 @@ class BankAccount extends Model
         'iban',
         'opening_balance',
         'is_default',
+        'is_cash_box',
         'is_active',
         'note',
     ];
@@ -33,6 +34,7 @@ class BankAccount extends Model
         return [
             'opening_balance' => 'decimal:2',
             'is_default' => 'boolean',
+            'is_cash_box' => 'boolean',
             'is_active' => 'boolean',
         ];
     }
@@ -109,6 +111,18 @@ class BankAccount extends Model
     }
 
     /** The account money defaults to, or the only active one. */
+    /**
+     * The drawer, as opposed to a bank.
+     *
+     * Found by its flag rather than its name: matching on "صندوق نقد"
+     * would hold until someone renamed it on a screen that invites
+     * renaming, and cash would quietly stop being recorded again.
+     */
+    public static function cashBox(): ?self
+    {
+        return static::active()->where('is_cash_box', true)->first();
+    }
+
     public static function defaultAccount(): ?self
     {
         return static::active()->where('is_default', true)->first()

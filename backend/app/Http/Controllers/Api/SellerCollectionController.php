@@ -129,10 +129,17 @@ class SellerCollectionController extends Controller
                 $count++;
             }
 
-            // Only what actually cleared an invoice is banked, so the
-            // account never shows more than the debt that was settled.
-            if ($method === 'card' && $collected > 0) {
-                $account = BankAccount::where('is_default', true)->first();
+            // Only what actually cleared an invoice is banked, so no
+            // account ever shows more than the debt that was settled.
+            //
+            // Both ways now, not just the card. Cash used to be described as
+            // staying in the till and went nowhere at all, because there was
+            // no till — money the shop knew it had taken and could not say
+            // where it was.
+            if ($collected > 0) {
+                $account = $method === 'card'
+                    ? BankAccount::defaultAccount()
+                    : BankAccount::cashBox();
 
                 $account?->record(
                     'in',
@@ -140,7 +147,8 @@ class SellerCollectionController extends Controller
                     'settlement',
                     $request->user()->id,
                     null,
-                    'وصول نسیه با کارتخوان — '.$customer->name,
+                    ($method === 'card' ? 'وصول نسیه با کارتخوان — ' : 'وصول نسیه نقدی — ')
+                        .$customer->name,
                 );
             }
 
