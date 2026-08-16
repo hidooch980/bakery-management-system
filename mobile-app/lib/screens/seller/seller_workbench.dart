@@ -696,15 +696,18 @@ class _Stepper extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
-    this.min = 1,
-    this.max = 99,
   });
 
   final String label;
   final int value;
   final ValueChanged<int> onChanged;
-  final int min;
-  final int max;
+
+  /// Fixed rather than passed in. One bag is the smallest batch worth
+  /// recording and ninety-nine is far past anything this oven holds, so
+  /// they were parameters no caller ever had a reason to set.
+  static const _min = 1;
+
+  static const _max = 99;
 
   @override
   Widget build(BuildContext context) {
@@ -719,7 +722,7 @@ class _Stepper extends StatelessWidget {
           children: [
             _Round(
               icon: Icons.remove_rounded,
-              onTap: value > min ? () => onChanged(value - 1) : null,
+              onTap: value > _min ? () => onChanged(value - 1) : null,
             ),
             SizedBox(
               width: 96,
@@ -734,7 +737,7 @@ class _Stepper extends StatelessWidget {
             ),
             _Round(
               icon: Icons.add_rounded,
-              onTap: value < max ? () => onChanged(value + 1) : null,
+              onTap: value < _max ? () => onChanged(value + 1) : null,
             ),
           ],
         ),
