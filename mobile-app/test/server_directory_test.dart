@@ -76,8 +76,11 @@ ServerDirectory _directory(_FakeAdapter adapter, {String? fallback}) {
 }
 
 void main() {
-  const newServer = 'http://194.5.176.140:8000/api/v1';
-  const oldServer = 'http://185.97.119.91:8000/api/v1';
+  // Made-up addresses on purpose. A real one that the shop has since left
+  // reads like it is still in use, and a test is where someone goes looking
+  // for what the app talks to.
+  const newServer = 'http://server-jadid.test/api/v1';
+  const oldServer = 'http://server-ghadimi.test/api/v1';
 
   final bothPublished = '{"api_base_url":"$newServer",'
       '"fallback_urls":["$oldServer"]}';
