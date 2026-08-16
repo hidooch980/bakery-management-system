@@ -65,11 +65,26 @@ class FlourAllocationPeriod extends Model
             ->sum('quantity');
 
         // Flour given back when an entry was deleted was never really
-        // consumed. Counting it would push the period towards its quota
-        // for work that no longer exists — and only reversals are netted
-        // off, since an ordinary purchase is not a refund of usage.
+        // consumed. Counting it would push the period towards its quota for
+        // work that no longer exists — and only reversals are netted off,
+        // since an ordinary purchase is not a refund of usage.
+        //
+        // Matched by the date of the movement being undone, not the date of
+        // the undoing. A batch kneaded on the 24th and cancelled on the
+        // 25th belongs to the period it was kneaded in; matching on the
+        // reversal's own date left the consumption here and put the refund
+        // in the following period, so this one stayed over its quota for a
+        // batch that no longer exists.
         $reversed = (float) $flour->movements()
             ->where('reason', 'production_reversal')
+            ->whereHas('reverses', fn ($q) => $q->whereBetween('created_at', $window))
+            ->sum('quantity');
+
+        // Older reversals, written before they recorded what they undo, can
+        // only be placed by their own date.
+        $reversed += (float) $flour->movements()
+            ->where('reason', 'production_reversal')
+            ->whereNull('reverses_movement_id')
             ->whereBetween('created_at', $window)
             ->sum('quantity');
 

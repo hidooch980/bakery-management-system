@@ -35,6 +35,7 @@ class InventoryMovement extends Model
         'source_type',
         'source_id',
         'note',
+        'reverses_movement_id',
     ];
 
     protected function casts(): array
@@ -60,5 +61,11 @@ class InventoryMovement extends Model
     public function getReasonLabelAttribute(): string
     {
         return self::REASONS[$this->reason] ?? $this->reason;
+    }
+
+    /** The movement this one undoes, when it is a reversal. */
+    public function reverses()
+    {
+        return $this->belongsTo(self::class, 'reverses_movement_id');
     }
 }

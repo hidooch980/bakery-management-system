@@ -32,7 +32,7 @@ class StockReversal
             ->sortByDesc(fn (InventoryMovement $m) => $m->direction === 'out' ? 1 : 0);
 
         foreach ($movements as $movement) {
-            $movement->item?->move(
+            $reversal = $movement->item?->move(
                 // Undo each one by moving the same quantity the other way.
                 $movement->direction === 'out' ? 'in' : 'out',
                 (float) $movement->quantity,
@@ -41,6 +41,13 @@ class StockReversal
                 null,
                 $note,
             );
+
+            // Which movement this undoes, so a quota period can ask whether
+            // the thing being cancelled was its own. Matching on the
+            // reversal's own date instead left a batch recorded on the 24th
+            // and cancelled on the 25th counted against the earlier period
+            // and refunded to the later one.
+            $reversal?->update(['reverses_movement_id' => $movement->id]);
         }
     }
 
