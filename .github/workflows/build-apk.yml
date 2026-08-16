@@ -117,11 +117,15 @@ jobs:
         working-directory: mobile-app
         run: flutter pub get
 
-      # The output is echoed back as GitHub error annotations, which are
-      # readable without a token. Without this the run reports only
-      # "Process completed with exit code 1" and the reason lives in a log
-      # nobody outside the repo can open -- which cost three blind guesses
-      # and three round trips in one afternoon.
+      # The reason, as GitHub error annotations, which are readable without
+      # a token. Left to itself the run says only "Process completed with
+      # exit code 1" and the cause sits in a log outsiders cannot open.
+      #
+      # Findings only, and few of them: `flutter analyze` resolves packages
+      # first and prints a screenful of version numbers, GitHub keeps just
+      # ten annotations per step, and the earlier attempts spent all ten on
+      # that preamble. Analyzer findings carry a bullet, so match on that
+      # and fall back to the last few lines if the shape ever changes.
       - name: Analyze
         working-directory: mobile-app
         run: |
@@ -129,16 +133,12 @@ jobs:
           flutter analyze 2>&1 | tee /tmp/analyze.txt
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            # Every line, unfiltered. A pattern that misses is worse than
-            # no pattern: it reports nothing and looks like it worked.
+            found=$(grep '•' /tmp/analyze.txt | tail -8)
+            [ -z "$found" ] && found=$(tail -8 /tmp/analyze.txt)
             while IFS= read -r line; do
               [ -z "$line" ] && continue
               echo "::error::${line}"
-            # The tail, not the head: `flutter analyze` resolves packages
-            # first and prints a screenful of version numbers before it says
-            # anything about the code, so the first forty lines are all
-            # preamble and the findings are at the end.
-            done < <(tail -40 /tmp/analyze.txt)
+            done <<< "$found"
           fi
           exit "$status"
 
