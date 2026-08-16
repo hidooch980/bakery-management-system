@@ -129,9 +129,12 @@ jobs:
           flutter analyze 2>&1 | tee /tmp/analyze.txt
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            grep -E '^ +(error|warning|info)' /tmp/analyze.txt | head -20 | while read -r line; do
-              echo "::error::$line"
-            done
+            # Every line, unfiltered. A pattern that misses is worse than
+            # no pattern: it reports nothing and looks like it worked.
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              echo "::error::${line}"
+            done < <(head -40 /tmp/analyze.txt)
           fi
           exit "$status"
 
