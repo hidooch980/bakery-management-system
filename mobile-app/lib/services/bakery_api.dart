@@ -5,6 +5,7 @@ import '../models/financial_series.dart';
 import '../models/chane_board.dart';
 import '../models/customer.dart';
 import '../models/entries.dart';
+import '../models/payroll.dart';
 import '../models/flour_sale.dart';
 import '../models/ledger_entry.dart';
 import '../models/seller_account.dart';
@@ -208,6 +209,63 @@ class BakeryApi {
       weightKg: double.tryParse('${data['total_weight_kg']}') ?? 0,
       queued: false,
     );
+  }
+
+  // --------------------------------------------------------------- payroll
+
+  /// Everyone on the payroll, with what the shop has agreed to pay them.
+  Future<List<Employee>> payrollEmployees() async {
+    final body = await _client.get('/salaries/employees');
+
+    return ((body['data'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(Employee.fromJson)
+        .toList();
+  }
+
+  /// The payslips already written, newest period first.
+  Future<List<Payslip>> payslips({String? status}) async {
+    final body = await _client.get(
+      '/salaries${status == null ? '' : '?status=$status'}',
+    );
+
+    return _paginated(body).map(Payslip.fromJson).toList();
+  }
+
+  /// Writes a payslip for one person for one period.
+  ///
+  /// Amounts go up in the unit the shop is set to and the server converts;
+  /// sending Toman from a Rial shop is how every payslip once got saved ten
+  /// times over. The net is the server's arithmetic, not ours.
+  ///
+  /// [paidOn] set means the money has actually been handed over. Left null
+  /// the slip is written and owed, which is the honest state for a payroll
+  /// prepared before payday.
+  Future<Payslip> recordSalary({
+    required int userId,
+    required String periodStart,
+    required double baseAmount,
+    double bonus = 0,
+    double deduction = 0,
+    String? paidOn,
+    String? note,
+  }) async {
+    final body = await _client.post('/salaries', {
+      'user_id': userId,
+      'period_start': periodStart,
+      'base_amount': baseAmount,
+      'bonus': bonus,
+      'deduction': deduction,
+      if (paidOn != null) 'paid_on': paidOn,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+
+    return Payslip.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// Marks a slip already written as handed over.
+  Future<void> markSalaryPaid(int id) async {
+    await _client.patch('/salaries/$id/mark-paid', const {});
   }
 
   Future<List<ChaneEntry>> myChaneHistory() async {

@@ -4,9 +4,7 @@ namespace App\Support;
 
 use App\Models\BakeryShare;
 use App\Models\BankAccount;
-use App\Models\ConsignmentFlour;
 use App\Models\FixedAsset;
-use App\Models\InventoryItem;
 use App\Models\Loan;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
@@ -64,12 +62,6 @@ class BalanceSheet
                 'note' => null,
             ],
             [
-                'key' => 'inventory',
-                'label' => 'ارزش انبار',
-                'amount' => self::inventoryValue(),
-                'note' => 'به قیمت خرید',
-            ],
-            [
                 'key' => 'customer_debt',
                 'label' => 'طلب از مشتریان',
                 'amount' => round((float) Sale::query()->outstanding()->sum('amount'), 2),
@@ -115,35 +107,12 @@ class BalanceSheet
                 'note' => null,
             ],
             [
-                'key' => 'consignment',
-                'label' => 'آرد امانی دریافتی',
-                'amount' => self::consignmentOwed(),
-                'note' => 'آرد دیگران که نزد ماست',
-            ],
-            [
                 'key' => 'partner_shares',
                 'label' => 'سهم تسویه‌نشده شرکا',
                 'amount' => self::partnerShares(),
                 'note' => null,
             ],
         ];
-    }
-
-    /**
-     * The store at what it cost, not what it would sell for.
-     *
-     * Valuing flour at its selling price would book a profit the shop has
-     * not made yet — the bread is not baked, let alone sold.
-     */
-    private static function inventoryValue(): float
-    {
-        $flourPrice = (float) (CurrentBakery::get()?->flour_purchase_price_per_kg ?? 0);
-
-        $flour = InventoryItem::query()
-            ->where('key', InventoryItem::FLOUR)
-            ->first();
-
-        return round(($flour?->balance ?? 0) * $flourPrice, 2);
     }
 
     /** Cash the sellers are holding, plus bread they owe for. */
@@ -162,19 +131,6 @@ class BalanceSheet
     {
         return round((float) StaffAdvance::query()->get()
             ->sum(fn (StaffAdvance $advance) => $advance->outstanding), 2);
-    }
-
-    /** Flour borrowed from another shop, which has to go back or be paid for. */
-    private static function consignmentOwed(): float
-    {
-        $flourPrice = (float) (CurrentBakery::get()?->flour_purchase_price_per_kg ?? 0);
-
-        $kg = (float) ConsignmentFlour::query()
-            ->where('direction', 'borrowed')
-            ->outstanding()
-            ->sum('amount_kg');
-
-        return round($kg * $flourPrice, 2);
     }
 
     /**
