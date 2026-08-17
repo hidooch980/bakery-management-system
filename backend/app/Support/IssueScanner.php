@@ -437,11 +437,16 @@ class IssueScanner
                 title: $overdue
                     ? "قسط «{$loan->title}» عقب افتاده است"
                     : "قسط «{$loan->title}» نزدیک است",
+                // Says the date has passed, not why. The check cannot tell
+                // an unpaid instalment from a paid one nobody entered, and
+                // claiming the second when it is the first sends the owner
+                // looking for a bank entry that was never there.
                 detail: 'قسط '.Money::format((float) $loan->instalment_amount)
                     .' سررسید '.$loan->next_due_on_display
                     .($overdue
-                        ? " — {$days} روز گذشته و هنوز ثبت نشده."
+                        ? " — {$days} روز از سررسید گذشته."
                         : " — {$days} روز مانده.")
+                    .' تا امروز '.$loan->paid_formatted.' پرداخت شده،'
                     .' مانده‌ی وام '.$loan->remaining_formatted.'.',
                 cause: $overdue
                     ? 'یا قسط پرداخت نشده، یا پرداخت شده و در سامانه ثبت نشده است.'

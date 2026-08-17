@@ -140,9 +140,16 @@ class MoneyAtAGlance extends BaseWidget
     private function monthProfit($from, $to): Stat
     {
         $income = Ledger::totalIncome($from, $to);
-        $cost = Ledger::costOfGoodsSold($from, $to);
-        $expenses = Ledger::totalExpenses($from, $to);
-        $net = $income - $cost - $expenses;
+
+        // Money in less money out, which is the shop's own rule —
+        // «پول اول پرداخت می‌شه»: a sack costs on the day it is paid for,
+        // not the day it is kneaded. The same figure the report headlines
+        // and the partners' split is paid on.
+        //
+        // This used to be income minus cost-of-goods minus expenses, which
+        // is neither rule: flour sits in both those terms, so the sack was
+        // charged twice and the figure read 164,640,000 Rial low.
+        $net = Ledger::profit($from, $to);
 
         $unrecordedWages = $this->wagesNotInTheFigure($from, $to);
 

@@ -321,16 +321,14 @@ class ReportController extends Controller
         $costOfGoods = Ledger::costOfGoodsSold($from, $to);
 
         // Flour bought is the same money as flour baked, recognised at a
-        // different moment. Counting the purchase as an overhead as well as
-        // the consumption as a cost charged the shop twice for one sack and
-        // made a profitable month read as a loss.
-        $flourPurchases = round((float) Expense::whereBetween('spent_on', [
-            $from->toDateString(), $to->toDateString(),
-        ])->where('category', 'flour')->sum('amount'), 2);
-
-        $operatingExpenses = round($totalExpenses - $flourPurchases, 2);
-        $grossProfit = $income - $costOfGoods;
-        $netProfit = $grossProfit - $operatingExpenses;
+        // different moment; adding both charges the shop twice for one
+        // sack. The arithmetic lives in Ledger so this screen and the
+        // dashboard cannot answer the same question differently — which
+        // they did, until they were made to share it.
+        $flourPurchases = Ledger::flourPurchases($from, $to);
+        $operatingExpenses = Ledger::operatingExpenses($from, $to);
+        $grossProfit = Ledger::grossProfit($from, $to);
+        $netProfit = round($grossProfit - $operatingExpenses, 2);
 
         return $this->success([
             'from' => $from->toDateString(),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/bakery.dart';
 import '../../models/entries.dart';
+import '../../models/flour_sale.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../services/last_used.dart';
@@ -816,7 +817,16 @@ class _Round extends StatelessWidget {
 
 /// Flour arriving, and flour swapped with a neighbouring bakery. Both reuse
 /// the sheet the admin already uses, so the two screens cannot drift apart.
-class _FlourSection extends StatelessWidget {
+/// The warehouse, with what is in it on the heading.
+///
+/// The seller could already see the flour balance — inside the sheet for
+/// selling flour, which meant deciding to sell some before finding out
+/// whether there was any. It is the figure that answers «can we bake
+/// tomorrow», so it belongs where it is read without asking.
+///
+/// Sacks lead and the weight follows: sacks are what arrive at the door,
+/// what the quota is counted in, and what the shop says out loud.
+class _FlourSection extends StatefulWidget {
   const _FlourSection({
     required this.api,
     required this.onChanged,
@@ -827,14 +837,44 @@ class _FlourSection extends StatelessWidget {
   final Bakery? bakery;
   final VoidCallback onChanged;
 
+  @override
+  State<_FlourSection> createState() => _FlourSectionState();
+}
+
+class _FlourSectionState extends State<_FlourSection> {
+  FlourSaleOptions? _stock;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStock();
+  }
+
+  Future<void> _loadStock() async {
+    try {
+      final stock = await widget.api.flourSaleOptions();
+      if (mounted) setState(() => _stock = stock);
+    } on ApiException {
+      // The two buttons below still work; the heading simply says nothing
+      // rather than showing a figure it could not confirm.
+    }
+  }
+
   Future<void> _open(BuildContext context, AdminRecordKind kind) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => AdminRecordSheet(api: api, kind: kind, bakery: bakery),
+      builder: (_) => AdminRecordSheet(
+        api: widget.api,
+        kind: kind,
+        bakery: widget.bakery,
+      ),
     );
 
-    if (saved == true) onChanged();
+    if (saved == true) {
+      widget.onChanged();
+      await _loadStock();
+    }
   }
 
   @override
@@ -842,13 +882,16 @@ class _FlourSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Heading(title: 'انبار', icon: Icons.grain_rounded),
+        _Heading(
+          title: 'انبار',
+          icon: Icons.grain_rounded,
+          trailing: _stock == null ? null : _FlourOnHand(stock: _stock!),
+        ),
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () =>
-                    _open(context, AdminRecordKind.intake),
+                onPressed: () => _open(context, AdminRecordKind.intake),
                 icon: const Icon(Icons.local_shipping_rounded, size: 18),
                 label: const Text('ورودی انبار'),
                 style: OutlinedButton.styleFrom(
@@ -859,8 +902,7 @@ class _FlourSection extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () =>
-                    _open(context, AdminRecordKind.consignment),
+                onPressed: () => _open(context, AdminRecordKind.consignment),
                 icon: const Icon(Icons.swap_horiz_rounded, size: 18),
                 label: const Text('آرد همکار'),
                 style: OutlinedButton.styleFrom(
@@ -869,6 +911,58 @@ class _FlourSection extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// «۱۹۳ کیسه · ۷٬۷۲۰ کگ» — what is in the store, at a glance.
+///
+/// Coloured only when it is low. A figure that is always tinted is a
+/// figure nobody reads a warning into; this one stays plain until there
+/// really is something to say, and the threshold is the shop's own, set on
+/// the warehouse item rather than guessed at here.
+class _FlourOnHand extends StatelessWidget {
+  const _FlourOnHand({required this.stock});
+
+  /// Ten sacks: about a week of baking at this shop's rate, which is time
+  /// enough to order more before the oven stops.
+  static const _lowBags = 10;
+
+  final FlourSaleOptions stock;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final low = stock.availableBags < _lowBags;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (low)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 4),
+            child: Icon(
+              Icons.error_outline_rounded,
+              size: 15,
+              color: AppColors.attention,
+            ),
+          ),
+        Text(
+          '${stock.availableBags.toStringAsFixed(stock.availableBags % 1 == 0 ? 0 : 1)} کیسه',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: low ? AppColors.attention : null,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        Text(
+          '  ·  ${stock.availableKg.toStringAsFixed(0)} کگ',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
         ),
       ],
     );

@@ -153,6 +153,33 @@ class Ledger
         return round(self::totalIncome($from, $to) - self::totalExpenses($from, $to), 2);
     }
 
+    /**
+     * Flour bought, as against flour baked.
+     *
+     * The same money, recognised at two different moments — and the reason
+     * the two of them cannot simply be added up.
+     */
+    public static function flourPurchases(Carbon $from, Carbon $to): float
+    {
+        return round((float) Expense::whereBetween('spent_on', [
+            $from->toDateString(), $to->toDateString(),
+        ])->where('category', 'flour')->sum('amount'), 2);
+    }
+
+    /**
+     * Everything the shop spent that is not the flour in the bread.
+     *
+     * Flour purchases come out because [costOfGoodsSold] already charges
+     * for the flour, at the moment it is kneaded rather than the day a
+     * sack was paid for. Counting both charges the shop twice for one sack:
+     * on this month's figures that is 164,640,000 Rial of a 1.7 billion
+     * month, and in a leaner month it turns a profit into a loss.
+     */
+    public static function operatingExpenses(Carbon $from, Carbon $to): float
+    {
+        return round(self::totalExpenses($from, $to) - self::flourPurchases($from, $to), 2);
+    }
+
     /** The income side broken out, for reports that show where money came from. */
     public static function incomeBreakdown(Carbon $from, Carbon $to): array
     {

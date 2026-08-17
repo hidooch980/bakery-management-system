@@ -267,15 +267,25 @@ class AnsweringAnIssueTest extends TestCase
             arguments: ['key' => 'wages-never-recorded'],
         );
 
-        $this->assertSame(0, $this->page()->getOpenIssues()->count());
+        // About the wages issue specifically, not about the page being
+        // empty: a cash sale leaves money with the seller, and that is its
+        // own issue with its own life.
+        $this->assertFalse($this->isOpen('wages-never-recorded'));
 
         // Five more days of ordinary trading.
         for ($i = 0; $i < 5; $i++) {
             $sell(100);
         }
 
-        $this->assertSame(0, $this->page()->getOpenIssues()->count());
-        $this->assertSame(1, $this->page()->getAnsweredIssues()->count());
+        $this->assertFalse($this->isOpen('wages-never-recorded'));
+        $this->assertTrue(
+            $this->page()->getAnsweredIssues()->contains(fn ($i) => $i->key === 'wages-never-recorded')
+        );
+    }
+
+    private function isOpen(string $key): bool
+    {
+        return $this->page()->getOpenIssues()->contains(fn ($i) => $i->key === $key);
     }
 
     public function test_the_page_renders_with_an_answered_issue(): void
