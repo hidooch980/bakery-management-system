@@ -199,7 +199,7 @@ class _PayCardState extends State<PayCard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: theme.textTheme.bodySmall),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           value,
           style: theme.textTheme.headlineSmall?.copyWith(

@@ -222,7 +222,7 @@ class _RequestTile extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           request.requestedAtLabel,
           style: Theme.of(context).textTheme.bodySmall,

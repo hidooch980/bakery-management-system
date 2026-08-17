@@ -64,7 +64,7 @@ class ActionCard extends StatelessWidget {
                 height: 56,
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(Corner.control),
                 ),
                 child: Icon(icon, color: accent, size: IconSize.heading),
               ),
@@ -134,7 +134,7 @@ class StatTile extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(

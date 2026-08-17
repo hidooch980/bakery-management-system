@@ -245,7 +245,7 @@ class _QuotaMeter extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(Corner.hair),
           child: LinearProgressIndicator(
             value: fraction,
             minHeight: 10,

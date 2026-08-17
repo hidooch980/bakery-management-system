@@ -171,6 +171,68 @@ class IconSize {
   static const double hero = 64;
 }
 
+/// How round a corner is.
+///
+/// The app had twelve radii — 2, 3, 6, 8, 10, 12, 14, 16, 20, 26, 34 and a
+/// 999 standing in for a pill — and the theme itself used six of them. A
+/// card at 20 beside a button at 16 beside an input at 16 inside a sheet at
+/// 26 is not wrong anywhere and does not settle anywhere either.
+///
+/// Six steps, and the order is the meaning: the smaller a thing is, the
+/// tighter its corner, so a chip inside a card never looks rounder than
+/// the card holding it.
+class Corner {
+  const Corner._();
+
+  /// A progress bar, a rule, a swatch — barely rounded at all.
+  static const double hair = 4;
+
+  /// A chip, a key on the keypad, a small tile.
+  static const double chip = 10;
+
+  /// Buttons, inputs, the things a thumb aims at.
+  static const double control = 16;
+
+  /// Cards and sections — the containers those controls sit in.
+  static const double card = 20;
+
+  /// A dialog, which sits above everything else.
+  static const double dialog = 24;
+
+  /// A bottom sheet's top edge, and the app's own mark.
+  static const double sheet = 28;
+
+  /// Fully round, whatever the height — a pill or an avatar.
+  static const double pill = 999;
+}
+
+/// The gaps between things, by what the gap is for.
+///
+/// The app spaces on a two-point grid — 4, 6, 8, 10, 12, 14, 16, 20, 22,
+/// 24, 28 — which is not disorderly so much as finer than the eye can
+/// settle on. These four are the rhythm underneath it, named so a new
+/// widget asks "how related are these two things" instead of picking a
+/// number.
+///
+/// Existing spacings were left where they are: snapping a hundred and
+/// forty of them is a change to every screen at once, and this app has
+/// never been looked at on a real handset. Worth doing — with eyes on it.
+class Gap {
+  const Gap._();
+
+  /// A label and the figure it names. They belong together.
+  static const double tight = 6;
+
+  /// Rows in a list, fields in a form.
+  static const double item = 10;
+
+  /// One block of a screen from the next.
+  static const double block = 16;
+
+  /// One section from another — the biggest break inside a page.
+  static const double section = 24;
+}
+
 class AppTheme {
   static const _fontFamily = 'Vazirmatn';
 
@@ -254,7 +316,7 @@ class AppTheme {
         margin: EdgeInsets.zero,
         color: isDark ? AppColors.ironCard : AppColors.ashSurface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(Corner.card),
           side: BorderSide(
             color: scheme.outlineVariant.withValues(alpha: isDark ? 0.35 : 0.6),
           ),
@@ -269,7 +331,7 @@ class AppTheme {
           foregroundColor: scheme.onPrimary,
           elevation: 0,
           textStyle: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corner.control)),
         ),
       ),
 
@@ -277,7 +339,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(58),
           textStyle: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corner.control)),
         ),
       ),
 
@@ -285,7 +347,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(54),
           textStyle: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corner.control)),
         ),
       ),
 
@@ -294,19 +356,19 @@ class AppTheme {
         fillColor: isDark ? AppColors.ironCard : AppColors.ashSurface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(Corner.control),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(Corner.control),
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(Corner.control),
           borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(Corner.control),
           borderSide: BorderSide(color: scheme.error),
         ),
         labelStyle: TextStyle(color: scheme.onSurfaceVariant),
@@ -314,21 +376,21 @@ class AppTheme {
 
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corner.control)),
       ),
 
       chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corner.chip)),
         side: BorderSide(color: scheme.outlineVariant),
       ),
 
       dialogTheme: DialogThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corner.dialog)),
       ),
 
       bottomSheetTheme: const BottomSheetThemeData(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(Corner.sheet)),
         ),
       ),
 

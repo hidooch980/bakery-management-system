@@ -130,7 +130,7 @@ class _SheetShell extends StatelessWidget {
                   height: 4,
                   decoration: BoxDecoration(
                     color: scheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(Corner.hair),
                   ),
                 ),
               ),

@@ -178,7 +178,7 @@ class _MoveTile extends StatelessWidget {
               height: 40,
               decoration: BoxDecoration(
                 color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(Corner.chip),
               ),
               child: Icon(
                 move.isIncoming
@@ -200,7 +200,7 @@ class _MoveTile extends StatelessWidget {
                         .bodyMedium
                         ?.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
                     [
                       if (move.dateDisplay != null) move.dateDisplay!,
@@ -211,7 +211,7 @@ class _MoveTile extends StatelessWidget {
                         ),
                   ),
                   if (move.note != null && move.note!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
                       move.note!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(

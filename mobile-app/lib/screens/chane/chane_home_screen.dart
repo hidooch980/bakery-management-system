@@ -258,7 +258,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
             color: picked
                 ? AppColors.signalFor(theme.brightness).withValues(alpha: 0.14)
                 : theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(Corner.chip),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () => setState(() => _chosen = dough),
@@ -269,7 +269,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
                     color: picked ? AppColors.signalFor(theme.brightness) : Colors.transparent,
                     width: 2,
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(Corner.chip),
                 ),
                 child: Row(
                   children: [

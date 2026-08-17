@@ -150,7 +150,7 @@ class _BigButton extends StatelessWidget {
       child: FilledButton(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corner.control)),
           textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
         ),
         child: busy
@@ -315,7 +315,7 @@ class _StepButtonState extends State<_StepButton> {
                   : AppColors.signalFor(Theme.of(context).brightness),
               width: 2,
             ),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Corner.chip)),
           ),
           child: Icon(widget.icon, size: IconSize.large, semanticLabel: widget.label),
         ),
@@ -429,7 +429,7 @@ class _KeyRow extends StatelessWidget {
                 height: 54,
                 child: Material(
                   color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(Corner.chip),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () => onPress(_digits[key] ?? key),
@@ -561,7 +561,7 @@ class OneTaskRepeatWarning extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.signalFor(theme.brightness), width: 2),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(Corner.control),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

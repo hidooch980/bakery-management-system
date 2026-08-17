@@ -8,6 +8,7 @@ import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
+import '../../theme/app_theme.dart';
 
 /// Sells flour out of the warehouse, by the kilo or by the sack.
 ///
@@ -363,7 +364,7 @@ class _Preview extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: colour.withValues(alpha: 0.09),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Corner.chip),
         border: Border.all(color: colour.withValues(alpha: 0.3)),
       ),
       child: Row(

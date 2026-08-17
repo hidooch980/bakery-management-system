@@ -30,7 +30,7 @@ class StationRail extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(Corner.control),
         border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
@@ -159,7 +159,7 @@ class _StationMarker extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 7),
+        const SizedBox(height: 6),
         Text(
           station.value,
           style: Theme.of(context)

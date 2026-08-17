@@ -285,7 +285,7 @@ class _RequestTile extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
                     color: colour.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(Corner.pill),
                   ),
                   child: Text(
                     request.statusLabel,

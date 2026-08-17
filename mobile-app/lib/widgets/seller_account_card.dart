@@ -120,7 +120,7 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: warn.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(Corner.control),
         border: Border.all(color: warn.withValues(alpha: 0.35)),
       ),
       child: Column(
@@ -329,7 +329,7 @@ class _PendingNotice extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: pending.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Corner.chip),
         border: Border.all(color: pending.withValues(alpha: 0.35)),
       ),
       child: Row(
@@ -378,7 +378,7 @@ class _RejectionNotice extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: rejected.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Corner.chip),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

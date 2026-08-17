@@ -154,7 +154,7 @@ class _NaninoEquivalentBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: ChaneComparison._naninoColor.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Corner.chip),
         border: Border.all(
           color: ChaneComparison._naninoColor.withValues(alpha: 0.3),
         ),
@@ -204,7 +204,7 @@ class _Verdict extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Corner.chip),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,7 +258,7 @@ class _Metric extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(Corner.control),
         border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Column(
@@ -279,7 +279,7 @@ class _Metric extends StatelessWidget {
                   color: color,
                 ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             '${weightKg.toStringAsFixed(1)} کیلوگرم',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -319,7 +319,7 @@ class _ShareBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(Corner.chip),
       child: SizedBox(
         height: 14,
         child: Row(

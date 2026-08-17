@@ -261,12 +261,12 @@ class _QuickRecordButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(Corner.control),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(
           color: kind.color.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(Corner.control),
           border: Border.all(color: kind.color.withValues(alpha: 0.30)),
         ),
         child: Row(

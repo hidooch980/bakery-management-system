@@ -229,7 +229,7 @@ class _StartRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: tone.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(Corner.control),
         border: Border.all(color: tone.withValues(alpha: 0.3)),
       ),
       child: Column(

@@ -223,7 +223,7 @@ class _UpdateAvailableCard extends StatelessWidget {
                   height: 52,
                   decoration: BoxDecoration(
                     color: AppColors.moneyIn.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(Corner.control),
                   ),
                   child: const Icon(Icons.system_update_rounded,
                       color: AppColors.moneyIn, size: IconSize.heading),
@@ -273,7 +273,7 @@ class _UpdateAvailableCard extends StatelessWidget {
             const SizedBox(height: 22),
             if (downloading) ...[
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(Corner.chip),
                 child: LinearProgressIndicator(
                   value: progress,
                   minHeight: 10,
@@ -359,7 +359,7 @@ class _InstallFailedHintState extends State<_InstallFailedHint> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(Corner.chip),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

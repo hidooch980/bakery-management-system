@@ -130,7 +130,7 @@ class _SplashScreen extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(26),
+                borderRadius: BorderRadius.circular(Corner.sheet),
               ),
               child: const Icon(Icons.bakery_dining_rounded,
                   size: IconSize.emptyLarge, color: AppColors.onSignal),

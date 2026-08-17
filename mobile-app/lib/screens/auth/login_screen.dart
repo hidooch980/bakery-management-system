@@ -187,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
                                 decoration: BoxDecoration(
                                   color: scheme.surface,
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius: BorderRadius.circular(Corner.dialog),
                                   border: Border.all(
                                     color: scheme.outlineVariant.withValues(alpha: 0.6),
                                   ),
@@ -339,7 +339,7 @@ class _Logo extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(34),
+          borderRadius: BorderRadius.circular(Corner.sheet),
           boxShadow: [
             BoxShadow(
               color: AppColors.crust.withValues(alpha: 0.34),

@@ -407,7 +407,7 @@ class _SectionHeader extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
               color: scheme.primary.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(Corner.chip),
             ),
             child: Text(
               '$count',
@@ -437,7 +437,7 @@ class _InlineEmpty extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(Corner.control),
       ),
       child: Row(
         children: [
@@ -669,7 +669,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                   height: 4,
                   decoration: BoxDecoration(
                     color: scheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(Corner.hair),
                   ),
                 ),
               ),
@@ -793,7 +793,7 @@ class _RemainingBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Corner.chip),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Row(
@@ -864,7 +864,7 @@ class _PaymentRow extends StatelessWidget {
         color: active
             ? scheme.primary.withValues(alpha: 0.08)
             : scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(Corner.control),
         border: Border.all(
           color: active ? scheme.primary.withValues(alpha: 0.4) : Colors.transparent,
         ),
@@ -980,7 +980,7 @@ class _TotalRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: scheme.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(Corner.control),
       ),
       child: Row(
         children: [
@@ -1024,7 +1024,7 @@ class _FlourSaleTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(Corner.chip),
       ),
       child: Row(
         children: [

@@ -286,7 +286,7 @@ class _PeriodCard extends StatelessWidget {
       // The period in progress is the one that matters most.
       shape: isCurrent
           ? RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(Corner.card),
               side: BorderSide(color: scheme.primary, width: 2),
             )
           : null,
@@ -324,7 +324,7 @@ class _PeriodCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(Corner.hair),
               child: LinearProgressIndicator(
                 value: (percent / 100).clamp(0.0, 1.0),
                 minHeight: 10,

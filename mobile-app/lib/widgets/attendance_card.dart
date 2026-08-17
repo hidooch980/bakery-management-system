@@ -126,7 +126,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
                       decoration: BoxDecoration(
                         color: (_checkedIn ? done : scheme.primary)
                             .withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(Corner.control),
                       ),
                       child: Icon(
                         _checkedIn

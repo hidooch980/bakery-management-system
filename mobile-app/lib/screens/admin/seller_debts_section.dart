@@ -274,7 +274,7 @@ class _SellerTile extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: AppColors.moneyNeutral.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(Corner.chip),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -149,7 +149,7 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(Corner.control),
         border: Border.all(color: accent.withValues(alpha: 0.30)),
       ),
       child: Column(
