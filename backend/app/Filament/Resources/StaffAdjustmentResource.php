@@ -6,6 +6,7 @@ use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\StaffAdjustmentResource\Pages;
 use App\Models\StaffAdjustment;
+use App\Models\User;
 use App\Support\Jalali;
 use App\Support\Money;
 use Filament\Forms;
@@ -113,7 +114,7 @@ class StaffAdjustmentResource extends Resource
                         ->label('معادل مبلغ')
                         ->visible(fn (Forms\Get $get) => $get('basis') === StaffAdjustment::BY_DAYS)
                         ->content(function (Forms\Get $get) {
-                            $person = \App\Models\User::find($get('user_id'));
+                            $person = User::find($get('user_id'));
                             $monthly = (float) ($person?->monthly_salary ?? 0);
 
                             if ($monthly <= 0) {
