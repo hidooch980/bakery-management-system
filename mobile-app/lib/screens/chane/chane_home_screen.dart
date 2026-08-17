@@ -62,7 +62,13 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
 
   Future<void> _prepare() async {
     _spray = await LastUsed.sprayFlourKg();
-    _nanino = await LastUsed.naninoCount();
+
+    // Spray flour is remembered; nanino deliberately is not. Five kilos go
+    // on every single batch, so carrying that forward saves a question
+    // already answered. Nanino is shaped about one day in twenty, and a
+    // remembered count would ride along on every batch after it —
+    // submitted without the extras screen ever being opened again, and
+    // eating a kilo of dough per phantom loaf on the way through.
 
     try {
       final bakery = await widget.api.bakery();
@@ -135,7 +141,6 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
       );
 
       await LastUsed.rememberSprayFlourKg(_spray);
-      await LastUsed.rememberNaninoCount(_nanino);
 
       if (!mounted) return;
       setState(() {

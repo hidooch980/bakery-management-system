@@ -18,7 +18,6 @@ class LastUsed {
 
   static const _spray = 'last_spray_flour_kg';
 
-  static const _nanino = 'last_nanino_count';
 
   /// Ten, until the shop says otherwise — the commonest batch by far.
   static Future<int> doughBags() async {
@@ -47,18 +46,11 @@ class LastUsed {
     await prefs.setDouble(_spray, kg);
   }
 
-  /// Zero unless this shop actually shapes nanino, in which case the last
-  /// count is a better guess than nothing.
-  static Future<int> naninoCount() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    return prefs.getInt(_nanino) ?? 0;
-  }
-
-  static Future<void> rememberNaninoCount(int count) async {
-    if (count < 0) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_nanino, count);
-  }
+  // Nanino was remembered here too, on the reasoning that the last count
+  // beats no guess at all. That is true of spray flour, which goes on
+  // every batch. It is false of nanino: this shop shaped some on one day
+  // out of the last twenty, and the remembered figure is submitted by
+  // both entry screens without either one being opened to look at it. One
+  // order of a hundred would have quietly ridden every batch after it and
+  // taken a kilo of dough with each loaf that was never shaped.
 }

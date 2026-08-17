@@ -505,9 +505,10 @@ class _ChaneSheetState extends State<_ChaneSheet> {
   final _nanino = TextEditingController(text: '0');
   final _spray = TextEditingController(text: '5');
 
-  /// Nanino and spray flour are folded away. This shop has shaped no
-  /// nanino at all and put on five kilos of spray flour every single time,
-  /// so two of the three boxes were asking a question already answered —
+  /// Nanino and spray flour are folded away. This shop shapes nanino about
+  /// one day in twenty and puts on five kilos of spray flour every single
+  /// time, so two of the three boxes were asking a question already
+  /// answered on almost every batch —
   /// and a form of three identical-looking number fields is where the
   /// wrong one gets filled in.
   bool _showMore = false;
@@ -523,12 +524,15 @@ class _ChaneSheetState extends State<_ChaneSheet> {
 
   Future<void> _restore() async {
     final spray = await LastUsed.sprayFlourKg();
-    final nanino = await LastUsed.naninoCount();
 
     if (!mounted) return;
     setState(() {
       _spray.text = spray.toStringAsFixed(spray % 1 == 0 ? 0 : 1);
-      _nanino.text = nanino.toString();
+      // Nanino starts at zero every time. It is shaped about one day in
+      // twenty here, and both these fields are folded away — so a
+      // remembered count would be submitted batch after batch without
+      // anyone opening the panel to see it, taking a kilo of dough with
+      // each phantom loaf.
       _ready = true;
     });
   }
@@ -572,7 +576,6 @@ class _ChaneSheetState extends State<_ChaneSheet> {
       );
 
       await LastUsed.rememberSprayFlourKg(spray);
-      await LastUsed.rememberNaninoCount(nanino);
 
       if (!mounted) return;
       Navigator.pop(context, true);
