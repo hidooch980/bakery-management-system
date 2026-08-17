@@ -47,7 +47,7 @@ class IssueScanner
             ...$this->loanInstalmentDue(),
             ...$this->flourOutWithPartners(),
             ...$this->dieselRunningOut(),
-            ...$this->wagesNeverRecorded(),
+            ...$this->monthlyObligations(),
             ...$this->expensesMostlyUncategorised(),
         ]);
 
@@ -614,54 +614,120 @@ class IssueScanner
      * way to know the difference between a month with no wages and a
      * month whose wages were never entered.
      */
-    private function wagesNeverRecorded(): array
+    /**
+     * The two things this shop owes every month, and whether they are in.
+     *
+     * Wages at the end of the Jalali month, insurance before it —
+     * «پایان هر ماه پرداخت حقوق», «پرداخت بیمه هم قبل پایان ماه هست».
+     *
+     * The old check fired the moment anything was sold, which meant it
+     * shouted «حقوق این ماه ثبت نشده» as CRITICAL from the shop's first
+     * day of trading — twenty-two days before its first payday had even
+     * arrived. That is not a warning, it is noise wearing a warning's
+     * colour, and it is exactly what teaches an owner to stop reading the
+     * page.
+     *
+     * So: nothing is said until the thing is actually due. Insurance is
+     * chased in the last five days of the month, wages once the month has
+     * closed on them. Both go quiet the moment a payment is recorded,
+     * whether as a payslip or as an expense in its own category — this
+     * shop has paid wages both ways.
+     */
+    private function monthlyObligations(): array
     {
-        $from = now()->startOfMonth();
+        [$monthStart, $monthEnd] = Jalali::currentMonthRange();
 
-        $sales = Sale::where('created_at', '>=', $from)->count();
-
-        // Nothing sold yet this month: nothing to conclude.
-        if ($sales === 0) {
+        // Nothing traded yet this month: nothing to conclude about what it
+        // owes.
+        if (Sale::where('created_at', '>=', $monthStart)->count() === 0) {
             return [];
         }
 
-        $paid = SalaryPayment::paid()
-            ->where('paid_on', '>=', $from->toDateString())
-            ->count();
+        $daysLeft = (int) now()->startOfDay()->diffInDays($monthEnd->copy()->startOfDay(), false);
 
-        // Not every shop runs a payroll: this one pays wages as advances
-        // entered straight on the expense sheet. Counting only payslips
-        // called that a missing payroll and cried wolf every month.
-        $asExpense = Expense::where('category', 'salary')
-            ->where('spent_on', '>=', $from->toDateString())
-            ->count();
+        return [
+            ...$this->obligation(
+                key: 'insurance',
+                category: 'insurance',
+                label: 'حق بیمه',
+                monthStart: $monthStart,
+                // Paid before the month closes, so it is worth saying
+                // while there are still days to pay it in.
+                due: $daysLeft <= 5,
+                overdue: $daysLeft < 0,
+                url: '/admin/expenses',
+                daysLeft: $daysLeft,
+            ),
+            ...$this->obligation(
+                key: 'wages',
+                category: 'salary',
+                label: 'حقوق کارکنان',
+                monthStart: $monthStart,
+                // Due at the end, so the month has to have ended.
+                due: $daysLeft <= 0,
+                overdue: $daysLeft < 0,
+                url: '/admin/salary-payments',
+                daysLeft: $daysLeft,
+            ),
+        ];
+    }
 
-        if ($paid > 0 || $asExpense > 0) {
+    /**
+     * One monthly obligation, raised only once it is due.
+     *
+     * @return array<int, SystemIssue>
+     */
+    private function obligation(
+        string $key,
+        string $category,
+        string $label,
+        $monthStart,
+        bool $due,
+        bool $overdue,
+        string $url,
+        int $daysLeft,
+    ): array {
+        if (! $due) {
             return [];
         }
 
-        $everPaid = SalaryPayment::paid()->count() > 0
-            || Expense::where('category', 'salary')->exists();
+        $recorded = Expense::where('category', $category)
+            ->where('spent_on', '>=', $monthStart->toDateString())
+            ->exists();
+
+        // Wages have a ledger of their own as well as an expense category,
+        // and this shop has used both.
+        if ($category === 'salary' && ! $recorded) {
+            $recorded = SalaryPayment::paid()
+                ->where('paid_on', '>=', $monthStart->toDateString())
+                ->exists();
+        }
+
+        if ($recorded) {
+            return [];
+        }
 
         return [new SystemIssue(
-            key: 'wages-never-recorded',
-            severity: SystemIssue::CRITICAL,
-            title: 'حقوق این ماه ثبت نشده است',
-            detail: $everPaid
-                ? 'در این ماه '.number_format($sales).' فروش ثبت شده اما هیچ پرداخت حقوقی ثبت نشده است.'
-                : 'تا امروز هیچ پرداخت حقوقی در سامانه ثبت نشده است، در حالی که '
-                    .number_format($sales).' فروش این ماه ثبت شده.',
-            cause: 'حقوق کارکنان خارج از سامانه پرداخت شده و نه در بخش حقوق و نه در هزینه‌ها وارد نشده است.',
-            suggestion: 'تا زمانی که حقوق ثبت نشود، سود گزارش‌شده به اندازه‌ی کل حقوق بیشتر از واقعیت است.'
-                .' پرداخت‌ها را در بخش حقوق، یا به‌عنوان هزینه‌ی دسته‌ی «حقوق کارکنان»، وارد کنید.',
-            url: '/admin/salary-payments',
-            urlLabel: 'حقوق',
-            // Deliberately no magnitude. This is not a quantity that grows —
-            // wages are recorded or they are not — and the obvious
-            // candidate, the month's sale count, climbs every day, so an
-            // answer would have reopened itself within a week. The profit
-            // figure carries the warning independently anyway, every time
-            // the dashboard is opened.
+            key: "monthly-{$key}-".$monthStart->format('Y-m'),
+            severity: $overdue ? SystemIssue::CRITICAL : SystemIssue::WARNING,
+            title: $overdue
+                ? "{$label} این ماه پرداخت نشده"
+                : "{$label} این ماه نزدیک است",
+            detail: $overdue
+                ? "ماه تمام شده و {$label} این ماه در سامانه ثبت نشده است."
+                : "{$daysLeft} روز تا پایان ماه مانده و {$label} هنوز ثبت نشده است.",
+            cause: $overdue
+                ? 'یا پرداخت نشده، یا پرداخت شده و وارد سامانه نشده است.'
+                : 'موعد ماهانه‌ی این پرداخت نزدیک شده است.',
+            suggestion: $overdue
+                ? 'تا وقتی ثبت نشود، سود گزارش‌شده به همان اندازه بیشتر از واقعیت است.'
+                : 'پیش از پایان ماه پرداخت و ثبتش کنید.',
+            url: $url,
+            urlLabel: $label,
+            // Days past due, so an answer about a payment one day late
+            // does not cover the same payment a month late. Not yet
+            // overdue counts as zero.
+            magnitude: $overdue ? (float) abs($daysLeft) : 0.0,
         )];
     }
 

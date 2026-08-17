@@ -13,12 +13,14 @@ use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\User;
 use App\Support\IssueScanner;
+use App\Support\Jalali;
 use App\Support\Money;
 use App\Support\SystemIssue;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -295,19 +297,70 @@ class IssueCenterTest extends TestCase
         ]);
     }
 
-    public function test_trading_with_no_wages_recorded_is_critical(): void
+    /**
+     * Nothing is said until the payment is actually due.
+     *
+     * The old check fired the moment anything was sold, so it shouted
+     * «حقوق این ماه ثبت نشده» as critical from this shop's first day of
+     * trading — three weeks before its first payday arrived. That is noise
+     * wearing a warning's colour, and it is what teaches an owner to stop
+     * reading the page.
+     */
+    private function monthlyIssue(string $key): ?SystemIssue
+    {
+        return $this->scan()->first(
+            fn (SystemIssue $i) => str_starts_with($i->key, "monthly-{$key}-")
+        );
+    }
+
+    /** Puts the clock inside the window where a payment is chased. */
+    private function clockAt(int $daysBeforeMonthEnd): void
+    {
+        [, $monthEnd] = Jalali::currentMonthRange();
+
+        Carbon::setTestNow($monthEnd->copy()->subDays($daysBeforeMonthEnd)->setTime(12, 0));
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
+    public function test_wages_are_not_chased_before_payday(): void
     {
         $this->sellSomething();
+        $this->clockAt(10);
 
-        $issue = $this->issue('wages-never-recorded');
+        // Ten days of the month still to run. The shop pays at the end of
+        // it, so there is nothing late about nothing being recorded.
+        $this->assertNull($this->monthlyIssue('wages'));
+    }
+
+    public function test_insurance_is_chased_in_the_last_days_of_the_month(): void
+    {
+        $this->sellSomething();
+        $this->clockAt(3);
+
+        $issue = $this->monthlyIssue('insurance');
 
         $this->assertNotNull($issue);
-        $this->assertSame(SystemIssue::CRITICAL, $issue->severity);
+        // A warning, not a crisis: there are still days to pay it in.
+        $this->assertSame(SystemIssue::WARNING, $issue->severity);
+    }
+
+    public function test_insurance_is_not_chased_mid_month(): void
+    {
+        $this->sellSomething();
+        $this->clockAt(20);
+
+        $this->assertNull($this->monthlyIssue('insurance'));
     }
 
     public function test_a_recorded_wage_payment_settles_it(): void
     {
         $this->sellSomething();
+        $this->clockAt(0);
 
         SalaryPayment::create([
             'user_id' => $this->admin->id,
@@ -318,16 +371,17 @@ class IssueCenterTest extends TestCase
             'paid_on' => now(),
         ]);
 
-        $this->assertNull($this->issue('wages-never-recorded'));
+        $this->assertNull($this->monthlyIssue('wages'));
     }
 
     public function test_wages_paid_as_an_expense_settle_it_too(): void
     {
         $this->sellSomething();
+        $this->clockAt(0);
 
-        // This shop has no payroll run: wages are handed over as advances
-        // and entered straight on the expense sheet. Looking only at
-        // payslips called that a missing payroll every month.
+        // This shop has paid wages both ways: as payslips and as expenses
+        // on the «حقوق کارکنان» category. Looking at only one of them
+        // called a paid payroll missing.
         Expense::create([
             'user_id' => $this->admin->id,
             'category' => 'salary',
@@ -336,13 +390,32 @@ class IssueCenterTest extends TestCase
             'spent_on' => now(),
         ]);
 
-        $this->assertNull($this->issue('wages-never-recorded'));
+        $this->assertNull($this->monthlyIssue('wages'));
     }
 
-    public function test_a_month_with_no_sales_says_nothing_about_wages(): void
+    public function test_a_recorded_premium_settles_the_insurance(): void
     {
-        // No trading is not the same as unrecorded payroll.
-        $this->assertNull($this->issue('wages-never-recorded'));
+        $this->sellSomething();
+        $this->clockAt(3);
+
+        Expense::create([
+            'user_id' => $this->admin->id,
+            'category' => 'insurance',
+            'title' => 'حق بیمه',
+            'amount' => 5_000_000,
+            'spent_on' => now(),
+        ]);
+
+        $this->assertNull($this->monthlyIssue('insurance'));
+    }
+
+    public function test_a_month_with_no_sales_says_nothing_about_either(): void
+    {
+        $this->clockAt(0);
+
+        // No trading is not the same as an unpaid obligation.
+        $this->assertNull($this->monthlyIssue('wages'));
+        $this->assertNull($this->monthlyIssue('insurance'));
     }
 
     public function test_expenses_piled_into_other_are_flagged(): void

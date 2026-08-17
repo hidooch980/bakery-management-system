@@ -52,7 +52,7 @@ class _PayrollSectionState extends State<PayrollSection> {
   /// The period a payslip belongs to: the first of the Jalali month that
   /// is being paid for. Sent as the shop writes dates, not as ISO.
   String get _thisPeriod {
-    final now = JalaliFormat.date(DateTime.now()) ?? '';
+    final now = JalaliFormat.date(DateTime.now());
     final parts = now.split('/');
 
     return parts.length == 3 ? '${parts[0]}/${parts[1]}/01' : now;
