@@ -242,7 +242,7 @@ class _AdvanceTile extends StatelessWidget {
               : Icons.schedule_rounded,
           color: advance.isSettled
               ? AppColors.moneyIn
-              : AppColors.emberHot,
+              : AppColors.attention,
         ),
       ),
     );
@@ -260,7 +260,7 @@ class _RequestTile extends StatelessWidget {
     final colour = switch (request.status) {
       'approved' => AppColors.moneyIn,
       'rejected' => AppColors.moneyOut,
-      _ => AppColors.emberHot,
+      _ => AppColors.attention,
     };
 
     return Card(

@@ -288,11 +288,11 @@ class _ProductionSectionState extends State<_ProductionSection> {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
                       leading: CircleAvatar(
-                        backgroundColor: AppColors.emberHot
+                        backgroundColor: AppColors.stock
                             .withValues(alpha: 0.16),
                         child: const Icon(
                           Icons.water_drop_rounded,
-                          color: AppColors.emberHot,
+                          color: AppColors.stock,
                         ),
                       ),
                       title: Text(
@@ -426,7 +426,7 @@ class _DoughSheetState extends State<_DoughSheet> {
     return _SheetShell(
       title: 'ثبت خمیر',
       icon: Icons.water_drop_rounded,
-      color: AppColors.emberHot,
+      color: AppColors.stock,
       child: !_ready
           ? const Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
@@ -641,14 +641,14 @@ class _ChaneSheetState extends State<_ChaneSheet> {
                     Row(
                       children: [
                         const Icon(Icons.error_outline_rounded,
-                            size: 18, color: AppColors.emberHot),
+                            size: 18, color: AppColors.attention),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'این عدد از حالت عادی این نانوایی خیلی دور است.'
                             ' اگر درست است ثبتش کنید.',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppColors.emberHot,
+                              color: AppColors.attention,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -766,7 +766,7 @@ class _Stepper extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: theme.textTheme.displaySmall?.copyWith(
                   fontWeight: FontWeight.w900,
-                  color: AppColors.emberHot,
+                  color: AppColors.stock,
                 ),
               ),
             ),

@@ -88,7 +88,7 @@ class _PayCardState extends State<PayCard> {
           children: [
             Row(
               children: [
-                const Icon(Icons.savings_outlined, color: AppColors.emberHot),
+                Icon(Icons.savings_outlined, color: AppColors.signalFor(theme.brightness)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -140,7 +140,7 @@ class _PayCardState extends State<PayCard> {
                     theme,
                     'علی‌الحساب تسویه‌نشده',
                     pay.advanceOutstandingFormatted,
-                    colour: AppColors.emberHot,
+                    colour: AppColors.attention,
                   ),
                 if (pay.hasUnpaidPayslips)
                   _row(
@@ -190,9 +190,9 @@ class _PayCardState extends State<PayCard> {
       final p when p.remainingFormatted != null => (
           'مانده حقوق پس از کسر بدهی',
           p.remainingFormatted!,
-          AppColors.emberHot,
+          AppColors.attention,
         ),
-      _ => ('مانده حقوق', '—', AppColors.emberHot),
+      _ => ('مانده حقوق', '—', AppColors.attention),
     };
 
     return Column(

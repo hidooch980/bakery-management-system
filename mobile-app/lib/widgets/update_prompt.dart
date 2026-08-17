@@ -62,7 +62,7 @@ class _UpdatePromptState extends State<UpdatePrompt> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         icon: const Icon(Icons.warning_amber_rounded,
-            size: 34, color: AppColors.emberHot),
+            size: 34, color: AppColors.attention),
         title: const Text('بروزرسانی لازم است'),
         content: Column(
           mainAxisSize: MainAxisSize.min,

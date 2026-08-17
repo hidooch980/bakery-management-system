@@ -332,7 +332,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                   '${data.flour!.totalWeightKg.toStringAsFixed(1)} کیلوگرم  •  '
                   '${data.flour!.totalFormatted}',
           icon: Icons.local_shipping_rounded,
-          color: AppColors.emberHot,
+          color: AppColors.stock,
           onTap: _openFlourSaleSheet,
           trailing: const Icon(Icons.add_rounded),
         ),
@@ -783,7 +783,7 @@ class _RemainingBanner extends StatelessWidget {
           '${-unassigned} نان بیشتر از این چانه وارد شده است.',
         ),
       _ => (
-          AppColors.emberHot,
+          AppColors.attention,
           Icons.info_rounded,
           '$unassigned نان باقی مانده — اگر ثبت نشود، بدهی موقت فروشنده می‌شود.',
         ),
@@ -1033,7 +1033,7 @@ class _FlourSaleTile extends StatelessWidget {
                 ? Icons.shopping_bag_rounded
                 : Icons.scale_rounded,
             size: 20,
-            color: AppColors.emberHot,
+            color: AppColors.stock,
           ),
           const SizedBox(width: 10),
           Expanded(
