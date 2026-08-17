@@ -31,7 +31,10 @@ class MoneyAtAGlance extends BaseWidget
 
     protected function getStats(): array
     {
-        [$monthFrom, $monthTo] = Jalali::currentMonthRange();
+        // The shop's own month, the 5th to the 4th, because that is the
+        // cycle the flour quota runs on and the one the report headlines.
+        // The two must not answer «how did the month go» differently.
+        [$monthFrom, $monthTo] = Jalali::currentQuotaPeriod();
 
         return [
             $this->takings(),
@@ -159,7 +162,7 @@ class MoneyAtAGlance extends BaseWidget
             // month's wages are missing from it, in which case the margin
             // is not the thing worth saying.
             ->description(match (true) {
-                $unrecordedWages > 0 => 'حقوق این ماه ثبت نشده — این عدد '
+                $unrecordedWages > 0 => 'حقوق ثبت نشده — این عدد تا امروز '
                     .Money::format($unrecordedWages).' از واقعیت بیشتر است',
                 $income > 0 => 'حاشیه سود '.round($net / $income * 100, 1).'٪ از '.Money::format($income),
                 default => 'هنوز درآمدی برای این ماه ثبت نشده',
@@ -175,19 +178,25 @@ class MoneyAtAGlance extends BaseWidget
     }
 
     /**
-     * Wages the shop owes for this month and has recorded nowhere.
+     * Wages the shop has run up so far this period and recorded nowhere.
      *
-     * A profit figure that leaves out a month's payroll is not a small
-     * bit wrong, it is wrong by the payroll — for this shop, a thousand
-     * million Rial against takings of a few hundred. Saying so on the
-     * figure itself is the only place it cannot be missed: the issue
-     * centre reports it too, but an owner who has answered that issue,
-     * for perfectly good reasons of his own, would still be reading this
+     * A profit figure that leaves out payroll is not a small bit wrong, it
+     * is wrong by the payroll — for this shop a thousand million Rial a
+     * period against takings of a few hundred. Saying so on the figure
+     * itself is the only place it cannot be missed: the issue centre
+     * reports it too, but an owner who has answered that issue, for
+     * perfectly good reasons of his own, would still be reading this
      * number as though it meant something.
+     *
+     * **Pro-rated to the days gone.** The income beside it is the income
+     * so far, and setting a whole period's wages against a part period's
+     * takings overstates the hole — which is exactly the mistake I made
+     * out loud on 2026-08-17, subtracting a full month's payroll from
+     * twenty-two days of trading and calling the answer the real profit.
      *
      * Zero once anything is recorded — a payslip or a wage expense. This
      * does not try to work out whether the amount was right, only whether
-     * the month is accounted for at all.
+     * the period is accounted for at all.
      */
     private function wagesNotInTheFigure($from, $to): float
     {
@@ -202,6 +211,13 @@ class MoneyAtAGlance extends BaseWidget
             return 0.0;
         }
 
-        return (float) User::query()->ofCurrentBakery()->where('is_active', true)->sum('monthly_salary');
+        $monthly = (float) User::query()->ofCurrentBakery()
+            ->where('is_active', true)
+            ->sum('monthly_salary');
+
+        $days = max(1, (int) $from->diffInDays($to) + 1);
+        $gone = min($days, max(0, (int) $from->diffInDays(now()) + 1));
+
+        return round($monthly * $gone / $days, 2);
     }
 }

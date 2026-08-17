@@ -10,6 +10,7 @@ use App\Models\Expense;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\Jalali;
 use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -89,14 +90,41 @@ class ProfitSaysWhenWagesAreMissingTest extends TestCase
         ]);
     }
 
-    public function test_it_names_the_amount_that_is_missing(): void
+    public function test_it_says_wages_are_missing(): void
     {
         $this->sell();
 
-        Livewire::test(MoneyAtAGlance::class)
-            ->assertSee('حقوق این ماه ثبت نشده')
-            // Both wages, added up — not one of them, and not a guess.
-            ->assertSee(Money::format(68_000_000));
+        Livewire::test(MoneyAtAGlance::class)->assertSee('حقوق ثبت نشده');
+    }
+
+    /**
+     * Pro-rated to the days gone, not the whole period's payroll.
+     *
+     * The income beside it is the income so far. Setting a whole period's
+     * wages against a part period's takings overstates the hole, and it is
+     * the mistake I made out loud before this test existed — subtracting a
+     * full month's payroll from twenty-two days of trading and calling the
+     * answer the real profit.
+     */
+    public function test_the_figure_is_what_has_been_run_up_so_far(): void
+    {
+        $this->sell();
+
+        [$from, $to] = Jalali::currentQuotaPeriod();
+
+        $days = (int) $from->diffInDays($to) + 1;
+        $gone = (int) $from->diffInDays(now()) + 1;
+
+        // Both wages together, for the part of the period that has passed.
+        $expected = round(68_000_000 * $gone / $days, 2);
+
+        Livewire::test(MoneyAtAGlance::class)->assertSee(Money::format($expected));
+
+        // And it is genuinely less than the whole period's payroll unless
+        // the period happens to have ended today.
+        if ($gone < $days) {
+            $this->assertLessThan(68_000_000, $expected);
+        }
     }
 
     public function test_it_says_which_way_the_figure_is_wrong(): void
@@ -121,7 +149,7 @@ class ProfitSaysWhenWagesAreMissingTest extends TestCase
 
         Livewire::test(MoneyAtAGlance::class)
             ->assertSee('حاشیه سود')
-            ->assertDontSee('حقوق این ماه ثبت نشده');
+            ->assertDontSee('حقوق ثبت نشده');
     }
 
     public function test_wages_paid_as_an_expense_count_too(): void
@@ -138,7 +166,7 @@ class ProfitSaysWhenWagesAreMissingTest extends TestCase
             'spent_on' => now(),
         ]);
 
-        Livewire::test(MoneyAtAGlance::class)->assertDontSee('حقوق این ماه ثبت نشده');
+        Livewire::test(MoneyAtAGlance::class)->assertDontSee('حقوق ثبت نشده');
     }
 
     public function test_a_shop_that_owes_no_wages_is_left_alone(): void
@@ -150,7 +178,7 @@ class ProfitSaysWhenWagesAreMissingTest extends TestCase
         // Owing nothing is not the same as having recorded nothing.
         Livewire::test(MoneyAtAGlance::class)
             ->assertSee('حاشیه سود')
-            ->assertDontSee('حقوق این ماه ثبت نشده');
+            ->assertDontSee('حقوق ثبت نشده');
     }
 
     public function test_the_warning_does_not_stop_the_figure_being_shown(): void

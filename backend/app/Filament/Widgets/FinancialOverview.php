@@ -22,7 +22,10 @@ class FinancialOverview extends BaseWidget
 
     protected function getStats(): array
     {
-        [$from, $to] = Jalali::currentMonthRange();
+        // The shop's own month, the 5th to the 4th, because that is the
+        // cycle the flour quota runs on and the one the report headlines.
+        // The two must not answer «how did the month go» differently.
+        [$from, $to] = Jalali::currentQuotaPeriod();
 
         // Read through the ledger so bread, flour and miscellaneous income
         // are counted here exactly as the reports count them.

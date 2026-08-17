@@ -30,6 +30,18 @@ class BakeryShareResource extends Resource
 
     protected static ?int $navigationSort = 5;
 
+    /**
+     * Hidden while nothing is drawn against the shares.
+     *
+     * The two brothers' holding is real and stays on file; what is off is
+     * the pretence that a settlement is pending. Turning it back on is one
+     * line in config/bakery.php.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return (bool) config('bakery.partner_drawings');
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

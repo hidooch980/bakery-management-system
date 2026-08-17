@@ -185,6 +185,16 @@ class BalanceSheet
      */
     private static function partnerShares(): float
     {
+        // Nothing has ever been drawn against the shares and the owner
+        // says nothing will be — «برداشت شرکا اصلا وجود ندارد». Carrying
+        // the period's profit as money owed to the two brothers put a
+        // liability of a billion and a half Rial on the sheet that nobody
+        // is owed, and one inflated further by the wages the profit does
+        // not yet include.
+        if (! config('bakery.partner_drawings')) {
+            return 0.0;
+        }
+
         [$from, $to] = Jalali::currentMonthRange();
 
         $split = BakeryShare::splitFor($from, $to);

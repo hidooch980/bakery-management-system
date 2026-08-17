@@ -23,7 +23,13 @@ class ProfitSplitTable extends BaseWidget
 
     public static function canView(): bool
     {
-        return BakeryShare::active()->exists();
+        // Shares on file are not the same as money being drawn against
+        // them. This shop has two brothers holding five dang and one, and
+        // has never settled a rial to either — «برداشت شرکا اصلا وجود
+        // ندارد» — so a table saying each is owed his share of the profit
+        // is a debt nobody is owed, inflated further by the wages that
+        // profit does not yet include.
+        return config('bakery.partner_drawings') && BakeryShare::active()->exists();
     }
 
     public function getTableHeading(): string

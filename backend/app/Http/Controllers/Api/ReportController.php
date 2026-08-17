@@ -346,7 +346,14 @@ class ReportController extends Controller
                     $from->toDateString(), $to->toDateString(),
                 ])->count(),
             ]),
-            'profit_split' => BakeryShare::splitFor($from, $to),
+            // Empty while nothing is drawn against the shares, which the
+            // app already reads as "do not draw this section" — the two
+            // brothers' holding is real, but showing each of them owed a
+            // share of a profit nobody has taken, out of a profit with no
+            // wages in it, is two wrong numbers in one row.
+            'profit_split' => config('bakery.partner_drawings')
+                ? BakeryShare::splitFor($from, $to)
+                : ['holders' => [], 'total' => 0],
             'expenses' => [
                 'recorded' => round($recordedExpenses, 2),
                 'recorded_formatted' => Money::format($recordedExpenses),

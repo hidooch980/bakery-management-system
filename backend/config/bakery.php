@@ -25,4 +25,29 @@ return [
 
     'multi_shop' => env('BAKERY_MULTI_SHOP', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Paying the partners
+    |--------------------------------------------------------------------------
+    |
+    | Off. «برداشت شرکا اصلا وجود ندارد» — 2026-08-17.
+    |
+    | The shop is held five dang to one between two brothers and that
+    | ownership is real, but nothing has ever been drawn against it: zero
+    | settlements, ever. Meanwhile the split screen was showing the whole
+    | period's profit as money owed to them, and the balance sheet was
+    | carrying it as a liability — a debt of a billion and a half Rial that
+    | nobody is owed and nobody expects.
+    |
+    | Worse, that figure inherits the payroll hole: the profit it divides
+    | has no wages in it, so what each brother appeared to be owed was
+    | overstated by their share of a thousand million Rial a month.
+    |
+    | The shares themselves stay on file. This decides only whether the app
+    | and the panel show a split and a balance owing.
+    |
+    */
+
+    'partner_drawings' => env('BAKERY_PARTNER_DRAWINGS', false),
+
 ];

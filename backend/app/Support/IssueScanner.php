@@ -373,7 +373,10 @@ class IssueScanner
      */
     private function tradingAtALoss(): array
     {
-        [$from, $to] = Jalali::currentMonthRange();
+        // The shop's own month, the 5th to the 4th, because that is the
+        // cycle the flour quota runs on and the one the report headlines.
+        // The two must not answer «how did the month go» differently.
+        [$from, $to] = Jalali::currentQuotaPeriod();
 
         // A week in, so a single large purchase at the start of the month
         // does not raise an alarm every time. Measured from the start of

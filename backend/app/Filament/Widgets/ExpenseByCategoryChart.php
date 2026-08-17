@@ -18,7 +18,10 @@ class ExpenseByCategoryChart extends ChartWidget
 
     protected function getData(): array
     {
-        [$from, $to] = Jalali::currentMonthRange();
+        // The shop's own month, the 5th to the 4th, because that is the
+        // cycle the flour quota runs on and the one the report headlines.
+        // The two must not answer «how did the month go» differently.
+        [$from, $to] = Jalali::currentQuotaPeriod();
 
         $grouped = Expense::whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
             ->get()
