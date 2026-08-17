@@ -95,7 +95,7 @@ class OneTaskScaffold extends StatelessWidget {
                   Text(
                     '$step از $of',
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: AppColors.signal,
+                      color: AppColors.signalFor(theme.brightness),
                       fontWeight: FontWeight.w500,
                       letterSpacing: 1.2,
                     ),
@@ -312,7 +312,7 @@ class _StepButtonState extends State<_StepButton> {
             side: BorderSide(
               color: widget.onPressed == null
                   ? Theme.of(context).colorScheme.outlineVariant
-                  : AppColors.signal,
+                  : AppColors.signalFor(Theme.of(context).brightness),
               width: 2,
             ),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -439,7 +439,7 @@ class _KeyRow extends StatelessWidget {
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w500,
                           color: key == '⌫'
-                              ? AppColors.signal
+                              ? AppColors.signalFor(theme.brightness)
                               : theme.colorScheme.onSurface,
                         ),
                       ),
@@ -560,7 +560,7 @@ class OneTaskRepeatWarning extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.signal, width: 2),
+        border: Border.all(color: AppColors.signalFor(theme.brightness), width: 2),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -572,7 +572,7 @@ class OneTaskRepeatWarning extends StatelessWidget {
             'دستهٔ تازه‌ای است؟',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppColors.signal,
+              color: AppColors.signalFor(theme.brightness),
             ),
           ),
           const SizedBox(height: 14),

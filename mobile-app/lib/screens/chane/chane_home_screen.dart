@@ -256,7 +256,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
 
           return Material(
             color: picked
-                ? AppColors.signal.withValues(alpha: 0.14)
+                ? AppColors.signalFor(theme.brightness).withValues(alpha: 0.14)
                 : theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
@@ -266,7 +266,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: picked ? AppColors.signal : Colors.transparent,
+                    color: picked ? AppColors.signalFor(theme.brightness) : Colors.transparent,
                     width: 2,
                   ),
                   borderRadius: BorderRadius.circular(12),

@@ -1,18 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// The shop's palette — "the kiln".
-///
-/// Iron and ember. The ground is the dark of a cold oven and the warm
-/// notes are the colours iron actually passes through as it heats, which
-/// is why they are a ramp rather than a single accent: [emberCool] through
-/// [emberPale] is a scale, and where a figure sits on it is the reading.
-/// A quota nearly spent glows; one barely touched is dull. That saves the
-/// eye a number at arm's length across a hot, bright room, which is where
-/// most of these screens are read.
-///
-/// Dark is the design; light is the same identity in daylight, for the
-/// owner reading figures at a desk rather than the floor reading them
-/// beside an oven. Both keep contrast high rather than softening it.
 /// The shop's palette — "one task".
 ///
 /// A near-black ground and a single yellow. The yellow is not decoration
@@ -38,6 +25,14 @@ class AppColors {
 
   /// On a pale ground the same yellow turns to highlighter, so it darkens.
   static const Color signalInk = Color(0xFF8A6D00);
+
+  /// The accent as it should appear at this brightness.
+  ///
+  /// Anything drawing the accent itself — a border, a label, an outline —
+  /// asks for it this way rather than naming a constant, because getting
+  /// it wrong is invisible until someone opens the app in daylight.
+  static Color signalFor(Brightness brightness) =>
+      brightness == Brightness.dark ? signal : signalInk;
 
   /// Text and icons sitting on the yellow.
   static const Color onSignal = Color(0xFF17150A);
@@ -100,11 +95,20 @@ class AppColors {
 class AppTheme {
   static const _fontFamily = 'Vazirmatn';
 
+  /// Daylight, same identity.
+  ///
+  /// The yellow does not survive the trip: at full strength on a pale
+  /// ground it stops reading as a button and starts reading as a
+  /// highlighter drawn over one. So the *button* darkens to
+  /// [AppColors.signalInk] and the yellow keeps only the jobs where it
+  /// sits on something dark — a chip, a filled marker — which is what
+  /// holds the two themes together as one design rather than two.
   static ThemeData light() {
     final scheme = ColorScheme.fromSeed(
-      seedColor: AppColors.crust,
+      seedColor: AppColors.signalInk,
       brightness: Brightness.light,
-      primary: AppColors.crust,
+      primary: AppColors.signalInk,
+      onPrimary: Colors.white,
       secondary: AppColors.info,
       surface: AppColors.ashSurface,
       error: AppColors.danger,
