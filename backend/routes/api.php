@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\PowerBiExportController;
 use App\Http\Controllers\Api\QuotaController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
+use App\Http\Controllers\Api\StaffAdjustmentController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SellerCollectionController;
@@ -247,6 +248,14 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:manage-finance')->group(function () {
             Route::get('/expenses/categories', [ExpenseController::class, 'categories']);
             Route::apiResource('expenses', ExpenseController::class)->except(['show']);
+
+            // Rewards and penalties, recorded on the day. The pay sheet
+            // opens on their total rather than asking the owner to
+            // remember who was late three weeks ago.
+            Route::get('/staff-adjustments/period', [StaffAdjustmentController::class, 'forPeriod']);
+            Route::get('/staff-adjustments', [StaffAdjustmentController::class, 'index']);
+            Route::post('/staff-adjustments', [StaffAdjustmentController::class, 'store']);
+            Route::delete('/staff-adjustments/{adjustment}', [StaffAdjustmentController::class, 'destroy']);
 
             Route::get('/salaries/employees', [SalaryController::class, 'employees']);
             Route::patch('/salaries/{salary}/mark-paid', [SalaryController::class, 'markPaid']);

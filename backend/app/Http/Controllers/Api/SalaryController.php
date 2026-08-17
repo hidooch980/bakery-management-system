@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\SalaryPayment;
 use App\Models\StaffAdvance;
+use App\Models\StaffAdjustment;
 use App\Models\StaffAdvanceRequest;
 use App\Models\User;
 use App\Support\AppCalendar;
@@ -268,9 +269,17 @@ class SalaryController extends Controller
     {
         $fallback = BankAccount::defaultAccount()?->id;
 
+        [$monthFrom, $monthUntil] = Jalali::currentMonthRange();
+
         $users = User::ofCurrentBakery()->where('is_active', true)
-            ->get(['id', 'name', 'monthly_salary'])
-            ->map(function (User $u) use ($fallback) {
+            ->get(['id', 'name', 'monthly_salary']);
+
+        $adjustments = $users->mapWithKeys(fn (User $u) => [
+            $u->id => StaffAdjustment::monthFor($u->id, $monthFrom, $monthUntil),
+        ]);
+
+        $users = $users
+            ->map(function (User $u) use ($fallback, $adjustments) {
                 $outstanding = StaffAdvance::outstandingFor($u->id);
 
                 return [
@@ -286,6 +295,20 @@ class SalaryController extends Controller
                     // nothing, and the account is the field most likely to be
                     // skipped at the end of a long month.
                     'suggested_bank_account_id' => $this->lastAccountFor($u->id) ?? $fallback,
+                    // This month's rewards and penalties, so the sheet
+                    // opens on a total that was arrived at rather than
+                    // remembered at the end of a long month.
+                    //
+                    // Suggested, not applied: the server does not add these
+                    // during save. A wage confirmed at one figure and
+                    // stored at another is the bug this shop spent
+                    // 2026-08-17 finding, and it came from exactly that
+                    // shape of helpfulness.
+                    'suggested_bonus' => Money::convert($adjustments[$u->id]['reward'] ?? 0),
+                    'suggested_bonus_formatted' => Money::format($adjustments[$u->id]['reward'] ?? 0),
+                    'suggested_deduction' => Money::convert($adjustments[$u->id]['penalty'] ?? 0),
+                    'suggested_deduction_formatted' => Money::format($adjustments[$u->id]['penalty'] ?? 0),
+                    'adjustment_count' => $adjustments[$u->id]['count'] ?? 0,
                 ];
             });
 

@@ -55,8 +55,15 @@ class SalaryPayment extends Model
 
         // The advances themselves are marked off once the payslip exists to
         // point at, and released again if it is taken away.
-        static::saved(fn (self $payment) => $payment->applyAdvanceRecovery());
-        static::deleted(fn (self $payment) => $payment->releaseAdvanceRecovery());
+        static::saved(function (self $payment) {
+            $payment->applyAdvanceRecovery();
+            $payment->claimAdjustments();
+        });
+
+        static::deleted(function (self $payment) {
+            $payment->releaseAdvanceRecovery();
+            $payment->releaseAdjustments();
+        });
     }
 
     /**
@@ -126,6 +133,46 @@ class SalaryPayment extends Model
     public function releaseAdvanceRecovery(): void
     {
         $this->recoveries()->delete();
+    }
+
+    /**
+     * Marks this month's rewards and penalties as settled by this payslip.
+     *
+     * A link, never arithmetic. The bonus and deduction stored here are
+     * whatever was on screen when the button was pressed — the owner may
+     * have changed them, and a server that quietly re-added the
+     * adjustments on top would store a figure he never saw. That is the
+     * bug this shop spent 2026-08-17 finding, in a different field.
+     *
+     * What this does is stop the same reward being offered again next
+     * month, and it says which payslip answered for it.
+     */
+    public function claimAdjustments(): void
+    {
+        if (! $this->user_id || ! $this->period_start) {
+            return;
+        }
+
+        [$from, $until] = Jalali::monthRangeFor($this->period_start->copy());
+
+        StaffAdjustment::where('user_id', $this->user_id)
+            ->whereBetween('occurred_on', [$from, $until])
+            ->where(function ($q) {
+                $q->whereNull('salary_payment_id')->orWhere('salary_payment_id', $this->id);
+            })
+            ->update(['salary_payment_id' => $this->id]);
+    }
+
+    /** Hands them back, unsettled, if the payslip is taken away. */
+    public function releaseAdjustments(): void
+    {
+        StaffAdjustment::where('salary_payment_id', $this->id)
+            ->update(['salary_payment_id' => null]);
+    }
+
+    public function adjustments()
+    {
+        return $this->hasMany(StaffAdjustment::class);
     }
 
     public function recoveries()

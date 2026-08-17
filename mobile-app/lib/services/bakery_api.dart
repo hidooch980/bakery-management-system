@@ -6,6 +6,7 @@ import '../models/chane_board.dart';
 import '../models/customer.dart';
 import '../models/entries.dart';
 import '../models/payroll.dart';
+import '../models/staff_adjustment.dart';
 import '../models/flour_sale.dart';
 import '../models/ledger_entry.dart';
 import '../models/seller_account.dart';
@@ -210,6 +211,46 @@ class BakeryApi {
       queued: false,
     );
   }
+
+  // ------------------------------------------------ reward and penalty
+
+  /// Writes down one reward or one penalty on the day it happened.
+  ///
+  /// [basis] is 'amount', 'days' or 'note'. A reason is required by the
+  /// server and refused if missing: a deduction nobody can explain a month
+  /// later is one the person it was taken from will dispute.
+  Future<StaffAdjustment> recordAdjustment({
+    required int userId,
+    required String kind,
+    required String basis,
+    required String reason,
+    double? amount,
+    double? days,
+    String? occurredOn,
+  }) async {
+    final body = await _client.post('/staff-adjustments', {
+      'user_id': userId,
+      'kind': kind,
+      'basis': basis,
+      'reason': reason,
+      if (amount != null) 'amount': amount,
+      if (days != null) 'days': days,
+      if (occurredOn != null) 'occurred_on': occurredOn,
+    });
+
+    return StaffAdjustment.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// One person's month: the two totals and the entries behind them.
+  Future<AdjustmentPeriod> adjustmentsFor(int userId) async {
+    final body = await _client.get('/staff-adjustments/period', query: {
+      'user_id': '$userId',
+    });
+
+    return AdjustmentPeriod.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAdjustment(int id) => _client.delete('/staff-adjustments/$id');
 
   // --------------------------------------------------------------- payroll
 

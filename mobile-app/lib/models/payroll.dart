@@ -8,6 +8,11 @@ class Employee {
     this.advanceOutstanding = 0,
     this.advanceOutstandingFormatted = '',
     this.suggestedBankAccountId,
+    this.suggestedBonus = 0,
+    this.suggestedBonusFormatted = '',
+    this.suggestedDeduction = 0,
+    this.suggestedDeductionFormatted = '',
+    this.adjustmentCount = 0,
   });
 
   final int id;
@@ -31,7 +36,20 @@ class Employee {
   /// records the cost and moves nothing.
   final int? suggestedBankAccountId;
 
+  /// This month's rewards and penalties, already totalled.
+  ///
+  /// The pay sheet opens on these instead of on zero. They are suggestions
+  /// and nothing more — the server does not add them during save, so the
+  /// figure confirmed on screen is the figure stored.
+  final double suggestedBonus;
+  final String suggestedBonusFormatted;
+  final double suggestedDeduction;
+  final String suggestedDeductionFormatted;
+  final int adjustmentCount;
+
   bool get owesAdvance => advanceOutstanding > 0;
+
+  bool get hasAdjustments => adjustmentCount > 0;
 
   factory Employee.fromJson(Map<String, dynamic> json) => Employee(
         id: (json['id'] as num).toInt(),
@@ -41,6 +59,11 @@ class Employee {
         advanceOutstanding: _double(json['advance_outstanding']),
         advanceOutstandingFormatted: '${json['advance_outstanding_formatted'] ?? ''}',
         suggestedBankAccountId: (json['suggested_bank_account_id'] as num?)?.toInt(),
+        suggestedBonus: _double(json['suggested_bonus']),
+        suggestedBonusFormatted: '${json['suggested_bonus_formatted'] ?? ''}',
+        suggestedDeduction: _double(json['suggested_deduction']),
+        suggestedDeductionFormatted: '${json['suggested_deduction_formatted'] ?? ''}',
+        adjustmentCount: (json['adjustment_count'] as num?)?.toInt() ?? 0,
       );
 
   static double _double(dynamic value) =>

@@ -7,6 +7,7 @@ import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
+import 'adjustment_sheet.dart';
 import 'admin_home_screen.dart';
 
 /// Paying wages, from the phone.
@@ -63,6 +64,17 @@ class _PayrollSectionState extends State<PayrollSection> {
   }
 
   void _reload() => setState(() => _data = _load());
+
+  /// Writing one down as it happens, rather than recalling it at payday.
+  Future<void> _addAdjustment(List<Employee> staff) async {
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => AdjustmentSheet(api: widget.api, staff: staff),
+    );
+
+    if (saved == true) _reload();
+  }
 
   /// The period a payslip belongs to: the first of the Jalali month that
   /// is being paid for. Sent as the shop writes dates, not as ISO.
@@ -147,6 +159,14 @@ class _PayrollSectionState extends State<PayrollSection> {
           title: 'حقوق کارکنان',
           icon: Icons.payments_rounded,
           children: [
+            if (staff.isNotEmpty)
+              AdminRow(
+                label: 'ثبت تشویقی یا تنبیهی',
+                value: 'امروز',
+                icon: Icons.add_task_rounded,
+                color: AppColors.signalFor(Theme.of(context).brightness),
+                onTap: () => _addAdjustment(staff),
+              ),
             if (staff.isEmpty)
               const AdminRow(label: 'کارمندی ثبت نشده', value: '—')
             else
@@ -228,8 +248,8 @@ class _PaySheet extends StatefulWidget {
 
 class _PaySheetState extends State<_PaySheet> {
   late final TextEditingController _base;
-  final _bonus = TextEditingController();
-  final _deduction = TextEditingController();
+  late final TextEditingController _bonus;
+  late final TextEditingController _deduction;
   final _note = TextEditingController();
 
   int? _accountId;
@@ -254,6 +274,25 @@ class _PaySheetState extends State<_PaySheet> {
       text: widget.person.monthlySalary == 0
           ? ''
           : widget.person.monthlySalary.toStringAsFixed(0),
+    );
+
+    // Opened on this month's rewards and penalties, already totalled from
+    // what was written down as it happened. These two boxes used to start
+    // empty and be filled from memory at the end of a long month, which is
+    // how a figure gets guessed at.
+    //
+    // Still editable: the server does not add these during save, so
+    // whatever is here when the button is pressed is what the shop owes.
+    _bonus = TextEditingController(
+      text: widget.person.suggestedBonus == 0
+          ? ''
+          : widget.person.suggestedBonus.toStringAsFixed(0),
+    );
+
+    _deduction = TextEditingController(
+      text: widget.person.suggestedDeduction == 0
+          ? ''
+          : widget.person.suggestedDeduction.toStringAsFixed(0),
     );
   }
 
@@ -308,9 +347,28 @@ class _PaySheetState extends State<_PaySheet> {
               const SizedBox(height: 20),
               _Field(controller: _base, label: 'حقوق پایه', onChanged: _refresh),
               const SizedBox(height: 12),
-              _Field(controller: _bonus, label: 'پاداش', onChanged: _refresh),
+              _Field(controller: _bonus, label: 'تشویقی', onChanged: _refresh),
               const SizedBox(height: 12),
-              _Field(controller: _deduction, label: 'کسورات', onChanged: _refresh),
+              _Field(controller: _deduction, label: 'تنبیهی و کسورات', onChanged: _refresh),
+              // A box that fills itself is a box the owner has to be able
+              // to account for, or he will not trust the total under it.
+              if (widget.person.hasAdjustments) ...[
+                const SizedBox(height: Gap.tight),
+                Row(
+                  children: [
+                    const Icon(Icons.receipt_long_rounded,
+                        size: IconSize.inline, color: AppColors.moneyNeutral),
+                    const SizedBox(width: Gap.tight),
+                    Expanded(
+                      child: Text(
+                        'از ${widget.person.adjustmentCount} مورد ثبت‌شدهٔ این ماه',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: AppColors.moneyNeutral),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (widget.accounts.isNotEmpty) ...[
                 const SizedBox(height: Gap.block),
                 Align(
