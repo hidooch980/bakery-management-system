@@ -39,11 +39,15 @@ class HomeTab {
 /// to a thousand lines, and finding the day's sales meant scrolling past
 /// attendance, stock and the account.
 ///
-/// The pages are chosen from a drawer rather than a bar along the bottom.
-/// A bar spends eighty pixels of a phone held in a bakery on something
-/// looked at a few times an hour, and it caps the useful number of pages at
-/// about five before the labels stop fitting. The drawer costs one tap and
-/// gives the height back to the work.
+/// The pages are chosen from a bar along the bottom. It was a drawer for a
+/// while — a bar spends height on something looked at a few times an hour,
+/// and the height belongs to the work. The shop tried both and said the
+/// bar was tidier, which settles it: the drawer's saving is real and so is
+/// having to remember the pages are behind a button, and only one of those
+/// two is felt by the person holding the phone.
+///
+/// The height is kept as low as a bar can go and only the selected page is
+/// labelled, so the cost is about sixty pixels rather than eighty.
 ///
 /// Written once here so a shop's roles do not each drift into their own
 /// idea of where things live.
@@ -160,38 +164,27 @@ class _RoleHomeScaffoldState extends State<RoleHomeScaffold> {
           ],
         ),
       ),
-      // Absent when there is nothing to choose between, which also takes
-      // away the button that would offer to open it.
-      drawer: tabs.length < 2 ? null : _menu(context, tabs),
+      // Absent when there is nothing to choose between: one page with a
+      // bar under it saying so is a row of nothing.
+      bottomNavigationBar: tabs.length < 2 ? null : _bar(tabs),
     );
   }
 
-  Widget _menu(BuildContext context, List<HomeTab> tabs) {
-    final theme = Theme.of(context);
-
-    return NavigationDrawer(
+  Widget _bar(List<HomeTab> tabs) {
+    return NavigationBar(
       selectedIndex: _tab.clamp(0, tabs.length - 1),
-      onDestinationSelected: (index) {
-        setState(() => _tab = index);
-
-        // Closed on the way out. Leaving it open over the page it just
-        // chose hides the thing the tap was for.
-        Navigator.pop(context);
-      },
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(28, 20, 28, 10),
-          child: Text(
-            'بخش‌ها',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ),
+      onDestinationSelected: (index) => setState(() => _tab = index),
+      // The label under the selected one only. All four labelled at once
+      // is four words competing with the page above them; none at all and
+      // the icons have to be learned.
+      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+      height: 64,
+      destinations: [
         for (final tab in tabs)
-          NavigationDrawerDestination(
+          NavigationDestination(
             icon: Icon(tab.icon),
             selectedIcon: Icon(tab.selectedIcon),
-            label: Text(tab.label),
+            label: tab.label,
           ),
       ],
     );

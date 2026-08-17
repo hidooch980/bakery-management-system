@@ -67,16 +67,15 @@ void main() {
     expect(find.text('خلاصه امروز'), findsOneWidget);
   });
 
-  testWidgets('the drawer moves between pages', (tester) async {
+  testWidgets('the bar moves between pages', (tester) async {
     await _pump(tester, [
       _tab('خلاصه', 'خلاصه امروز', 'صفحه یک'),
       _tab('فروش', 'فروش', 'صفحه دو'),
       _tab('حساب من', 'حساب من', 'صفحه سه'),
     ]);
 
-    tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
-    await tester.pumpAndSettle();
-
+    // One tap, no menu to open first — which is why the shop asked for the
+    // bar back after living with a drawer.
     await tester.tap(find.text('حساب من').last);
     await tester.pumpAndSettle();
 
@@ -84,45 +83,38 @@ void main() {
     expect(find.text('صفحه یک'), findsNothing);
   });
 
-  testWidgets('choosing a page closes the drawer behind it', (tester) async {
-    await _pump(tester, [
-      _tab('خلاصه', 'خلاصه امروز', 'صفحه یک'),
-      _tab('فروش', 'فروش', 'صفحه دو'),
-    ]);
-
-    tester.state<ScaffoldState>(find.byType(Scaffold).first).openDrawer();
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('فروش').last);
-    await tester.pumpAndSettle();
-
-    // Left open, it would cover the page the tap was for.
-    expect(find.byType(NavigationDrawer), findsNothing);
-    expect(find.text('صفحه دو'), findsOneWidget);
-  });
-
-  testWidgets('a single page gets the same bar and no chooser', (tester) async {
+  testWidgets('a single page gets the same title bar and no chooser', (tester) async {
     await _pump(tester, [_tab('شاطر', 'شاطر', 'تنها صفحه')]);
 
     expect(find.text('تنها صفحه'), findsOneWidget);
 
-    // Nothing to choose between, so there is no drawer — and therefore no
-    // button in the title bar offering to open one.
+    // One page with a bar under it saying so is a row of nothing.
     expect(
-      tester.widget<Scaffold>(find.byType(Scaffold).first).drawer,
+      tester.widget<Scaffold>(find.byType(Scaffold).first).bottomNavigationBar,
       isNull,
     );
   });
 
-  testWidgets('more than one page is offered a drawer', (tester) async {
+  testWidgets('more than one page is offered a bar', (tester) async {
     await _pump(tester, [
       _tab('خلاصه', 'خلاصه', 'صفحه یک'),
       _tab('فروش', 'فروش', 'صفحه دو'),
     ]);
 
+    expect(find.byType(NavigationBar), findsOneWidget);
+  });
+
+  testWidgets('only the page you are on is labelled', (tester) async {
+    await _pump(tester, [
+      _tab('خلاصه', 'خلاصه امروز', 'صفحه یک'),
+      _tab('فروش', 'فروش', 'صفحه دو'),
+      _tab('حساب من', 'حساب من', 'صفحه سه'),
+    ]);
+
+    // Three words along the bottom compete with the page above them.
     expect(
-      tester.widget<Scaffold>(find.byType(Scaffold).first).drawer,
-      isNotNull,
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).labelBehavior,
+      NavigationDestinationLabelBehavior.onlyShowSelected,
     );
   });
 
