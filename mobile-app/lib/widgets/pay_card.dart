@@ -147,7 +147,7 @@ class _PayCardState extends State<PayCard> {
                     theme,
                     'فیش پرداخت‌نشده (${pay.unpaidPayslipsCount} فیش)',
                     pay.unpaidPayslipsFormatted,
-                    colour: const Color(0xFF2E9E6B),
+                    colour: AppColors.moneyIn,
                   ),
               ],
             ],
@@ -181,7 +181,7 @@ class _PayCardState extends State<PayCard> {
       final p when p.hasUnpaidPayslips => (
           'پرداخت‌نشده',
           p.unpaidPayslipsFormatted,
-          const Color(0xFF2E9E6B),
+          AppColors.moneyIn,
         ),
       // Not "this month's": the shop issues no payslips, so an advance is
       // a standing debt and is still being deducted months after it was

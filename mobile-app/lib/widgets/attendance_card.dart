@@ -6,6 +6,7 @@ import '../utils/formatters.dart';
 import '../services/api_client.dart';
 import '../services/bakery_api.dart';
 import 'common.dart';
+import '../theme/app_theme.dart';
 
 /// The attendance check-in control every staff role sees on their home screen.
 /// The recorded time is what the admin reads in the attendance report.
@@ -96,7 +97,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    const done = Color(0xFF2E9E6B);
+    const done = AppColors.moneyIn;
 
     return Card(
       child: Padding(
@@ -309,7 +310,7 @@ class _RosterSheetState extends State<_RosterSheet> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    const done = Color(0xFF2E9E6B);
+    const done = AppColors.moneyIn;
     final staff = _staff;
 
     return SafeArea(

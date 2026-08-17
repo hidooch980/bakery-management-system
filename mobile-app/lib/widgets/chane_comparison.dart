@@ -11,7 +11,7 @@ class ChaneComparison extends StatelessWidget {
   final ChaneBoard board;
 
   static const _normalColor = AppColors.emberHot;
-  static const _naninoColor = Color(0xFF3B82C4);
+  static const _naninoColor = AppColors.moneyNeutral;
 
   @override
   Widget build(BuildContext context) {

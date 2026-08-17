@@ -597,7 +597,7 @@ class _ChaneSheetState extends State<_ChaneSheet> {
     return _SheetShell(
       title: 'ثبت چانه — ${widget.dough.bagCount} کیسه',
       icon: Icons.blur_circular_rounded,
-      color: const Color(0xFF3B82C4),
+      color: AppColors.moneyNeutral,
       child: !_ready
           ? const Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
@@ -987,7 +987,7 @@ class _AttendanceRow extends StatelessWidget {
             JalaliFormat.time(checkedInAt),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFF2E9E6B),
+                  color: AppColors.moneyIn,
                 ),
           ),
         ],

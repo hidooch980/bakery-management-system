@@ -4,6 +4,7 @@ import '../../models/bank_account.dart';
 import '../../services/bakery_api.dart';
 import 'admin_home_screen.dart';
 import 'bank_statement_screen.dart';
+import '../../theme/app_theme.dart';
 
 /// What is in the shop's bank accounts.
 ///
@@ -80,7 +81,7 @@ class _BankBalancesSectionState extends State<BankBalancesSection> {
                 value: account.balanceFormatted,
                 // Overdrawn is the one state worth a colour: it means the
                 // ledger says more has left the account than went in.
-                color: account.isOverdrawn ? const Color(0xFFD1495B) : null,
+                color: account.isOverdrawn ? AppColors.moneyOut : null,
                 // The balance answers how much; its statement answers where
                 // it went, which is the question asked when the figure is
                 // not what was expected.

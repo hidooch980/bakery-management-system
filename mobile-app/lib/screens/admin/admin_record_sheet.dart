@@ -10,10 +10,10 @@ import '../../widgets/common.dart';
 
 /// What the admin can record from the phone, without opening the panel.
 enum AdminRecordKind {
-  expense('هزینه', Icons.trending_down_rounded, Color(0xFFD1495B)),
-  income('درآمد', Icons.trending_up_rounded, Color(0xFF2E9E6B)),
-  intake('ورودی', Icons.local_shipping_rounded, AppColors.emberHot),
-  consignment('آرد همکار', Icons.swap_horiz_rounded, Color(0xFF6C63FF));
+  expense('هزینه', Icons.trending_down_rounded, AppColors.moneyOut),
+  income('درآمد', Icons.trending_up_rounded, AppColors.moneyIn),
+  intake('ورودی', Icons.local_shipping_rounded, AppColors.stock),
+  consignment('آرد همکار', Icons.swap_horiz_rounded, AppColors.partner);
 
   const AdminRecordKind(this.label, this.icon, this.color);
 

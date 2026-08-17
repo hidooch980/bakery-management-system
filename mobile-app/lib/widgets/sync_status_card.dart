@@ -88,7 +88,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
     if (online && _pending == 0) return const SizedBox.shrink();
 
     final scheme = Theme.of(context).colorScheme;
-    final color = online ? AppColors.emberHot : const Color(0xFFD1495B);
+    final color = online ? AppColors.emberHot : AppColors.moneyOut;
 
     return Card(
       color: color.withValues(alpha: 0.08),

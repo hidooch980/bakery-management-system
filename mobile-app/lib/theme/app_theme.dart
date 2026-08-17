@@ -90,6 +90,51 @@ class AppColors {
   static const Color danger = Color(0xFFB3352A);
   static const Color dangerDark = Color(0xFFF07C6E);
   static const Color warning = Color(0xFFB37A0E);
+
+  // ------------------------------------------------------------ money
+
+  /// Money in, money out, and money that is neither.
+  ///
+  /// Not the same idea as [success] and [danger], which mean "fine" and
+  /// "wrong": a large expense is not an error and a settled debt is not
+  /// income. The admin screens had this pair written as bare hex in fifty
+  /// places, which is how the app ended up with two greens that were
+  /// almost but not quite the same.
+  ///
+  /// Mid-toned on purpose — these have to read on the near-black ground
+  /// and on white, and a figure is the last thing that should change
+  /// meaning with the time of day.
+  static const Color moneyIn = Color(0xFF2E9E6B);
+  static const Color moneyOut = Color(0xFFD1495B);
+  static const Color moneyNeutral = Color(0xFF3B82C4);
+
+  /// Goods rather than money — flour arriving, and flour that belongs to
+  /// another shop. Kept off the yellow like everything else: these label a
+  /// kind of record, and the yellow means «press this».
+  static const Color stock = Color(0xFF3F8F86);
+  static const Color partner = Color(0xFF6C63FF);
+
+  // -------------------------------------------------------- attention
+
+  /// Something to look at, as opposed to something to press.
+  ///
+  /// An overdue follow-up, an advance waiting on an answer, thin
+  /// attendance. Deliberately an orange rather than the yellow: the two
+  /// have to be told apart across a room, because one of them means the
+  /// thumb goes here and the other does not.
+  ///
+  /// One value for both grounds, like the money pair — partly so it reads
+  /// the same at three in the morning as at noon, and partly so it can be
+  /// `const`, which is what the enums and static fields that need it are.
+  static const Color attention = Color(0xFFC2691C);
+
+  /// Where an amount falls, by sign. Zero is neutral rather than positive:
+  /// a balance of nothing is not good news, it is no news.
+  static Color forAmount(num amount) => switch (amount) {
+        > 0 => moneyIn,
+        < 0 => moneyOut,
+        _ => moneyNeutral,
+      };
 }
 
 class AppTheme {

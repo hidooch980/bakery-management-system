@@ -4,6 +4,7 @@ import '../../models/bank_account.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/common.dart';
+import '../../theme/app_theme.dart';
 
 /// What has moved through one account.
 ///
@@ -113,8 +114,8 @@ class _BalanceHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final accent = account.isOverdrawn
-        ? const Color(0xFFD1495B)
-        : const Color(0xFF2E9E6B);
+        ? AppColors.moneyOut
+        : AppColors.moneyIn;
 
     return Card(
       child: Padding(
@@ -163,8 +164,8 @@ class _MoveTile extends StatelessWidget {
     // In and out are told apart by colour and arrow rather than by a minus
     // sign, which is easy to miss on a phone held at arm's length.
     final accent = move.isIncoming
-        ? const Color(0xFF2E9E6B)
-        : const Color(0xFFD1495B);
+        ? AppColors.moneyIn
+        : AppColors.moneyOut;
 
     return Card(
       margin: EdgeInsets.zero,

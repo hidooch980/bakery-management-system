@@ -105,8 +105,8 @@ class _UpdatePromptState extends State<UpdatePrompt> {
 
     ScaffoldMessenger.of(context).showMaterialBanner(
       MaterialBanner(
-        backgroundColor: AppColors.emberHot.withValues(alpha: 0.15),
-        leading: const Icon(Icons.warning_amber_rounded, color: AppColors.emberHot),
+        backgroundColor: AppColors.attention.withValues(alpha: 0.15),
+        leading: const Icon(Icons.warning_amber_rounded, color: AppColors.attention),
         content: Text('نسخه ${update.version} منتشر شده — بروزرسانی نکرده‌اید.'),
         actions: [
           TextButton(

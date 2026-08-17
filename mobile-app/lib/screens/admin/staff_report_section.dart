@@ -98,7 +98,7 @@ class _StaffReportSectionState extends State<StaffReportSection> {
               // Below three-quarters is worth noticing: either people are
               // not turning up or they are not recording it, and both
               // matter before payday.
-              color: coverage < 75 ? AppColors.emberHot : null,
+              color: coverage < 75 ? AppColors.attention : null,
             ),
 
             const Divider(height: 1),
@@ -112,7 +112,7 @@ class _StaffReportSectionState extends State<StaffReportSection> {
               AdminRow(
                 label: 'پرداخت‌نشده',
                 value: _money(payroll, unpaid),
-                color: const Color(0xFFD1495B),
+                color: AppColors.moneyOut,
               ),
 
             if (byEmployee.isNotEmpty) ...[

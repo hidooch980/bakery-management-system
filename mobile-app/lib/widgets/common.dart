@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/theme_provider.dart';
+import '../theme/app_theme.dart';
 
 /// One-tap light/dark/system switch, placed in every app bar.
 class ThemeToggleButton extends StatelessWidget {
@@ -254,7 +255,7 @@ void showMessage(BuildContext context, String message, {bool isError = false}) {
             Expanded(child: Text(message)),
           ],
         ),
-        backgroundColor: isError ? scheme.error : const Color(0xFF2E9E6B),
+        backgroundColor: isError ? scheme.error : AppColors.moneyIn,
       ),
     );
 }

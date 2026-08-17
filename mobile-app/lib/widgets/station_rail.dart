@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 /// The shop's own sequence, drawn once at the top of the screen.
 ///
 /// Dough is mixed, shaped, then sold, and a batch cannot skip a step. The
@@ -123,8 +125,8 @@ class _StationMarker extends StatelessWidget {
     final (Color fill, Color border, Color label) = switch (station.state) {
       StationState.active => (scheme.primary, scheme.primary, scheme.onPrimary),
       StationState.done => (
-          isDark ? const Color(0xFF35C793) : const Color(0xFF0B7A54),
-          isDark ? const Color(0xFF35C793) : const Color(0xFF0B7A54),
+          isDark ? AppColors.successDark : AppColors.success,
+          isDark ? AppColors.successDark : AppColors.success,
           Colors.white,
         ),
       StationState.idle => (

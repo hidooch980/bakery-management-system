@@ -191,9 +191,9 @@ class _StartRow extends StatelessWidget {
   final bool busy;
   final VoidCallback onTick;
 
-  static const _late = Color(0xFFD1495B);
-  static const _done = Color(0xFF2E9E6B);
-  static const _soon = AppColors.emberHot;
+  static const _late = AppColors.moneyOut;
+  static const _done = AppColors.moneyIn;
+  static const _soon = AppColors.attention;
 
   Color _tone(ColorScheme scheme) {
     if (item.isLate || item.overdue) return _late;

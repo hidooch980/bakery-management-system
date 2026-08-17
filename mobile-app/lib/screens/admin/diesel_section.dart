@@ -176,7 +176,7 @@ class _DieselSectionState extends State<DieselSection> {
                           'تحویل بعدی را هماهنگ کنید.'
                       : 'هم سوخت تحویلی و هم سهمیه‌ی ماه تمام شده.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFFD1495B),
+                        color: AppColors.moneyOut,
                         fontWeight: FontWeight.w600,
                       ),
                 ),

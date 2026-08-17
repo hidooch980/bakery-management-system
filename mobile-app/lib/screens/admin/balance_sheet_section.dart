@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/balance_sheet.dart';
 import '../../services/bakery_api.dart';
 import 'admin_home_screen.dart';
+import '../../theme/app_theme.dart';
 
 /// What the shop owns against what it owes.
 ///
@@ -21,8 +22,8 @@ class BalanceSheetSection extends StatefulWidget {
 class _BalanceSheetSectionState extends State<BalanceSheetSection> {
   late Future<BalanceSheet> _sheet;
 
-  static const _ownColour = Color(0xFF2E9E6B);
-  static const _oweColour = Color(0xFFD1495B);
+  static const _ownColour = AppColors.moneyIn;
+  static const _oweColour = AppColors.moneyOut;
 
   @override
   void initState() {

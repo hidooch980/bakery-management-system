@@ -263,7 +263,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
               label: 'مجموع (${unit.label})',
               value: MoneyFormat.plain(today.total, currency: unit),
               icon: Icons.payments_rounded,
-              color: const Color(0xFF2E9E6B),
+              color: AppColors.moneyIn,
             ),
           ),
         ],
@@ -310,7 +310,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
             subtitle: 'وزن: ${entry.weightKg.toStringAsFixed(2)} کیلوگرم'
                 '${entry.userName != null ? '  •  ${entry.userName}' : ''}',
             icon: Icons.shopping_basket_rounded,
-            color: const Color(0xFF3B82C4),
+            color: AppColors.moneyNeutral,
             onTap: () => _openSaleSheet(entry),
             trailing: const Icon(Icons.point_of_sale_rounded),
           ),
@@ -773,12 +773,12 @@ class _RemainingBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final (color, icon, text) = switch (unassigned) {
       0 => (
-          const Color(0xFF2E9E6B),
+          AppColors.moneyIn,
           Icons.check_circle_rounded,
           'همه $batchCount نان این چانه ثبت شد.',
         ),
       < 0 => (
-          const Color(0xFFD1495B),
+          AppColors.moneyOut,
           Icons.error_rounded,
           '${-unassigned} نان بیشتر از این چانه وارد شده است.',
         ),

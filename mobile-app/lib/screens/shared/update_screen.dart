@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../services/install_permission.dart';
 import '../../services/update_service.dart';
 import '../../widgets/common.dart';
+import '../../theme/app_theme.dart';
 
 /// Manual "check for updates" screen, reachable from Settings.
 class UpdateScreen extends StatefulWidget {
@@ -221,11 +222,11 @@ class _UpdateAvailableCard extends StatelessWidget {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2E9E6B).withValues(alpha: 0.14),
+                    color: AppColors.moneyIn.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(Icons.system_update_rounded,
-                      color: Color(0xFF2E9E6B), size: 28),
+                      color: AppColors.moneyIn, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Expanded(

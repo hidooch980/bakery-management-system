@@ -4,6 +4,7 @@ import '../services/api_client.dart';
 import '../services/bakery_api.dart';
 import '../utils/formatters.dart';
 import 'common.dart';
+import '../theme/app_theme.dart';
 
 typedef _Collections = ({
   List<Map<String, dynamic>> customers,
@@ -142,7 +143,7 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
     }
 
     final scheme = Theme.of(context).colorScheme;
-    const accent = Color(0xFF3B82C4);
+    const accent = AppColors.moneyNeutral;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -198,7 +199,7 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
                         '${customer['owed_formatted']}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFFD1495B),
+                              color: AppColors.moneyOut,
                             ),
                       ),
                     ],

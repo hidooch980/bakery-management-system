@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../models/financial_series.dart';
 import '../../services/bakery_api.dart';
 import 'admin_home_screen.dart';
+import '../../theme/app_theme.dart';
 
 /// Money in against money out, side by side.
 ///
@@ -37,8 +38,8 @@ class IncomeExpenseChart extends StatefulWidget {
 class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
   late Future<FinancialSeries> _series;
 
-  static const _incomeColour = Color(0xFF2E9E6B);
-  static const _expenseColour = Color(0xFFD1495B);
+  static const _incomeColour = AppColors.moneyIn;
+  static const _expenseColour = AppColors.moneyOut;
 
   @override
   void initState() {

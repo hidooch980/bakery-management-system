@@ -103,7 +103,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                       icon: _iconFor('${items[i]['key']}'),
                       // A low balance is the one thing worth colouring.
                       color: items[i]['is_low'] == true
-                          ? const Color(0xFFD1495B)
+                          ? AppColors.moneyOut
                           : null,
                       emphasise: true,
                     ),
@@ -124,7 +124,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                           : '${flour.totalWeightKg.toStringAsFixed(1)} کیلوگرم'
                               '  •  ${flour.totalFormatted}',
                       icon: Icons.inventory_2_rounded,
-                      color: AppColors.emberHot,
+                      color: AppColors.stock,
                       emphasise: true,
                     ),
                     for (final sale in flour.sales) ...[
@@ -340,7 +340,7 @@ class _BreadReconciliation extends StatelessWidget {
 
     // More sold than the quota allows is the figure worth noticing.
     final remainderColor = remainder < 0
-        ? const Color(0xFFD1495B)
+        ? AppColors.moneyOut
         : scheme.onSurfaceVariant;
 
     return Padding(

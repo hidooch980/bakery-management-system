@@ -78,7 +78,7 @@ class _AdvanceRequestsSectionState extends State<AdvanceRequestsSection> {
                   'با این تأیید، جمع علی‌الحساب از حقوق یک ماه بیشتر می‌شود و'
                   ' باقی‌اش به ماه بعد می‌افتد.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.emberHot,
+                        color: AppColors.attention,
                         fontWeight: FontWeight.w700,
                       ),
                 ),
@@ -166,7 +166,7 @@ class _AdvanceRequestsSectionState extends State<AdvanceRequestsSection> {
             '${requests.length} در انتظار',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: AppColors.emberHot,
+                  color: AppColors.attention,
                 ),
           ),
           children: [
@@ -242,7 +242,7 @@ class _RequestTile extends StatelessWidget {
             TextButton.icon(
               onPressed: onReject,
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFD1495B),
+                foregroundColor: AppColors.moneyOut,
               ),
               icon: const Icon(Icons.close_rounded, size: 18),
               label: const Text('رد'),

@@ -114,7 +114,7 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
     }
 
     final scheme = Theme.of(context).colorScheme;
-    const warn = AppColors.emberHot;
+    const warn = AppColors.attention;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -285,7 +285,7 @@ class _AccountLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isProblem
-        ? const Color(0xFFD1495B)
+        ? AppColors.moneyOut
         : Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Padding(
@@ -323,7 +323,7 @@ class _PendingNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const pending = Color(0xFF3B82C4);
+    const pending = AppColors.moneyNeutral;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -372,7 +372,7 @@ class _RejectionNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const rejected = Color(0xFFD1495B);
+    const rejected = AppColors.moneyOut;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -607,7 +607,7 @@ class _BalanceLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
           fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-          color: good ? const Color(0xFF2E9E6B) : null,
+          color: good ? AppColors.moneyIn : null,
         );
 
     return Padding(

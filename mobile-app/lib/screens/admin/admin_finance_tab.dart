@@ -177,7 +177,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
     final holders = (split['holders'] as List?) ?? const [];
 
     final isPositive = profit['is_positive'] == true;
-    final profitColor = isPositive ? const Color(0xFF2E9E6B) : const Color(0xFFD1495B);
+    final profitColor = isPositive ? AppColors.moneyIn : AppColors.moneyOut;
 
     return [
       Card(
@@ -221,7 +221,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
             label: 'مجموع درآمد',
             value: '${income['total_formatted'] ?? income['sales_formatted'] ?? '—'}',
             icon: Icons.payments_rounded,
-            color: const Color(0xFF2E9E6B),
+            color: AppColors.moneyIn,
             emphasise: true,
           ),
           const Divider(height: 1),
@@ -261,7 +261,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
             label: 'مجموع هزینه‌ها',
             value: '${expenses['total_formatted'] ?? '—'}',
             icon: Icons.receipt_long_rounded,
-            color: const Color(0xFFD1495B),
+            color: AppColors.moneyOut,
             emphasise: true,
           ),
           const Divider(height: 1),
@@ -332,7 +332,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
             label: '${outstanding['count'] ?? 0} مورد در انتظار',
             value: '${outstanding['formatted'] ?? '—'}',
             icon: Icons.schedule_rounded,
-            color: AppColors.emberHot,
+            color: AppColors.attention,
           ),
         ],
       ),

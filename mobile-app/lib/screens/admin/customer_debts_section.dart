@@ -4,6 +4,7 @@ import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
+import '../../theme/app_theme.dart';
 
 typedef _Debts = ({
   List<Map<String, dynamic>> customers,
@@ -106,7 +107,7 @@ class _CustomerDebtsSectionState extends State<CustomerDebtsSection> {
               ? Text(
                   '${data.overdueCount} معوق',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFFD1495B),
+                        color: AppColors.moneyOut,
                         fontWeight: FontWeight.w700,
                       ),
                 )
@@ -178,7 +179,7 @@ class _DebtTile extends StatelessWidget {
               '${customer['amount_formatted']}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFFD1495B),
+                    color: AppColors.moneyOut,
                   ),
             ),
           ],
@@ -191,7 +192,7 @@ class _DebtTile extends StatelessWidget {
                   ? Icons.warning_amber_rounded
                   : Icons.schedule_rounded,
               size: 15,
-              color: overdue ? const Color(0xFFD1495B) : scheme.onSurfaceVariant,
+              color: overdue ? AppColors.moneyOut : scheme.onSurfaceVariant,
             ),
             const SizedBox(width: 6),
             Expanded(
@@ -202,7 +203,7 @@ class _DebtTile extends StatelessWidget {
                 '${overdue ? ' (معوق)' : ''}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: overdue
-                          ? const Color(0xFFD1495B)
+                          ? AppColors.moneyOut
                           : scheme.onSurfaceVariant,
                     ),
               ),

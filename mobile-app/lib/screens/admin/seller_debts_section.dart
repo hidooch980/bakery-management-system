@@ -249,7 +249,7 @@ class _SellerTile extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: settleable > 0
-                          ? AppColors.emberHot
+                          ? AppColors.attention
                           : scheme.onSurfaceVariant,
                     ),
               ),
@@ -273,7 +273,7 @@ class _SellerTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF3B82C4).withValues(alpha: 0.10),
+                color: AppColors.moneyNeutral.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -283,7 +283,7 @@ class _SellerTile extends StatelessWidget {
                     'درخواست تسویه ${request['amount_formatted']}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: const Color(0xFF3B82C4),
+                          color: AppColors.moneyNeutral,
                         ),
                   ),
                   Text(

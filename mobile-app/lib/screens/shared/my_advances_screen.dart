@@ -191,7 +191,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colour =
-        owesSomething ? AppColors.emberHot : const Color(0xFF2E9E6B);
+        owesSomething ? AppColors.attention : AppColors.moneyIn;
 
     return Card(
       child: Padding(
@@ -241,7 +241,7 @@ class _AdvanceTile extends StatelessWidget {
               ? Icons.check_circle_rounded
               : Icons.schedule_rounded,
           color: advance.isSettled
-              ? const Color(0xFF2E9E6B)
+              ? AppColors.moneyIn
               : AppColors.emberHot,
         ),
       ),
@@ -258,8 +258,8 @@ class _RequestTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colour = switch (request.status) {
-      'approved' => const Color(0xFF2E9E6B),
-      'rejected' => const Color(0xFFD1495B),
+      'approved' => AppColors.moneyIn,
+      'rejected' => AppColors.moneyOut,
       _ => AppColors.emberHot,
     };
 

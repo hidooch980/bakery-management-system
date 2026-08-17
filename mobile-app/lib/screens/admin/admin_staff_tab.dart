@@ -5,6 +5,7 @@ import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import 'advance_requests_section.dart';
 import 'staff_report_section.dart';
+import '../../theme/app_theme.dart';
 
 /// Who checked in today, and at what time.
 class AdminStaffTab extends StatefulWidget {
@@ -108,7 +109,7 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                     label: Text(JalaliFormat.time(checkedInAt)),
                     avatar: const Icon(Icons.schedule_rounded, size: 16),
                     backgroundColor:
-                        const Color(0xFF2E9E6B).withValues(alpha: 0.15),
+                        AppColors.moneyIn.withValues(alpha: 0.15),
                   ),
                 ),
               );
