@@ -67,6 +67,18 @@ class StaleAndLossAlertsTest extends TestCase
         return $sale;
     }
 
+    /** The key carries the Jalali month, so a new month is a new problem. */
+    private function tradingAtALossRaised(): bool
+    {
+        foreach ($this->keys() as $key) {
+            if (str_starts_with($key, 'trading-at-a-loss')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function keys(): array
     {
         return (new IssueScanner)->scan()->pluck('key')->all();
@@ -122,13 +134,13 @@ class StaleAndLossAlertsTest extends TestCase
             $this->markTestSkipped('Too early in the month for the check to fire.');
         }
 
-        $this->assertContains('trading-at-a-loss', $this->keys());
+        $this->assertTrue($this->tradingAtALossRaised());
     }
 
     public function test_a_month_in_the_black_raises_nothing(): void
     {
         $this->saleDaysAgo(1, 9_000_000);
 
-        $this->assertNotContains('trading-at-a-loss', $this->keys());
+        $this->assertFalse($this->tradingAtALossRaised());
     }
 }

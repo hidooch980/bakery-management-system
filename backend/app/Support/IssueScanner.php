@@ -390,7 +390,7 @@ class IssueScanner
         }
 
         return [new SystemIssue(
-            key: 'trading-at-a-loss',
+            key: 'trading-at-a-loss-'.$from->format('Y-m'),
             severity: SystemIssue::WARNING,
             title: 'این ماه بیش از درآمد خرج شده',
             detail: 'درآمد '.Money::format($income).' در برابر هزینه '
@@ -484,7 +484,7 @@ class IssueScanner
         // quota left to draw.
         if ($quota->is_tank_empty && $quota->delivered_litres > 0) {
             return [new SystemIssue(
-                key: 'diesel-tank-empty',
+                key: "diesel-tank-empty-{$quota->id}",
                 severity: SystemIssue::CRITICAL,
                 title: 'سوخت تحویلی این ماه مصرف شده',
                 detail: number_format($quota->delivered_litres, 0).' لیتر تحویل گرفته‌اید و '
@@ -499,7 +499,10 @@ class IssueScanner
                     : 'سهمیه‌ی ماه هم تمام شده؛ برای ادامه‌ی کار سوخت آزاد لازم است.',
                 url: '/admin/diesel-deliveries',
                 urlLabel: 'تحویل گازوئیل',
-                magnitude: (float) $quota->consumed_litres,
+                // Litres taken, which only climbs within a period. Not
+                // used_percent: that is capped at 100, so it cannot tell
+                // 'just over' from 'far over'.
+                magnitude: (float) $quota->delivered_litres,
             )];
         }
 
@@ -509,7 +512,7 @@ class IssueScanner
         }
 
         return [new SystemIssue(
-            key: 'diesel-running-out',
+            key: "diesel-running-out-{$quota->id}",
             severity: $quota->is_overdrawn ? SystemIssue::CRITICAL : SystemIssue::WARNING,
             title: $quota->is_overdrawn
                 ? 'سهمیه گازوئیل این ماه تمام شده'
@@ -524,9 +527,7 @@ class IssueScanner
                 : 'پیش از تمام شدن، تحویل بعدی را هماهنگ کنید.',
             url: '/admin/diesel-allocations',
             urlLabel: 'سهمیه گازوئیل',
-            // Overdrawn counts up from zero; still in credit counts down
-            // to it. Either way a bigger number is a worse position.
-            magnitude: $quota->is_overdrawn ? abs((float) $remaining) : (float) $quota->used_percent,
+            magnitude: (float) $quota->delivered_litres,
         )];
     }
 
@@ -581,7 +582,12 @@ class IssueScanner
                 .' پرداخت‌ها را در بخش حقوق، یا به‌عنوان هزینه‌ی دسته‌ی «حقوق کارکنان»، وارد کنید.',
             url: '/admin/salary-payments',
             urlLabel: 'حقوق',
-            magnitude: (float) $sales,
+            // Deliberately no magnitude. This is not a quantity that grows —
+            // wages are recorded or they are not — and the obvious
+            // candidate, the month's sale count, climbs every day, so an
+            // answer would have reopened itself within a week. The profit
+            // figure carries the warning independently anyway, every time
+            // the dashboard is opened.
         )];
     }
 

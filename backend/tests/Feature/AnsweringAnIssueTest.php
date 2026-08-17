@@ -4,9 +4,12 @@ namespace Tests\Feature;
 
 use App\Filament\Pages\IssueCenter;
 use App\Models\Bakery;
+use App\Models\ChaneEntry;
+use App\Models\DoughEntry;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
 use App\Models\IssueAcknowledgement;
+use App\Models\Sale;
 use App\Models\User;
 use App\Support\Money;
 use Database\Seeders\BakerySeeder;
@@ -219,6 +222,60 @@ class AnsweringAnIssueTest extends TestCase
         $page = $this->page();
         $this->assertSame(0, $page->getOpenIssues()->count());
         $this->assertSame(0, $page->getAnsweredIssues()->count());
+    }
+
+    /**
+     * The wages issue has no magnitude on purpose.
+     *
+     * The obvious candidate was the month's sale count — it is in the
+     * message — but that climbs every day the shop opens, so an answer
+     * given on the 5th would have reopened itself by the 10th. The one
+     * issue the owner is most certain to answer would have been the one
+     * that would not stay answered.
+     */
+    public function test_answering_the_wages_issue_survives_another_days_trading(): void
+    {
+        $seller = User::factory()->create(['is_active' => true]);
+        $seller->assignRole('seller');
+
+        $sell = function (int $loaves) use ($seller) {
+            $dough = DoughEntry::create(['user_id' => $seller->id, 'bag_count' => 1]);
+            $chane = ChaneEntry::create([
+                'dough_entry_id' => $dough->id,
+                'user_id' => $seller->id,
+                'chane_count' => $loaves,
+                'normal_weight_kg' => $loaves * 0.85,
+                'nanino_weight_kg' => 0,
+                'spray_flour_kg' => 0,
+                'status' => 'sold',
+            ]);
+            Sale::create([
+                'chane_entry_id' => $chane->id,
+                'user_id' => $seller->id,
+                'bread_count' => $loaves,
+                'payment_type' => 'cash',
+                'amount' => $loaves * 5000,
+                'amount_difference' => 0,
+            ]);
+        };
+
+        $sell(100);
+
+        Livewire::test(IssueCenter::class)->callAction(
+            'acknowledge',
+            data: ['note' => 'حقوق بیرون از سامانه پرداخت می‌شود.'],
+            arguments: ['key' => 'wages-never-recorded'],
+        );
+
+        $this->assertSame(0, $this->page()->getOpenIssues()->count());
+
+        // Five more days of ordinary trading.
+        for ($i = 0; $i < 5; $i++) {
+            $sell(100);
+        }
+
+        $this->assertSame(0, $this->page()->getOpenIssues()->count());
+        $this->assertSame(1, $this->page()->getAnsweredIssues()->count());
     }
 
     public function test_the_page_renders_with_an_answered_issue(): void

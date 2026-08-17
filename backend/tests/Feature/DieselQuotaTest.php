@@ -8,6 +8,7 @@ use App\Models\DieselDelivery;
 use App\Models\FlourAllocation;
 use App\Models\User;
 use App\Support\IssueScanner;
+use App\Support\SystemIssue;
 use App\Support\Jalali;
 use App\Support\Money;
 use Database\Seeders\BakerySeeder;
@@ -115,12 +116,23 @@ class DieselQuotaTest extends TestCase
         $this->assertEquals(100.0, $quota->fresh()->used_percent);
     }
 
+    /**
+     * The key carries the quota period's id — one month's exhausted quota
+     * is not the same problem as the next month's, and an answer given
+     * about one must not cover the other.
+     */
+    private function dieselIssue(): ?SystemIssue
+    {
+        return (new IssueScanner)->scan()
+            ->first(fn (SystemIssue $i) => str_starts_with($i->key, 'diesel-running-out'));
+    }
+
     public function test_nearly_out_is_raised_while_there_is_time_to_order(): void
     {
         $this->quota(1000);
         $this->delivery(850);
 
-        $issue = (new IssueScanner)->scan()->firstWhere('key', 'diesel-running-out');
+        $issue = $this->dieselIssue();
 
         $this->assertNotNull($issue);
         $this->assertSame('warning', $issue->severity);
@@ -131,7 +143,7 @@ class DieselQuotaTest extends TestCase
         $this->quota(1000);
         $this->delivery(1100);
 
-        $issue = (new IssueScanner)->scan()->firstWhere('key', 'diesel-running-out');
+        $issue = $this->dieselIssue();
 
         $this->assertNotNull($issue);
         $this->assertSame('critical', $issue->severity);
@@ -143,14 +155,14 @@ class DieselQuotaTest extends TestCase
         $this->quota(1000);
         $this->delivery(400);
 
-        $this->assertNull((new IssueScanner)->scan()->firstWhere('key', 'diesel-running-out'));
+        $this->assertNull($this->dieselIssue());
     }
 
     public function test_no_quota_registered_raises_nothing(): void
     {
         $this->delivery(400);
 
-        $this->assertNull((new IssueScanner)->scan()->firstWhere('key', 'diesel-running-out'));
+        $this->assertNull($this->dieselIssue());
     }
 
     public function test_the_quota_follows_the_flour_allocation(): void

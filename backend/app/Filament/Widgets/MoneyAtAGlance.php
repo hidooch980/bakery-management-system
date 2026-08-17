@@ -3,6 +3,8 @@
 namespace App\Filament\Widgets;
 
 use App\Models\DieselAllocation;
+use App\Models\Expense;
+use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\User;
 use App\Support\Jalali;
@@ -142,15 +144,57 @@ class MoneyAtAGlance extends BaseWidget
         $expenses = Ledger::totalExpenses($from, $to);
         $net = $income - $cost - $expenses;
 
+        $unrecordedWages = $this->wagesNotInTheFigure($from, $to);
+
         return Stat::make('سود خالص ماه', Money::format($net))
             // The margin, because the figure alone says nothing about
-            // whether a big month was also a good one.
-            ->description($income > 0
-                ? 'حاشیه سود '.round($net / $income * 100, 1).'٪ از '.Money::format($income)
-                : 'هنوز درآمدی برای این ماه ثبت نشده')
-            ->descriptionIcon($net >= 0
-                ? 'heroicon-m-arrow-trending-up'
-                : 'heroicon-m-arrow-trending-down')
-            ->color($net >= 0 ? 'success' : 'danger');
+            // whether a big month was also a good one — unless a whole
+            // month's wages are missing from it, in which case the margin
+            // is not the thing worth saying.
+            ->description(match (true) {
+                $unrecordedWages > 0 => 'حقوق این ماه ثبت نشده — این عدد '
+                    .Money::format($unrecordedWages).' از واقعیت بیشتر است',
+                $income > 0 => 'حاشیه سود '.round($net / $income * 100, 1).'٪ از '.Money::format($income),
+                default => 'هنوز درآمدی برای این ماه ثبت نشده',
+            })
+            ->descriptionIcon($unrecordedWages > 0
+                ? 'heroicon-m-exclamation-triangle'
+                : ($net >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down'))
+            ->color(match (true) {
+                $unrecordedWages > 0 => 'warning',
+                $net >= 0 => 'success',
+                default => 'danger',
+            });
+    }
+
+    /**
+     * Wages the shop owes for this month and has recorded nowhere.
+     *
+     * A profit figure that leaves out a month's payroll is not a small
+     * bit wrong, it is wrong by the payroll — for this shop, a thousand
+     * million Rial against takings of a few hundred. Saying so on the
+     * figure itself is the only place it cannot be missed: the issue
+     * centre reports it too, but an owner who has answered that issue,
+     * for perfectly good reasons of his own, would still be reading this
+     * number as though it meant something.
+     *
+     * Zero once anything is recorded — a payslip or a wage expense. This
+     * does not try to work out whether the amount was right, only whether
+     * the month is accounted for at all.
+     */
+    private function wagesNotInTheFigure($from, $to): float
+    {
+        $recorded = SalaryPayment::paid()
+            ->whereBetween('paid_on', [$from->toDateString(), $to->toDateString()])
+            ->exists()
+            || Expense::where('category', 'salary')
+                ->whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
+                ->exists();
+
+        if ($recorded) {
+            return 0.0;
+        }
+
+        return (float) User::query()->ofCurrentBakery()->where('is_active', true)->sum('monthly_salary');
     }
 }
