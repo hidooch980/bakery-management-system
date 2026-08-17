@@ -49,8 +49,10 @@ class Employee {
 class Payslip {
   const Payslip({
     required this.id,
+    required this.userId,
     required this.userName,
     required this.periodLabel,
+    required this.periodStartJalali,
     required this.netAmount,
     required this.netAmountFormatted,
     required this.isPaid,
@@ -61,8 +63,16 @@ class Payslip {
   });
 
   final int id;
+  final int userId;
   final String userName;
   final String periodLabel;
+
+  /// The period this slip is for, as ۱۴۰۵/۰۵/۰۱ — the form the phone builds
+  /// when it writes one. Whether somebody has been paid is a question about
+  /// a person and a period, and answering it off the newest label on file
+  /// marks everyone paid last month as paid this month.
+  final String periodStartJalali;
+
   final double netAmount;
   final String netAmountFormatted;
   final bool isPaid;
@@ -79,8 +89,10 @@ class Payslip {
 
   factory Payslip.fromJson(Map<String, dynamic> json) => Payslip(
         id: (json['id'] as num).toInt(),
+        userId: ((json['user'] as Map?)?['id'] as num?)?.toInt() ?? 0,
         userName: '${(json['user'] as Map?)?['name'] ?? ''}',
         periodLabel: '${json['period_label'] ?? ''}',
+        periodStartJalali: '${json['period_start_jalali'] ?? ''}',
         netAmount: Employee._double(json['net_amount']),
         netAmountFormatted: '${json['net_amount_formatted'] ?? ''}',
         isPaid: json['is_paid'] == true,

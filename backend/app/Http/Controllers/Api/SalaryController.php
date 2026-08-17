@@ -268,6 +268,12 @@ class SalaryController extends Controller
             'id' => $payment->id,
             'user' => $payment->relationLoaded('user') ? $payment->user?->only(['id', 'name']) : null,
             'period_start' => $payment->period_start?->toDateString(),
+            // The Jalali form too, because that is the one the phone knows
+            // the period by. Deciding who has already been paid off the
+            // newest label on file marks everyone paid last month as paid
+            // this month, and the payroll locks itself the first time a
+            // second month comes around.
+            'period_start_jalali' => Jalali::date($payment->period_start),
             'period_label' => $payment->period_label,
             // In the display unit, matching what was typed. The stored
             // figures are Toman; handing those back put the wrong numbers

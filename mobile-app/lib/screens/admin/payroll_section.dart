@@ -51,8 +51,12 @@ class _PayrollSectionState extends State<PayrollSection> {
 
   /// The period a payslip belongs to: the first of the Jalali month that
   /// is being paid for. Sent as the shop writes dates, not as ISO.
+  ///
+  /// In Latin digits, which is what the server sends back for the same
+  /// field. Half-Persian and half-Latin parsed correctly but would never
+  /// compare equal to anything, and comparing is what it is for.
   String get _thisPeriod {
-    final now = JalaliFormat.date(DateTime.now());
+    final now = latinDigits(JalaliFormat.date(DateTime.now()));
     final parts = now.split('/');
 
     return parts.length == 3 ? '${parts[0]}/${parts[1]}/01' : now;
@@ -109,11 +113,17 @@ class _PayrollSectionState extends State<PayrollSection> {
         final staff = snapshot.data!.staff;
         final slips = snapshot.data!.slips;
 
-        // Who has already been paid for the period showing, so the list
-        // does not offer to pay the same person twice.
+        // Who has already been paid for the period the button would write,
+        // so the list does not offer to pay the same person twice.
+        //
+        // Keyed on that period and on the person's id. It used to key on
+        // whichever period was newest on file, which is the same period only
+        // until a month turns: from the first of the next month everyone
+        // paid in the last one reads as already paid, and the payroll shuts
+        // itself for a month it has not paid at all.
         final paidThisPeriod = slips
-            .where((s) => s.periodLabel == _periodLabel(slips))
-            .map((s) => s.userName)
+            .where((s) => s.periodStartJalali == _thisPeriod)
+            .map((s) => s.userId)
             .toSet();
 
         return AdminSection(
@@ -126,20 +136,20 @@ class _PayrollSectionState extends State<PayrollSection> {
               for (final person in staff) ...[
                 AdminRow(
                   label: person.name,
-                  value: paidThisPeriod.contains(person.name)
+                  value: paidThisPeriod.contains(person.id)
                       ? 'پرداخت شد'
                       : person.monthlySalaryFormatted,
-                  icon: paidThisPeriod.contains(person.name)
+                  icon: paidThisPeriod.contains(person.id)
                       ? Icons.check_circle_rounded
                       : Icons.arrow_circle_left_rounded,
-                  color: paidThisPeriod.contains(person.name) ? AppColors.moneyIn : null,
-                  onTap: paidThisPeriod.contains(person.name) ? null : () => _pay(person),
+                  color: paidThisPeriod.contains(person.id) ? AppColors.moneyIn : null,
+                  onTap: paidThisPeriod.contains(person.id) ? null : () => _pay(person),
                 ),
                 // Before the sheet is opened, not after. The wage on the row
                 // above is not what this person is going to be handed, and
                 // finding that out only once the sum is on screen is how the
                 // deduction came to look like it was not happening.
-                if (person.owesAdvance && !paidThisPeriod.contains(person.name))
+                if (person.owesAdvance && !paidThisPeriod.contains(person.id))
                   Padding(
                     padding: const EdgeInsetsDirectional.only(start: 4, bottom: Gap.tight),
                     child: Row(
@@ -175,10 +185,6 @@ class _PayrollSectionState extends State<PayrollSection> {
       },
     );
   }
-
-  /// The newest period on file, which is the one the buttons are about.
-  String _periodLabel(List<Payslip> slips) =>
-      slips.isEmpty ? '' : slips.first.periodLabel;
 }
 
 typedef _PayInput = ({double base, double bonus, double deduction, String? note});
@@ -222,25 +228,11 @@ class _PaySheetState extends State<_PaySheet> {
     super.dispose();
   }
 
-  /// What was typed, as a number. The grouping formatter puts separators
-  /// in and Persian keyboards put Persian digits in; neither parses.
-  double _read(TextEditingController c) {
-    const persian = '۰۱۲۳۴۵۶۷۸۹';
-    final buffer = StringBuffer();
-
-    for (final rune in c.text.runes) {
-      final char = String.fromCharCode(rune);
-      final digit = persian.indexOf(char);
-
-      if (digit >= 0) {
-        buffer.write(digit);
-      } else if (RegExp(r'[0-9]').hasMatch(char)) {
-        buffer.write(char);
-      }
-    }
-
-    return double.tryParse(buffer.toString()) ?? 0;
-  }
+  /// What was typed, as a number. The grouping formatter puts separators in
+  /// and Persian keyboards put Persian digits in; neither parses. The same
+  /// reading the flour sheet does, through the same helper.
+  double _read(TextEditingController c) =>
+      MoneyFormat.parseInput(c.text.trim()) ?? 0;
 
   double get _gross => _read(_base) + _read(_bonus) - _read(_deduction);
 

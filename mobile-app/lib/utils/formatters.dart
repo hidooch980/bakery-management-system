@@ -2,6 +2,25 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 
+/// Persian and Arabic digits rewritten as Latin ones.
+///
+/// Anything that has to be compared, parsed, or sent has to go through
+/// here first. A string that is half Persian and half Latin still parses —
+/// the server is forgiving — but it will never compare equal to anything,
+/// and comparing is most of what dates get used for.
+String latinDigits(String value) {
+  const persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+  const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+  var result = value;
+
+  for (var i = 0; i < persian.length; i++) {
+    result = result.replaceAll(persian[i], '$i').replaceAll(arabic[i], '$i');
+  }
+
+  return result;
+}
+
 /// Every date shown in the app goes through here, so the UI is Jalali
 /// end-to-end even though the API stores Gregorian timestamps.
 class JalaliFormat {
@@ -99,16 +118,7 @@ class JalaliFormat {
 
   static String _two(int n) => n.toString().padLeft(2, '0');
 
-  static String _toLatinDigits(String value) {
-    const persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-
-    var result = value;
-    for (var i = 0; i < persian.length; i++) {
-      result = result.replaceAll(persian[i], '$i');
-    }
-
-    return result;
-  }
+  static String _toLatinDigits(String value) => latinDigits(value);
 }
 
 /// Currency unit the bakery displays amounts in. Amounts are always stored
@@ -175,17 +185,7 @@ class MoneyFormat {
     return bare.isEmpty ? null : double.tryParse(bare);
   }
 
-  static String _toLatinDigits(String value) {
-    const persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-    const arabic = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-
-    var result = value;
-    for (var i = 0; i < persian.length; i++) {
-      result = result.replaceAll(persian[i], '$i').replaceAll(arabic[i], '$i');
-    }
-
-    return result;
-  }
+  static String _toLatinDigits(String value) => latinDigits(value);
 }
 
 /// Groups an amount into threes while it is being typed.
