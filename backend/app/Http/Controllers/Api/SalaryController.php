@@ -233,17 +233,31 @@ class SalaryController extends Controller
         return 'اگر امروز تسویه شود، '.Money::format($remaining).' به شما می‌رسد.';
     }
 
-    /** Staff list with their configured monthly pay, to pre-fill the form. */
+    /**
+     * Staff list with their configured monthly pay, to pre-fill the form.
+     *
+     * The outstanding advance comes with it. The payslip has always taken
+     * advances off — but it did so on the server, after the button was
+     * pressed, and the phone had no way of knowing. So a wage was confirmed
+     * at one figure and stored at another, and from where the owner sat the
+     * advances simply were not being deducted.
+     */
     public function employees(): JsonResponse
     {
         $users = User::ofCurrentBakery()->where('is_active', true)
             ->get(['id', 'name', 'monthly_salary'])
-            ->map(fn (User $u) => [
-                'id' => $u->id,
-                'name' => $u->name,
-                'monthly_salary' => Money::convert($u->monthly_salary),
-                'monthly_salary_formatted' => Money::format($u->monthly_salary),
-            ]);
+            ->map(function (User $u) {
+                $outstanding = StaffAdvance::outstandingFor($u->id);
+
+                return [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'monthly_salary' => Money::convert($u->monthly_salary),
+                    'monthly_salary_formatted' => Money::format($u->monthly_salary),
+                    'advance_outstanding' => Money::convert($outstanding),
+                    'advance_outstanding_formatted' => Money::format($outstanding),
+                ];
+            });
 
         return $this->success($users);
     }
@@ -261,6 +275,8 @@ class SalaryController extends Controller
             'base_amount' => Money::convert($payment->base_amount),
             'bonus' => Money::convert($payment->bonus),
             'deduction' => Money::convert($payment->deduction),
+            'advance_deduction' => Money::convert($payment->advance_deduction),
+            'advance_deduction_formatted' => Money::format($payment->advance_deduction),
             'net_amount' => Money::convert($payment->net_amount),
             'net_amount_formatted' => Money::format($payment->net_amount),
             'paid_on' => $payment->paid_on?->toDateString(),

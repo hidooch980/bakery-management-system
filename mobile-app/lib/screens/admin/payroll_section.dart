@@ -123,7 +123,7 @@ class _PayrollSectionState extends State<PayrollSection> {
             if (staff.isEmpty)
               const AdminRow(label: 'کارمندی ثبت نشده', value: '—')
             else
-              for (final person in staff)
+              for (final person in staff) ...[
                 AdminRow(
                   label: person.name,
                   value: paidThisPeriod.contains(person.name)
@@ -135,11 +135,37 @@ class _PayrollSectionState extends State<PayrollSection> {
                   color: paidThisPeriod.contains(person.name) ? AppColors.moneyIn : null,
                   onTap: paidThisPeriod.contains(person.name) ? null : () => _pay(person),
                 ),
+                // Before the sheet is opened, not after. The wage on the row
+                // above is not what this person is going to be handed, and
+                // finding that out only once the sum is on screen is how the
+                // deduction came to look like it was not happening.
+                if (person.owesAdvance && !paidThisPeriod.contains(person.name))
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 4, bottom: Gap.tight),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.remove_circle_outline_rounded,
+                            size: IconSize.inline, color: AppColors.moneyOut),
+                        const SizedBox(width: Gap.tight),
+                        Text(
+                          'علی‌الحساب ${person.advanceOutstandingFormatted}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.moneyOut),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             if (slips.isNotEmpty) ...[
               const Divider(height: 24),
               for (final slip in slips.take(6))
                 AdminRow(
-                  label: '${slip.userName}  •  ${slip.periodLabel}',
+                  label: slip.recoveredAdvance
+                      ? '${slip.userName}  •  ${slip.periodLabel}\n'
+                          'پس از کسر ${slip.advanceDeductionFormatted} علی‌الحساب'
+                      : '${slip.userName}  •  ${slip.periodLabel}',
                   value: slip.netAmountFormatted,
                   color: slip.isPaid ? AppColors.moneyIn : AppColors.attention,
                 ),
@@ -216,7 +242,21 @@ class _PaySheetState extends State<_PaySheet> {
     return double.tryParse(buffer.toString()) ?? 0;
   }
 
-  double get _net => _read(_base) + _read(_bonus) - _read(_deduction);
+  double get _gross => _read(_base) + _read(_bonus) - _read(_deduction);
+
+  /// How much of the outstanding advance this payslip absorbs — never more
+  /// than the pay itself, which is the same rule the server applies.
+  double get _advance {
+    if (_gross <= 0) return 0;
+
+    final owed = widget.person.advanceOutstanding;
+
+    return owed < _gross ? owed : _gross;
+  }
+
+  double get _net => _gross - _advance;
+
+  bool get _carriesOver => widget.person.advanceOutstanding > _advance;
 
   @override
   Widget build(BuildContext context) {
@@ -247,33 +287,65 @@ class _PaySheetState extends State<_PaySheet> {
                 decoration: const InputDecoration(labelText: 'توضیح (اختیاری)'),
               ),
               const SizedBox(height: 20),
-              // The net, shown as it is typed. It is the server's
-              // arithmetic that is stored — this is the same sum done here
-              // so nobody presses the button on a figure they have not
-              // seen.
+              // The net, shown as it is typed. It is the server's arithmetic
+              // that is stored — this is the same sum done here so nobody
+              // presses the button on a figure they have not seen.
+              //
+              // Including the advance, which is the whole point. The server
+              // always took it off; this panel used to show the wage before
+              // it, so the figure agreed to and the figure paid were two
+              // different numbers and only the first was ever on screen.
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(Corner.control),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
                   children: [
-                    Text('خالص پرداختی', style: theme.textTheme.bodyMedium),
-                    Text(
-                      MoneyFormat.plain(_net),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                    if (_advance > 0) ...[
+                      _SumLine(label: 'حقوق و پاداش', amount: _gross),
+                      const SizedBox(height: Gap.tight),
+                      _SumLine(
+                        label: 'کسر علی‌الحساب',
+                        amount: -_advance,
+                        color: AppColors.moneyOut,
+                      ),
+                      const Divider(height: 20),
+                    ],
+                    _SumLine(label: 'خالص پرداختی', amount: _net, strong: true),
+                  ],
+                ),
+              ),
+              // What an advance bigger than a month's pay does. It is not a
+              // negative wage — the rest stands and comes off next month —
+              // and being told that now is better than wondering next month
+              // why the deduction is still there.
+              if (_carriesOver) ...[
+                const SizedBox(height: Gap.item),
+                Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded,
+                        size: IconSize.inline, color: AppColors.attention),
+                    const SizedBox(width: Gap.tight),
+                    Expanded(
+                      child: Text(
+                        '${MoneyFormat.plain(widget.person.advanceOutstanding - _advance)} '
+                        'از علی‌الحساب به ماه بعد می‌ماند.',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: AppColors.attention),
                       ),
                     ),
                   ],
                 ),
-              ),
+              ],
               const SizedBox(height: 20),
               FilledButton.icon(
-                onPressed: _net <= 0
+                // On the gross, not the net. A wage entirely swallowed by an
+                // advance still has to be recorded: that is the month the
+                // debt gets worked off, and refusing to write it leaves the
+                // advance outstanding forever.
+                onPressed: _gross <= 0
                     ? null
                     : () => Navigator.pop(context, (
                           base: _read(_base),
@@ -282,7 +354,9 @@ class _PaySheetState extends State<_PaySheet> {
                           note: _note.text.trim().isEmpty ? null : _note.text.trim(),
                         )),
                 icon: const Icon(Icons.check_rounded),
-                label: const Text('پرداخت شد'),
+                label: Text(_net <= 0 && _advance > 0
+                    ? 'تسویه با علی‌الحساب'
+                    : 'پرداخت شد'),
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
               ),
             ],
@@ -293,6 +367,45 @@ class _PaySheetState extends State<_PaySheet> {
   }
 
   void _refresh(String _) => setState(() {});
+}
+
+/// One line of the pay sum: what it is, and how much.
+class _SumLine extends StatelessWidget {
+  const _SumLine({
+    required this.label,
+    required this.amount,
+    this.color,
+    this.strong = false,
+  });
+
+  final String label;
+  final double amount;
+  final Color? color;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final style = strong ? theme.textTheme.titleMedium : theme.textTheme.bodyMedium;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodyMedium?.copyWith(color: color),
+        ),
+        Text(
+          MoneyFormat.plain(amount),
+          style: style?.copyWith(
+            color: color,
+            fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _Field extends StatelessWidget {

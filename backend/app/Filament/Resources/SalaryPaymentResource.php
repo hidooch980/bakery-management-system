@@ -6,6 +6,7 @@ use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\SalaryPaymentResource\Pages;
 use App\Models\SalaryPayment;
+use App\Models\StaffAdvance;
 use App\Models\User;
 use App\Support\Jalali;
 use App\Support\Money;
@@ -82,15 +83,41 @@ class SalaryPaymentResource extends Resource
                     Forms\Components\Placeholder::make('net_preview')
                         ->label('خالص پرداختی')
                         ->columnSpanFull()
-                        ->content(function (Forms\Get $get) {
+                        ->content(function (Forms\Get $get, ?SalaryPayment $record) {
                             // Form state is in the display unit, so build the
                             // preview there rather than double-converting.
-                            $net = (float) $get('base_amount')
+                            $gross = (float) $get('base_amount')
                                 + (float) $get('bonus')
                                 - (float) $get('deduction');
 
-                            return number_format($net, 0, '.', Money::GROUP_SEPARATOR)
+                            // The advance too. The payslip has always taken
+                            // it off on save; this preview did not, so the
+                            // figure agreed to and the figure stored were
+                            // different numbers and only one of them was
+                            // ever shown before pressing the button.
+                            $userId = (int) $get('user_id');
+                            $outstanding = $userId === 0
+                                ? 0.0
+                                : Money::convert(StaffAdvance::outstandingFor($userId, $record?->id));
+
+                            $advance = max(0.0, min($outstanding, max(0.0, $gross)));
+                            $net = $gross - $advance;
+
+                            $say = fn (float $v) => number_format($v, 0, '.', Money::GROUP_SEPARATOR)
                                 .' '.Money::label();
+
+                            if ($advance <= 0) {
+                                return $say($net);
+                            }
+
+                            $line = $say($net).'  —  پس از کسر '.$say($advance).' علی‌الحساب';
+
+                            // An advance larger than the month's pay is not a
+                            // negative payslip; what is left of it stands and
+                            // comes off the month after.
+                            return $outstanding > $advance
+                                ? $line.'، '.$say($outstanding - $advance).' به ماه بعد می‌ماند'
+                                : $line;
                         }),
                 ]),
 
@@ -138,6 +165,15 @@ class SalaryPaymentResource extends Resource
                     ->label('کسورات')
                     ->formatStateUsing(fn ($state) => Money::format($state))
                     ->toggleable(isToggledHiddenByDefault: true),
+
+                // Not hidden by default, unlike the other parts. This is the
+                // one deduction the shop actually uses, and a payslip that
+                // silently came out smaller than the wage is what sent the
+                // owner looking for it.
+                Tables\Columns\TextColumn::make('advance_deduction')
+                    ->label('کسر علی‌الحساب')
+                    ->formatStateUsing(fn ($state) => (float) $state > 0 ? Money::format($state) : '—')
+                    ->color(fn ($state) => (float) $state > 0 ? 'warning' : 'gray'),
 
                 Tables\Columns\TextColumn::make('net_amount')
                     ->label('خالص')
