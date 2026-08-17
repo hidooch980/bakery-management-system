@@ -231,6 +231,16 @@ class _QuotaMeter extends StatelessWidget {
         ? Theme.of(context).colorScheme.error
         : AppColors.emberAt(fraction);
 
+    // The ramp is for the bar, where length and shade say the same thing
+    // twice and neither has to be read. It must not colour the sentence
+    // under it: a ramp runs dark to light by definition, so one end of it
+    // is always invisible against a given ground — the dull end at 2.2:1
+    // on the night ground, the pale end at 1.1:1 in daylight. Whichever
+    // way the quota is going, the words about it stay readable.
+    final wordsColour = quota.isOverdrawn
+        ? Theme.of(context).colorScheme.error
+        : (fraction >= 0.8 ? AppColors.attention : null);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -249,7 +259,7 @@ class _QuotaMeter extends StatelessWidget {
               ? 'سهمیه این ماه تمام شده'
               : '${quota.usedPercent.round()}٪ مصرف شده',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colour,
+                color: wordsColour,
                 fontWeight: FontWeight.w700,
               ),
         ),

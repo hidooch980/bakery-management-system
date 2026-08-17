@@ -235,6 +235,13 @@ class _PeriodCard extends StatelessWidget {
         ? Theme.of(context).colorScheme.error
         : AppColors.emberAt((percent / 100).clamp(0.0, 1.0));
 
+    // Same rule as the diesel meter: the ramp draws the bar, never the
+    // words. A ramp runs dark to light, so one end of it always vanishes
+    // into one of the two grounds.
+    final wordsColour = isOver
+        ? Theme.of(context).colorScheme.error
+        : (percent >= 80 ? AppColors.attention : null);
+
     return Card(
       // The period in progress is the one that matters most.
       shape: isCurrent
@@ -300,7 +307,7 @@ class _PeriodCard extends StatelessWidget {
                       ? 'بیش از سهمیه'
                       : 'باقی‌مانده ${period['remaining_kg']} کیلوگرم',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: color,
+                        color: wordsColour,
                         fontWeight: FontWeight.w700,
                       ),
                 ),

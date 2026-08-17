@@ -124,10 +124,13 @@ class _StationMarker extends StatelessWidget {
 
     final (Color fill, Color border, Color label) = switch (station.state) {
       StationState.active => (scheme.primary, scheme.primary, scheme.onPrimary),
+      // The green is light in the dark theme and dark in the light one, so
+      // the numeral on it has to flip too — white on successDark is
+      // 2.31:1, which is a marker nobody can read.
       StationState.done => (
           isDark ? AppColors.successDark : AppColors.success,
           isDark ? AppColors.successDark : AppColors.success,
-          Colors.white,
+          isDark ? AppColors.iron : Colors.white,
         ),
       StationState.idle => (
           scheme.surface,
