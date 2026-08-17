@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\BankAccount;
 use App\Models\ChaneEntry;
+use App\Models\ConsignmentFlour;
 use App\Models\DieselAllocation;
 use App\Models\DoughEntry;
 use App\Models\Expense;
@@ -44,6 +45,7 @@ class IssueScanner
             ...$this->longUnsettledSellers(),
             ...$this->tradingAtALoss(),
             ...$this->loanInstalmentDue(),
+            ...$this->flourOutWithPartners(),
             ...$this->dieselRunningOut(),
             ...$this->wagesNeverRecorded(),
             ...$this->expensesMostlyUncategorised(),
@@ -402,6 +404,70 @@ class IssueScanner
             urlLabel: 'گزارش مالی',
             magnitude: $loss,
         )];
+    }
+
+    /**
+     * Flour lent to a partner bakery and not yet returned.
+     *
+     * The shop lends and borrows sacks with the bakeries around it, which
+     * is ordinary and not a debt in money — but the sacks are the shop's,
+     * and the store is short by exactly what is out. On 2026-08-17 that was
+     * 76 sacks across two partners, the oldest fifteen days old, and
+     * nothing anywhere said so: the seller's cash gets chased, and flour
+     * worth more than most of those balances did not.
+     *
+     * Counted per partner rather than per lending, because what the owner
+     * needs is a name and a number, not four rows about the same person.
+     *
+     * A fortnight is the line. Sacks go back and forth within a week here
+     * as a matter of course; past two weeks it has stopped being the
+     * ordinary rhythm and become flour nobody is asking for.
+     */
+    private function flourOutWithPartners(): array
+    {
+        $limit = now()->subDays(14);
+
+        $open = ConsignmentFlour::query()
+            ->where('direction', 'lent')
+            ->whereNull('settled_on')
+            ->with('partner')
+            ->get();
+
+        if ($open->isEmpty()) {
+            return [];
+        }
+
+        $issues = [];
+
+        foreach ($open->groupBy(fn (ConsignmentFlour $c) => $c->customer_id ?? $c->partner_name) as $key => $lendings) {
+            $oldest = $lendings->min(fn (ConsignmentFlour $c) => $c->occurred_on);
+
+            if ($oldest->gt($limit)) {
+                continue;
+            }
+
+            $bags = round($lendings->sum(fn (ConsignmentFlour $c) => (float) $c->bags), 1);
+            $days = (int) $oldest->diffInDays(now());
+            $who = $lendings->first()->partner_label ?: 'همکار بی‌نام';
+
+            $issues[] = new SystemIssue(
+                key: "consignment-open-{$key}",
+                severity: SystemIssue::WARNING,
+                title: "آرد امانی نزد {$who} برنگشته",
+                detail: number_format($bags, 1).' کیسه در '.$lendings->count().' نوبت،'
+                    ." قدیمی‌ترین {$days} روز پیش (".AppCalendar::date($oldest).').',
+                cause: 'آرد به نانوایی همکار داده شده و هنوز پس نیامده است.',
+                suggestion: 'اگر برگشته، در بخش آرد امانی تسویه‌اش کنید تا انبار درست شود؛'
+                    .' وگرنه پیگیری کنید — این کیسه‌ها از موجودی شما کم شده‌اند.',
+                url: '/admin/consignment-flours',
+                urlLabel: 'آرد امانی',
+                // Sacks, which is what the shop counts them in and what
+                // grows if more go out to the same partner.
+                magnitude: $bags,
+            );
+        }
+
+        return $issues;
     }
 
     /**
