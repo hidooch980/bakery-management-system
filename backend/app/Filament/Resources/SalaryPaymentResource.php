@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\SalaryPaymentResource\Pages;
+use App\Models\BankAccount;
 use App\Models\SalaryPayment;
 use App\Models\StaffAdvance;
 use App\Models\User;
@@ -127,9 +128,25 @@ class SalaryPaymentResource extends Resource
                     JalaliDateInput::make('paid_on', 'تاریخ پرداخت')
                         ->helperText('خالی بگذارید تا در وضعیت «پرداخت‌نشده» بماند.'),
 
+                    // The account the money leaves. Without it a payslip
+                    // records the cost and moves nothing: the wage is paid,
+                    // the balance does not fall, and the bank stops
+                    // reconciling with nothing to say where the gap is.
+                    // Advances have had this field all along; wages never
+                    // did, on either screen.
+                    Forms\Components\Select::make('bank_account_id')
+                        ->label('از حساب')
+                        ->relationship('bankAccount', 'title')
+                        ->searchable()
+                        ->preload()
+                        ->native(false)
+                        ->default(fn () => BankAccount::defaultAccount()?->id)
+                        ->helperText('خالی بگذارید اگر از صندوق پرداخت شده.'),
+
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')
-                        ->rows(2),
+                        ->rows(2)
+                        ->columnSpanFull(),
                 ]),
         ]);
     }
@@ -186,6 +203,11 @@ class SalaryPaymentResource extends Resource
                             ->label('جمع')
                             ->formatStateUsing(fn ($state) => Money::format($state))
                     ),
+
+                Tables\Columns\TextColumn::make('bankAccount.title')
+                    ->label('از حساب')
+                    ->placeholder('صندوق')
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('paid_on')
                     ->label('وضعیت')

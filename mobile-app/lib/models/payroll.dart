@@ -7,6 +7,7 @@ class Employee {
     required this.monthlySalaryFormatted,
     this.advanceOutstanding = 0,
     this.advanceOutstandingFormatted = '',
+    this.suggestedBankAccountId,
   });
 
   final int id;
@@ -25,6 +26,11 @@ class Employee {
   final double advanceOutstanding;
   final String advanceOutstandingFormatted;
 
+  /// The account this person's money last came out of, so the sheet opens
+  /// on an answer rather than a question. A wage paid from no account
+  /// records the cost and moves nothing.
+  final int? suggestedBankAccountId;
+
   bool get owesAdvance => advanceOutstanding > 0;
 
   factory Employee.fromJson(Map<String, dynamic> json) => Employee(
@@ -34,6 +40,7 @@ class Employee {
         monthlySalaryFormatted: '${json['monthly_salary_formatted'] ?? ''}',
         advanceOutstanding: _double(json['advance_outstanding']),
         advanceOutstandingFormatted: '${json['advance_outstanding_formatted'] ?? ''}',
+        suggestedBankAccountId: (json['suggested_bank_account_id'] as num?)?.toInt(),
       );
 
   static double _double(dynamic value) =>
@@ -58,6 +65,7 @@ class Payslip {
     required this.isPaid,
     this.advanceDeduction = 0,
     this.advanceDeductionFormatted = '',
+    this.bankAccountTitle,
     this.paidOnJalali,
     this.note,
   });
@@ -85,6 +93,9 @@ class Payslip {
   final String? paidOnJalali;
   final String? note;
 
+  /// Which account it was paid from, or null when it came out of the till.
+  final String? bankAccountTitle;
+
   bool get recoveredAdvance => advanceDeduction > 0;
 
   factory Payslip.fromJson(Map<String, dynamic> json) => Payslip(
@@ -98,6 +109,7 @@ class Payslip {
         isPaid: json['is_paid'] == true,
         advanceDeduction: Employee._double(json['advance_deduction']),
         advanceDeductionFormatted: '${json['advance_deduction_formatted'] ?? ''}',
+        bankAccountTitle: json['bank_account_title'] as String?,
         paidOnJalali: json['paid_on_jalali'] as String?,
         note: json['note'] as String?,
       );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../models/bank_account.dart';
 import '../../models/payroll.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
@@ -29,7 +30,11 @@ class PayrollSection extends StatefulWidget {
   State<PayrollSection> createState() => _PayrollSectionState();
 }
 
-typedef _Payroll = ({List<Employee> staff, List<Payslip> slips});
+typedef _Payroll = ({
+  List<Employee> staff,
+  List<Payslip> slips,
+  List<BankAccount> accounts,
+});
 
 class _PayrollSectionState extends State<PayrollSection> {
   late Future<_Payroll> _data;
@@ -44,7 +49,17 @@ class _PayrollSectionState extends State<PayrollSection> {
     final staff = await widget.api.payrollEmployees();
     final slips = await widget.api.payslips();
 
-    return (staff: staff, slips: slips);
+    // The accounts too, because a wage has to come out of one. A payslip
+    // with no account records the cost and moves nothing: the money is
+    // handed over, the balance does not fall, and the bank stops
+    // reconciling with nothing on the page to say why.
+    final balances = await widget.api.bankBalances();
+
+    return (
+      staff: staff,
+      slips: slips,
+      accounts: balances.accounts.where((a) => a.isActive).toList(),
+    );
   }
 
   void _reload() => setState(() => _data = _load());
@@ -62,11 +77,11 @@ class _PayrollSectionState extends State<PayrollSection> {
     return parts.length == 3 ? '${parts[0]}/${parts[1]}/01' : now;
   }
 
-  Future<void> _pay(Employee person) async {
+  Future<void> _pay(Employee person, List<BankAccount> accounts) async {
     final result = await showModalBottomSheet<_PayInput>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _PaySheet(person: person),
+      builder: (_) => _PaySheet(person: person, accounts: accounts),
     );
 
     if (result == null) return;
@@ -82,6 +97,7 @@ class _PayrollSectionState extends State<PayrollSection> {
         // شد» means. A slip prepared before payday is a different action
         // and does not exist yet.
         paidOn: JalaliFormat.date(DateTime.now()),
+        bankAccountId: result.accountId,
         note: result.note,
       );
 
@@ -112,6 +128,7 @@ class _PayrollSectionState extends State<PayrollSection> {
 
         final staff = snapshot.data!.staff;
         final slips = snapshot.data!.slips;
+        final accounts = snapshot.data!.accounts;
 
         // Who has already been paid for the period the button would write,
         // so the list does not offer to pay the same person twice.
@@ -143,7 +160,9 @@ class _PayrollSectionState extends State<PayrollSection> {
                       ? Icons.check_circle_rounded
                       : Icons.arrow_circle_left_rounded,
                   color: paidThisPeriod.contains(person.id) ? AppColors.moneyIn : null,
-                  onTap: paidThisPeriod.contains(person.id) ? null : () => _pay(person),
+                  onTap: paidThisPeriod.contains(person.id)
+                      ? null
+                      : () => _pay(person, accounts),
                 ),
                 // Before the sheet is opened, not after. The wage on the row
                 // above is not what this person is going to be handed, and
@@ -175,7 +194,8 @@ class _PayrollSectionState extends State<PayrollSection> {
                   label: slip.recoveredAdvance
                       ? '${slip.userName}  •  ${slip.periodLabel}\n'
                           'پس از کسر ${slip.advanceDeductionFormatted} علی‌الحساب'
-                      : '${slip.userName}  •  ${slip.periodLabel}',
+                      : '${slip.userName}  •  ${slip.periodLabel}'
+                          '${slip.bankAccountTitle == null ? '' : '  •  ${slip.bankAccountTitle}'}',
                   value: slip.netAmountFormatted,
                   color: slip.isPaid ? AppColors.moneyIn : AppColors.attention,
                 ),
@@ -187,13 +207,20 @@ class _PayrollSectionState extends State<PayrollSection> {
   }
 }
 
-typedef _PayInput = ({double base, double bonus, double deduction, String? note});
+typedef _PayInput = ({
+  double base,
+  double bonus,
+  double deduction,
+  int? accountId,
+  String? note,
+});
 
 /// One person's pay, opened on what was agreed for them.
 class _PaySheet extends StatefulWidget {
-  const _PaySheet({required this.person});
+  const _PaySheet({required this.person, required this.accounts});
 
   final Employee person;
+  final List<BankAccount> accounts;
 
   @override
   State<_PaySheet> createState() => _PaySheetState();
@@ -205,9 +232,20 @@ class _PaySheetState extends State<_PaySheet> {
   final _deduction = TextEditingController();
   final _note = TextEditingController();
 
+  int? _accountId;
+
   @override
   void initState() {
     super.initState();
+
+    // Opened on the account this person's money last came from. It is the
+    // field a tired owner skips at the end of a long month, and skipping it
+    // is what makes a wage that costs the shop nothing.
+    final suggested = widget.person.suggestedBankAccountId;
+
+    _accountId = widget.accounts.any((a) => a.id == suggested)
+        ? suggested
+        : (widget.accounts.isEmpty ? null : widget.accounts.first.id);
 
     // Filled in with the agreed wage. The ordinary month is everybody on
     // their usual figure, and a form that starts empty is a form that
@@ -273,6 +311,26 @@ class _PaySheetState extends State<_PaySheet> {
               _Field(controller: _bonus, label: 'پاداش', onChanged: _refresh),
               const SizedBox(height: 12),
               _Field(controller: _deduction, label: 'کسورات', onChanged: _refresh),
+              if (widget.accounts.isNotEmpty) ...[
+                const SizedBox(height: Gap.block),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text('از حساب', style: theme.textTheme.bodySmall),
+                ),
+                const SizedBox(height: Gap.tight),
+                Wrap(
+                  spacing: Gap.tight,
+                  runSpacing: Gap.tight,
+                  children: [
+                    for (final account in widget.accounts)
+                      ChoiceChip(
+                        selected: _accountId == account.id,
+                        onSelected: (_) => setState(() => _accountId = account.id),
+                        label: Text('${account.title}  ${account.balanceFormatted}'),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: _note,
@@ -343,6 +401,7 @@ class _PaySheetState extends State<_PaySheet> {
                           base: _read(_base),
                           bonus: _read(_bonus),
                           deduction: _read(_deduction),
+                          accountId: _accountId,
                           note: _note.text.trim().isEmpty ? null : _note.text.trim(),
                         )),
                 icon: const Icon(Icons.check_rounded),

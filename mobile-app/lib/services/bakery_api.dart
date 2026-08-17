@@ -248,6 +248,7 @@ class BakeryApi {
     double bonus = 0,
     double deduction = 0,
     String? paidOn,
+    int? bankAccountId,
     String? note,
   }) async {
     final body = await _client.post('/salaries', {
@@ -257,6 +258,10 @@ class BakeryApi {
       'bonus': bonus,
       'deduction': deduction,
       if (paidOn != null) 'paid_on': paidOn,
+      // Null when it came out of the till, which is a real answer. Sent
+      // either way: without it the payslip records the cost and moves no
+      // account, so the wage is paid and the balance never falls.
+      'bank_account_id': bankAccountId,
       if (note != null && note.isNotEmpty) 'note': note,
     });
 

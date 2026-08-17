@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BankAccount;
 use App\Models\SalaryPayment;
 use App\Models\StaffAdvance;
 use App\Models\StaffAdvanceRequest;
@@ -21,7 +22,7 @@ class SalaryController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $payments = SalaryPayment::with('user:id,name')
+        $payments = SalaryPayment::with(['user:id,name', 'bankAccount:id,title'])
             ->when($request->query('user_id'), fn ($q, $id) => $q->where('user_id', $id))
             ->when($request->query('status') === 'paid', fn ($q) => $q->paid())
             ->when($request->query('status') === 'unpaid', fn ($q) => $q->unpaid())
@@ -41,6 +42,7 @@ class SalaryController extends Controller
             'bonus' => ['nullable', 'numeric', 'min:0'],
             'deduction' => ['nullable', 'numeric', 'min:0'],
             'paid_on' => ['nullable', 'string', 'max:20'],
+            'bank_account_id' => ['nullable', 'exists:bank_accounts,id'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
@@ -71,6 +73,13 @@ class SalaryController extends Controller
             'bonus' => Money::toToman($data['bonus'] ?? 0),
             'deduction' => Money::toToman($data['deduction'] ?? 0),
             'paid_on' => Jalali::parseFlexible($data['paid_on'] ?? null),
+            // Which account the money left. Without it the payslip records
+            // the cost and moves nothing: the wage is paid, the shop's
+            // balance does not fall, and the bank stops reconciling with no
+            // sign of where the gap came from. Null is a real answer — cash
+            // out of the till — but it has to be chosen, not defaulted to by
+            // the field never existing.
+            'bank_account_id' => $data['bank_account_id'] ?? null,
             'note' => $data['note'] ?? null,
         ]);
 
@@ -84,6 +93,7 @@ class SalaryController extends Controller
             'bonus' => ['sometimes', 'numeric', 'min:0'],
             'deduction' => ['sometimes', 'numeric', 'min:0'],
             'paid_on' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'bank_account_id' => ['sometimes', 'nullable', 'exists:bank_accounts,id'],
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
         ]);
 
@@ -102,14 +112,26 @@ class SalaryController extends Controller
         return $this->success($this->payload($salary->fresh()), 'حقوق به‌روزرسانی شد.');
     }
 
-    /** Marks an outstanding salary as paid today. */
-    public function markPaid(SalaryPayment $salary): JsonResponse
+    /** Marks an outstanding salary as paid today, from an account. */
+    public function markPaid(Request $request, SalaryPayment $salary): JsonResponse
     {
         if ($salary->is_paid) {
             return $this->error('این حقوق قبلاً پرداخت شده است.', 409);
         }
 
-        $salary->update(['paid_on' => now()]);
+        $data = $request->validate([
+            'bank_account_id' => ['sometimes', 'nullable', 'exists:bank_accounts,id'],
+        ]);
+
+        // The account matters more here than anywhere: this is the call that
+        // turns a slip into money leaving the shop, and the posting is only
+        // written for an account that is named.
+        $salary->update([
+            'paid_on' => now(),
+            'bank_account_id' => array_key_exists('bank_account_id', $data)
+                ? $data['bank_account_id']
+                : $salary->bank_account_id,
+        ]);
 
         return $this->success($this->payload($salary->fresh()), 'پرداخت ثبت شد.');
     }
@@ -244,9 +266,11 @@ class SalaryController extends Controller
      */
     public function employees(): JsonResponse
     {
+        $fallback = BankAccount::defaultAccount()?->id;
+
         $users = User::ofCurrentBakery()->where('is_active', true)
             ->get(['id', 'name', 'monthly_salary'])
-            ->map(function (User $u) {
+            ->map(function (User $u) use ($fallback) {
                 $outstanding = StaffAdvance::outstandingFor($u->id);
 
                 return [
@@ -256,10 +280,36 @@ class SalaryController extends Controller
                     'monthly_salary_formatted' => Money::format($u->monthly_salary),
                     'advance_outstanding' => Money::convert($outstanding),
                     'advance_outstanding_formatted' => Money::format($outstanding),
+                    // Where this person's money has come from before, so the
+                    // sheet opens on an answer instead of a question. A wage
+                    // paid from no account records the cost and moves
+                    // nothing, and the account is the field most likely to be
+                    // skipped at the end of a long month.
+                    'suggested_bank_account_id' => $this->lastAccountFor($u->id) ?? $fallback,
                 ];
             });
 
         return $this->success($users);
+    }
+
+    /**
+     * The account this person's money last came out of.
+     *
+     * A wage before an advance, because a wage is the closer precedent —
+     * but either is a better guess than none, and both beat the shop
+     * default when the two disagree.
+     */
+    private function lastAccountFor(int $userId): ?int
+    {
+        $fromWage = SalaryPayment::where('user_id', $userId)
+            ->whereNotNull('bank_account_id')
+            ->latest('paid_on')
+            ->value('bank_account_id');
+
+        return $fromWage ?? StaffAdvance::where('user_id', $userId)
+            ->whereNotNull('bank_account_id')
+            ->latest('paid_on')
+            ->value('bank_account_id');
     }
 
     private function payload(SalaryPayment $payment): array
@@ -285,6 +335,8 @@ class SalaryController extends Controller
             'advance_deduction_formatted' => Money::format($payment->advance_deduction),
             'net_amount' => Money::convert($payment->net_amount),
             'net_amount_formatted' => Money::format($payment->net_amount),
+            'bank_account_id' => $payment->bank_account_id,
+            'bank_account_title' => $payment->bankAccount?->title,
             'paid_on' => $payment->paid_on?->toDateString(),
             'paid_on_jalali' => Jalali::date($payment->paid_on),
             'is_paid' => $payment->is_paid,
