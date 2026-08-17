@@ -633,73 +633,86 @@ class IssueScanner
      * whether as a payslip or as an expense in its own category — this
      * shop has paid wages both ways.
      */
+    /**
+     * The two things this shop owes every month, and whether they are in.
+     *
+     * Wages at the end of the Jalali month, insurance before it —
+     * «پایان هر ماه پرداخت حقوق», «پرداخت بیمه هم قبل پایان ماه هست».
+     *
+     * The old check fired the moment anything was sold, which meant it
+     * shouted «حقوق این ماه ثبت نشده» as CRITICAL from the shop's first
+     * day of trading, three weeks before its first payday arrived. That is
+     * noise wearing a warning's colour, and it is what teaches an owner to
+     * stop reading the page.
+     *
+     * Two months are looked at, and that is the whole trick. Chasing only
+     * the current one cannot work: a payment due at month end is never
+     * late while the month is running, and the moment it ends the calendar
+     * rolls and the countdown starts again at thirty. Wages would have
+     * gone unmentioned forever. So the month in progress is checked for
+     * what is coming, and the one just gone for what never arrived.
+     */
     private function monthlyObligations(): array
     {
-        [$monthStart, $monthEnd] = Jalali::currentMonthRange();
+        [$thisStart, $thisEnd] = Jalali::currentMonthRange();
+        [$lastStart, $lastEnd] = Jalali::monthRangeFor($thisStart->copy()->subDay());
 
-        // Nothing traded yet this month: nothing to conclude about what it
-        // owes.
-        if (Sale::where('created_at', '>=', $monthStart)->count() === 0) {
-            return [];
-        }
-
-        $daysLeft = (int) now()->startOfDay()->diffInDays($monthEnd->copy()->startOfDay(), false);
+        $daysLeft = (int) now()->startOfDay()->diffInDays($thisEnd->copy()->startOfDay(), false);
 
         return [
-            ...$this->obligation(
-                key: 'insurance',
-                category: 'insurance',
-                label: 'حق بیمه',
-                monthStart: $monthStart,
-                // Paid before the month closes, so it is worth saying
-                // while there are still days to pay it in.
-                due: $daysLeft <= 5,
-                overdue: $daysLeft < 0,
-                url: '/admin/expenses',
-                daysLeft: $daysLeft,
-            ),
-            ...$this->obligation(
-                key: 'wages',
-                category: 'salary',
-                label: 'حقوق کارکنان',
-                monthStart: $monthStart,
-                // Due at the end, so the month has to have ended.
-                due: $daysLeft <= 0,
-                overdue: $daysLeft < 0,
-                url: '/admin/salary-payments',
-                daysLeft: $daysLeft,
-            ),
+            // The month just gone, if it closed without either payment. A
+            // shop that was not trading then owes nothing for it, which
+            // the sales guard inside handles.
+            ...$this->obligation('insurance', 'حق بیمه', $lastStart, $lastEnd, '/admin/expenses'),
+            ...$this->obligation('wages', 'حقوق کارکنان', $lastStart, $lastEnd, '/admin/salary-payments'),
+
+            // And the month in progress, once its own due date is near.
+            // Insurance is paid before the month closes, so five days out
+            // is while there is still time to pay it; wages fall on the
+            // last day itself.
+            ...($daysLeft <= 5
+                ? $this->obligation('insurance', 'حق بیمه', $thisStart, $thisEnd, '/admin/expenses', $daysLeft)
+                : []),
+            ...($daysLeft <= 0
+                ? $this->obligation('wages', 'حقوق کارکنان', $thisStart, $thisEnd, '/admin/salary-payments', $daysLeft)
+                : []),
         ];
     }
 
     /**
-     * One monthly obligation, raised only once it is due.
+     * One monthly obligation for one month.
+     *
+     * [$daysLeft] given means the month is still running and this is a
+     * heads-up; absent means the month has closed and the payment never
+     * came, which is the serious one.
      *
      * @return array<int, SystemIssue>
      */
     private function obligation(
         string $key,
-        string $category,
         string $label,
-        $monthStart,
-        bool $due,
-        bool $overdue,
+        $from,
+        $to,
         string $url,
-        int $daysLeft,
+        ?int $daysLeft = null,
     ): array {
-        if (! $due) {
+        // Nothing traded in that month: nothing to conclude about what it
+        // owes. This is what keeps a shop's first weeks quiet.
+        if (Sale::whereBetween('created_at', [$from, $to])->count() === 0) {
             return [];
         }
 
+        $category = $key === 'wages' ? 'salary' : 'insurance';
+
         $recorded = Expense::where('category', $category)
-            ->where('spent_on', '>=', $monthStart->toDateString())
+            ->whereBetween('spent_on', [$from->toDateString(), $to->toDateString()])
             ->exists();
 
         // Wages have a ledger of their own as well as an expense category,
         // and this shop has used both.
-        if ($category === 'salary' && ! $recorded) {
+        if ($key === 'wages' && ! $recorded) {
             $recorded = SalaryPayment::paid()
-                ->where('paid_on', '>=', $monthStart->toDateString())
+                ->whereBetween('paid_on', [$from->toDateString(), $to->toDateString()])
                 ->exists();
         }
 
@@ -707,14 +720,17 @@ class IssueScanner
             return [];
         }
 
+        $overdue = $daysLeft === null;
+        $month = Jalali::monthLabel($from);
+
         return [new SystemIssue(
-            key: "monthly-{$key}-".$monthStart->format('Y-m'),
+            key: "monthly-{$key}-".$from->format('Y-m'),
             severity: $overdue ? SystemIssue::CRITICAL : SystemIssue::WARNING,
             title: $overdue
-                ? "{$label} این ماه پرداخت نشده"
+                ? "{$label} {$month} پرداخت نشده"
                 : "{$label} این ماه نزدیک است",
             detail: $overdue
-                ? "ماه تمام شده و {$label} این ماه در سامانه ثبت نشده است."
+                ? "ماه {$month} تمام شده و {$label} آن در سامانه ثبت نشده است."
                 : "{$daysLeft} روز تا پایان ماه مانده و {$label} هنوز ثبت نشده است.",
             cause: $overdue
                 ? 'یا پرداخت نشده، یا پرداخت شده و وارد سامانه نشده است.'
@@ -724,10 +740,11 @@ class IssueScanner
                 : 'پیش از پایان ماه پرداخت و ثبتش کنید.',
             url: $url,
             urlLabel: $label,
-            // Days past due, so an answer about a payment one day late
-            // does not cover the same payment a month late. Not yet
-            // overdue counts as zero.
-            magnitude: $overdue ? (float) abs($daysLeft) : 0.0,
+            // Days past the month's end, so an answer about a payment a day
+            // late does not cover the same one a month late.
+            magnitude: $overdue
+                ? (float) max(0, (int) $to->copy()->startOfDay()->diffInDays(now()->startOfDay()))
+                : 0.0,
         )];
     }
 

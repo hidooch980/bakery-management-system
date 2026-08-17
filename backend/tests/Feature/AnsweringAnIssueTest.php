@@ -261,32 +261,35 @@ class AnsweringAnIssueTest extends TestCase
             ]);
         };
 
-        // Past the end of the month, because that is when wages fall due
-        // and therefore the only time the issue exists to be answered.
-        [, $monthEnd] = Jalali::currentMonthRange();
-        Carbon::setTestNow($monthEnd->copy()->addDay()->setTime(9, 0));
+        // A month of trading, then past its end — which is when wages fall
+        // due and therefore the only moment the issue exists to be
+        // answered at all.
+        [$monthStart, $monthEnd] = Jalali::currentMonthRange();
+        $key = 'monthly-wages-'.$monthStart->format('Y-m');
 
         $sell(100);
+
+        Carbon::setTestNow($monthEnd->copy()->addDay()->setTime(9, 0));
 
         Livewire::test(IssueCenter::class)->callAction(
             'acknowledge',
             data: ['note' => 'حقوق بیرون از سامانه پرداخت می‌شود.'],
-            arguments: ['key' => $this->wagesKey()],
+            arguments: ['key' => $key],
         );
 
         // About the wages issue specifically, not about the page being
         // empty: a cash sale leaves money with the seller, and that is its
         // own issue with its own life.
-        $this->assertFalse($this->isOpen($this->wagesKey()));
+        $this->assertFalse($this->isOpen($key));
 
-        // Five more days of ordinary trading.
+        // Five more days of ordinary trading in the new month.
         for ($i = 0; $i < 5; $i++) {
             $sell(100);
         }
 
-        $this->assertFalse($this->isOpen($this->wagesKey()));
+        $this->assertFalse($this->isOpen($key));
         $this->assertTrue(
-            $this->page()->getAnsweredIssues()->contains(fn ($i) => $i->key === $this->wagesKey())
+            $this->page()->getAnsweredIssues()->contains(fn ($i) => $i->key === $key)
         );
     }
 
@@ -299,18 +302,6 @@ class AnsweringAnIssueTest extends TestCase
     {
         Carbon::setTestNow();
         parent::tearDown();
-    }
-
-    /**
-     * The wages issue is keyed by the month it belongs to now, because a
-     * new month's unpaid payroll is a new problem and must not be covered
-     * by an answer given about the last one's.
-     */
-    private function wagesKey(): string
-    {
-        [$monthStart] = Jalali::currentMonthRange();
-
-        return 'monthly-wages-'.$monthStart->format('Y-m');
     }
 
     public function test_the_page_renders_with_an_answered_issue(): void
