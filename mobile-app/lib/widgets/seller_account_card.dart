@@ -129,7 +129,7 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
           Row(
             children: [
               const Icon(Icons.account_balance_wallet_rounded,
-                  size: 20, color: warn),
+                  size: IconSize.button, color: warn),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -198,7 +198,7 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
                       _expanded
                           ? Icons.keyboard_arrow_up_rounded
                           : Icons.keyboard_arrow_down_rounded,
-                      size: 18,
+                      size: IconSize.row,
                       color: scheme.primary,
                     ),
                   ],
@@ -250,7 +250,7 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
                     )
-                  : const Icon(Icons.handshake_rounded, size: 18),
+                  : const Icon(Icons.handshake_rounded, size: IconSize.row),
               label: Text(_sending ? 'در حال ارسال…' : 'درخواست تسویه حساب'),
             ),
             const SizedBox(height: 6),
@@ -292,7 +292,7 @@ class _AccountLine extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: IconSize.inline, color: color),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -334,7 +334,7 @@ class _PendingNotice extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.hourglass_top_rounded, size: 18, color: pending),
+          const Icon(Icons.hourglass_top_rounded, size: IconSize.row, color: pending),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -383,7 +383,7 @@ class _RejectionNotice extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, size: 18, color: rejected),
+          const Icon(Icons.info_outline_rounded, size: IconSize.row, color: rejected),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

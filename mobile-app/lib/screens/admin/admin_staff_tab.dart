@@ -60,7 +60,7 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                 StaffReportSection(api: widget.api),
                 const SizedBox(height: 40),
                 const EmptyState(
-                  icon: Icons.how_to_reg_outlined,
+                  icon: Icons.how_to_reg_rounded,
                   title: 'هنوز کسی تیک حضور نزده',
                   subtitle: 'ساعت ورود کارکنان اینجا نمایش داده می‌شود.',
                 ),
@@ -107,7 +107,7 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                   subtitle: Text(JalaliFormat.date(checkedInAt)),
                   trailing: Chip(
                     label: Text(JalaliFormat.time(checkedInAt)),
-                    avatar: const Icon(Icons.schedule_rounded, size: 16),
+                    avatar: const Icon(Icons.schedule_rounded, size: IconSize.inline),
                     backgroundColor:
                         AppColors.moneyIn.withValues(alpha: 0.15),
                   ),

@@ -88,7 +88,7 @@ class _PayCardState extends State<PayCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.savings_outlined, color: AppColors.signalFor(theme.brightness)),
+                Icon(Icons.savings_rounded, color: AppColors.signalFor(theme.brightness)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -157,7 +157,7 @@ class _PayCardState extends State<PayCard> {
               alignment: AlignmentDirectional.centerStart,
               child: TextButton.icon(
                 onPressed: _openAdvances,
-                icon: const Icon(Icons.pan_tool_alt_rounded, size: 18),
+                icon: const Icon(Icons.pan_tool_alt_rounded, size: IconSize.row),
                 label: Text(
                   pay?.hasPendingRequest == true
                       ? 'درخواست شما در انتظار پاسخ است'

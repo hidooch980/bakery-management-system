@@ -8,6 +8,7 @@ import '../../widgets/biometric_tile.dart';
 import 'change_password_screen.dart';
 import 'my_advances_screen.dart';
 import 'update_screen.dart';
+import '../../theme/app_theme.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -16,7 +17,7 @@ class SettingsScreen extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        icon: const Icon(Icons.logout_rounded, size: 32),
+        icon: const Icon(Icons.logout_rounded, size: IconSize.large),
         title: const Text('خروج از حساب'),
         content: const Text('آیا می‌خواهید از حساب خود خارج شوید؟'),
         actions: [
@@ -63,7 +64,7 @@ class SettingsScreen extends StatelessWidget {
                       radius: 30,
                       backgroundColor: scheme.primary.withValues(alpha: 0.15),
                       child: Icon(Icons.person_rounded,
-                          size: 32, color: scheme.primary),
+                          size: IconSize.large, color: scheme.primary),
                     ),
                     const SizedBox(width: 16),
                     Expanded(

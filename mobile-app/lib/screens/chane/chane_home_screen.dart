@@ -209,7 +209,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
           children: [
             Icon(
               Icons.hourglass_empty_rounded,
-              size: 56,
+              size: IconSize.emptyLarge,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
             ),
             const SizedBox(height: 18),

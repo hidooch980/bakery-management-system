@@ -317,7 +317,7 @@ class _StepButtonState extends State<_StepButton> {
             ),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          child: Icon(widget.icon, size: 32, semanticLabel: widget.label),
+          child: Icon(widget.icon, size: IconSize.large, semanticLabel: widget.label),
         ),
       ),
     );
@@ -501,7 +501,7 @@ class OneTaskDone extends StatelessWidget {
                   color: AppColors.success,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_rounded, size: 42, color: Colors.white),
+                child: const Icon(Icons.check_rounded, size: IconSize.empty, color: Colors.white),
               ),
             ),
             const SizedBox(height: 20),

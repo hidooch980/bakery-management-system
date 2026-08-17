@@ -6,6 +6,7 @@ use App\Support\Jalali;
 use App\Support\Money;
 use App\Support\PeriodBuckets;
 use App\Support\ReportSeries;
+use Filament\Actions\Action;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -49,9 +50,11 @@ class Reports extends Page implements HasForms
 
     public function mount(): void
     {
-        // Opens on the Jalali month in progress, which is the range the
-        // admin asks for far more often than any other.
-        [$start, $end] = Jalali::currentMonthRange();
+        // Opens on the shop's own month — the 5th to the 4th — because
+        // that is the cycle the flour quota runs on and therefore the one
+        // the shop is actually judged by. The calendar month puts four
+        // days at each end into the wrong period.
+        [$start, $end] = Jalali::currentQuotaPeriod();
 
         $this->form->fill([
             'from' => Jalali::date($start),
@@ -82,6 +85,55 @@ class Reports extends Page implements HasForms
                     ->native(false)
                     ->live(),
             ]),
+        ]);
+    }
+
+    /**
+     * The two ranges worth a click rather than four typed digits.
+     *
+     * Both are offered because they answer different questions: the quota
+     * period is what the flour allowance is measured against, and the
+     * calendar month is what the partners' split and every conversation
+     * outside the shop uses.
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('quotaPeriod')
+                ->label('دورهٔ سهمیه')
+                ->icon('heroicon-o-calendar-days')
+                ->color('primary')
+                ->tooltip('۵ این ماه تا ۴ ماه بعد — دوره‌ای که سهمیه آرد بر آن حساب می‌شود')
+                ->action(fn () => $this->useRange(Jalali::currentQuotaPeriod())),
+
+            Action::make('calendarMonth')
+                ->label('ماه شمسی')
+                ->icon('heroicon-o-calendar')
+                ->color('gray')
+                ->tooltip('۱ تا آخر ماه')
+                ->action(fn () => $this->useRange(Jalali::currentMonthRange())),
+
+            Action::make('previousQuotaPeriod')
+                ->label('دورهٔ قبل')
+                ->icon('heroicon-o-arrow-uturn-right')
+                ->color('gray')
+                ->action(fn () => $this->useRange(
+                    // A day before this period opened is inside the last
+                    // one, whichever month that lands in.
+                    Jalali::quotaPeriodFor(Jalali::currentQuotaPeriod()[0]->copy()->subDay())
+                )),
+        ];
+    }
+
+    /** @param  array{0: Carbon, 1: Carbon}  $range */
+    private function useRange(array $range): void
+    {
+        [$start, $end] = $range;
+
+        $this->form->fill([
+            'from' => Jalali::date($start),
+            'to' => Jalali::date($end),
+            'granularity' => $this->granularity,
         ]);
     }
 
@@ -121,7 +173,30 @@ class Reports extends Page implements HasForms
         [$from, $to] = $this->range();
 
         return Jalali::date($from).' تا '.Jalali::date($to)
+            // Saying which kind of window this is, because two dates alone
+            // do not tell the owner whether the quota figures below them
+            // are the ones the allowance is actually measured against.
+            .$this->windowName($from, $to)
             .'   —   '.PeriodBuckets::label($this->granularity());
+    }
+
+    private function windowName(Carbon $from, Carbon $to): string
+    {
+        $sameDay = fn (Carbon $a, Carbon $b) => $a->isSameDay($b);
+
+        [$quotaFrom, $quotaTo] = Jalali::quotaPeriodFor($from);
+
+        if ($sameDay($from, $quotaFrom) && $sameDay($to, $quotaTo)) {
+            return '  (دورهٔ سهمیه)';
+        }
+
+        [$monthFrom, $monthTo] = Jalali::monthRangeFor($from);
+
+        if ($sameDay($from, $monthFrom) && $sameDay($to, $monthTo)) {
+            return '  (ماه شمسی)';
+        }
+
+        return '';
     }
 
     private function granularity(): string

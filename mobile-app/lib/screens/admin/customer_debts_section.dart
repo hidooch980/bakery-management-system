@@ -191,7 +191,7 @@ class _DebtTile extends StatelessWidget {
               overdue
                   ? Icons.warning_amber_rounded
                   : Icons.schedule_rounded,
-              size: 15,
+              size: IconSize.inline,
               color: overdue ? AppColors.moneyOut : scheme.onSurfaceVariant,
             ),
             const SizedBox(width: 6),

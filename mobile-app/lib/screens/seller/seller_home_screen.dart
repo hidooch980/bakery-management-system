@@ -350,7 +350,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
       const SizedBox(height: 10),
       if (today.sales.isEmpty)
         const _InlineEmpty(
-          icon: Icons.receipt_long_outlined,
+          icon: Icons.receipt_long_rounded,
           text: 'امروز هنوز فروشی ثبت نشده است.',
         )
       else
@@ -392,7 +392,7 @@ class _SectionHeader extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(icon, size: 18, color: scheme.primary),
+        Icon(icon, size: IconSize.row, color: scheme.primary),
         const SizedBox(width: 8),
         Text(
           title,
@@ -441,7 +441,7 @@ class _InlineEmpty extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: scheme.onSurfaceVariant, size: 22),
+          Icon(icon, color: scheme.onSurfaceVariant, size: IconSize.button),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -473,7 +473,7 @@ class _SaleTile extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
           backgroundColor: scheme.primary.withValues(alpha: 0.14),
-          child: Icon(Icons.sell_rounded, color: scheme.primary, size: 20),
+          child: Icon(Icons.sell_rounded, color: scheme.primary, size: IconSize.button),
         ),
         title: Text(
           sale.amount != null
@@ -798,7 +798,7 @@ class _RemainingBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: color),
+          Icon(icon, size: IconSize.button, color: color),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -941,7 +941,7 @@ class _PaymentRow extends StatelessWidget {
                 decoration: const InputDecoration(
                   labelText: 'مشتری',
                   isDense: true,
-                  prefixIcon: Icon(Icons.account_balance_rounded, size: 20),
+                  prefixIcon: Icon(Icons.account_balance_rounded, size: IconSize.button),
                 ),
                 items: [
                   for (final customer in customers)
@@ -1032,7 +1032,7 @@ class _FlourSaleTile extends StatelessWidget {
             sale.unit == FlourUnit.bag
                 ? Icons.shopping_bag_rounded
                 : Icons.scale_rounded,
-            size: 20,
+            size: IconSize.button,
             color: AppColors.stock,
           ),
           const SizedBox(width: 10),

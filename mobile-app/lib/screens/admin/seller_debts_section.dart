@@ -300,7 +300,7 @@ class _SellerTile extends StatelessWidget {
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: onConfirm,
-                    icon: const Icon(Icons.check_rounded, size: 18),
+                    icon: const Icon(Icons.check_rounded, size: IconSize.row),
                     label: const Text('تأیید'),
                   ),
                 ),
@@ -308,7 +308,7 @@ class _SellerTile extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: onReject,
-                    icon: const Icon(Icons.close_rounded, size: 18),
+                    icon: const Icon(Icons.close_rounded, size: IconSize.row),
                     label: const Text('رد'),
                   ),
                 ),
@@ -317,7 +317,7 @@ class _SellerTile extends StatelessWidget {
           ] else if (settleable > 0)
             OutlinedButton.icon(
               onPressed: onSettle,
-              icon: const Icon(Icons.handshake_rounded, size: 18),
+              icon: const Icon(Icons.handshake_rounded, size: IconSize.row),
               label: const Text('ثبت تسویه'),
             ),
           const Divider(height: 22),

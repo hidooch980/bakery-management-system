@@ -66,7 +66,7 @@ class ActionCard extends StatelessWidget {
                   color: accent.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: accent, size: 28),
+                child: Icon(icon, color: accent, size: IconSize.heading),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -124,7 +124,7 @@ class StatTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 22),
+            Icon(icon, color: color, size: IconSize.button),
             const SizedBox(height: 10),
             Text(
               value,
@@ -178,7 +178,7 @@ class EmptyState extends StatelessWidget {
                 color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 40, color: scheme.onSurfaceVariant),
+              child: Icon(icon, size: IconSize.empty, color: scheme.onSurfaceVariant),
             ),
             const SizedBox(height: 20),
             Text(
@@ -221,7 +221,7 @@ class ErrorBox extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Icon(Icons.cloud_off_rounded, size: 40, color: scheme.error),
+            Icon(Icons.cloud_off_rounded, size: IconSize.empty, color: scheme.error),
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),

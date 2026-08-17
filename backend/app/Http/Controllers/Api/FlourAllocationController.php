@@ -7,6 +7,7 @@ use App\Models\FlourAllocation;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
+use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -129,7 +130,9 @@ class FlourAllocationController extends Controller
                 'allocated_kg' => (float) $p->allocated_kg,
                 'allocated_bags' => $allocation->bagsForPeriod($p),
                 'used_kg' => $p->used_kg,
+                'used_bags' => $this->inBags($p->used_kg),
                 'remaining_kg' => $p->remaining_kg,
+                'remaining_bags' => $this->inBags($p->remaining_kg),
                 'usage_percent' => $p->usage_percent,
                 'is_over' => $p->is_over,
                 // The quota restated as nanino loaves, against what the card
@@ -143,6 +146,78 @@ class FlourAllocationController extends Controller
                 'card_amount_formatted' => $p->card_amount_formatted,
                 'is_current' => $current !== null && $current->id === $p->id,
             ]),
+            'whole_period' => $this->wholePeriod($allocation),
+        ];
+    }
+
+    /**
+     * The three delivery periods added up: 5th to 4th, the shop's own
+     * month.
+     *
+     * The three answer "may I draw more this week"; this one answers "how
+     * did the month go", and until now that had to be added up in someone's
+     * head off three cards. Shaped exactly like a period so the app can
+     * draw it with the same card rather than a second kind of thing.
+     *
+     * Every figure is summed from the periods rather than recomputed over
+     * the window, so the total can never disagree with the cards above it —
+     * which is the whole reason for showing it in the same place.
+     */
+    /**
+     * A weight said in sacks, which is the unit the shop counts flour in.
+     *
+     * Derived here rather than in the app, so the sack size lives in one
+     * place. Signed: an overrun reads as negative sacks remaining, which is
+     * the honest way round.
+     */
+    private function inBags(float $kg): float
+    {
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+
+        return $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
+    }
+
+    private function wholePeriod(FlourAllocation $allocation): ?array
+    {
+        $periods = $allocation->periods;
+
+        if ($periods->isEmpty()) {
+            return null;
+        }
+
+        $first = $periods->sortBy('period_number')->first();
+        $last = $periods->sortByDesc('period_number')->first();
+
+        $sum = fn (string $field) => round($periods->sum(fn ($p) => (float) $p->{$field}), 3);
+
+        $allocated = $sum('allocated_kg');
+        $used = $sum('used_kg');
+
+        return [
+            'number' => 0,
+            'label' => 'کل دوره (۵ تا ۴ ماه بعد)',
+            'starts_on' => $first->starts_on?->toDateString(),
+            'ends_on' => $last->ends_on?->toDateString(),
+            'starts_on_display' => AppCalendar::date($first->starts_on),
+            'ends_on_display' => AppCalendar::date($last->ends_on),
+            'allocated_kg' => $allocated,
+            'allocated_bags' => round($periods->sum(fn ($p) => $allocation->bagsForPeriod($p)), 2),
+            'used_kg' => $used,
+            'used_bags' => $this->inBags($used),
+            'remaining_kg' => round($allocated - $used, 3),
+            'remaining_bags' => $this->inBags($allocated - $used),
+            'usage_percent' => $allocated > 0 ? round($used / $allocated * 100, 1) : 0.0,
+            'is_over' => $used > $allocated,
+            'allocated_bread_count' => (int) $periods->sum('allocated_bread_count'),
+            'card_bread_count' => (int) $periods->sum('card_bread_count'),
+            'bread_remainder' => (int) $periods->sum('bread_remainder'),
+            'card_amount' => round($periods->sum(fn ($p) => (float) $p->card_amount), 2),
+            'card_amount_formatted' => Money::format(
+                round($periods->sum(fn ($p) => (float) $p->card_amount), 2)
+            ),
+            // Never the current one: it is the whole window, not the slice
+            // the shop is drawing from today.
+            'is_current' => false,
         ];
     }
 }

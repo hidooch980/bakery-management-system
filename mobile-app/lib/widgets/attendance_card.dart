@@ -133,7 +133,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
                             ? Icons.how_to_reg_rounded
                             : Icons.fingerprint_rounded,
                         color: _checkedIn ? done : scheme.primary,
-                        size: 30,
+                        size: IconSize.large,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -180,7 +180,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
                       )
                     else if (_checkedIn)
                       const Icon(Icons.check_circle_rounded,
-                          color: done, size: 32)
+                          color: done, size: IconSize.large)
                     else
                       FilledButton(
                         onPressed: _submitting ? null : _checkIn,
@@ -208,7 +208,7 @@ class _AttendanceCardState extends State<AttendanceCard> {
                           isScrollControlled: true,
                           builder: (_) => _RosterSheet(api: widget.api),
                         ),
-                        icon: const Icon(Icons.groups_rounded, size: 18),
+                        icon: const Icon(Icons.groups_rounded, size: IconSize.row),
                         label: const Text('ثبت حضور بقیه کارکنان'),
                       ),
                     ],
@@ -347,7 +347,7 @@ class _RosterSheetState extends State<_RosterSheet> {
                       setState(() => _error = null);
                       _load();
                     },
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    icon: const Icon(Icons.refresh_rounded, size: IconSize.row),
                     label: const Text('دوباره'),
                   ),
                 ],
@@ -388,7 +388,7 @@ class _RosterSheetState extends State<_RosterSheet> {
                             ),
                       trailing: person.checkedIn
                           ? const Icon(Icons.check_circle_rounded,
-                              color: done, size: 28)
+                              color: done, size: IconSize.heading)
                           : FilledButton(
                               onPressed:
                                   working ? null : () => _tickIn(person),

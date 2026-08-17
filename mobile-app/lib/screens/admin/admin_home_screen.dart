@@ -9,6 +9,7 @@ import 'admin_finance_tab.dart';
 import 'admin_overview_tab.dart';
 import 'admin_staff_tab.dart';
 import 'admin_warehouse_tab.dart';
+import '../../theme/app_theme.dart';
 
 /// The admin's own app: today's numbers, money, stock and staff — the same
 /// information as the web panel, laid out for a phone.
@@ -104,7 +105,7 @@ class AdminSection extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: scheme.primary),
+              Icon(icon, size: IconSize.row, color: scheme.primary),
               const SizedBox(width: 8),
               Text(
                 title,
@@ -156,7 +157,7 @@ class AdminRow extends StatelessWidget {
       child: Row(
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 20, color: color ?? scheme.onSurfaceVariant),
+            Icon(icon, size: IconSize.button, color: color ?? scheme.onSurfaceVariant),
             const SizedBox(width: 12),
           ],
           Expanded(
@@ -177,7 +178,7 @@ class AdminRow extends StatelessWidget {
           if (onTap != null) ...[
             const SizedBox(width: 6),
             Icon(Icons.chevron_left_rounded,
-                size: 20, color: scheme.onSurfaceVariant),
+                size: IconSize.button, color: scheme.onSurfaceVariant),
           ],
         ],
       ),

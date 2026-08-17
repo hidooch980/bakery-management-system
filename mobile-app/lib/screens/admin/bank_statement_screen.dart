@@ -185,7 +185,7 @@ class _MoveTile extends StatelessWidget {
                     ? Icons.south_west_rounded
                     : Icons.north_east_rounded,
                 color: accent,
-                size: 20,
+                size: IconSize.button,
               ),
             ),
             const SizedBox(width: 12),

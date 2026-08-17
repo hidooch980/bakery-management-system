@@ -133,7 +133,7 @@ class _SplashScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(26),
               ),
               child: const Icon(Icons.bakery_dining_rounded,
-                  size: 48, color: AppColors.onSignal),
+                  size: IconSize.emptyLarge, color: AppColors.onSignal),
             ),
             const SizedBox(height: 28),
             Text(
@@ -170,7 +170,7 @@ class _UnknownRoleScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.help_outline_rounded,
-                  size: 64, color: Theme.of(context).colorScheme.error),
+                  size: IconSize.hero, color: Theme.of(context).colorScheme.error),
               const SizedBox(height: 20),
               Text(
                 'نقشی برای حساب شما تعریف نشده است',

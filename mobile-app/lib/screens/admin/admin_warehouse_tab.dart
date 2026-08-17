@@ -22,6 +22,13 @@ typedef _WarehouseData = ({
 });
 
 /// Stock levels, today's flour sales, and the quota for the current period.
+/// A figure without a pointless trailing zero: «۴٬۶۰۰», not «۴٬۶۰۰٫۰۰».
+String _fmt(dynamic value) {
+  final number = value is num ? value : (num.tryParse('$value') ?? 0);
+
+  return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
+}
+
 class AdminWarehouseTab extends StatefulWidget {
   const AdminWarehouseTab({super.key, required this.api});
 
@@ -145,7 +152,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
 
               if (quota == null)
                 const EmptyState(
-                  icon: Icons.calendar_today_outlined,
+                  icon: Icons.calendar_today_rounded,
                   title: 'سهمیه‌ای تعریف نشده',
                   subtitle: 'سهمیه ماهانه آرد را از پنل مدیریت ثبت کنید.',
                 )
@@ -180,6 +187,17 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
           padding: const EdgeInsets.only(bottom: 12),
           child: _PeriodCard(period: period),
         ),
+      // The three added up: the shop's own month, 5th to 4th. The three
+      // above answer «may I draw more this week»; this answers «how did
+      // the month go», which until now had to be added up in someone's
+      // head off three cards. Drawn with the same card so it reads as the
+      // same kind of thing, and summed by the server off those very
+      // periods so it can never disagree with them.
+      if (quota['whole_period'] is Map<String, dynamic>)
+        _PeriodCard(
+          period: quota['whole_period'] as Map<String, dynamic>,
+          isTotal: true,
+        ),
     ];
   }
 
@@ -190,11 +208,6 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
         _ => Icons.inventory_rounded,
       };
 
-  static String _fmt(dynamic value) {
-    final number = value is num ? value : (num.tryParse('$value') ?? 0);
-
-    return number.toStringAsFixed(number == number.roundToDouble() ? 0 : 2);
-  }
 
   /// "۴ کیسه  •  ۱۰۰ کیلوگرم" — the bag count leads, the weight follows.
   ///
@@ -211,11 +224,38 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
   }
 }
 
-/// One of the three delivery periods, with a usage bar.
+/// One of the three delivery periods, with a usage bar — or all three
+/// added together, which is drawn the same way with a rule above it.
 class _PeriodCard extends StatelessWidget {
-  const _PeriodCard({required this.period});
+  const _PeriodCard({required this.period, this.isTotal = false});
+
+  /// The whole 5th-to-4th window rather than a slice of it. It never
+  /// carries the «current period» outline, because it is not the slice the
+  /// shop is drawing from today — it is all of them.
+  final bool isTotal;
 
   final Map<String, dynamic> period;
+
+
+  /// A sack count reads better without a trailing zero: «۱۱۵ کیسه», not
+  /// «۱۱۵٫۰».
+  static String _bags(dynamic value) {
+    final bags = value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+
+    return bags % 1 == 0 ? bags.toStringAsFixed(0) : bags.toStringAsFixed(1);
+  }
+
+  /// The server sends sacks for the allocation; for what was used and what
+  /// is left, they are the same weight over the same sack size.
+  static double _bagsFromKg(Map<String, dynamic> period, String key) {
+    final kg = (period[key] as num?)?.toDouble() ?? 0;
+    final allocatedKg = (period['allocated_kg'] as num?)?.toDouble() ?? 0;
+    final allocatedBags = (period['allocated_bags'] as num?)?.toDouble() ?? 0;
+
+    if (allocatedKg <= 0 || allocatedBags <= 0) return 0;
+
+    return kg / (allocatedKg / allocatedBags);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +282,7 @@ class _PeriodCard extends StatelessWidget {
         ? Theme.of(context).colorScheme.error
         : (percent >= 80 ? AppColors.attention : null);
 
-    return Card(
+    final card = Card(
       // The period in progress is the one that matters most.
       shape: isCurrent
           ? RoundedRectangleBorder(
@@ -294,28 +334,124 @@ class _PeriodCard extends StatelessWidget {
                     .withValues(alpha: 0.4),
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'مصرف ${period['used_kg']} از ${period['allocated_kg']} کیلوگرم',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                Text(
-                  isOver
-                      ? 'بیش از سهمیه'
-                      : 'باقی‌مانده ${period['remaining_kg']} کیلوگرم',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: wordsColour,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-              ],
+            const SizedBox(height: 12),
+            // Sacks, because sacks are what the shop counts flour in — the
+            // kilos follow in brackets for the books. «هر آرد ورودی کیسه
+            // است نه ریال», and the same goes for what goes out.
+            _FlourRow(
+              label: 'سهمیه دوره',
+              bags: _bags(period['allocated_bags']),
+              kg: period['allocated_kg'],
+            ),
+            _FlourRow(
+              label: 'مصرف شده',
+              bags: _bags(period['used_bags'] ?? _bagsFromKg(period, 'used_kg')),
+              kg: period['used_kg'],
+            ),
+            _FlourRow(
+              label: isOver ? 'بیش از سهمیه' : 'باقی‌مانده',
+              bags: _bags(period['remaining_bags'] ?? _bagsFromKg(period, 'remaining_kg')),
+              kg: period['remaining_kg'],
+              colour: wordsColour,
+              emphasise: true,
             ),
             _BreadReconciliation(period: period),
           ],
         ),
+      ),
+    );
+
+    if (!isTotal) return card;
+
+    // A rule and a word, because a fourth card in a row of three reads as
+    // a fourth period unless something says otherwise.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              Expanded(child: Divider(color: scheme.outlineVariant)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  'جمع هر سه دوره',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+              Expanded(child: Divider(color: scheme.outlineVariant)),
+            ],
+          ),
+        ),
+        card,
+      ],
+    );
+  }
+}
+
+/// «سهمیه دوره        ۱۱۵ کیسه · ۴٬۶۰۰ کگ»
+///
+/// Sacks lead because that is the unit the shop trades, counts and argues
+/// in; the weight follows quietly for the books.
+class _FlourRow extends StatelessWidget {
+  const _FlourRow({
+    required this.label,
+    required this.bags,
+    required this.kg,
+    this.colour,
+    this.emphasise = false,
+  });
+
+  final String label;
+  final String bags;
+  final dynamic kg;
+  final Color? colour;
+  final bool emphasise;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colour ?? scheme.onSurfaceVariant,
+              fontWeight: emphasise ? FontWeight.w700 : null,
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            textBaseline: TextBaseline.alphabetic,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            children: [
+              Text(
+                '$bags کیسه',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: emphasise ? FontWeight.w800 : FontWeight.w600,
+                  color: colour ?? scheme.onSurface,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              Text(
+                '  ·  ${_fmt(kg)} کگ',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -359,7 +495,7 @@ class _BreadReconciliation extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(Icons.bakery_dining_rounded, size: 16, color: scheme.primary),
+              Icon(Icons.bakery_dining_rounded, size: IconSize.inline, color: scheme.primary),
               const SizedBox(width: 6),
               Text(
                 'نان دوره',

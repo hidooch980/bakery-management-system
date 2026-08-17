@@ -121,7 +121,7 @@ class _FollowUpTile extends StatelessWidget {
           children: [
             Icon(
               overdue ? Icons.warning_amber_rounded : Icons.schedule_rounded,
-              size: 16,
+              size: IconSize.inline,
               color: accent,
             ),
             const SizedBox(width: 8),

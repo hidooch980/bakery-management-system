@@ -127,7 +127,7 @@ class _DieselSectionState extends State<DieselSection> {
           icon: Icons.local_gas_station_rounded,
           trailing: TextButton.icon(
             onPressed: _recordDelivery,
-            icon: const Icon(Icons.add_rounded, size: 18),
+            icon: const Icon(Icons.add_rounded, size: IconSize.row),
             label: const Text('ثبت تحویل'),
           ),
           children: [
@@ -187,7 +187,7 @@ class _DieselSectionState extends State<DieselSection> {
                 alignment: AlignmentDirectional.centerStart,
                 child: TextButton.icon(
                   onPressed: () => _changeRate(quota),
-                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  icon: const Icon(Icons.tune_rounded, size: IconSize.row),
                   label: const Text('تغییر لیتر هر کیسه'),
                 ),
               ),
@@ -330,7 +330,7 @@ class _DeliverySheetState extends State<_DeliverySheet> {
             autofocus: true,
             decoration: const InputDecoration(
               labelText: 'لیتر',
-              prefixIcon: Icon(Icons.water_drop_outlined),
+              prefixIcon: Icon(Icons.water_drop_rounded),
             ),
           ),
           const SizedBox(height: 12),
@@ -342,7 +342,7 @@ class _DeliverySheetState extends State<_DeliverySheet> {
               // Quota fuel carries no invoice, so this is left empty more
               // often than it is filled.
               helperText: 'اگر سهمیه‌ای بوده خالی بگذارید',
-              prefixIcon: Icon(Icons.payments_outlined),
+              prefixIcon: Icon(Icons.payments_rounded),
             ),
           ),
           const SizedBox(height: 12),
@@ -350,7 +350,7 @@ class _DeliverySheetState extends State<_DeliverySheet> {
             controller: _docket,
             decoration: const InputDecoration(
               labelText: 'شماره حواله',
-              prefixIcon: Icon(Icons.receipt_long_outlined),
+              prefixIcon: Icon(Icons.receipt_long_rounded),
             ),
           ),
           const SizedBox(height: 20),

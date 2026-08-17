@@ -79,7 +79,7 @@ class _Heading extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: scheme.primary),
+          Icon(icon, size: IconSize.row, color: scheme.primary),
           const SizedBox(width: 8),
           Text(
             title,
@@ -265,7 +265,7 @@ class _ProductionSectionState extends State<_ProductionSection> {
                     children: [
                       Icon(
                         Icons.check_circle_outline_rounded,
-                        size: 20,
+                        size: IconSize.button,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 10),
@@ -642,7 +642,7 @@ class _ChaneSheetState extends State<_ChaneSheet> {
                     Row(
                       children: [
                         const Icon(Icons.error_outline_rounded,
-                            size: 18, color: AppColors.attention),
+                            size: IconSize.row, color: AppColors.attention),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -667,7 +667,7 @@ class _ChaneSheetState extends State<_ChaneSheet> {
                         _showMore
                             ? Icons.expand_less_rounded
                             : Icons.expand_more_rounded,
-                        size: 20,
+                        size: IconSize.button,
                       ),
                       label: Text(_showMore ? 'بستن' : 'نانینو و آرد پاششی'),
                     ),
@@ -680,7 +680,7 @@ class _ChaneSheetState extends State<_ChaneSheet> {
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'تعداد چانه نانینو',
-                        prefixIcon: Icon(Icons.bakery_dining_outlined),
+                        prefixIcon: Icon(Icons.bakery_dining_rounded),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -802,7 +802,7 @@ class _Round extends StatelessWidget {
           onTap: onTap,
           child: Icon(
             icon,
-            size: 28,
+            size: IconSize.heading,
             color: onTap == null
                 ? Theme.of(context).disabledColor
                 : Theme.of(context).colorScheme.onSurface,
@@ -892,7 +892,7 @@ class _FlourSectionState extends State<_FlourSection> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _open(context, AdminRecordKind.intake),
-                icon: const Icon(Icons.local_shipping_rounded, size: 18),
+                icon: const Icon(Icons.local_shipping_rounded, size: IconSize.row),
                 label: const Text('ورودی انبار'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(50),
@@ -903,7 +903,7 @@ class _FlourSectionState extends State<_FlourSection> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _open(context, AdminRecordKind.consignment),
-                icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                icon: const Icon(Icons.swap_horiz_rounded, size: IconSize.row),
                 label: const Text('آرد همکار'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(50),
@@ -945,7 +945,7 @@ class _FlourOnHand extends StatelessWidget {
             padding: const EdgeInsetsDirectional.only(end: 4),
             child: Icon(
               Icons.error_outline_rounded,
-              size: 15,
+              size: IconSize.inline,
               color: AppColors.attention,
             ),
           ),
@@ -1069,7 +1069,7 @@ class _AttendanceRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       child: Row(
         children: [
-          Icon(Icons.person_rounded, size: 20, color: scheme.onSurfaceVariant),
+          Icon(Icons.person_rounded, size: IconSize.button, color: scheme.onSurfaceVariant),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

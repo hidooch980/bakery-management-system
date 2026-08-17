@@ -36,7 +36,7 @@ class MeScreen extends StatelessWidget {
           const SizedBox(height: 14),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.receipt_long_outlined),
+              leading: const Icon(Icons.receipt_long_rounded),
               title: const Text('علی‌الحساب‌های من'),
               subtitle: const Text('آنچه گرفته‌ام و آنچه خواسته‌ام'),
               trailing: const Icon(Icons.chevron_left_rounded),

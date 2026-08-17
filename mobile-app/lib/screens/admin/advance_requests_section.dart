@@ -236,7 +236,7 @@ class _RequestTile extends StatelessWidget {
           children: [
             TextButton.icon(
               onPressed: onApprove,
-              icon: const Icon(Icons.check_rounded, size: 18),
+              icon: const Icon(Icons.check_rounded, size: IconSize.row),
               label: const Text('تأیید'),
             ),
             TextButton.icon(
@@ -244,7 +244,7 @@ class _RequestTile extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.moneyOut,
               ),
-              icon: const Icon(Icons.close_rounded, size: 18),
+              icon: const Icon(Icons.close_rounded, size: IconSize.row),
               label: const Text('رد'),
             ),
           ],

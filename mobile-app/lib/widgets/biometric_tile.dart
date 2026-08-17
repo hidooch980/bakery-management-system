@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/biometric_service.dart';
 import 'common.dart';
+import '../theme/app_theme.dart';
 
 /// Settings row for turning fingerprint or face unlock on and off.
 ///
@@ -105,7 +106,7 @@ class _BiometricTileState extends State<BiometricTile> {
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        icon: const Icon(Icons.fingerprint_rounded, size: 32),
+        icon: const Icon(Icons.fingerprint_rounded, size: IconSize.large),
         title: Text('فعال‌سازی ورود با $_label'),
         content: Column(
           mainAxisSize: MainAxisSize.min,

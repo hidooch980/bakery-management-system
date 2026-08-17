@@ -11,6 +11,9 @@ use Morilog\Jalali\Jalalian;
  */
 class Jalali
 {
+    /** The shop's month opens on the 5th — the flour quota's own cycle. */
+    public const QUOTA_PERIOD_STARTS_ON = 5;
+
     /** Years at or above this are Gregorian, not Jalali. */
     private const MAX_JALALI_YEAR = 1700;
 
@@ -135,6 +138,50 @@ class Jalali
             Carbon::instance($jalali->getFirstDayOfMonth()->toCarbon())->startOfDay(),
             Carbon::instance($jalali->getEndDayOfMonth()->toCarbon())->endOfDay(),
         ];
+    }
+
+    /**
+     * The shop's own month: the 5th to the 4th of the next.
+     *
+     * The flour quota runs on this cycle, not on the calendar month, and
+     * so does everything downstream of it — how much may be drawn, which
+     * of the three delivery periods a bake falls in, whether a period went
+     * over. Judging the shop by the Jalali month puts four days at each
+     * end into the wrong quota, which is a mistake I have already made once
+     * on this system.
+     *
+     * Named here rather than worked out where it is needed, so the report,
+     * the quota page and the scanner cannot drift into three answers.
+     */
+    public static function quotaPeriodFor(Carbon $date): array
+    {
+        $jalali = Jalalian::fromCarbon($date);
+
+        // Before the 5th, the period in progress is the one that opened
+        // last month.
+        $start = $jalali->getDay() >= self::QUOTA_PERIOD_STARTS_ON
+            ? $jalali->getFirstDayOfMonth()->addDays(self::QUOTA_PERIOD_STARTS_ON - 1)
+            : $jalali->getFirstDayOfMonth()->subMonths(1)->addDays(self::QUOTA_PERIOD_STARTS_ON - 1);
+
+        $end = $start->addMonths(1)->subDays(1);
+
+        return [
+            Carbon::instance($start->toCarbon())->startOfDay(),
+            Carbon::instance($end->toCarbon())->endOfDay(),
+        ];
+    }
+
+    public static function currentQuotaPeriod(): array
+    {
+        return self::quotaPeriodFor(Carbon::now());
+    }
+
+    /** «۵ مرداد تا ۴ شهریور» — the period said the way the shop says it. */
+    public static function quotaPeriodLabel(Carbon $date): string
+    {
+        [$from, $to] = self::quotaPeriodFor($date);
+
+        return self::date($from).' تا '.self::date($to);
     }
 
     public static function toLatinDigits(string $value): string

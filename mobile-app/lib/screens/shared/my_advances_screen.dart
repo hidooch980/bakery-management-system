@@ -168,7 +168,7 @@ class _MyAdvancesScreenState extends State<MyAdvancesScreen> {
                   const Padding(
                     padding: EdgeInsets.only(top: 40),
                     child: EmptyState(
-                      icon: Icons.wallet_outlined,
+                      icon: Icons.wallet_rounded,
                       title: 'چیزی ثبت نشده',
                       subtitle: 'تا امروز علی‌الحسابی نگرفته‌اید.',
                     ),
@@ -395,7 +395,7 @@ class _RequestSheetState extends State<_RequestSheet> {
             autofocus: true,
             decoration: const InputDecoration(
               labelText: 'مبلغ',
-              prefixIcon: Icon(Icons.payments_outlined),
+              prefixIcon: Icon(Icons.payments_rounded),
             ),
           ),
           const SizedBox(height: 12),

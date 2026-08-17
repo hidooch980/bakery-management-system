@@ -77,12 +77,12 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
                   ButtonSegment(
                     value: 'cash',
                     label: Text('نقد'),
-                    icon: Icon(Icons.payments_rounded, size: 18),
+                    icon: Icon(Icons.payments_rounded, size: IconSize.row),
                   ),
                   ButtonSegment(
                     value: 'card',
                     label: Text('کارتخوان'),
-                    icon: Icon(Icons.credit_card_rounded, size: 18),
+                    icon: Icon(Icons.credit_card_rounded, size: IconSize.row),
                   ),
                 ],
                 selected: {method},
@@ -157,7 +157,7 @@ class _SellerCollectionsCardState extends State<SellerCollectionsCard> {
         children: [
           Row(
             children: [
-              const Icon(Icons.account_balance_rounded, size: 20, color: accent),
+              const Icon(Icons.account_balance_rounded, size: IconSize.button, color: accent),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(

@@ -271,7 +271,7 @@ class _QuickRecordButton extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(kind.icon, size: 20, color: kind.color),
+            Icon(kind.icon, size: IconSize.button, color: kind.color),
             const SizedBox(width: 8),
             Expanded(
               child: Text(

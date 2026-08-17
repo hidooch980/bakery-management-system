@@ -85,7 +85,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
     final open = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        icon: const Icon(Icons.shield_outlined, size: 32),
+        icon: const Icon(Icons.shield_rounded, size: IconSize.large),
         title: const Text('اجازه نصب لازم است'),
         content: const Text(
           'اندروید برای نصب برنامه‌هایی که از فروشگاه نیامده‌اند، یک اجازه '
@@ -226,7 +226,7 @@ class _UpdateAvailableCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(Icons.system_update_rounded,
-                      color: AppColors.moneyIn, size: 28),
+                      color: AppColors.moneyIn, size: IconSize.heading),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -295,7 +295,7 @@ class _UpdateAvailableCard extends StatelessWidget {
             const SizedBox(height: 12),
             TextButton.icon(
               onPressed: onOpenPermissionSettings,
-              icon: const Icon(Icons.shield_outlined, size: 18),
+              icon: const Icon(Icons.shield_rounded, size: IconSize.row),
               label: const Text('تنظیم اجازه نصب (یک‌بار لازم است)'),
               style: TextButton.styleFrom(
                 foregroundColor: scheme.onSurfaceVariant,
@@ -346,7 +346,7 @@ class _InstallFailedHintState extends State<_InstallFailedHint> {
             _open
                 ? Icons.keyboard_arrow_up_rounded
                 : Icons.help_outline_rounded,
-            size: 18,
+            size: IconSize.row,
           ),
           label: const Text('نصب نشد؟'),
           style: TextButton.styleFrom(

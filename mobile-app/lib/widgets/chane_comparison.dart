@@ -162,7 +162,7 @@ class _NaninoEquivalentBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: ChaneComparison._naninoColor),
+          Icon(icon, size: IconSize.row, color: ChaneComparison._naninoColor),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

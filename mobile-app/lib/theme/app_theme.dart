@@ -137,6 +137,40 @@ class AppColors {
       };
 }
 
+/// The sizes icons come in.
+///
+/// The app had twelve — 15, 16, 18, 20, 22, 28, 32, 40, 42, 48, 56, 64 —
+/// five of them used once or twice, which is what makes a screen look
+/// unsettled without anything on it being obviously wrong. Six steps now,
+/// each with a job, so the next icon is chosen rather than measured.
+class IconSize {
+  const IconSize._();
+
+  /// Beside small print — a hint, a chip, a table cell.
+  static const double inline = 16;
+
+  /// The ordinary one: rows, section headings, list leading icons.
+  static const double row = 18;
+
+  /// Buttons and anything a thumb aims at.
+  static const double button = 20;
+
+  /// Large enough to carry a heading on its own.
+  static const double heading = 28;
+
+  /// A dialog's mark, a big tick, the icon inside a round avatar.
+  static const double large = 32;
+
+  /// The mark on an empty state, where the icon is most of the screen.
+  static const double empty = 40;
+
+  /// The same, when the screen has nothing else on it at all.
+  static const double emptyLarge = 56;
+
+  /// The one mark a screen is about — a tick, a logo.
+  static const double hero = 64;
+}
+
 class AppTheme {
   static const _fontFamily = 'Vazirmatn';
 
