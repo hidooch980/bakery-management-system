@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../../models/bakery.dart';
 import '../../models/chane_board.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/attendance_card.dart';
-import '../../widgets/pay_card.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
-import '../../widgets/role_home_scaffold.dart';
+import '../shared/me_screen.dart';
+import '../shared/settings_screen.dart';
 
-/// The shater works the oven, so this screen answers one question at a
-/// glance: how many chane are waiting. Everything else is secondary.
+/// The shater records nothing. He wants one number.
+///
+/// «چقدر چانه منتظر تنور است؟» — and until now the answer to that was the
+/// fourth thing down a scrolling page, under a greeting, his attendance
+/// and his own pay. The other roles ask one question a screen; this role
+/// is asked nothing, so it is given one answer a screen instead, in the
+/// same shape and the same size of figure.
+///
+/// What is behind it — the batches making up the total, the nanino
+/// comparison the flour quota follows — is below, for when he wants it.
+/// Attendance and pay moved behind «حساب من» in the bar with everyone
+/// else's.
 class ShaterHomeScreen extends StatefulWidget {
   const ShaterHomeScreen({super.key, required this.api});
 
@@ -32,8 +38,8 @@ class _ShaterHomeScreenState extends State<ShaterHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadBakery();
     _board = widget.api.chaneBoard();
+    _loadBakery();
   }
 
   Future<void> _loadBakery() async {
@@ -41,140 +47,143 @@ class _ShaterHomeScreenState extends State<ShaterHomeScreen> {
       final bakery = await widget.api.bakery();
       if (mounted) setState(() => _bakery = bakery);
     } on ApiException {
-      // The page reads fine without the shop's name in the bar.
+      // The figure reads fine without the shop's name over it.
     }
   }
 
-  void _reload() {
+  Future<void> _reload() async {
     setState(() => _board = widget.api.chaneBoard());
+    await _board;
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthProvider>().user;
-
-    return RoleHomeScaffold(
-      api: widget.api,
-      bakery: _bakery,
-      tabs: [
-        HomeTab(
-          label: 'شاطر',
-          title: 'شاطر',
-          icon: Icons.local_fire_department_outlined,
-          selectedIcon: Icons.local_fire_department_rounded,
-          builder: (_) => RefreshIndicator(
-            onRefresh: () async => _reload(),
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                Text(
-                  'سلام ${user?.name ?? ''}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 20),
-                AttendanceCard(api: widget.api),
-                const SizedBox(height: 14),
-                PayCard(api: widget.api),
-                const SizedBox(height: 20),
-                FutureBuilder<ChaneBoard>(
-                  future: _board,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 60),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-
-                    if (snapshot.hasError) {
-                      return ErrorBox(
-                        message: '${snapshot.error}',
-                        onRetry: _reload,
-                      );
-                    }
-
-                    final board = snapshot.data!;
-
-                    return Column(
-                      children: [
-                        _WaitingCard(board: board),
-                        const SizedBox(height: 16),
-                        ChaneComparison(board: board),
-                        const SizedBox(height: 16),
-                        _QueueCard(board: board),
-                      ],
-                    );
-                  },
-                ),
-              ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_bakery?.name ?? 'شاطر'),
+        centerTitle: false,
+        titleTextStyle: Theme.of(context).textTheme.titleMedium,
+        actions: [
+          IconButton(
+            tooltip: 'حساب من',
+            icon: const Icon(Icons.person_outline_rounded),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => MeScreen(api: widget.api)),
             ),
           ),
+          IconButton(
+            tooltip: 'تنظیمات',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _reload,
+        child: FutureBuilder<ChaneBoard>(
+          future: _board,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              return ListView(
+                padding: const EdgeInsets.all(20),
+                children: [ErrorBox(message: '${snapshot.error}', onRetry: _reload)],
+              );
+            }
+
+            return _waiting(snapshot.data!);
+          },
         ),
+      ),
+    );
+  }
+
+  Widget _waiting(ChaneBoard board) {
+    final theme = Theme.of(context);
+    final waiting = board.waitingChane;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+      children: [
+        Text(
+          'منتظر تنور',
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          textBaseline: TextBaseline.alphabetic,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          children: [
+            Text(
+              '$waiting',
+              style: theme.textTheme.displayLarge?.copyWith(
+                fontSize: 92,
+                height: 1.05,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -3,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text('چانه', style: theme.textTheme.titleLarge),
+          ],
+        ),
+        Text(
+          waiting == 0
+              ? 'چیزی در صف نیست'
+              : 'در ${board.waitingBatches} دسته'
+                  '${board.pendingDoughBatches > 0 ? '، و ${board.pendingDoughBags} کیسه خمیر هنوز چانه نشده' : ''}',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
+        const SizedBox(height: 26),
+        ChaneComparison(board: board),
+        const SizedBox(height: 16),
+        _Today(board: board),
       ],
     );
   }
 }
 
-/// The headline number: chane waiting for the oven.
-class _WaitingCard extends StatelessWidget {
-  const _WaitingCard({required this.board});
+/// What the day has produced so far — read after the figure that mattered,
+/// not before it.
+class _Today extends StatelessWidget {
+  const _Today({required this.board});
 
   final ChaneBoard board;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final hasWork = board.waitingChane > 0;
-    final accent = hasWork ? scheme.primary : const Color(0xFF2E9E6B);
+    final theme = Theme.of(context);
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+        padding: const EdgeInsets.all(18),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.14),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                hasWork
-                    ? Icons.local_fire_department_rounded
-                    : Icons.check_circle_rounded,
-                size: 40,
-                color: accent,
-              ),
-            ),
-            const SizedBox(height: 18),
             Text(
-              'چانه در انتظار پخت',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+              'امروز — ${board.dateDisplay}',
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 8),
-            // Deliberately oversized — readable across the bakery floor.
-            Text(
-              '${board.waitingChane}',
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: accent,
-                  ),
+            const SizedBox(height: 12),
+            _Row(label: 'چانهٔ عادی', value: '${board.normalCount}'),
+            _Row(label: 'چانهٔ نانینو', value: '${board.naninoCount}'),
+            _Row(
+              label: 'وزن کل',
+              value: '${board.totalWeightKg.toStringAsFixed(1)} کیلوگرم',
             ),
-            const SizedBox(height: 6),
-            Text(
-              hasWork
-                  ? 'در ${board.waitingBatches} دسته'
-                  : 'همه چانه‌ها پخته شده‌اند',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-            ),
+            _Row(label: 'کیسهٔ خمیر امروز', value: '${board.doughBagsToday}'),
           ],
         ),
       ),
@@ -182,55 +191,35 @@ class _WaitingCard extends StatelessWidget {
   }
 }
 
-class _QueueCard extends StatelessWidget {
-  const _QueueCard({required this.board});
+class _Row extends StatelessWidget {
+  const _Row({required this.label, required this.value});
 
-  final ChaneBoard board;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.emberHot.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(Icons.inventory_2_rounded,
-                  color: AppColors.emberHot, size: 24),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'خمیر در انتظار چانه',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${board.pendingDoughBags} کیسه در ${board.pendingDoughBatches} دسته',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
