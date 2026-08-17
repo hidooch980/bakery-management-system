@@ -13,20 +13,48 @@ import 'package:flutter/material.dart';
 /// Dark is the design; light is the same identity in daylight, for the
 /// owner reading figures at a desk rather than the floor reading them
 /// beside an oven. Both keep contrast high rather than softening it.
+/// The shop's palette — "one task".
+///
+/// A near-black ground and a single yellow. The yellow is not decoration
+/// and never appears twice on a screen: it marks the one thing to be
+/// touched. That is the whole design — a person holding the phone with
+/// floury hands at four in the morning should be able to see, without
+/// reading, where their thumb goes.
+///
+/// Dark is the design. Light is the same identity in daylight — white
+/// ground, the same yellow, the same rule about it appearing once — for
+/// the owner reading figures at a desk rather than the floor reading them
+/// beside an oven.
+///
+/// The ember ramp survives from the previous palette because a few
+/// readings genuinely are a scale rather than a state: the diesel meter
+/// fills from dull to bright as the quota goes. It is now built out of
+/// the yellow so it belongs to this palette rather than the old one.
 class AppColors {
+  // ------------------------------------------------------- the yellow
+
+  /// The one accent. Everything touchable is this; nothing else is.
+  static const Color signal = Color(0xFFF5C518);
+
+  /// On a pale ground the same yellow turns to highlighter, so it darkens.
+  static const Color signalInk = Color(0xFF8A6D00);
+
+  /// Text and icons sitting on the yellow.
+  static const Color onSignal = Color(0xFF17150A);
+
   // ---------------------------------------------------- the ember ramp
 
   /// Dullest — plenty left, nothing to attend to.
-  static const Color emberCool = Color(0xFF7A1F12);
+  static const Color emberCool = Color(0xFF5A4A12);
 
   /// Warming — worth noticing.
-  static const Color emberWarm = Color(0xFFC24A16);
+  static const Color emberWarm = Color(0xFFA88A16);
 
   /// Hot — the accent proper, and the one buttons carry.
-  static const Color emberHot = Color(0xFFE8952D);
+  static const Color emberHot = signal;
 
   /// Palest — nearly spent, or the figure of the moment.
-  static const Color emberPale = Color(0xFFF5D08A);
+  static const Color emberPale = Color(0xFFFCE79A);
 
   /// The ramp in order, for anything mapping a proportion onto it.
   static const List<Color> ember = [emberCool, emberWarm, emberHot, emberPale];
@@ -43,31 +71,30 @@ class AppColors {
     return Color.lerp(ember[index], ember[index + 1], (f - index * span) / span)!;
   }
 
-  // ------------------------------------------------------------ iron
+  // ------------------------------------------------------------ night
 
-  static const Color iron = Color(0xFF12161C); // cold oven — the dark ground
-  static const Color ironSurface = Color(0xFF1A2029);
-  static const Color ironCard = Color(0xFF212936);
-  static const Color ironLine = Color(0xFF2A333F);
+  static const Color iron = Color(0xFF111214); // the dark ground
+  static const Color ironSurface = Color(0xFF17191D);
+  static const Color ironCard = Color(0xFF1D1F23);
+  static const Color ironLine = Color(0xFF2A2C30);
 
-  // ----------------------------------------------------------- ash
+  // ------------------------------------------------------------- day
 
-  /// Daylight: ash and flour rather than white, so the ember still reads.
-  static const Color ash = Color(0xFFEDEEF0);
-  static const Color ashSurface = Color(0xFFFAFAFB);
-  static const Color ashLine = Color(0xFFD9DDE2);
+  static const Color ash = Color(0xFFF4F4F2);
+  static const Color ashSurface = Color(0xFFFFFFFF);
+  static const Color ashLine = Color(0xFFDDDEDB);
 
-  /// The accent has to darken for a pale ground or it turns to highlighter.
-  static const Color crust = Color(0xFFA8501A);
+  /// Kept for the few places that name it; the accent on a pale ground.
+  static const Color crust = signalInk;
 
-  /// Semantic, and deliberately off the ramp: a settled account and a
-  /// primary button must never be told apart by shade alone.
-  static const Color success = Color(0xFF0B7A54);
-  static const Color successDark = Color(0xFF3FB98B);
-  static const Color info = Color(0xFF2C6FA8);
-  static const Color danger = Color(0xFFC5373C);
-  static const Color dangerDark = Color(0xFFF1666B);
-  static const Color warning = Color(0xFFC24A16);
+  /// Semantic, and deliberately nowhere near the yellow: a settled account
+  /// and a button waiting to be pressed must never be told apart by shade.
+  static const Color success = Color(0xFF1E6B44);
+  static const Color successDark = Color(0xFF4CBF87);
+  static const Color info = Color(0xFF3A6EA5);
+  static const Color danger = Color(0xFFB3352A);
+  static const Color dangerDark = Color(0xFFF07C6E);
+  static const Color warning = Color(0xFFB37A0E);
 }
 
 class AppTheme {
@@ -91,9 +118,13 @@ class AppTheme {
 
   static ThemeData dark() {
     final scheme = ColorScheme.fromSeed(
-      seedColor: AppColors.emberHot,
+      seedColor: AppColors.signal,
       brightness: Brightness.dark,
-      primary: AppColors.emberHot,
+      primary: AppColors.signal,
+      // Black on the yellow, not white: at this brightness white text on
+      // yellow is unreadable, and Material's own contrast pick lands on
+      // white often enough to be worth stating.
+      onPrimary: AppColors.onSignal,
       secondary: AppColors.info,
       surface: AppColors.ironSurface,
       error: AppColors.dangerDark,

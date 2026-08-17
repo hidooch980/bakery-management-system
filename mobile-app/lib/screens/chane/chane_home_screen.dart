@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
 
-import '../../utils/formatters.dart';
-import 'package:provider/provider.dart';
-
 import '../../models/bakery.dart';
-import '../../models/chane_board.dart';
 import '../../models/entries.dart';
-import '../../models/work_start.dart';
-import '../../providers/auth_provider.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
-import '../../widgets/attendance_card.dart';
-import '../../widgets/pay_card.dart';
-import '../../widgets/role_home_scaffold.dart';
-import '../../widgets/work_start_card.dart';
-import '../../widgets/chane_comparison.dart';
-import '../../widgets/common.dart';
+import '../../services/last_used.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/common.dart';
+import '../../widgets/one_task.dart';
+import '../shared/me_screen.dart';
+import '../shared/settings_screen.dart';
 
-/// Home screen for the chane gir. One scrolling page: the dough waiting to be
-/// shaped, today's production split, and the entries already recorded.
+/// The chane maker's whole app: two questions.
+///
+/// «کدام خمیر؟» — and only when there is more than one waiting, because a
+/// choice between one thing is not a choice. Then «چند چانه شد؟».
+///
+/// The count is the one number in the shop that is different every single
+/// time, so it is typed rather than stepped, on a keypad the app draws
+/// itself: Persian digits, thumb-sized keys, and nothing sliding up over
+/// the answer while it is entered. A count more than a fifth away from
+/// what the batch should yield is coloured and questioned before it is
+/// saved — asked, not refused, because the shop knows its trade better
+/// than the formula does.
 class ChaneHomeScreen extends StatefulWidget {
   const ChaneHomeScreen({super.key, required this.api});
 
@@ -29,503 +32,117 @@ class ChaneHomeScreen extends StatefulWidget {
   State<ChaneHomeScreen> createState() => _ChaneHomeScreenState();
 }
 
-typedef _ChaneData = ({
-  List<DoughEntry> pending,
-  List<ChaneEntry> history,
-  ChaneBoard? board,
-});
+enum _Stage { loading, nothingWaiting, choosing, counting, extras, done }
 
 class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
-  late Future<_ChaneData> _data;
+  /// How far off the expected yield a count has to be before the app says
+  /// something. A fifth: wide enough that an ordinary good or bad batch
+  /// passes without comment, narrow enough to catch a slipped digit.
+  static const _questionAt = 0.2;
 
-  /// Chane weights the form derives its read-only figures from.
+  _Stage _stage = _Stage.loading;
+
+  List<DoughEntry> _waiting = const [];
+  DoughEntry? _chosen;
+
+  int _count = 0;
+  double _spray = 5;
+  int _nanino = 0;
+
   Bakery? _bakery;
+  bool _saving = false;
+  bool _queued = false;
+  double? _weightKg;
 
   @override
   void initState() {
     super.initState();
-    _data = _load();
-    _loadBakery();
+    _prepare();
   }
 
-  Future<_ChaneData> _load() async {
-    final pending = await widget.api.pendingDough();
-    final history = await widget.api.myChaneHistory();
+  Future<void> _prepare() async {
+    _spray = await LastUsed.sprayFlourKg();
+    _nanino = await LastUsed.naninoCount();
 
-    ChaneBoard? board;
-    try {
-      board = await widget.api.chaneBoard();
-    } on ApiException {
-      board = null;
-    }
-
-    return (pending: pending, history: history, board: board);
-  }
-
-  Future<void> _loadBakery() async {
     try {
       final bakery = await widget.api.bakery();
       if (mounted) setState(() => _bakery = bakery);
     } on ApiException {
-      // Without settings the form warns and blocks submission.
+      // The expected yield is a hint, not the question.
+    }
+
+    await _loadWaiting();
+  }
+
+  Future<void> _loadWaiting() async {
+    try {
+      final waiting = await widget.api.pendingDough();
+
+      if (!mounted) return;
+      setState(() {
+        _waiting = waiting;
+
+        if (waiting.isEmpty) {
+          _stage = _Stage.nothingWaiting;
+        } else if (waiting.length == 1) {
+          // One batch is not a choice. Skip straight to the count.
+          _chosen = waiting.first;
+          _stage = _Stage.counting;
+        } else {
+          _stage = _Stage.choosing;
+        }
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _stage = _Stage.nothingWaiting);
+      showMessage(context, e.message, isError: true);
     }
   }
 
-  void _reload() => setState(() => _data = _load());
+  /// What this batch should yield, from the shop's own dough formula.
+  /// Null when the formula has not been set, in which case nothing is
+  /// claimed rather than a figure guessed at.
+  int? get _expected {
+    final perBag = _bakery?.normalChanePerBag;
+    final dough = _chosen;
 
-  Future<void> _openRecordSheet(DoughEntry dough) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _RecordChaneSheet(
-        api: widget.api,
-        dough: dough,
-        bakery: _bakery,
-      ),
-    );
+    if (perBag == null || perBag <= 0 || dough == null) return null;
 
-    if (saved == true) _reload();
+    return perBag * dough.bagCount;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return RoleHomeScaffold(
-      api: widget.api,
-      bakery: _bakery,
-      tabs: [
-        HomeTab(
-          label: 'خلاصه',
-          title: 'خلاصه امروز',
-          icon: Icons.dashboard_outlined,
-          selectedIcon: Icons.dashboard_rounded,
-          builder: (_) => _withData(_overview),
-        ),
-        HomeTab(
-          label: 'چانه‌گیری',
-          title: 'چانه‌گیری',
-          icon: Icons.pan_tool_outlined,
-          selectedIcon: Icons.pan_tool_rounded,
-          builder: (_) => _withData(_shaping),
-        ),
-      ],
-    );
-  }
+  bool get _looksWrong {
+    final expected = _expected;
 
-  /// Both pages read the same fetch and pull to refresh the same way, so
-  /// switching pages does not re-ask the server.
-  Widget _withData(List<Widget> Function(_ChaneData data) children) {
-    return RefreshIndicator(
-      onRefresh: () async => _reload(),
-      child: FutureBuilder<_ChaneData>(
-        future: _data,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    if (expected == null || expected == 0 || _count == 0) return false;
 
-          if (snapshot.hasError) {
-            return ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                ErrorBox(message: '${snapshot.error}', onRetry: _reload),
-              ],
-            );
-          }
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-            children: children(snapshot.data!),
-          );
-        },
-      ),
-    );
-  }
-
-  // ------------------------------------------------------------ خلاصه
-
-  List<Widget> _overview(_ChaneData data) {
-    final user = context.watch<AuthProvider>().user;
-
-    return [
-      Text(
-        'سلام ${user?.name ?? ''}',
-        style: Theme.of(context)
-            .textTheme
-            .titleLarge
-            ?.copyWith(fontWeight: FontWeight.w800),
-      ),
-      const SizedBox(height: 14),
-      AttendanceCard(api: widget.api),
-      const SizedBox(height: 14),
-      PayCard(api: widget.api),
-      const SizedBox(height: 14),
-      WorkStartCard(
-        api: widget.api,
-        // Baking start is the seller's tick, not the chane gir's — each
-        // role sees only the one it records.
-        visibleTypes: const {WorkStartType.chane},
-      ),
-      if (data.board != null) ...[
-        const SizedBox(height: 16),
-        ChaneComparison(board: data.board!),
-      ],
-    ];
-  }
-
-  // ------------------------------------------------------- چانه‌گیری
-
-  List<Widget> _shaping(_ChaneData data) {
-    return [
-      _SectionHeader(
-        title: 'خمیرهای در انتظار',
-        count: data.pending.length,
-        icon: Icons.pending_actions_rounded,
-      ),
-      const SizedBox(height: 10),
-      if (data.pending.isEmpty)
-        const _InlineEmpty(
-          icon: Icons.check_circle_outline_rounded,
-          text: 'همه خمیرها چانه شده‌اند.',
-        )
-      else
-        for (final entry in data.pending) ...[
-          ActionCard(
-            title: '${entry.bagCount} کیسه خمیر',
-            subtitle: [
-              if (entry.userName != null) entry.userName!,
-              if (entry.createdAt != null) JalaliFormat.dateTime(entry.createdAt),
-            ].join('  •  '),
-            icon: Icons.inventory_2_rounded,
-            color: AppColors.emberHot,
-            onTap: () => _openRecordSheet(entry),
-            trailing: const Icon(Icons.add_circle_outline_rounded),
-          ),
-          const SizedBox(height: 10),
-        ],
-      const SizedBox(height: 16),
-      _SectionHeader(
-        title: 'ثبت‌های من',
-        count: data.history.length,
-        icon: Icons.history_rounded,
-      ),
-      const SizedBox(height: 10),
-      if (data.history.isEmpty)
-        const _InlineEmpty(
-          icon: Icons.history_rounded,
-          text: 'هنوز چانه‌ای ثبت نکرده‌اید.',
-        )
-      else
-        for (final entry in data.history) ...[
-          _ChaneTile(entry: entry),
-          const SizedBox(height: 10),
-        ],
-    ];
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.count,
-    required this.icon,
-  });
-
-  final String title;
-  final int count;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: scheme.primary),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: Theme.of(context)
-              .textTheme
-              .titleSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(width: 8),
-        if (count > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: scheme.primary.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '$count',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _InlineEmpty extends StatelessWidget {
-  const _InlineEmpty({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: scheme.onSurfaceVariant, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One recorded chane batch, with its authoritative weight and the nanino
-/// figure shown separately.
-class _ChaneTile extends StatelessWidget {
-  const _ChaneTile({required this.entry});
-
-  final ChaneEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.grain_rounded, color: scheme.primary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  '${entry.chaneCount} چانه',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const Spacer(),
-                Chip(
-                  label: Text(entry.isPending ? 'در انتظار فروش' : 'فروخته شده'),
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: (entry.isPending
-                          ? AppColors.emberHot
-                          : const Color(0xFF2E9E6B))
-                      .withValues(alpha: 0.15),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _WeightPill(
-                  label: 'وزن ملاک',
-                  value: entry.weightKg,
-                  color: const Color(0xFF2E9E6B),
-                ),
-                if (entry.naninoWeightKg > 0)
-                  _WeightPill(
-                    label: 'نانینو (نمایشی)',
-                    value: entry.naninoWeightKg,
-                    color: const Color(0xFF3B82C4),
-                  ),
-                _WeightPill(
-                  label: 'آرد پاششی',
-                  value: entry.sprayFlourKg,
-                  color: const Color(0xFFD1495B),
-                ),
-              ],
-            ),
-            if (entry.createdAt != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                JalaliFormat.dateTime(entry.createdAt),
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WeightPill extends StatelessWidget {
-  const _WeightPill({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final double value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        '$label: ${value.toStringAsFixed(2)} کیلوگرم',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-      ),
-    );
-  }
-}
-
-class _RecordChaneSheet extends StatefulWidget {
-  const _RecordChaneSheet({
-    required this.api,
-    required this.dough,
-    this.bakery,
-  });
-
-  final BakeryApi api;
-  final DoughEntry dough;
-  final Bakery? bakery;
-
-  @override
-  State<_RecordChaneSheet> createState() => _RecordChaneSheetState();
-}
-
-class _RecordChaneSheetState extends State<_RecordChaneSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _spray = TextEditingController(text: '0');
-
-  /// One field per tray, in the order they were filled. Chane is counted
-  /// into trays on the bench, so this is the real record; the batch total
-  /// is only their sum.
-  final List<TextEditingController> _trays = [];
-
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Start on the first tray, already filled to the shop's tray size.
-    _addTray();
-  }
-
-  @override
-  void dispose() {
-    for (final controller in _trays) {
-      controller.dispose();
-    }
-    _spray.dispose();
-    super.dispose();
-  }
-
-  int get _trayStep => widget.bakery?.trayStep ?? 1;
-
-  int get _count => _trays.fold(
-        0,
-        (sum, tray) => sum + (int.tryParse(tray.text.trim()) ?? 0),
-      );
-
-  /// Roughly what this dough should yield, so a miscount shows up here
-  /// rather than in a report at the end of the month.
-  int? get _expectedCount =>
-      widget.bakery?.expectedChaneFor(widget.dough.bagCount);
-
-  double get _normalWeight =>
-      _count * (widget.bakery?.normalChaneWeightKg ?? 0);
-
-  void _addTray() {
-    final controller = TextEditingController(text: '$_trayStep');
-
-    // Every keystroke moves the running total and the expected-yield
-    // notice, so both have to redraw as the count is typed.
-    controller.addListener(() => setState(() {}));
-
-    setState(() => _trays.add(controller));
-  }
-
-  void _removeTray(int index) {
-    final controller = _trays.removeAt(index);
-    controller.dispose();
-    setState(() {});
+    return (_count - expected).abs() / expected > _questionAt;
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) {
-      // The form is long enough that a field error can sit off-screen,
-      // which reads as the button doing nothing at all.
-      showMessage(context, 'یکی از فیلدها را کامل کنید.', isError: true);
-      return;
-    }
+    final dough = _chosen;
 
-    if (_count < 1) {
-      showMessage(context, 'حداقل یک تشتک با تعداد معتبر ثبت کنید.',
-          isError: true);
-      return;
-    }
+    if (dough == null || _count <= 0 || _saving) return;
 
     setState(() => _saving = true);
 
     try {
-      final trays = _trays
-          .map((c) => int.tryParse(c.text.trim()) ?? 0)
-          .where((count) => count > 0)
-          .toList();
-
       final result = await widget.api.recordChane(
-        doughEntryId: widget.dough.id,
+        doughEntryId: dough.id,
         chaneCount: _count,
-        sprayFlourKg: double.tryParse(_spray.text.trim()) ?? 0,
-        trays: trays,
+        naninoChaneCount: _nanino,
+        sprayFlourKg: _spray,
       );
+
+      await LastUsed.rememberSprayFlourKg(_spray);
+      await LastUsed.rememberNaninoCount(_nanino);
 
       if (!mounted) return;
-      Navigator.pop(context, true);
-      showMessage(
-        context,
-        result.queued
-            ? 'اینترنت وصل نیست؛ ثبت چانه ذخیره شد و با اتصال بعدی ارسال می‌شود.'
-            : 'ثبت چانه انجام شد. وزن کل: '
-                '${result.weightKg!.toStringAsFixed(2)} کیلوگرم',
-      );
+      setState(() {
+        _queued = result.queued;
+        _weightKg = result.weightKg;
+        _stage = _Stage.done;
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       showMessage(context, e.message, isError: true);
@@ -534,343 +151,239 @@ class _RecordChaneSheetState extends State<_RecordChaneSheet> {
     }
   }
 
+  Future<void> _startOver() async {
+    setState(() {
+      _stage = _Stage.loading;
+      _chosen = null;
+      _count = 0;
+    });
+
+    await _loadWaiting();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final expected = _expectedCount;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: scheme.outlineVariant,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 22),
-                Text(
-                  'ثبت چانه',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'برای خمیر #${widget.dough.id} — ${widget.dough.bagCount} کیسه',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-
-                if (expected != null) ...[
-                  const SizedBox(height: 16),
-                  _ExpectedBanner(expected: expected, actual: _count),
-                ],
-
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Text(
-                      'تشتک‌ها',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const Spacer(),
-                    if (_trayStep > 1)
-                      Text(
-                        'هر تشتک $_trayStep عدد',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                for (var i = 0; i < _trays.length; i++)
-                  _TrayRow(
-                    key: ObjectKey(_trays[i]),
-                    index: i,
-                    controller: _trays[i],
-                    // The batch must keep at least one tray to mean anything.
-                    canRemove: _trays.length > 1,
-                    onRemove: () => _removeTray(i),
-                  ),
-
-                const SizedBox(height: 4),
-                OutlinedButton.icon(
-                  onPressed: _addTray,
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('افزودن تشتک'),
-                ),
-
-                const SizedBox(height: 14),
-                _TrayTotal(trayCount: _trays.length, chaneCount: _count),
-
-                const SizedBox(height: 20),
-                // Weight comes from the admin's dough formula and cannot be
-                // edited here, so it is shown rather than entered.
-                _DerivedWeights(
-                  normalWeight: _normalWeight,
-                  normalPerChane: widget.bakery?.normalChaneWeightKg,
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _spray,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'وزن آرد پاششی مصرف‌شده',
-                    prefixIcon: Icon(Icons.grass_rounded),
-                    suffixText: 'کیلوگرم',
-                    // Starts at zero so a batch that used none can be filed
-                    // without the field blocking the whole form.
-                    helperText: 'اگر آرد پاششی مصرف نشده، صفر بماند',
-                  ),
-                  validator: (value) {
-                    final parsed = double.tryParse(value?.trim() ?? '');
-                    if (parsed == null) return 'یک عدد معتبر وارد کنید';
-                    if (parsed < 0) return 'مقدار نمی‌تواند منفی باشد';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: _saving ? null : _save,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.check_rounded),
-                  label: Text(_saving ? 'در حال ثبت…' : 'ثبت چانه'),
-                ),
-              ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_bakery?.name ?? 'چانه‌گیری'),
+        centerTitle: false,
+        titleTextStyle: Theme.of(context).textTheme.titleMedium,
+        actions: [
+          IconButton(
+            tooltip: 'حساب من',
+            icon: const Icon(Icons.person_outline_rounded),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => MeScreen(api: widget.api)),
             ),
           ),
+          IconButton(
+            tooltip: 'تنظیمات',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => SettingsScreen(api: widget.api)),
+            ),
+          ),
+        ],
+      ),
+      body: switch (_stage) {
+        _Stage.loading => const Center(child: CircularProgressIndicator()),
+        _Stage.nothingWaiting => _nothing(),
+        _Stage.choosing => _choose(),
+        _Stage.counting => _count_(),
+        _Stage.extras => _extras(),
+        _Stage.done => _done(),
+      },
+    );
+  }
+
+  Widget _nothing() {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.hourglass_empty_rounded,
+              size: 56,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'خمیری در انتظار نیست',
+              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'وقتی خمیرگیر دسته‌ای ثبت کند، همین‌جا می‌آید.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: 26),
+            OutlinedButton.icon(
+              onPressed: _startOver,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('دوباره نگاه کن'),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
-class _ExpectedBanner extends StatelessWidget {
-  const _ExpectedBanner({required this.expected, required this.actual});
+  Widget _choose() {
+    final theme = Theme.of(context);
 
-  final int expected;
-  final int actual;
+    return OneTaskScaffold(
+      question: 'کدام خمیر را چانه گرفتی؟',
+      step: 1,
+      of: 2,
+      actionLabel: 'ادامه',
+      onAction: _chosen == null ? null : () => setState(() => _stage = _Stage.counting),
+      child: ListView.separated(
+        shrinkWrap: true,
+        itemCount: _waiting.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (_, i) {
+          final dough = _waiting[i];
+          final picked = _chosen?.id == dough.id;
 
-  @override
-  Widget build(BuildContext context) {
-    // Counting is never exact, so only a real gap is worth flagging.
-    final short = expected - actual;
-    final isShort = short > expected * 0.05;
-
-    final color = isShort ? const Color(0xFFD1495B) : AppColors.emberHot;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isShort ? Icons.warning_amber_rounded : Icons.info_outline_rounded,
-            size: 18,
-            color: color,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              isShort
-                  ? 'انتظار حدود $expected چانه — فعلاً $short عدد کمتر ثبت شده.'
-                  : 'انتظار از این خمیر: حدود $expected چانه',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w700,
+          return Material(
+            color: picked
+                ? AppColors.signal.withValues(alpha: 0.14)
+                : theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => setState(() => _chosen = dough),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: picked ? AppColors.signal : Colors.transparent,
+                    width: 2,
                   ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One tray with a stepper either side of its count.
-/// One tray, with its count typed rather than stepped. Trays hold dozens of
-/// chane and the last one is trimmed to whatever was left, so tapping a
-/// plus button thirty times was never the right gesture.
-class _TrayRow extends StatelessWidget {
-  const _TrayRow({
-    super.key,
-    required this.index,
-    required this.controller,
-    required this.canRemove,
-    required this.onRemove,
-  });
-
-  final int index;
-  final TextEditingController controller;
-  final bool canRemove;
-  final VoidCallback onRemove;
-
-  static const _ordinals = [
-    'اول', 'دوم', 'سوم', 'چهارم', 'پنجم', 'ششم', 'هفتم', 'هشتم',
-    'نهم', 'دهم', 'یازدهم', 'دوازدهم',
-  ];
-
-  String get _label => index < _ordinals.length
-      ? 'تشتک ${_ordinals[index]}'
-      : 'تشتک ${index + 1}';
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                labelText: _label,
-                isDense: true,
-                suffixText: 'عدد',
-              ),
-              validator: (value) {
-                final parsed = int.tryParse(value?.trim() ?? '');
-                if (parsed == null) return 'عدد وارد کنید';
-                if (parsed < 1) return 'بیشتر از صفر';
-                return null;
-              },
-            ),
-          ),
-          IconButton(
-            onPressed: canRemove ? onRemove : null,
-            icon: const Icon(Icons.delete_outline_rounded),
-            tooltip: 'حذف تشتک',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrayTotal extends StatelessWidget {
-  const _TrayTotal({required this.trayCount, required this.chaneCount});
-
-  final int trayCount;
-  final int chaneCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: scheme.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.layers_rounded, color: scheme.primary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '$trayCount تشتک',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          Text(
-            '$chaneCount چانه',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: scheme.primary,
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: Row(
+                  children: [
+                    Text(
+                      '${dough.bagCount}',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text('کیسه', style: theme.textTheme.titleMedium),
+                    const Spacer(),
+                    Text(
+                      dough.userName ?? '',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _count_() {
+    final expected = _expected;
+    final many = _waiting.length > 1;
+
+    return OneTaskScaffold(
+      question: 'چند چانه شد؟',
+      step: many ? 2 : null,
+      of: many ? 2 : null,
+      onBack: many ? () => setState(() => _stage = _Stage.choosing) : null,
+      hint: switch (null) {
+        _ when _looksWrong && expected != null =>
+          'از ${_chosen!.bagCount} کیسه معمولاً حدود $expected چانه درمی‌آید — مطمئنی؟',
+        _ when expected != null => 'از ${_chosen!.bagCount} کیسه حدود $expected انتظار می‌رود',
+        _ => null,
+      },
+      actionLabel: 'ثبت کن',
+      busy: _saving,
+      onAction: _count > 0 ? _save : null,
+      secondary: _count > 0
+          ? TextButton(
+              onPressed: () => setState(() => _stage = _Stage.extras),
+              child: const Text('آرد پاششی و نانینو'),
+            )
+          : null,
+      child: OneTaskKeypad(
+        value: _count,
+        unit: 'چانه',
+        looksWrong: _looksWrong,
+        onChanged: (v) => setState(() => _count = v),
+      ),
+    );
+  }
+
+  /// The two numbers that are the same nearly every batch, kept off the
+  /// main question and remembered between batches.
+  Widget _extras() {
+    final theme = Theme.of(context);
+
+    return OneTaskScaffold(
+      question: 'آرد پاششی و نانینو',
+      onBack: () => setState(() => _stage = _Stage.counting),
+      hint: 'اینها را به یاد می‌سپارم؛ دفعهٔ بعد لازم نیست دوباره بزنی.',
+      actionLabel: 'برگرد به ثبت',
+      onAction: () => setState(() => _stage = _Stage.counting),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('آرد پاششی — کیلوگرم', style: theme.textTheme.labelLarge),
+          const SizedBox(height: 10),
+          OneTaskCounter(
+            value: _spray.round(),
+            min: 0,
+            max: 60,
+            unit: 'کیلوگرم',
+            onChanged: (v) => setState(() => _spray = v.toDouble()),
+          ),
+          const SizedBox(height: 26),
+          Text('چانهٔ نانینو', style: theme.textTheme.labelLarge),
+          const SizedBox(height: 10),
+          OneTaskCounter(
+            value: _nanino,
+            min: 0,
+            max: 999,
+            unit: 'دانه',
+            onChanged: (v) => setState(() => _nanino = v),
           ),
         ],
       ),
     );
   }
-}
 
-/// Read-only weights derived from the admin's dough formula.
-///
-/// The chane gir enters counts; the weights follow from the recipe, so they
-/// are displayed rather than typed and cannot drift from it.
-/// The batch weight, worked out from the shop's formula rather than typed,
-/// so the floor cannot enter a figure that contradicts it.
-class _DerivedWeights extends StatelessWidget {
-  const _DerivedWeights({
-    required this.normalWeight,
-    required this.normalPerChane,
-  });
+  Widget _done() {
+    final weight = _weightKg;
 
-  final double normalWeight;
-  final double? normalPerChane;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final hasFormula = (normalPerChane ?? 0) > 0;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.scale_rounded, size: 20, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              hasFormula
-                  ? 'وزن این چانه‌ها'
-                  : 'وزن چانه در تنظیمات نانوایی ثبت نشده است',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ),
-          if (hasFormula)
-            Text(
-              '${normalWeight.toStringAsFixed(2)} کیلوگرم',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: scheme.primary,
-                  ),
-            ),
-        ],
-      ),
+    return OneTaskDone(
+      headline: _queued ? 'ذخیره شد' : 'ثبت شد',
+      summary: [
+        '$_count چانه از ${_chosen?.bagCount ?? 0} کیسه',
+        if (_queued)
+          'اینترنت وصل نیست — با اتصال بعدی می‌رود'
+        else if (weight != null)
+          'وزن کل ${weight.toStringAsFixed(1)} کیلوگرم',
+        if (_nanino > 0) '$_nanino دانه نانینو',
+      ],
+      actionLabel: 'دستهٔ بعدی',
+      onAction: _startOver,
     );
   }
 }
