@@ -49,20 +49,39 @@ class AdminPanelTest extends TestCase
     }
 
     /**
-     * The kiln ground reaches the page.
+     * The app's ground reaches the panel.
      *
      * It is injected by a render hook rather than a compiled theme, which
      * means nothing fails loudly if the hook stops firing — a rename in
      * Filament, a moved view, a cached config — and the panel would simply
      * go back to its default blue-grey with no error anywhere. The one
      * thing worth asserting is that the block is in the HTML.
+     *
+     * The figure is AppColors.iron, #111214, and it is written here as the
+     * literal it appears as so that changing one and not the other fails —
+     * which is how this test earned its keep when the palette moved.
      */
-    public function test_the_panel_carries_the_kiln_ground(): void
+    public function test_the_panel_stands_on_the_same_ground_as_the_app(): void
     {
         $response = $this->actingAs($this->admin())->get('/admin');
 
         $response->assertOk();
-        $response->assertSee('--gray-950: 18 22 28', escape: false);
+        $response->assertSee('--gray-950: 17 18 20', escape: false);
+    }
+
+    /**
+     * Black on the yellow, never white.
+     *
+     * Filament picks a filled button's foreground by its own contrast rule
+     * and on this yellow it lands on white — 1.63:1, a label nobody can
+     * read. The app had exactly this bug in seven places after the repaint,
+     * so the panel's copy of it is worth holding down.
+     */
+    public function test_a_filled_button_does_not_get_white_text_on_the_yellow(): void
+    {
+        $response = $this->actingAs($this->admin())->get('/admin');
+
+        $response->assertSee('color: rgb(23 21 10)', escape: false);
     }
 
     public function test_login_page_is_reachable(): void

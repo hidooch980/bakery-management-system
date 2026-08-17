@@ -31,27 +31,28 @@ class AdminPanelProvider extends PanelProvider
             // Short, because it sits in the sidebar beside every page and
             // a full sentence there is a sentence read a hundred times a day.
             ->brandName('نانوایی')
-            // Iron and ember, the same hexes the phone app is built from
-            // rather than Filament's generic ramps. Staff move between the
-            // two all day; when the panel's amber and the app's are almost
-            // but not quite the same colour, the pair reads as two products.
+            // The same hexes the phone app is built from rather than
+            // Filament's generic ramps. Staff move between the two all day;
+            // when the panel's amber and the app's are almost but not quite
+            // the same colour, the pair reads as two products.
             //
-            // Primary is the hot end of the ramp and warning the step below
-            // it, which is deliberate: on this palette "needs attention" is
-            // literally cooler than "do this", and the two are read as
-            // positions on one scale rather than as separate colours.
+            // Primary and warning are two different colours here, not two
+            // steps of one ramp — that was the old palette's idea and it
+            // was wrong. The yellow means «press this» and the orange means
+            // «read this», and a person has to tell them apart at a glance
+            // from across a bakery. On one ramp they cannot.
             ->colors([
-                'primary' => Color::hex('#E8952D'),  // ember, hot
-                'gray' => Color::hex('#6B7684'),     // iron-biased, not blue
-                'success' => Color::hex('#0B7A54'),
-                'warning' => Color::hex('#C24A16'),  // ember, warm
-                'danger' => Color::hex('#C5373C'),
-                'info' => Color::hex('#2C6FA8'),
+                'primary' => Color::hex('#F5C518'),  // the signal — «press this»
+                'gray' => Color::hex('#6E7278'),     // neutral-biased, not blue
+                'success' => Color::hex('#2E9E6B'),  // money in
+                'warning' => Color::hex('#C2691C'),  // attention — «read this»
+                'danger' => Color::hex('#D1495B'),   // money out
+                'info' => Color::hex('#3B82C4'),
             ])
             ->font('Vazirmatn')
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => view('filament.kiln-theme')->render(),
+                fn (): string => view('filament.panel-ground')->render(),
             )
             ->darkMode(true)
             // Fully, not to a strip of icons. Collapsed to icons the menu
