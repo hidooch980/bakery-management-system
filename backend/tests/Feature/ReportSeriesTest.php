@@ -287,7 +287,29 @@ class ReportSeriesTest extends TestCase
 
     // ---------------------------------------------- the panel's own page
 
-    public function test_the_reports_page_opens_on_the_current_jalali_month(): void
+    /**
+     * The shop's own month, not the calendar one.
+     *
+     * The flour quota runs from the 5th to the 4th and everything the shop
+     * is judged on runs with it, so that is the window the page opens on.
+     * The calendar month is a click away for the conversations that use it
+     * — the partners' split, anything said outside the shop.
+     */
+    public function test_the_reports_page_opens_on_the_quota_period(): void
+    {
+        $this->actingAs($this->admin());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        [$start, $end] = Jalali::currentQuotaPeriod();
+
+        Livewire::test(Reports::class)
+            ->assertOk()
+            ->assertSet('from', Jalali::date($start))
+            ->assertSet('to', Jalali::date($end))
+            ->assertSet('granularity', PeriodBuckets::DAY);
+    }
+
+    public function test_the_calendar_month_is_one_click_away(): void
     {
         $this->actingAs($this->admin());
         Filament::setCurrentPanel(Filament::getPanel('admin'));
@@ -295,10 +317,40 @@ class ReportSeriesTest extends TestCase
         [$start, $end] = Jalali::currentMonthRange();
 
         Livewire::test(Reports::class)
-            ->assertOk()
+            ->callAction('calendarMonth')
             ->assertSet('from', Jalali::date($start))
-            ->assertSet('to', Jalali::date($end))
-            ->assertSet('granularity', PeriodBuckets::DAY);
+            ->assertSet('to', Jalali::date($end));
+    }
+
+    public function test_the_previous_period_is_the_one_that_ended_yesterday(): void
+    {
+        $this->actingAs($this->admin());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        [$thisStart] = Jalali::currentQuotaPeriod();
+        [$lastStart, $lastEnd] = Jalali::quotaPeriodFor($thisStart->copy()->subDay());
+
+        Livewire::test(Reports::class)
+            ->callAction('previousQuotaPeriod')
+            ->assertSet('from', Jalali::date($lastStart))
+            ->assertSet('to', Jalali::date($lastEnd));
+
+        // The two windows meet without a gap or an overlap, which is the
+        // only way a figure cannot be counted twice or dropped.
+        $this->assertTrue($lastEnd->copy()->addDay()->isSameDay($thisStart));
+    }
+
+    public function test_the_granularity_survives_a_range_change(): void
+    {
+        $this->actingAs($this->admin());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(Reports::class)
+            ->set('granularity', PeriodBuckets::WEEK)
+            ->callAction('calendarMonth')
+            // Changing the window is not a reason to throw away how the
+            // owner asked to see it.
+            ->assertSet('granularity', PeriodBuckets::WEEK);
     }
 
     public function test_the_reports_page_reads_all_three_tabs_over_one_range(): void
