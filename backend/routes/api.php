@@ -51,7 +51,10 @@ Route::prefix('v1')->group(function () {
         'service' => 'bakery',
     ]));
 
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    // Five a minute. Ten was set when nobody had counted how many people
+    // actually log in here: five staff, once a day each, on phones that
+    // keep them signed in. Anything faster than five is not this shop.
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
     Route::middleware('auth:sanctum')->group(function () {
         // --- Available to every authenticated user ---

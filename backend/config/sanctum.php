@@ -50,7 +50,12 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Six months, absolute. A token used to live forever: two on this
+    // shop's server were issued in July, used once, and never again — and
+    // both would still have opened the whole system on the day someone
+    // found the phone they were on. Anyone using the app in an ordinary
+    // week never notices this; what it ends is the abandoned token.
+    'expiration' => 60 * 24 * 180,
 
     /*
     |--------------------------------------------------------------------------
