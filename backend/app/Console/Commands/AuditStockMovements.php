@@ -90,16 +90,19 @@ class AuditStockMovements extends Command
         $this->table(['نوع', 'تعداد', 'بدون حرکت انبار'], $rows);
 
         $orphans = $this->orphans();
+        $misLinked = $this->misLinkedReversals();
 
-        if ($gaps === [] && $orphans === []) {
+        if ($gaps === [] && $orphans === [] && $misLinked === []) {
             $this->info('هر رکوردی که باید انبار را جابه‌جا می‌کرد، کرده است.');
-            $this->info('و هر حرکتی هم صاحبی دارد یا برگردانده شده است.');
+            $this->info('هر حرکتی هم صاحبی دارد یا برگردانده شده است.');
+            $this->info('و هر ابطالی به همان حرکتی وصل است که باطلش کرده.');
 
             return self::SUCCESS;
         }
 
         if ($gaps === []) {
             $this->reportOrphans($orphans);
+            $this->reportMisLinked($misLinked);
 
             return self::FAILURE;
         }
@@ -108,6 +111,7 @@ class AuditStockMovements extends Command
         $this->error(count($gaps).' رکورد انبار را جابه‌جا نکرده‌اند:');
         $this->table(['نوع', 'شناسه', 'تاریخ'], $gaps);
         $this->reportOrphans($this->orphans());
+        $this->reportMisLinked($this->misLinkedReversals());
 
         // Deliberately not offered as an auto-fix. What the missing
         // movement should be depends on the shop's formula on the day, and
@@ -199,6 +203,68 @@ class AuditStockMovements extends Command
         }
 
         return $found;
+    }
+
+    /**
+     * Reversals pointing at a movement whose record is still there.
+     *
+     * A reversal is written when a record is deleted, so it cannot undo a
+     * movement belonging to one that still exists — nothing deleted it.
+     * The backfill that filled this column in matched on item and quantity
+     * and took the first candidate, and this shop bakes the same 440 kg
+     * batch over and over, so two ended up wired to movements nine days
+     * older from a dough entry nobody ever removed.
+     *
+     * It moves no stock, which is why nothing else notices. What it moves
+     * is which quota period a refund is counted against.
+     */
+    private function misLinkedReversals(): array
+    {
+        $found = [];
+
+        $reversals = InventoryMovement::query()
+            ->withoutGlobalScopes()
+            ->whereNotNull('reverses_movement_id')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($reversals as $reversal) {
+            $original = InventoryMovement::withoutGlobalScopes()->find($reversal->reverses_movement_id);
+
+            if ($original === null) {
+                $found[] = [$reversal->id, $reversal->reverses_movement_id, 'حرکتی با این شناسه نیست'];
+
+                continue;
+            }
+
+            $class = $original->source_type;
+
+            if ($class === null || ! class_exists($class)) {
+                continue;
+            }
+
+            if ($class::withoutGlobalScopes()->find($original->source_id)) {
+                $found[] = [
+                    $reversal->id,
+                    $original->id,
+                    class_basename($class).'#'.$original->source_id.' هنوز موجود است',
+                ];
+            }
+        }
+
+        return $found;
+    }
+
+    private function reportMisLinked(array $rows): void
+    {
+        if ($rows === []) {
+            return;
+        }
+
+        $this->newLine();
+        $this->error(count($rows).' ابطال به حرکت اشتباه وصل است:');
+        $this->table(['ابطال', 'وصل به', 'مشکل'], $rows);
+        $this->line('روی موجودی اثر ندارد، ولی برگشت را به دورهٔ سهمیهٔ اشتباه می‌برد.');
     }
 
     private function reportOrphans(array $orphans): void
