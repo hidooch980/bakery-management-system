@@ -26,6 +26,7 @@ class ChaneBoard {
     this.doughBagsToday = 0,
     this.doughAsNaninoCount,
     this.doughAsNaninoAnnouncement,
+    this.naninoPerBag = 0,
   });
 
   final String dateDisplay;
@@ -54,6 +55,16 @@ class ChaneBoard {
   final int doughBagsToday;
   final int? doughAsNaninoCount;
   final String? doughAsNaninoAnnouncement;
+
+  /// Nanino loaves one sack of flour comes to — 64 here, and the owner
+  /// knows it by heart. Carried so the card can show its working instead
+  /// of asking to be believed.
+  final int naninoPerBag;
+
+  /// Whether any nanino was actually shaped today. Almost every day it was
+  /// not: one day in twenty over the last month. The card reads completely
+  /// differently in the two cases, so it asks.
+  bool get shapedNanino => naninoCount > 0;
 
   int get totalCount => normalCount + naninoCount;
 
@@ -106,6 +117,7 @@ class ChaneBoard {
           ? null
           : _int(doughToday['as_nanino_count']),
       doughAsNaninoAnnouncement: doughToday['as_nanino_announcement'] as String?,
+      naninoPerBag: _int(doughToday['nanino_per_bag']),
     );
   }
 

@@ -74,6 +74,11 @@ class ChaneBoardController extends Controller
                 'bags' => (int) $doughBagsToday,
                 'dough_kg' => $formula->doughKg($doughBagsToday),
                 'as_nanino_count' => $doughAsNanino,
+                // The rate itself, so the card can show its working. The
+                // owner knows this number — «هر ارد = 64 چانه نانینو» — and
+                // a figure he can check against what he already knows is a
+                // figure he will trust.
+                'nanino_per_bag' => $formula->naninoPerBag,
                 'as_nanino_announcement' => $doughAsNanino === null
                     ? null
                     : 'خمیر امروز ('.(int) $doughBagsToday." کیسه) معادل {$doughAsNanino} نان نانینو است.",

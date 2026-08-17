@@ -65,7 +65,7 @@ class ChaneComparison extends StatelessWidget {
                     child: _Metric(
                       label: 'چانه عادی (ملاک)',
                       count: board.normalCount,
-                      weightKg: board.normalWeightKg,
+                      detail: '${board.normalWeightKg.toStringAsFixed(1)} کیلوگرم',
                       color: _normalColor,
                     ),
                   ),
@@ -73,42 +73,58 @@ class ChaneComparison extends StatelessWidget {
                   Expanded(
                     child: _Metric(
                       label: 'چانه نانینو (نمایشی)',
-                      count: board.naninoCount,
-                      weightKg: board.naninoWeightKg,
+                      // The equivalent, not the count of what was shaped.
+                      // «نمایشی» is what this box has always been called and
+                      // it was showing a bare zero on nineteen days out of
+                      // twenty — the shop shapes nanino about once a month,
+                      // but every sack it bakes is worth 64 nanino to the
+                      // system that counts them. That number is the one the
+                      // owner reads, and the one that moves every day.
+                      count: board.doughAsNaninoCount ?? board.naninoCount,
+                      detail: board.doughBagsToday > 0 && board.naninoPerBag > 0
+                          ? '${board.doughBagsToday} کیسه × ${board.naninoPerBag}'
+                          : '${board.naninoWeightKg.toStringAsFixed(1)} کیلوگرم',
                       color: _naninoColor,
-                      // Most days nothing is shaped as nanino, so the real
-                      // count alone reads as a bare zero. The equivalent
-                      // says what today's chane would have been instead.
-                      footnote: board.naninoEquivalent == null
-                          ? null
-                          : 'معادل امروز: ${board.naninoEquivalent} عدد',
+                      // Only when some was genuinely shaped, because then it
+                      // is a real count and not an equivalent at all.
+                      footnote: board.shapedNanino
+                          ? 'شکل‌گرفته: ${board.naninoCount} عدد'
+                          : null,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              _ShareBar(
-                normalShare: board.normalShare,
-                naninoShare: board.naninoShare,
-                normalColor: _normalColor,
-                naninoColor: _naninoColor,
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _Legend(
-                    color: _normalColor,
-                    text: '${(board.normalShare * 100).toStringAsFixed(0)}٪ عادی',
-                  ),
-                  _Legend(
-                    color: _naninoColor,
-                    text: '${(board.naninoShare * 100).toStringAsFixed(0)}٪ نانینو',
-                  ),
+              // The bar, the legend and the verdict all split one output
+              // between two systems. On a day when nothing was shaped as
+              // nanino there is nothing to split: they read 100٪ / 0٪ and
+              // «عادی 764 عدد بیشتر» every single day, which is a lot of
+              // screen saying one thing. They come back the day the shop
+              // actually shapes some.
+              if (board.shapedNanino) ...[
+                const SizedBox(height: 18),
+                _ShareBar(
+                  normalShare: board.normalShare,
+                  naninoShare: board.naninoShare,
+                  normalColor: _normalColor,
+                  naninoColor: _naninoColor,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _Legend(
+                      color: _normalColor,
+                      text: '${(board.normalShare * 100).toStringAsFixed(0)}٪ عادی',
+                    ),
+                    _Legend(
+                      color: _naninoColor,
+                      text: '${(board.naninoShare * 100).toStringAsFixed(0)}٪ نانینو',
+                    ),
                 ],
               ),
               const SizedBox(height: 14),
               _Verdict(board: board),
+              ],
 
               if (board.naninoAnnouncement != null) ...[
                 const SizedBox(height: 10),
@@ -118,9 +134,10 @@ class ChaneComparison extends StatelessWidget {
                 ),
               ],
 
-              // The same comparison asked of the day's dough rather than
-              // its output — how much nanino all of today's dough could make.
-              if (board.doughAsNaninoAnnouncement != null) ...[
+              // The dough-as-nanino banner used to sit here. It is the
+              // figure the nanino box now leads with, and the same number
+              // twice on one card is one of them being ignored.
+              if (board.shapedNanino && board.doughAsNaninoAnnouncement != null) ...[
                 const SizedBox(height: 10),
                 _NaninoEquivalentBanner(
                   message: board.doughAsNaninoAnnouncement!,
@@ -239,14 +256,19 @@ class _Metric extends StatelessWidget {
   const _Metric({
     required this.label,
     required this.count,
-    required this.weightKg,
+    required this.detail,
     required this.color,
     this.footnote,
   });
 
   final String label;
   final int count;
-  final double weightKg;
+
+  /// The line under the figure — a weight on one side, the sacks and the
+  /// rate they convert at on the other. It used to be a weight on both,
+  /// which left the nanino box saying «0.0 کیلوگرم» under a zero.
+  final String detail;
+
   final Color color;
 
   /// A what-if line under the figure, not a count of anything baked.
@@ -281,7 +303,7 @@ class _Metric extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${weightKg.toStringAsFixed(1)} کیلوگرم',
+            detail,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
