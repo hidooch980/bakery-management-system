@@ -55,8 +55,22 @@ class OpenBakery extends Page implements HasForms
         return Bakery::query()->oldest('id')->first();
     }
 
+    /**
+     * Off until the shop says otherwise.
+     *
+     * The owner asked on 2026-08-17 for the other bakeries to stay shut
+     * until the app has been through a final test on real handsets. The
+     * page and everything behind it are built and tested; this only
+     * decides whether the panel offers to open a shop, and the answer
+     * lives in config so turning it back on is one line rather than an
+     * archaeology of what was removed.
+     */
     public static function canAccess(): bool
     {
+        if (! config('bakery.multi_shop')) {
+            return false;
+        }
+
         $user = auth()->user();
         $head = self::headShop();
 

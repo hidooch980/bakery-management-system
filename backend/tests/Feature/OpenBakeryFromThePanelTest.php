@@ -55,6 +55,11 @@ class OpenBakeryFromThePanelTest extends TestCase
 
         $this->actingAs($this->owner);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        // These tests are about what the page does; whether the panel
+        // offers it at all is the switch's own business, tested at the
+        // bottom of this file.
+        config(['bakery.multi_shop' => true]);
     }
 
     private function open(array $overrides = []): Testable
@@ -195,5 +200,41 @@ class OpenBakeryFromThePanelTest extends TestCase
         Livewire::test(OpenBakery::class)
             ->assertSee($this->head->name)
             ->assertSee('نانوایی درازهی');
+    }
+
+    /**
+     * The switch, which is off.
+     *
+     * The owner asked on 2026-08-17 for the other bakeries to stay shut
+     * until the app has been through a final test on real handsets. Nothing
+     * behind the page was removed — this decides only whether the panel
+     * offers to open a shop, so turning it back on is one line in config.
+     */
+    public function test_the_page_is_gone_while_the_switch_is_off(): void
+    {
+        config(['bakery.multi_shop' => false]);
+
+        $this->assertFalse(OpenBakery::canAccess());
+    }
+
+    public function test_typing_the_address_does_not_get_round_the_switch(): void
+    {
+        config(['bakery.multi_shop' => false]);
+
+        // A page hidden from a menu and reachable by URL is not hidden.
+        $this->get(OpenBakery::getUrl())->assertForbidden();
+    }
+
+    public function test_the_switch_ships_off(): void
+    {
+        // The file itself, not the live config — setUp turns it on for
+        // every other test here, and the thing worth holding down is what
+        // arrives on the server when nobody has said anything.
+        $shipped = require config_path('bakery.php');
+
+        $this->assertFalse(
+            $shipped['multi_shop'],
+            'config/bakery.php should ship with multi_shop off',
+        );
     }
 }
