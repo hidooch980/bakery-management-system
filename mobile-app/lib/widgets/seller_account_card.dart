@@ -244,11 +244,11 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
               // that would only cover that.
               onPressed: _sending ? null : _requestSettlement,
               icon: _sending
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
                     )
                   : const Icon(Icons.handshake_rounded, size: 18),
               label: Text(_sending ? 'در حال ارسال…' : 'درخواست تسویه حساب'),

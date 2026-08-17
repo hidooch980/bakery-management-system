@@ -188,11 +188,11 @@ class _AttendanceCardState extends State<AttendanceCard> {
                           minimumSize: const Size(104, 48),
                         ),
                         child: _submitting
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
+                                    strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
                               )
                             : const Text('ثبت'),
                       ),
@@ -393,12 +393,12 @@ class _RosterSheetState extends State<_RosterSheet> {
                               onPressed:
                                   working ? null : () => _tickIn(person),
                               child: working
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       width: 18,
                                       height: 18,
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Colors.white),
+                                          color: Theme.of(context).colorScheme.onPrimary),
                                     )
                                   : const Text('ثبت'),
                             ),

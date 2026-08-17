@@ -275,12 +275,12 @@ class _StartRow extends StatelessWidget {
                     minimumSize: const Size(84, 38),
                   ),
                   child: busy
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onPrimary,
                           ),
                         )
                       : const Text('ثبت'),

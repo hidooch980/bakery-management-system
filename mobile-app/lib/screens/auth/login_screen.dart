@@ -265,12 +265,12 @@ class _LoginScreenState extends State<LoginScreen>
                               FilledButton.icon(
                                 onPressed: busy ? null : _submit,
                                 icon: busy
-                                    ? const SizedBox(
+                                    ? SizedBox(
                                         width: 20,
                                         height: 20,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Colors.white,
+                                          color: Theme.of(context).colorScheme.onPrimary,
                                         ),
                                       )
                                     : const Icon(Icons.login_rounded),
@@ -376,13 +376,13 @@ class _SangakPainter extends CustomPainter {
       ..cubicTo(w * 0.22, h * 0.86, w * 0.16, h * 0.72, w * 0.14, h * 0.50)
       ..close();
 
-    canvas.drawPath(loaf, Paint()..color = Colors.white);
+    canvas.drawPath(loaf, Paint()..color = AppColors.onSignal);
 
     // The ridges, pressed down the length of it. Drawn as translucent
     // knocks-out rather than a second colour, so the mark stays one solid
     // shape at the size a launcher icon is seen.
     final ridge = Paint()
-      ..color = AppColors.crust.withValues(alpha: 0.55)
+      ..color = AppColors.signal.withValues(alpha: 0.5)
       ..strokeWidth = w * 0.055
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;

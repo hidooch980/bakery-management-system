@@ -138,11 +138,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 FilledButton.icon(
                   onPressed: busy ? null : _submit,
                   icon: busy
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
                         )
                       : const Icon(Icons.save_rounded),
                   label: Text(busy ? 'در حال ذخیره…' : 'تغییر رمز عبور'),
