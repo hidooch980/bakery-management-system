@@ -1,8 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
-import '../theme/app_theme.dart';
-
 /// One question, the whole screen, and nothing else to touch.
 ///
 /// The production roles — خمیرگیر, چانه‌گیر — record one or two numbers a
@@ -21,6 +16,13 @@ import '../theme/app_theme.dart';
 /// What the questions are, and what happens to the answers, belongs to the
 /// screen that uses them.
 library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../theme/app_theme.dart';
 
 /// The frame every question shares: the step counter, the question, the
 /// body, and one button along the bottom.
@@ -243,7 +245,11 @@ class OneTaskCounter extends StatelessWidget {
   }
 }
 
-class _StepButton extends StatelessWidget {
+/// Holds to repeat.
+///
+/// Thirteen bags to thirty is seventeen taps otherwise, and the day that
+/// is not the usual day is exactly the day nobody has a spare hand.
+class _StepButton extends StatefulWidget {
   const _StepButton({required this.icon, required this.label, this.onPressed});
 
   final IconData icon;
@@ -251,21 +257,68 @@ class _StepButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
   @override
+  State<_StepButton> createState() => _StepButtonState();
+}
+
+class _StepButtonState extends State<_StepButton> {
+  /// Long enough that an ordinary press is never mistaken for a hold.
+  static const _beforeRepeating = Duration(milliseconds: 420);
+
+  static const _between = Duration(milliseconds: 90);
+
+  Timer? _timer;
+
+  void _startRepeating() {
+    if (widget.onPressed == null) return;
+
+    _timer?.cancel();
+    _timer = Timer(_beforeRepeating, () {
+      _timer = Timer.periodic(_between, (_) {
+        // The button disables itself at the end of its range, and a timer
+        // that kept firing into a disabled button would spin forever.
+        if (widget.onPressed == null) {
+          _stop();
+
+          return;
+        }
+
+        widget.onPressed!();
+      });
+    });
+  }
+
+  void _stop() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  @override
+  void dispose() {
+    _stop();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 66,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(
-            color: onPressed == null
-                ? Theme.of(context).colorScheme.outlineVariant
-                : AppColors.signal,
-            width: 2,
+      child: Listener(
+        onPointerDown: (_) => _startRepeating(),
+        onPointerUp: (_) => _stop(),
+        onPointerCancel: (_) => _stop(),
+        child: OutlinedButton(
+          onPressed: widget.onPressed,
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(
+              color: widget.onPressed == null
+                  ? Theme.of(context).colorScheme.outlineVariant
+                  : AppColors.signal,
+              width: 2,
+            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Icon(widget.icon, size: 32, semanticLabel: widget.label),
         ),
-        child: Icon(icon, size: 32, semanticLabel: label),
       ),
     );
   }

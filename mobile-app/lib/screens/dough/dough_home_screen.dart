@@ -155,7 +155,7 @@ class _DoughHomeScreenState extends State<DoughHomeScreen> {
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => SettingsScreen(api: widget.api)),
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
           ),
         ],

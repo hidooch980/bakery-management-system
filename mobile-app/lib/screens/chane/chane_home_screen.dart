@@ -182,7 +182,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => SettingsScreen(api: widget.api)),
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
             ),
           ),
         ],
@@ -191,7 +191,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
         _Stage.loading => const Center(child: CircularProgressIndicator()),
         _Stage.nothingWaiting => _nothing(),
         _Stage.choosing => _choose(),
-        _Stage.counting => _count_(),
+        _Stage.counting => _askCount(),
         _Stage.extras => _extras(),
         _Stage.done => _done(),
       },
@@ -298,7 +298,19 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
     );
   }
 
-  Widget _count_() {
+  /// What the batch should yield — stated plainly while the count still
+  /// looks right, and turned into a question once it does not.
+  String? _hint(int? expected) {
+    final bags = _chosen?.bagCount;
+
+    if (expected == null || bags == null) return null;
+
+    return _looksWrong
+        ? 'از $bags کیسه معمولاً حدود $expected چانه درمی‌آید — مطمئنی؟'
+        : 'از $bags کیسه حدود $expected انتظار می‌رود';
+  }
+
+  Widget _askCount() {
     final expected = _expected;
     final many = _waiting.length > 1;
 
@@ -307,12 +319,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
       step: many ? 2 : null,
       of: many ? 2 : null,
       onBack: many ? () => setState(() => _stage = _Stage.choosing) : null,
-      hint: switch (null) {
-        _ when _looksWrong && expected != null =>
-          'از ${_chosen!.bagCount} کیسه معمولاً حدود $expected چانه درمی‌آید — مطمئنی؟',
-        _ when expected != null => 'از ${_chosen!.bagCount} کیسه حدود $expected انتظار می‌رود',
-        _ => null,
-      },
+      hint: _hint(expected),
       actionLabel: 'ثبت کن',
       busy: _saving,
       onAction: _count > 0 ? _save : null,
