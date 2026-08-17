@@ -57,7 +57,6 @@ class InventoryItemResource extends Resource
                         ->minValue(0)
                         ->suffix('کیلوگرم')
                         ->visible(fn (?InventoryItem $record) => $record !== null
-                            && ! in_array($record->key, InventoryItem::WEIGHED_ONLY, true)
                             && $record->key !== InventoryItem::FLOUR)
                         ->helperText('برای نمایش موجودی به تعداد کیسه'),
 
@@ -73,13 +72,7 @@ class InventoryItemResource extends Resource
     /** Flour reads its sack size from the production formula; others carry their own. */
     private static function bagWeightFor(InventoryItem $item): float
     {
-        if (in_array($item->key, InventoryItem::WEIGHED_ONLY, true)) {
-            return 0.0;
-        }
-
-        return $item->key === InventoryItem::FLOUR
-            ? DoughFormula::fromBakery()->bagWeightKg
-            : (float) ($item->bag_weight_kg ?? 0);
+        return $item->bagWeightKg();
     }
 
     public static function table(Table $table): Table

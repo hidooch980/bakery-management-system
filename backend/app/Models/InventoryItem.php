@@ -55,7 +55,18 @@ class InventoryItem extends Model
      * fixed size and dough is never bagged at all, so a bag count for either
      * would be a number nobody weighs.
      */
-    public const WEIGHED_ONLY = [self::SALT, self::YEAST_DRY, self::YEAST_WET];
+    /**
+     * Goods with no fixed package, so a bag count for them would be
+     * converted at a figure nobody measures.
+     *
+     * It used to hold salt and both yeasts on the belief that they are
+     * weighed rather than counted. They are weighed *into the dough* —
+     * but they arrive in sacks like everything else, and the owner reads
+     * his store in sacks: «هر کیسه خمیر ۱۰ کیلو هست، هر کیسه نمک ۲۵».
+     * Whether a good has a package is a fact about the good, so it is
+     * data now: an item shows bags when its bag weight is known.
+     */
+    public const WEIGHED_ONLY = [];
 
     protected function casts(): array
     {
@@ -90,15 +101,23 @@ class InventoryItem extends Model
      */
     public function getBalanceBagsAttribute(): ?float
     {
-        if (in_array($this->key, self::WEIGHED_ONLY, true)) {
-            return null;
-        }
-
-        $bagWeight = $this->key === self::FLOUR
-            ? DoughFormula::fromBakery()->bagWeightKg
-            : (float) ($this->bag_weight_kg ?? 0);
+        $bagWeight = $this->bagWeightKg();
 
         return $bagWeight > 0 ? round($this->balance / $bagWeight, 2) : null;
+    }
+
+    /**
+     * The size of one sack of this, or zero when it has no fixed package.
+     *
+     * Flour's lives on the production formula rather than here — that
+     * setting predates this column and every install already has it — so
+     * this is the one place that knows the difference.
+     */
+    public function bagWeightKg(): float
+    {
+        return $this->key === self::FLOUR
+            ? DoughFormula::fromBakery()->bagWeightKg
+            : (float) ($this->bag_weight_kg ?? 0);
     }
 
     public function getIsLowAttribute(): bool

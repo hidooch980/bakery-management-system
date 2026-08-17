@@ -81,18 +81,19 @@ class InventoryController extends Controller
         $item = InventoryItem::ofKey($data['item']);
 
         if (isset($data['bags'])) {
-            // Salt and dough are weighed, so a bag count for them would be
-            // converted at a figure nobody actually measures.
-            if (in_array($item->key, InventoryItem::WEIGHED_ONLY, true)) {
+            // A good with no fixed package still cannot be counted in
+            // sacks — the conversion would be at a figure nobody measures.
+            // Which goods those are is now the shop's own answer, carried
+            // on the item, rather than a list in the code that said salt
+            // and yeast come loose when they arrive in sacks like the rest.
+            $bagWeight = $item->bagWeightKg();
+
+            if ($bagWeight <= 0) {
                 return $this->error(
-                    $item->name.' فقط به کیلوگرم ثبت می‌شود.',
+                    $item->name.' فقط به کیلوگرم ثبت می‌شود چون وزن کیسه‌اش ثبت نشده است.',
                     422
                 );
             }
-
-            $bagWeight = $item->key === InventoryItem::FLOUR
-                ? DoughFormula::fromBakery()->bagWeightKg
-                : (float) ($item->bag_weight_kg ?? 0);
 
             if ($bagWeight <= 0) {
                 return $this->error(

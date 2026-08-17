@@ -1107,6 +1107,7 @@ class ProductionFormulaTest extends TestCase
         $this->assertNull(InventoryItem::ofKey(InventoryItem::SALT)->bag_weight_kg);
     }
 
+    /** Until the shop says what a sack of it weighs, nothing is in sacks. */
     public function test_salt_balance_is_not_reported_in_sacks(): void
     {
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 75, 'purchase');
@@ -1130,18 +1131,30 @@ class ProductionFormulaTest extends TestCase
     }
 
     /**
-     * A bag weight left on the record from before must not bring the bag
-     * count back: these two are weighed goods by nature, not by setting.
+     * A bag weight set on salt is honoured.
+     *
+     * This test used to assert the opposite, on the reasoning that salt and
+     * yeast are weighed goods «by nature, not by setting». Half of that was
+     * right: they are weighed into the dough. They arrive in sacks like
+     * everything else, and on 2026-08-17 the owner said what those sacks
+     * weigh — «هر کیسه نمک ۲۵، هر کیسه خمیر ۱۰». A store he reads in sacks
+     * was reporting his yeast as 8.52 kilograms rather than as under one
+     * bag left.
+     *
+     * So whether a good has a package is a fact about the good, and the
+     * shop is the one who knows it. The two tests above still hold: with
+     * nothing set, nothing is said in sacks.
      */
-    public function test_a_stale_bag_weight_does_not_revive_the_bag_count(): void
+    public function test_a_bag_weight_set_on_salt_is_used(): void
     {
         $salt = InventoryItem::ofKey(InventoryItem::SALT);
         $salt->update(['bag_weight_kg' => 25]);
         $salt->move('in', 75, 'purchase');
 
-        $this->assertNull($salt->fresh()->balance_bags);
+        $this->assertSame(3.0, $salt->fresh()->balance_bags);
     }
 
+    /** With no sack weight recorded, a sack count has nothing to convert at. */
     public function test_recording_salt_in_bags_is_refused(): void
     {
         $admin = User::factory()->create();
