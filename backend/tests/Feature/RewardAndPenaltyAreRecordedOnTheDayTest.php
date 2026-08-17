@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Bakery;
-use App\Models\SalaryPayment;
 use App\Models\StaffAdjustment;
 use App\Models\User;
 use App\Support\Jalali;
