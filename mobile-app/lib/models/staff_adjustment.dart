@@ -105,3 +105,52 @@ class AdjustmentPeriod {
             .toList(),
       );
 }
+
+/// A member of staff asking to be paid for the month.
+///
+/// It carries no amount: the wage is what was agreed, less what has been
+/// drawn against it, and inviting a figure would start a negotiation over
+/// a number the system already knows. [estimatedNet] is what it would come
+/// to if it were paid today — a forecast, and labelled as one.
+class SalaryRequest {
+  const SalaryRequest({
+    required this.id,
+    required this.periodLabel,
+    required this.status,
+    required this.statusLabel,
+    required this.requestedOn,
+    required this.daysWaiting,
+    this.userName,
+    this.note,
+    this.decisionNote,
+    this.estimatedNetFormatted,
+  });
+
+  final int id;
+  final String periodLabel;
+  final String status;
+  final String statusLabel;
+  final String requestedOn;
+  final int daysWaiting;
+  final String? userName;
+  final String? note;
+  final String? decisionNote;
+  final String? estimatedNetFormatted;
+
+  bool get isPending => status == 'pending';
+
+  bool get wasRejected => status == 'rejected';
+
+  factory SalaryRequest.fromJson(Map<String, dynamic> json) => SalaryRequest(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        periodLabel: '${json['period_label'] ?? ''}',
+        status: '${json['status'] ?? 'pending'}',
+        statusLabel: '${json['status_label'] ?? ''}',
+        requestedOn: '${json['requested_on_jalali'] ?? ''}',
+        daysWaiting: (json['days_waiting'] as num?)?.toInt() ?? 0,
+        userName: (json['user'] as Map?)?['name'] as String?,
+        note: json['note'] as String?,
+        decisionNote: json['decision_note'] as String?,
+        estimatedNetFormatted: json['estimated_net_formatted'] as String?,
+      );
+}

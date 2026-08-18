@@ -225,6 +225,7 @@ class PaySummary {
     required this.unpaidPayslipsCount,
     required this.carriesOver,
     required this.hasPendingRequest,
+    this.hasPendingSalaryRequest = false,
     required this.summary,
     this.monthlySalaryFormatted,
     this.remainingFormatted,
@@ -242,6 +243,8 @@ class PaySummary {
         remainingFormatted: json['remaining_formatted'] as String?,
         carriesOver: json['carries_over'] as bool? ?? false,
         hasPendingRequest: json['has_pending_request'] as bool? ?? false,
+        hasPendingSalaryRequest:
+            json['has_pending_salary_request'] as bool? ?? false,
         summary: json['summary'] as String? ?? '',
       );
 
@@ -265,6 +268,11 @@ class PaySummary {
   final bool carriesOver;
 
   final bool hasPendingRequest;
+
+  /// Whether this person has already asked to be paid for the month, so
+  /// the card offers to ask rather than letting them ask twice and be
+  /// told no by the server.
+  final bool hasPendingSalaryRequest;
   final String summary;
 
   bool get owesAdvance => advanceOutstanding > 0;

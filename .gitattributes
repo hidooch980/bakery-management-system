@@ -1,0 +1,42 @@
+# Line endings, settled once.
+#
+# This repo is written on Windows and runs on Linux. Git's autocrlf was
+# turning every source file into CRLF in the working tree, so every file
+# copied to the server carried Windows endings and `pint --test` failed on
+# `line_ending` — five times on 2026-08-18 alone, each one a false alarm
+# that had to be chased down and hand-fixed before anything could be
+# pushed.
+#
+# Nothing in the repository's history changes: git has always stored LF.
+# What changes is that the working copy gets LF too, so what is edited is
+# what is tested.
+
+* text=auto eol=lf
+
+# Anything that is not text at all. Left alone entirely — a line-ending
+# rewrite inside a binary is not a formatting change, it is corruption.
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.webp    binary
+*.pdf     binary
+*.zip     binary
+*.gz      binary
+*.jar     binary
+*.keystore binary
+*.jks     binary
+*.ttf     binary
+*.otf     binary
+*.woff    binary
+*.woff2   binary
+*.apk     binary
+*.so      binary
+*.dll     binary
+
+# Windows' own scripts genuinely want CRLF; nothing on the server reads
+# them.
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.ps1     text eol=crlf

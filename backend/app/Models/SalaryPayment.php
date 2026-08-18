@@ -58,6 +58,17 @@ class SalaryPayment extends Model
         static::saved(function (self $payment) {
             $payment->applyAdvanceRecovery();
             $payment->claimAdjustments();
+            $payment->answerRequests();
+        });
+
+        // Before the row goes, not after. `salary_payment_id` is a foreign
+        // key with nullOnDelete, so by the time a `deleted` hook runs the
+        // database has already cleared the link and there is nothing left
+        // to find. That is harmless for the adjustments, which only needed
+        // the link cleared — but a request also has to go back to pending,
+        // and no foreign key can do that.
+        static::deleting(function (self $payment) {
+            $payment->reopenRequests();
         });
 
         static::deleted(function (self $payment) {
@@ -168,6 +179,46 @@ class SalaryPayment extends Model
     {
         StaffAdjustment::where('salary_payment_id', $this->id)
             ->update(['salary_payment_id' => null]);
+    }
+
+    /**
+     * Answers whoever asked to be paid for this month.
+     *
+     * Paying is what approval means. There is no approve button anywhere:
+     * one would write a wage nobody had looked at, and every figure on a
+     * payslip — the advance, the month's rewards, the account it leaves —
+     * has to be seen before the money moves.
+     */
+    public function answerRequests(): void
+    {
+        if (! $this->user_id || ! $this->period_start) {
+            return;
+        }
+
+        SalaryPaymentRequest::where('user_id', $this->user_id)
+            ->whereDate('period_start', $this->period_start->toDateString())
+            ->pending()
+            ->update([
+                'status' => SalaryPaymentRequest::PAID,
+                'salary_payment_id' => $this->id,
+                'decided_at' => now(),
+            ]);
+    }
+
+    /** A wage taken back leaves the person asking again. */
+    public function reopenRequests(): void
+    {
+        SalaryPaymentRequest::where('salary_payment_id', $this->id)
+            ->update([
+                'status' => SalaryPaymentRequest::PENDING,
+                'salary_payment_id' => null,
+                'decided_at' => null,
+            ]);
+    }
+
+    public function paymentRequests()
+    {
+        return $this->hasMany(SalaryPaymentRequest::class);
     }
 
     public function adjustments()

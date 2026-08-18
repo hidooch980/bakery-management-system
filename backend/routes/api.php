@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\PowerBiExportController;
 use App\Http\Controllers\Api\QuotaController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
+use App\Http\Controllers\Api\SalaryPaymentRequestController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SellerCollectionController;
@@ -240,6 +241,13 @@ Route::prefix('v1')->group(function () {
         // Asking for one, which used to happen in the doorway and left no
         // record of who asked or what was said back. Open to every
         // employee: asking is not the same as granting.
+        // Asking to be paid for the month. No amount is sent — the wage is
+        // what was agreed, and the person asking is saying he has not had
+        // it, not proposing a figure.
+        Route::get('/salary-requests/mine', [SalaryPaymentRequestController::class, 'mine']);
+        Route::post('/salary-requests', [SalaryPaymentRequestController::class, 'store']);
+        Route::delete('/salary-requests/{salaryRequest}', [SalaryPaymentRequestController::class, 'destroy']);
+
         Route::get('/advance-requests/mine', [StaffAdvanceRequestController::class, 'mine']);
         Route::post('/advance-requests', [StaffAdvanceRequestController::class, 'store']);
         Route::delete('/advance-requests/{advanceRequest}', [StaffAdvanceRequestController::class, 'destroy']);
@@ -262,6 +270,12 @@ Route::prefix('v1')->group(function () {
             Route::apiResource('salaries', SalaryController::class)->except(['show']);
 
             Route::get('/staff-advances/outstanding', [StaffAdvanceController::class, 'outstanding']);
+
+            // No approve route on purpose: paying the person through the
+            // pay sheet is what approval means, and that is where the
+            // figures are on screen before the money moves.
+            Route::get('/salary-requests', [SalaryPaymentRequestController::class, 'index']);
+            Route::patch('/salary-requests/{salaryRequest}/reject', [SalaryPaymentRequestController::class, 'reject']);
 
             Route::get('/advance-requests', [StaffAdvanceRequestController::class, 'index']);
             Route::patch('/advance-requests/{advanceRequest}/approve', [StaffAdvanceRequestController::class, 'approve']);

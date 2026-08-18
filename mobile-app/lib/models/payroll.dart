@@ -13,6 +13,8 @@ class Employee {
     this.suggestedDeduction = 0,
     this.suggestedDeductionFormatted = '',
     this.adjustmentCount = 0,
+    this.hasRequested = false,
+    this.requestedDaysAgo,
   });
 
   final int id;
@@ -49,6 +51,12 @@ class Employee {
 
   bool get owesAdvance => advanceOutstanding > 0;
 
+  /// Whether this person has asked to be paid, and how long ago. The shop
+  /// went three weeks without writing a payslip and nobody had a way to say
+  /// so except in person.
+  final bool hasRequested;
+  final int? requestedDaysAgo;
+
   bool get hasAdjustments => adjustmentCount > 0;
 
   factory Employee.fromJson(Map<String, dynamic> json) => Employee(
@@ -64,6 +72,8 @@ class Employee {
         suggestedDeduction: _double(json['suggested_deduction']),
         suggestedDeductionFormatted: '${json['suggested_deduction_formatted'] ?? ''}',
         adjustmentCount: (json['adjustment_count'] as num?)?.toInt() ?? 0,
+        hasRequested: json['has_requested'] == true,
+        requestedDaysAgo: (json['requested_days_ago'] as num?)?.toInt(),
       );
 
   static double _double(dynamic value) =>

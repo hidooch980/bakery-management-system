@@ -184,6 +184,29 @@ class _PayrollSectionState extends State<PayrollSection> {
                       ? null
                       : () => _pay(person, accounts),
                 ),
+                // He has asked. Shown before the row is tapped, because a
+                // person chasing their own wage is the one thing on this
+                // screen that is about somebody waiting.
+                if (person.hasRequested && !paidThisPeriod.contains(person.id))
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 4, bottom: Gap.tight),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.event_available_rounded,
+                            size: IconSize.inline, color: AppColors.attention),
+                        const SizedBox(width: Gap.tight),
+                        Text(
+                          person.requestedDaysAgo == null || person.requestedDaysAgo == 0
+                              ? 'امروز درخواست پرداخت داد'
+                              : '${person.requestedDaysAgo} روز پیش درخواست پرداخت داد',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.attention),
+                        ),
+                      ],
+                    ),
+                  ),
                 // Before the sheet is opened, not after. The wage on the row
                 // above is not what this person is going to be handed, and
                 // finding that out only once the sum is on screen is how the

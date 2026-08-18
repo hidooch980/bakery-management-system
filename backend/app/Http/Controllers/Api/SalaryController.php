@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\SalaryPayment;
+use App\Models\SalaryPaymentRequest;
 use App\Models\StaffAdjustment;
 use App\Models\StaffAdvance;
 use App\Models\StaffAdvanceRequest;
@@ -214,6 +215,12 @@ class SalaryController extends Controller
                 ->where('status', StaffAdvanceRequest::PENDING)
                 ->exists(),
 
+            // And whether he has asked to be paid for the month, so the
+            // card offers to ask rather than letting him ask twice.
+            'has_pending_salary_request' => SalaryPaymentRequest::where('user_id', $user->id)
+                ->pending()
+                ->exists(),
+
             'summary' => $this->summarise($salary, $outstanding, $remaining, $unpaidTotal, $carriesOver),
         ]);
     }
@@ -278,8 +285,13 @@ class SalaryController extends Controller
             $u->id => StaffAdjustment::monthFor($u->id, $monthFrom, $monthUntil),
         ]);
 
+        $requests = SalaryPaymentRequest::pending()
+            ->whereBetween('period_start', [$monthFrom, $monthUntil])
+            ->get(['user_id', 'created_at'])
+            ->mapWithKeys(fn (SalaryPaymentRequest $r) => [$r->user_id => $r->days_waiting]);
+
         $users = $users
-            ->map(function (User $u) use ($fallback, $adjustments) {
+            ->map(function (User $u) use ($fallback, $adjustments, $requests) {
                 $outstanding = StaffAdvance::outstandingFor($u->id);
 
                 return [
@@ -309,6 +321,13 @@ class SalaryController extends Controller
                     'suggested_deduction' => Money::convert($adjustments[$u->id]['penalty'] ?? 0),
                     'suggested_deduction_formatted' => Money::format($adjustments[$u->id]['penalty'] ?? 0),
                     'adjustment_count' => $adjustments[$u->id]['count'] ?? 0,
+                    // Whether this person has asked to be paid, and how
+                    // long ago. The shop went three weeks without writing a
+                    // payslip and nobody had a way to say so except in
+                    // person; a row that says «۴ روز پیش درخواست داد» is
+                    // that, in writing.
+                    'has_requested' => isset($requests[$u->id]),
+                    'requested_days_ago' => $requests[$u->id] ?? null,
                 ];
             });
 

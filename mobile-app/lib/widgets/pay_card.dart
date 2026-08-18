@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../models/quota_and_advance.dart';
 import '../screens/shared/my_advances_screen.dart';
+import '../services/api_client.dart';
 import '../services/bakery_api.dart';
 import '../theme/app_theme.dart';
+import 'common.dart';
 
 /// What this person is owed, on their own home screen.
 ///
@@ -26,6 +28,7 @@ class PayCard extends StatefulWidget {
 class _PayCardState extends State<PayCard> {
   PaySummary? _pay;
   bool _loading = true;
+  bool _requesting = false;
 
   /// The figures could not be read. The card still draws with a way back in:
   /// somebody who cannot see their pay must at least be able to retry, and
@@ -58,6 +61,28 @@ class _PayCardState extends State<PayCard> {
         _loading = false;
         _failed = true;
       });
+    }
+  }
+
+  /// Asking to be paid for the month.
+  ///
+  /// No amount and no form: the wage is what was agreed, and this says «I
+  /// have not had it». One tap, because a person chasing their own pay
+  /// should not have to fill anything in to do it.
+  Future<void> _requestSalary() async {
+    setState(() => _requesting = true);
+
+    try {
+      await widget.api.requestSalary();
+
+      if (!mounted) return;
+      showMessage(context, 'درخواست شما ثبت شد.');
+      await _refresh();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showMessage(context, e.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _requesting = false);
     }
   }
 
@@ -162,6 +187,29 @@ class _PayCardState extends State<PayCard> {
                   pay?.hasPendingRequest == true
                       ? 'درخواست شما در انتظار پاسخ است'
                       : 'درخواست علی‌الحساب',
+                ),
+              ),
+            ),
+            // Asking to be paid for the month. This shop traded three weeks
+            // without writing one payslip, and the people owed the money had
+            // no way to say so except in person.
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: _requesting || pay == null
+                    ? null
+                    : (pay.hasPendingSalaryRequest ? null : _requestSalary),
+                icon: _requesting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.event_available_rounded, size: IconSize.row),
+                label: Text(
+                  pay?.hasPendingSalaryRequest == true
+                      ? 'درخواست حقوق ثبت شده — در انتظار پرداخت'
+                      : 'درخواست پرداخت حقوق',
                 ),
               ),
             ),

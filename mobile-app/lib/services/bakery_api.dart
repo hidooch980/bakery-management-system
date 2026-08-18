@@ -1108,6 +1108,42 @@ class BakeryApi {
     );
   }
 
+  // ------------------------------------------- asking to be paid
+
+  /// Asks to be paid for the month. No amount is sent: the wage is what
+  /// was agreed, and what this says is «I have not had it».
+  Future<SalaryRequest> requestSalary({String? note}) async {
+    final body = await _client.post('/salary-requests', {
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+
+    return SalaryRequest.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<List<SalaryRequest>> mySalaryRequests() async {
+    final body = await _client.get('/salary-requests/mine');
+
+    return ((body['data'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(SalaryRequest.fromJson)
+        .toList();
+  }
+
+  Future<void> withdrawSalaryRequest(int id) =>
+      _client.delete('/salary-requests/$id');
+
+  /// Everything waiting, for whoever pays the wages. There is no approve
+  /// call to go with the reject: paying the person through the pay sheet
+  /// is what approval means, and that is where the figures are on screen.
+  Future<List<SalaryRequest>> pendingSalaryRequests() async {
+    final body = await _client.get('/salary-requests?status=pending');
+
+    return _paginated(body).map(SalaryRequest.fromJson).toList();
+  }
+
+  Future<void> rejectSalaryRequest(int id, {required String note}) =>
+      _client.patch('/salary-requests/$id/reject', {'decision_note': note});
+
   Future<AdvanceRequest> requestAdvance({
     required double amount,
     String? reason,
