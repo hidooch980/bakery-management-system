@@ -148,7 +148,8 @@ class _AdjustmentSheetState extends State<AdjustmentSheet> {
               const SizedBox(height: Gap.block),
 
               DropdownButtonFormField<int>(
-                value: _person?.id,
+                initialValue: _person?.id,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'کارمند'),
                 items: [
                   for (final p in widget.staff)
