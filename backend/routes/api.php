@@ -58,6 +58,16 @@ Route::prefix('v1')->group(function () {
     // keep them signed in. Anything faster than five is not this shop.
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
+    // Forgotten passwords, by text. Both answer the same way whether the
+    // number is registered or not, so neither can be used to find out who
+    // works here. The throttle is a second wall: the real limit is counted
+    // per phone number inside the controller, because that is what costs
+    // money and rings at night.
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])
+        ->middleware('throttle:6,1');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])
+        ->middleware('throttle:10,1');
+
     Route::middleware('auth:sanctum')->group(function () {
         // --- Available to every authenticated user ---
         Route::get('/me', [AuthController::class, 'me']);

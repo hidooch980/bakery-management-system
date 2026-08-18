@@ -16,6 +16,11 @@ class AuthProvider extends ChangeNotifier {
 
   BiometricService get biometrics => _biometrics;
 
+  /// The API, for screens that need it before anyone has signed in — the
+  /// forgotten-password flow is the only one, and by definition it runs
+  /// with no session at all.
+  BakeryApi get api => _api;
+
   AuthStatus _status = AuthStatus.unknown;
   AppUser? _user;
   String? _error;

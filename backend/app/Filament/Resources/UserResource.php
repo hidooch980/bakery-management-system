@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
+use App\Rules\NotAGuessablePassword;
 use App\Support\Jalali;
 use App\Support\Money;
 use Filament\Forms;
@@ -73,6 +74,11 @@ class UserResource extends Resource
                         ->password()
                         ->revealable()
                         ->minLength(8)
+                        // Length was never the test. One of this shop's
+                        // five accounts had eight characters of a password
+                        // that is on every published list of the commonest
+                        // ones, and it would be guessed in under a second.
+                        ->rule(new NotAGuessablePassword)
                         ->dehydrateStateUsing(fn ($state) => Hash::make($state))
                         ->dehydrated(fn ($state) => filled($state))
                         ->required(fn (string $operation) => $operation === 'create')

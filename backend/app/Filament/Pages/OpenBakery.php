@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\OpenBakery as OpenBakeryAction;
 use App\Models\Bakery;
+use App\Rules\NotAGuessablePassword;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -148,6 +149,7 @@ class OpenBakery extends Page implements HasForms
                             ->revealable()
                             ->required()
                             ->minLength(8)
+                            ->rule(new NotAGuessablePassword)
                             ->same('password_confirmation')
                             ->helperText('حداقل ۸ کاراکتر. خود مدیر بعداً می‌تواند عوضش کند.'),
 

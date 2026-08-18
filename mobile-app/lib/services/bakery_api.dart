@@ -60,6 +60,27 @@ class BakeryApi {
     }
   }
 
+  /// Asks for a six-digit code by text.
+  ///
+  /// Answers the same way whether the number is registered or not — the
+  /// server refuses to say, so that this cannot be used to find out who
+  /// works at the shop. Nothing here should try to interpret it otherwise.
+  Future<void> requestPasswordCode(String phone) =>
+      _client.post('/forgot-password', {'phone': phone});
+
+  /// The code, and a new password.
+  Future<void> resetPasswordWithCode({
+    required String phone,
+    required String code,
+    required String password,
+  }) =>
+      _client.post('/reset-password', {
+        'phone': phone,
+        'code': code,
+        'password': password,
+        'password_confirmation': password,
+      });
+
   Future<String> changePassword({
     required String current,
     required String next,

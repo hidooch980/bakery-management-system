@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import 'forgot_password_screen.dart';
 import '../../services/biometric_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
@@ -75,6 +76,25 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (!mounted) return;
     setState(() => _biometricEnabled = stillEnabled);
+  }
+
+  /// The way back in, by text.
+  Future<void> _forgotPassword() async {
+    final done = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(
+          api: context.read<AuthProvider>().api,
+          // Carried over, so somebody who typed their number and then
+          // remembered they have no password does not type it twice.
+          phone: _loginController.text.trim(),
+        ),
+      ),
+    );
+
+    if (done == true && mounted) {
+      _passwordController.clear();
+    }
   }
 
   @override
@@ -275,6 +295,14 @@ class _LoginScreenState extends State<LoginScreen>
                                       )
                                     : const Icon(Icons.login_rounded),
                                 label: Text(busy ? 'در حال ورود…' : 'ورود'),
+                              ),
+                              // Right under the button that just refused
+                              // them. Somebody locked out of the app cannot
+                              // be sent to a computer to fix it — four of
+                              // the five people here do not open one.
+                              TextButton(
+                                onPressed: busy ? null : _forgotPassword,
+                                child: const Text('رمزم را فراموش کرده‌ام'),
                               ),
                               if (_biometricEnabled &&
                                   _availability == BiometricAvailability.ready) ...[

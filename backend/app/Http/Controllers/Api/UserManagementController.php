@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Rules\NotAGuessablePassword;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,7 +46,7 @@ class UserManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:20', 'unique:users,phone'],
-            'password' => ['required', 'string', 'min:8'],
+            'password' => ['required', 'string', 'min:8', new NotAGuessablePassword],
             'role' => ['required', Rule::in(self::ASSIGNABLE_ROLES)],
         ]);
 
@@ -73,7 +74,7 @@ class UserManagementController extends Controller
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', Rule::unique('users')->ignore($user->id)],
             'phone' => ['sometimes', 'nullable', 'string', 'max:20', Rule::unique('users')->ignore($user->id)],
-            'password' => ['sometimes', 'string', 'min:8'],
+            'password' => ['sometimes', 'string', 'min:8', new NotAGuessablePassword],
             'is_active' => ['sometimes', 'boolean'],
             'role' => ['sometimes', Rule::in(self::ASSIGNABLE_ROLES)],
         ]);
