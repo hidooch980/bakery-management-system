@@ -115,7 +115,7 @@ class MoneyAtAGlanceTest extends TestCase
     public function test_the_diesel_line_leads_with_the_tank(): void
     {
         DieselAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
+            'month_start' => Jalali::currentQuotaPeriod()[0],
             'total_litres' => 1000,
         ]);
         DieselDelivery::create([
@@ -135,7 +135,7 @@ class MoneyAtAGlanceTest extends TestCase
     public function test_before_the_first_tanker_the_tank_is_not_called_empty(): void
     {
         DieselAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
+            'month_start' => Jalali::currentQuotaPeriod()[0],
             'total_litres' => 1000,
         ]);
 

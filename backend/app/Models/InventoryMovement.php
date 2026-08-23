@@ -24,6 +24,14 @@ class InventoryMovement extends Model
         // Written when consignment flour is handed back, or the record of it
         // is deleted — either way the sack physically moves the other way.
         'consignment_return' => 'بازگشت آرد امانی',
+        // What the shelf actually held on a day somebody counted it.
+        //
+        // Deliberately its own reason rather than «ثبت دستی» or a nameless
+        // correction: the shop once carried a 702,926,025 Rial expense row
+        // titled «اختلاف» that existed only to make the books balance, and
+        // it hid 57% of the shop's apparent costs. A line that says what it
+        // is can be argued with. A line that says nothing cannot.
+        'stocktake' => 'شمارش انبار',
     ];
 
     protected $fillable = [

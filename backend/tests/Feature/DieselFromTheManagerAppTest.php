@@ -54,7 +54,7 @@ class DieselFromTheManagerAppTest extends TestCase
     /** The month's flour quota, which the diesel quota follows. */
     private function flourQuota(float $bags = 343): FlourAllocation
     {
-        $monthStart = Jalali::currentMonthRange()[0];
+        $monthStart = Jalali::currentQuotaPeriod()[0];
 
         return FlourAllocation::create([
             'month_start' => $monthStart,
@@ -427,7 +427,11 @@ class DieselFromTheManagerAppTest extends TestCase
         // that starts on the 5th and the depot follows it.
         $this->assertSame('05', Jalali::format($from, 'd'));
         $this->assertSame('04', Jalali::format($to, 'd'));
-        $this->assertTrue($from->gt($allocation->month_start));
+        // Not `gt`: the allocation is keyed to the period it covers, so
+        // its start and the period's start are the same day. What must
+        // never happen is a period that opens before the quota it belongs
+        // to — which `gte` still catches.
+        $this->assertTrue($from->gte($allocation->month_start));
     }
 
     public function test_a_delivery_before_the_period_belongs_to_the_last_one(): void

@@ -44,7 +44,7 @@ class DieselQuotaTest extends TestCase
     private function quota(float $litres, float $carryover = 0): DieselAllocation
     {
         return DieselAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
+            'month_start' => Jalali::currentQuotaPeriod()[0],
             'total_litres' => $litres,
             'carryover_litres' => $carryover,
         ]);
@@ -170,7 +170,7 @@ class DieselQuotaTest extends TestCase
         // Five litres a sack is the rate the depot works to, so a hundred
         // sacks is five hundred litres and nobody types either figure.
         FlourAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
+            'month_start' => Jalali::currentQuotaPeriod()[0],
             'month_label' => 'تست',
             'total_bags' => 100,
         ]);
@@ -188,7 +188,7 @@ class DieselQuotaTest extends TestCase
         Bakery::first()->update(['diesel_litres_per_bag' => 7]);
 
         FlourAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
+            'month_start' => Jalali::currentQuotaPeriod()[0],
             'month_label' => 'تست',
             'total_bags' => 10,
         ]);
@@ -204,7 +204,7 @@ class DieselQuotaTest extends TestCase
         // The depot occasionally issues something other than the formula,
         // and the docket is the truth.
         FlourAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
+            'month_start' => Jalali::currentQuotaPeriod()[0],
             'month_label' => 'تست',
             'total_bags' => 100,
         ]);

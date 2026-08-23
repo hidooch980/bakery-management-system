@@ -9,10 +9,12 @@ use App\Models\Expense;
 use App\Models\Sale;
 use App\Models\User;
 use App\Support\IssueScanner;
+use App\Support\Jalali;
 use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -38,6 +40,46 @@ class StaleAndLossAlertsTest extends TestCase
 
         $this->seller = User::factory()->create(['is_active' => true]);
         $this->seller->assignRole('seller');
+
+        // The 20th, on purpose.
+        //
+        // The scanner treats a debt that has crossed a month end as late
+        // whatever its age — «فروش ۲۹ام، در اول ماه دیر است» — which is a
+        // deliberate rule and the right one. But it means «eight days old»
+        // and «inside this month» are the same statement only in the back
+        // half of a month. Run on the 1st, these tests were asserting the
+        // wrong rule and failed in a batch.
+        //
+        // Freezing the day is what lets each test say which rule it is
+        // about. The cross-month rule has its own tests below.
+        Carbon::setTestNow(Jalali::parse('1405/05/20')->setTime(9, 0));
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
+    /**
+     * The rule the frozen clock above is keeping out of the way.
+     *
+     * Money that sat over a month end is late on the 1st however young it
+     * is: the month end was the deadline, and «I only took it yesterday»
+     * does not change which month it belongs to.
+     */
+    public function test_money_carried_over_a_month_end_is_late_on_the_first(): void
+    {
+        Carbon::setTestNow(Jalali::parse('1405/06/01')->setTime(9, 0));
+
+        $this->saleDaysAgo(1);
+
+        $issue = (new IssueScanner)->scan()
+            ->firstWhere('key', "seller-account-stale-{$this->seller->id}");
+
+        $this->assertNotNull($issue, 'پول مانده از ماه قبل باید هشدار بدهد');
+        $this->assertSame('critical', $issue->severity);
     }
 
     private function saleDaysAgo(int $days, float $amount = 500_000): Sale
