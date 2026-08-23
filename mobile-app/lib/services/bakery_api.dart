@@ -1001,6 +1001,16 @@ class BakeryApi {
 
   Future<int> pendingSyncCount() => _client.queue.count();
 
+  /// Writes the server refused outright. They are not retried — it would
+  /// refuse them again — but they are not thrown away either, because
+  /// what was refused is something a person typed and is entitled to see.
+  Future<List<RejectedRequest>> rejectedWrites() => _client.queue.rejected();
+
+  Future<int> rejectedWriteCount() => _client.queue.rejectedCount();
+
+  Future<void> dismissRejectedWrite(String id) =>
+      _client.queue.dismissRejected(id);
+
   /// Resends everything queued. Safe to call whenever — with nothing
   /// queued it is a no-op, and mid-sync it just picks up where it left off.
   Future<({int sent, int failed, int remaining})> syncPending() =>

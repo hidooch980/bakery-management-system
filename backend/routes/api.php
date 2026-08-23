@@ -68,7 +68,11 @@ Route::prefix('v1')->group(function () {
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])
         ->middleware('throttle:10,1');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    // `idempotent` sits inside the auth group, not on the api group: it
+    // needs to know who is asking, and group middleware runs before
+    // sanctum has resolved the user. It is a no-op unless the client
+    // sends an Idempotency-Key, so older app versions are unaffected.
+    Route::middleware(['auth:sanctum', 'idempotent'])->group(function () {
         // --- Available to every authenticated user ---
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
