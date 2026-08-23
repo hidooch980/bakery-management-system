@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
-use App\Models\Concerns\RecordsAudit;
 use App\Models\Concerns\PostsToBankAccount;
+use App\Models\Concerns\RecordsAudit;
 use App\Support\AppCalendar;
 use App\Support\CurrentBakery;
 use App\Support\DoughFormula;
