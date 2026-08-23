@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class SalaryPayment extends Model
 {
@@ -191,7 +192,7 @@ class SalaryPayment extends Model
      */
     public function answerRequests(): void
     {
-        if (! $this->user_id || ! $this->period_start) {
+        if (! $this->user_id || ! $this->period_start || ! self::requestsTableExists()) {
             return;
         }
 
@@ -205,9 +206,37 @@ class SalaryPayment extends Model
             ]);
     }
 
+    /**
+     * Whether the requests feature is actually installed here.
+     *
+     * Paying somebody their wages must not fail because a different
+     * feature's migration has not been run yet. On 1405/05/29 this shop's
+     * first payslip in its history — 150,000,000 Rial, correctly written,
+     * correctly posted to the bank — ended in a red error because this
+     * hook reached for a table that did not exist. Nothing was lost, but
+     * only by luck: the throw happened after the payment and its posting
+     * were already saved.
+     *
+     * A wage is the most important thing this system writes. It does not
+     * get to depend on a table that answers a convenience.
+     *
+     * Cached for the process: this is called on every payslip save and the
+     * answer cannot change mid-request.
+     */
+    private static ?bool $hasRequestsTable = null;
+
+    private static function requestsTableExists(): bool
+    {
+        return self::$hasRequestsTable ??= Schema::hasTable('salary_payment_requests');
+    }
+
     /** A wage taken back leaves the person asking again. */
     public function reopenRequests(): void
     {
+        if (! self::requestsTableExists()) {
+            return;
+        }
+
         SalaryPaymentRequest::where('salary_payment_id', $this->id)
             ->update([
                 'status' => SalaryPaymentRequest::PENDING,
