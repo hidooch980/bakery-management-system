@@ -62,3 +62,7 @@ graphify-out/
 
 # تنظیمات محلی Claude Code — مخصوص همین دستگاه است
 .claude/settings.local.json
+
+# بستهٔ مهندسی — آرشیو راهنماست، نه کد. محتوایش در docs/ زندگی می‌کند.
+Bakery-Management-System-Master-Engineering-Pack/
+Bakery-Management-System-Master-Engineering-Pack.zip
