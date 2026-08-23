@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\DoughEntry;
 use App\Models\IdempotentRequest;
 use App\Models\InventoryItem;
-use App\Models\DoughEntry;
 use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
