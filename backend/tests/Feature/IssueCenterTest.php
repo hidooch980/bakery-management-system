@@ -173,7 +173,7 @@ class IssueCenterTest extends TestCase
         $issue = $this->issue("seller-account-{$seller->id}");
 
         $this->assertNotNull($issue);
-        $this->assertStringContainsString('500/000', $issue->detail);
+        $this->assertStringContainsString('500،000', $issue->detail);
         // Cash simply not handed over yet is routine, not a crisis.
         $this->assertSame(SystemIssue::INFO, $issue->severity);
     }

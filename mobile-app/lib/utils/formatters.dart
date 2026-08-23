@@ -149,7 +149,10 @@ class MoneyFormat {
   /// The shop writes money the way its ledgers do — 100/000/000, not
   /// 100,000,000. A comma reads as a decimal point to anyone used to those
   /// books, which is the wrong thing to be unsure about on a sum of money.
-  static const groupSeparator = '/';
+  /// Persian comma, matching Money::GROUP_SEPARATOR on the server. The
+  /// phone and the panel must group a figure the same way or the same
+  /// wage reads as two different numbers on two screens.
+  static const groupSeparator = '،';
 
   static String _group(num value) =>
       _grouped.format(value).replaceAll(',', groupSeparator);

@@ -200,7 +200,7 @@ class CustomerDebtTest extends TestCase
 
         $this->assertSame(1, substr_count($html, 'دبستان نمونه'));
         // The two receipts show as one figure to collect.
-        $this->assertStringContainsString('80/000', $html);
+        $this->assertStringContainsString('80،000', $html);
     }
 
     public function test_the_panel_can_settle_a_customer_in_one_go(): void

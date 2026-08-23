@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
 
 class SalaryPayment extends Model
 {
-    use BelongsToBakery, PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount, RecordsAudit;
 
     protected $fillable = [
         'user_id',
@@ -258,6 +259,16 @@ class SalaryPayment extends Model
     public function recoveries()
     {
         return $this->hasMany(SalaryAdvanceRecovery::class);
+    }
+
+    /**
+     * The log outlives the payslip. Once the row is deleted its id points
+     * at nothing, and «فیش حقوقی عبدالله — 1405/05» is the whole of what
+     * is left to tell anyone what went.
+     */
+    public function auditSubject(): ?string
+    {
+        return trim('فیش حقوقی '.($this->user?->name ?? '').' — '.($this->period_label ?? ''), ' —');
     }
 
     public function user()

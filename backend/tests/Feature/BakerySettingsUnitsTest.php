@@ -106,6 +106,6 @@ class BakerySettingsUnitsTest extends TestCase
             ->getJson('/api/v1/bakery')
             ->assertOk()
             ->assertJsonPath('data.bread_price', fn ($v) => (float) $v === 1_000.0)
-            ->assertJsonPath('data.bread_price_formatted', '10/000 ریال');
+            ->assertJsonPath('data.bread_price_formatted', '10،000 ریال');
     }
 }

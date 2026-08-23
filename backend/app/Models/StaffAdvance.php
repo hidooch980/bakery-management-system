@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use App\Models\Concerns\PostsToBankAccount;
 use Illuminate\Database\Eloquent\Model;
 
@@ -20,7 +21,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class StaffAdvance extends Model
 {
-    use BelongsToBakery, PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount, RecordsAudit;
 
     protected $fillable = [
         'user_id',
@@ -37,6 +38,12 @@ class StaffAdvance extends Model
             'paid_on' => 'date',
             'amount' => 'decimal:2',
         ];
+    }
+
+    /** Named after the person, because that is how it will be asked about. */
+    public function auditSubject(): ?string
+    {
+        return trim('علی‌الحساب '.($this->user?->name ?? ''));
     }
 
     public function user()

@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use App\Models\Concerns\PostsToBankAccount;
 use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
 {
-    use BelongsToBakery, PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount, RecordsAudit;
 
     protected $fillable = [
         'chane_entry_id',

@@ -257,8 +257,8 @@ class CharityAndSplitSettlementTest extends TestCase
             ->json('data.sellers');
 
         $this->assertNotNull($sellers[0]['request']);
-        $this->assertStringContainsString('60/000', $sellers[0]['request']['paid_cash_formatted']);
-        $this->assertStringContainsString('40/000', $sellers[0]['request']['paid_card_formatted']);
+        $this->assertStringContainsString('60،000', $sellers[0]['request']['paid_cash_formatted']);
+        $this->assertStringContainsString('40،000', $sellers[0]['request']['paid_card_formatted']);
     }
 
     public function test_a_settled_seller_is_not_listed(): void
