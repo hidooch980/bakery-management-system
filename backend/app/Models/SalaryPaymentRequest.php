@@ -113,4 +113,41 @@ class SalaryPaymentRequest extends Model
             ? (int) $this->created_at->startOfDay()->diffInDays(now()->startOfDay())
             : 0;
     }
+
+    /**
+     * What it would come to if it were paid today.
+     *
+     * A forecast and nothing else — the payslip does this arithmetic again
+     * when it is written, and that is the figure that binds. It lives on
+     * the model so the phone and the panel quote the same number; the two
+     * screens showing a person different wages for the same month is the
+     * kind of disagreement nobody ever reports and everybody remembers.
+     */
+    public function estimatedNet(): ?float
+    {
+        if ($this->user?->monthly_salary === null) {
+            return null;
+        }
+
+        return max(0.0, (float) $this->user->monthly_salary - StaffAdvance::outstandingFor($this->user_id));
+    }
+
+    /**
+     * Turning it down, with a reason.
+     *
+     * There is deliberately no matching approve. Paying the person for
+     * that month is what approval means, and `SalaryPayment::answerRequests()`
+     * is what performs it. Keeping the refusal here means the phone and
+     * the panel say no the same way, and neither has anywhere to invent a
+     * yes that skips the pay sheet.
+     */
+    public function reject(?User $by, string $note): void
+    {
+        $this->update([
+            'status' => self::REJECTED,
+            'decided_by' => $by?->id,
+            'decided_at' => now(),
+            'decision_note' => $note,
+        ]);
+    }
 }
