@@ -140,8 +140,8 @@ class CurrencyConsistencyTest extends TestCase
             ->getJson('/api/v1/reports/financial')
             ->json('data.income.sales_formatted');
 
-        $this->assertSame('1/000 تومان', $toman);
-        $this->assertSame('10/000 ریال', $rial);
+        $this->assertSame('1،000 تومان', $toman);
+        $this->assertSame('10،000 ریال', $rial);
     }
 
     public function test_seller_summary_follows_the_unit(): void
@@ -156,7 +156,7 @@ class CurrencyConsistencyTest extends TestCase
         $this->actingAs($seller, 'sanctum')
             ->getJson('/api/v1/sales/today')
             ->assertOk()
-            ->assertJsonPath('data.summary.total_amount_formatted', '10/000 ریال')
+            ->assertJsonPath('data.summary.total_amount_formatted', '10،000 ریال')
             // The raw figure stays in Toman so clients can compute with it.
             ->assertJsonPath('data.summary.total_amount', 1000);
     }

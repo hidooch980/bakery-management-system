@@ -164,7 +164,7 @@ class SellerCollectionTest extends TestCase
         $row = $this->actingAs($this->seller, 'sanctum')
             ->getJson('/api/v1/my-collections')->json('data.customers.0');
 
-        $this->assertStringContainsString('50/000', $row['collected_formatted']);
+        $this->assertStringContainsString('50،000', $row['collected_formatted']);
         $this->assertEqualsWithDelta(30000, $row['owed'], 0.01);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -19,7 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class StaffAdjustment extends Model
 {
-    use BelongsToBakery;
+    use BelongsToBakery, RecordsAudit;
 
     public const REWARD = 'reward';
 

@@ -4,10 +4,13 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
+use App\Models\Concerns\RecordsAudit;
 use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
 {
+    use BelongsToBakery, PostsToBankAccount, RecordsAudit;
+
     /**
      * Every payment type that has ever existed, so an older row still
      * reads as words.
@@ -28,8 +31,6 @@ class Sale extends Model
         'shortfall' => 'کسری نان',
         'other' => 'سایر',
     ];
-
-    use BelongsToBakery, PostsToBankAccount;
 
     protected $fillable = [
         'chane_entry_id',

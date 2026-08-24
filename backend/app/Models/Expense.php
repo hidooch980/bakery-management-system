@@ -4,12 +4,13 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
+use App\Models\Concerns\RecordsAudit;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
 
 class Expense extends Model
 {
-    use BelongsToBakery, PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount, RecordsAudit;
 
     /**
      * Order matters: this is the order the picker offers them in, so the

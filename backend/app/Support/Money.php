@@ -45,13 +45,18 @@ class Money
     }
 
     /**
-     * The shop writes money the way its ledgers do — 100/000/000, not
-     * 100,000,000. A comma reads as a decimal point to anyone used to those
-     * books, which is the wrong thing to be unsure about on a sum of money.
+     * The shop writes money grouped with the Persian comma — ۱۰۰،۰۰۰،۰۰۰.
+     *
+     * Not the Latin comma, which reads as a decimal point to anyone raised
+     * on these ledgers, and not a full stop for the same reason in reverse.
+     * The Persian comma is the one mark that cannot be mistaken for the
+     * decimal point beside it, which is the whole requirement on a sum of
+     * money. The owner asked for this on 1405/06/01; it had been a slash
+     * before, and a slash is what to put back if he changes his mind.
      */
-    public const GROUP_SEPARATOR = '/';
+    public const GROUP_SEPARATOR = '،';
 
-    /** e.g. "100/000/000 ریال" — grouped, with the configured unit appended. */
+    /** e.g. "100،000،000 ریال" — grouped, with the configured unit appended. */
     public static function format(float|int|string|null $toman, ?string $currency = null): string
     {
         $currency ??= self::currency();
