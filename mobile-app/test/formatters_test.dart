@@ -22,7 +22,7 @@ void main() {
     });
 
     test('formats a compact date for chart axes', () {
-      expect(JalaliFormat.shortDate(gregorian), '05،03');
+      expect(JalaliFormat.shortDate(gregorian), '05/03');
     });
 
     test('formats a long date with weekday and month name', () {
