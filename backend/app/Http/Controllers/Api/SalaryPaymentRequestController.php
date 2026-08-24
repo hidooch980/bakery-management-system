@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SalaryPayment;
 use App\Models\SalaryPaymentRequest;
-use App\Models\StaffAdvance;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Traits\ApiResponse;
@@ -134,21 +133,14 @@ class SalaryPaymentRequestController extends Controller
             return $this->error('به این درخواست قبلاً پاسخ داده شده است.', 409);
         }
 
-        $salaryRequest->update([
-            'status' => SalaryPaymentRequest::REJECTED,
-            'decided_by' => $request->user()?->id,
-            'decided_at' => now(),
-            'decision_note' => $data['decision_note'],
-        ]);
+        $salaryRequest->reject($request->user(), $data['decision_note']);
 
         return $this->success($this->payload($salaryRequest->fresh('user')), 'درخواست رد شد.');
     }
 
     private function payload(SalaryPaymentRequest $r): array
     {
-        $owed = $r->user?->monthly_salary === null
-            ? null
-            : max(0.0, (float) $r->user->monthly_salary - StaffAdvance::outstandingFor($r->user_id));
+        $owed = $r->estimatedNet();
 
         return [
             'id' => $r->id,
