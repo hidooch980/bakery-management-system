@@ -161,8 +161,8 @@ void main() {
       // Stored as though it were written well beyond the keeping window.
       final stored = DateTime.now().subtract(ResponseCache.maxAge * 2);
 
-      SharedPreferences.setMockInitialValues({
-        'read_cache_v1:/chane-board':
+      FlutterSecureStorage.setMockInitialValues({
+        'read_cache_v2:/chane-board':
             '{"at":"${stored.toIso8601String()}","body":{"x":1}}',
       });
 

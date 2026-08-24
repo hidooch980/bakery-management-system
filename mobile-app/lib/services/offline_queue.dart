@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'secure_store.dart';
 
 /// One write the app could not send at the time, kept for a later retry.
 class QueuedRequest {
@@ -56,7 +56,17 @@ class QueuedRequest {
 /// (see BakeryApi), never reads, logins, or anything money-adjacent enough
 /// that a silent retry could be the wrong call.
 class OfflineQueue {
-  static const _key = 'offline_queue_v1';
+  OfflineQueue({SecureStore? store}) : _store = store ?? SecureStore();
+
+  final SecureStore _store;
+
+  // Held in [SecureStore], not a preference file. What waits here is
+  // sales the server has not seen yet — amounts, customers, notes — and
+  // on Android a preference file is plain XML that a rooted or seized
+  // handset simply reads. The version moved with the move; an entry
+  // written by an older build is left where it was rather than copied
+  // across, which would leave the plaintext original in place anyway.
+  static const _key = 'offline_queue_v2';
 
   /// Entries the server refused outright.
   ///
@@ -65,74 +75,75 @@ class OfflineQueue {
   /// them is not the answer — the server has said no and would say no
   /// again — but neither is silence. They are kept here until a person
   /// has seen them and dismissed them.
-  static const _rejectedKey = 'offline_rejected_v1';
+  static const _rejectedKey = 'offline_rejected_v2';
 
-  Future<List<QueuedRequest>> all() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_key) ?? const [];
+  Future<List<QueuedRequest>> all() async => _list(_key)
+      .then((rows) => rows.map(QueuedRequest.fromJson).toList());
 
-    return raw
-        .map((s) => QueuedRequest.fromJson(jsonDecode(s) as Map<String, dynamic>))
-        .toList();
+  /// Secure storage holds strings, not string lists, so each of these is
+  /// one JSON array. Anything unreadable is treated as empty rather than
+  /// thrown: a queue that will not parse must not stop the shop recording
+  /// the next sale.
+  Future<List<Map<String, dynamic>>> _list(String key) async {
+    final raw = await _store.read(key);
+
+    if (raw == null || raw.isEmpty) return [];
+
+    try {
+      final decoded = jsonDecode(raw);
+
+      return decoded is List
+          ? decoded.map((e) => (e as Map).cast<String, dynamic>()).toList()
+          : [];
+    } on Object {
+      return [];
+    }
   }
 
   Future<int> count() async => (await all()).length;
 
   Future<void> enqueue(QueuedRequest request) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_key) ?? const [];
+    final rows = await _list(_key);
 
-    await prefs.setStringList(_key, [
-      ...raw,
-      jsonEncode(request.toJson()),
-    ]);
+    await _store.write(_key, jsonEncode([...rows, request.toJson()]));
   }
 
-  Future<List<RejectedRequest>> rejected() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    return (prefs.getStringList(_rejectedKey) ?? const [])
-        .map((s) =>
-            RejectedRequest.fromJson(jsonDecode(s) as Map<String, dynamic>))
-        .toList();
-  }
+  Future<List<RejectedRequest>> rejected() async =>
+      _list(_rejectedKey).then((rows) => rows.map(RejectedRequest.fromJson).toList());
 
   Future<int> rejectedCount() async => (await rejected()).length;
 
   /// Moves an entry out of the queue and into the refused list, keeping
   /// what the server said so the person can see why.
   Future<void> reject(QueuedRequest request, String reason) async {
-    final prefs = await SharedPreferences.getInstance();
-    final existing = prefs.getStringList(_rejectedKey) ?? const [];
+    final existing = await _list(_rejectedKey);
 
-    await prefs.setStringList(_rejectedKey, [
+    await _store.write(_rejectedKey, jsonEncode([
       ...existing,
-      jsonEncode(RejectedRequest(request: request, reason: reason).toJson()),
-    ]);
+      RejectedRequest(request: request, reason: reason).toJson(),
+    ]));
 
     await remove(request.id);
   }
 
   Future<void> dismissRejected(String id) async {
-    final prefs = await SharedPreferences.getInstance();
     final items = await rejected();
 
-    await prefs.setStringList(
+    await _store.write(
       _rejectedKey,
-      items
+      jsonEncode(items
           .where((r) => r.request.id != id)
-          .map((r) => jsonEncode(r.toJson()))
-          .toList(),
+          .map((r) => r.toJson())
+          .toList()),
     );
   }
 
   Future<void> remove(String id) async {
-    final prefs = await SharedPreferences.getInstance();
     final items = await all();
 
-    await prefs.setStringList(
+    await _store.write(
       _key,
-      items.where((r) => r.id != id).map((r) => jsonEncode(r.toJson())).toList(),
+      jsonEncode(items.where((r) => r.id != id).map((r) => r.toJson()).toList()),
     );
   }
 }

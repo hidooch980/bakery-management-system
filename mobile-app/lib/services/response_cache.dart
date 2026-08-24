@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'secure_store.dart';
 
 /// The last good answer the server gave to each read.
 ///
@@ -12,8 +12,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// Only whole responses are kept, exactly as they arrived, so the screens
 /// parse cached and live data through the same code and cannot drift.
+///
+/// Kept in [SecureStore] rather than a preference file. What accumulates
+/// here is every read the manager makes — wages, bank balances, what each
+/// customer owes — and on Android a preference file is plain XML. The
+/// version in the key moved with the move: the old plaintext entries are
+/// not migrated, because copying them across would leave the originals
+/// sitting in the clear anyway. They expire in twelve hours regardless.
 class ResponseCache {
-  static const _prefix = 'read_cache_v1:';
+  ResponseCache({SecureStore? store}) : _store = store ?? SecureStore();
+
+  final SecureStore _store;
+
+  static const _prefix = 'read_cache_v2:';
 
   /// Anything older than this is not worth showing: a day-old board would
   /// be read as today's and quietly mislead.
@@ -35,19 +46,13 @@ class ResponseCache {
     Map<String, dynamic>? query,
     Map<String, dynamic> body,
   ) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      await prefs.setString(
-        _key(path, query),
-        jsonEncode({
-          'at': DateTime.now().toIso8601String(),
-          'body': body,
-        }),
-      );
-    } on Object {
-      // A cache that will not write is not worth failing a good request over.
-    }
+    await _store.write(
+      _key(path, query),
+      jsonEncode({
+        'at': DateTime.now().toIso8601String(),
+        'body': body,
+      }),
+    );
   }
 
   /// The stored answer, or null when there is none or it is too old.
@@ -56,8 +61,7 @@ class ResponseCache {
     Map<String, dynamic>? query,
   ) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_key(path, query));
+      final raw = await _store.read(_key(path, query));
 
       if (raw == null) return null;
 
@@ -81,14 +85,8 @@ class ResponseCache {
   /// Dropped on sign-out: the next person to use this phone must not be
   /// shown the last one's figures.
   Future<void> clear() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      for (final key in prefs.getKeys().where((k) => k.startsWith(_prefix))) {
-        await prefs.remove(key);
-      }
-    } on Object {
-      // Nothing to be done, and nothing worth interrupting a logout for.
+    for (final key in (await _store.keys()).where((k) => k.startsWith(_prefix))) {
+      await _store.delete(key);
     }
   }
 }
