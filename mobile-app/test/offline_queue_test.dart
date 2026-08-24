@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:bakery_app/services/offline_queue.dart';
@@ -10,6 +11,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
     queue = OfflineQueue();
   });
 
@@ -152,6 +154,44 @@ void main() {
       // the shop to wait for something that is not coming.
       expect((await queue.all()).single.id, 'waiting');
       expect((await queue.rejected()).single.request.id, 'refused');
+    });
+  });
+
+  group('where the shop's data actually sits', () {
+    test('a queued sale is not left in the preference file', () async {
+      await queue.enqueue(QueuedRequest(
+        id: 'a',
+        path: '/sales',
+        body: const {'amount': 500000, 'customer': 'مدرسه شهید بهشتی'},
+        label: 'فروش',
+        createdAt: DateTime(2026, 8, 24),
+      ));
+
+      // On Android a preference file is plain XML, and a queued sale is
+      // an amount and a customer's name. A phone left in a taxi should
+      // cost the shop a phone.
+      final prefs = await SharedPreferences.getInstance();
+
+      for (final key in prefs.getKeys()) {
+        expect(prefs.get(key).toString(), isNot(contains('مدرسه شهید بهشتی')),
+            reason: 'found the customer in preferences under "$key"');
+        expect(prefs.get(key).toString(), isNot(contains('500000')));
+      }
+
+      // And it is genuinely still there to be sent.
+      expect(await queue.count(), 1);
+    });
+
+    test('a refused entry is not left there either', () async {
+      await queue.reject(sample(), 'موجودی کافی نیست');
+
+      final prefs = await SharedPreferences.getInstance();
+
+      for (final key in prefs.getKeys()) {
+        expect(prefs.get(key).toString(), isNot(contains('موجودی کافی نیست')));
+      }
+
+      expect(await queue.rejectedCount(), 1);
     });
   });
 }
