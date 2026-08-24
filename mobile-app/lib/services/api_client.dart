@@ -142,8 +142,21 @@ class ApiClient {
     return [for (final k in keys) '$k=${query[k]}'].join('&');
   }
 
-  Future<Map<String, dynamic>> post(String path, [Map<String, dynamic>? body]) async {
-    return _unwrap(await _send(() => _dio.post(path, data: body)));
+  /// [idempotencyKey] names this write so the server can tell a retry
+  /// from a second one. Pass the *same* key on every attempt; see
+  /// [postOrQueue], which is where that matters.
+  Future<Map<String, dynamic>> post(
+    String path, [
+    Map<String, dynamic>? body,
+    String? idempotencyKey,
+  ]) async {
+    return _unwrap(await _send(() => _dio.post(
+          path,
+          data: body,
+          options: idempotencyKey == null
+              ? null
+              : Options(headers: {'Idempotency-Key': idempotencyKey}),
+        )));
   }
 
   Future<Map<String, dynamic>> put(String path, [Map<String, dynamic>? body]) async {
@@ -160,6 +173,16 @@ class ApiClient {
   }
 
   OfflineQueue get queue => _queue;
+
+  /// Swaps the transport so a test can see what actually went on the wire.
+  ///
+  /// Nothing in the app calls this. It exists because the thing worth
+  /// proving about idempotency is not that the server recognises a name —
+  /// that has its own tests — but that the phone sends the same one twice,
+  /// and no assertion about the queue's contents can show that.
+  @visibleForTesting
+  // ignore: avoid_setters_without_getters
+  set transport(HttpClientAdapter adapter) => _dio.httpClientAdapter = adapter;
 
   /// When the shown copy of [path] was last fetched, or null if it is live.
   DateTime? servedFrom(String path) => _servedAt[path];
@@ -247,8 +270,15 @@ class ApiClient {
     Map<String, dynamic> body, {
     required String label,
   }) async {
+    // Minted before the first attempt, not at enqueue time, and carried
+    // through every retry. Two of the failures below — a receive or send
+    // timeout — mean the request reached the server and very likely ran;
+    // only the answer was lost. Without a name the server could not tell
+    // that replay from a real second batch, and it recorded both.
+    final key = _uuid.v4();
+
     try {
-      final response = await post(path, body);
+      final response = await post(path, body, key);
       return {...response, 'queued': false};
     } on ApiException catch (e) {
       // The server answered and said no. Queueing a validation error or a
@@ -256,7 +286,7 @@ class ApiClient {
       if (!e.isConnectivityError) rethrow;
 
       await _queue.enqueue(QueuedRequest(
-        id: _uuid.v4(),
+        id: key,
         path: path,
         body: body,
         label: label,
@@ -270,7 +300,7 @@ class ApiClient {
       // to escape, and the entry the seller had just typed was lost with
       // it. Anything that is not the server talking is the connection.
       await _queue.enqueue(QueuedRequest(
-        id: _uuid.v4(),
+        id: key,
         path: path,
         body: body,
         label: label,
@@ -291,7 +321,9 @@ class ApiClient {
 
     for (final item in await _queue.all()) {
       try {
-        await post(item.path, item.body);
+        // The id is the name the first attempt used. Same name, so a
+        // write that did land is recognised rather than repeated.
+        await post(item.path, item.body, item.id);
         await _queue.remove(item.id);
         sent++;
       } on ApiException catch (e) {
@@ -299,9 +331,13 @@ class ApiClient {
           break; // Still offline — leave the rest queued for next time.
         }
 
-        // The server rejected it outright (e.g. stale reference); keeping
-        // it would just fail forever and hide anything queued after it.
-        await _queue.remove(item.id);
+        // The server rejected it outright (e.g. stale reference). Retrying
+        // would fail identically for ever and hide everything queued
+        // behind it — but deleting it, which is what happened before,
+        // threw away what the person had typed and left only a counter
+        // nothing displayed. It moves to the refused list instead, with
+        // the server's own words, and waits to be seen.
+        await _queue.reject(item, e.message);
         failed++;
       } catch (_) {
         // Not the server talking, so the connection went again mid-flush.

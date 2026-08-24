@@ -11,6 +11,27 @@ class Sale extends Model
 {
     use BelongsToBakery, PostsToBankAccount, RecordsAudit;
 
+    /**
+     * Every payment type that has ever existed, so an older row still
+     * reads as words.
+     *
+     * Lives here rather than on SaleResource because it is a fact about a
+     * sale, not about a table in the panel, and the API needs it too. The
+     * resource keeps its own name for it, pointing at this, so the ten
+     * call sites across the panel did not have to be disturbed to say the
+     * same thing they already said.
+     */
+    public const PAYMENT_LABELS = [
+        'cash' => 'نقد',
+        'card' => 'کارتخوان',
+        'credit' => 'نسیه',
+        'home' => 'منزل',
+        'schools' => 'مدارس',
+        'charity' => 'خیرات و کمک',
+        'shortfall' => 'کسری نان',
+        'other' => 'سایر',
+    ];
+
     protected $fillable = [
         'chane_entry_id',
         'user_id',

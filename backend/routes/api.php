@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\SalaryPaymentRequestController;
 use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SellerCollectionController;
+use App\Http\Controllers\Api\SellerPerformanceController;
 use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\StaffAdjustmentController;
 use App\Http\Controllers\Api\StaffAdvanceController;
@@ -68,7 +69,11 @@ Route::prefix('v1')->group(function () {
     Route::post('/reset-password', [AuthController::class, 'resetPassword'])
         ->middleware('throttle:10,1');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    // `idempotent` sits inside the auth group, not on the api group: it
+    // needs to know who is asking, and group middleware runs before
+    // sanctum has resolved the user. It is a no-op unless the client
+    // sends an Idempotency-Key, so older app versions are unaffected.
+    Route::middleware(['auth:sanctum', 'idempotent'])->group(function () {
         // --- Available to every authenticated user ---
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -221,6 +226,12 @@ Route::prefix('v1')->group(function () {
             Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
             Route::get('/reports/production', [ReportController::class, 'production']);
             Route::get('/reports/sales', [ReportController::class, 'sales']);
+
+            // What each seller sold, and one seller sale by sale. Sits
+            // beside the other reports and behind the same permission:
+            // it is the same class of question, asked per person.
+            Route::get('/reports/sellers', [SellerPerformanceController::class, 'index']);
+            Route::get('/reports/sellers/{seller}', [SellerPerformanceController::class, 'show']);
             Route::get('/reports/flour', [ReportController::class, 'flourConsumption']);
             Route::get('/reports/efficiency', [ReportController::class, 'efficiency']);
             // What the shop got through, a day, a week or a month at a time.

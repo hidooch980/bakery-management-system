@@ -96,4 +96,62 @@ void main() {
       expect(body['amount'], 12000.5);
     });
   });
+
+  group('a write the server refused', () {
+    test('is kept rather than deleted, with the reason', () async {
+      await queue.enqueue(sample());
+
+      await queue.reject(sample(), 'موجودی آرد کافی نیست.');
+
+      // Out of the queue, so it is never retried — the server would only
+      // refuse it again — but not gone. What a person typed and the shop
+      // lost used to leave nothing behind but a counter nothing showed.
+      expect(await queue.count(), 0);
+
+      final refused = await queue.rejected();
+      expect(refused, hasLength(1));
+      expect(refused.single.reason, 'موجودی آرد کافی نیست.');
+      expect(refused.single.request.label, 'خمیر — 10 کیسه');
+    });
+
+    test('survives a queue built fresh, like the rest of the queue does',
+        () async {
+      await queue.enqueue(sample());
+      await queue.reject(sample(), 'دلیل');
+
+      // Refused at closing time, read the next morning on a phone that
+      // has been restarted since.
+      expect(await OfflineQueue().rejectedCount(), 1);
+    });
+
+    test('is dismissed only by name, leaving the others', () async {
+      await queue.reject(sample(id: 'a'), 'یک');
+      await queue.reject(sample(id: 'b'), 'دو');
+
+      await queue.dismissRejected('a');
+
+      final left = await queue.rejected();
+      expect(left, hasLength(1));
+      expect(left.single.request.id, 'b');
+    });
+
+    test('dismissing something that is not there changes nothing', () async {
+      await queue.reject(sample(id: 'a'), 'یک');
+
+      await queue.dismissRejected('nope');
+
+      expect(await queue.rejectedCount(), 1);
+    });
+
+    test('the refused list and the queue do not read each other', () async {
+      await queue.enqueue(sample(id: 'waiting'));
+      await queue.reject(sample(id: 'refused'), 'دلیل');
+
+      // Two different questions — «what is still going to be sent» and
+      // «what will never be sent» — and a card that mixed them would tell
+      // the shop to wait for something that is not coming.
+      expect((await queue.all()).single.id, 'waiting');
+      expect((await queue.rejected()).single.request.id, 'refused');
+    });
+  });
 }

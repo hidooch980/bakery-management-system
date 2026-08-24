@@ -37,3 +37,8 @@ Schedule::command('tokens:prune-idle')
 /* And the ones that have simply reached their six months. */
 Schedule::command('sanctum:prune-expired --hours=24')
     ->dailyAt('04:10');
+
+// A key is only needed for as long as a phone might still replay the
+// write it names; after that it is a copy of a response nobody reads.
+Schedule::command('idempotency:prune')
+    ->dailyAt('04:20');

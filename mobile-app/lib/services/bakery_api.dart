@@ -560,6 +560,32 @@ class BakeryApi {
     return body['data'] as Map<String, dynamic>;
   }
 
+  /// What each seller sold over a period, busiest first.
+  ///
+  /// Distinct from [sellerAccounts], which answers "who owes money" and
+  /// hides anybody at zero. This one answers "who is carrying the shop",
+  /// so a seller who settles the same evening is present rather than
+  /// absent.
+  Future<Map<String, dynamic>> sellerPerformance({String? from, String? to}) async {
+    final body = await _client.getCached('/reports/sellers', query: {
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  /// One seller, sale by sale, grouped by day.
+  Future<Map<String, dynamic>> sellerDetail(int sellerId,
+      {String? from, String? to}) async {
+    final body = await _client.getCached('/reports/sellers/$sellerId', query: {
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
   /// What the shop owns against what it owes, as of now.
   ///
   /// Cached like the other admin reads, so a phone that cannot reach the
@@ -1000,6 +1026,14 @@ class BakeryApi {
   Future<List<QueuedRequest>> pendingSync() => _client.queue.all();
 
   Future<int> pendingSyncCount() => _client.queue.count();
+
+  /// Writes the server refused outright. They are not retried — it would
+  /// refuse them again — but they are not thrown away either, because
+  /// what was refused is something a person typed and is entitled to see.
+  Future<List<RejectedRequest>> rejectedWrites() => _client.queue.rejected();
+
+  Future<void> dismissRejectedWrite(String id) =>
+      _client.queue.dismissRejected(id);
 
   /// Resends everything queued. Safe to call whenever — with nothing
   /// queued it is a no-op, and mid-sync it just picks up where it left off.
