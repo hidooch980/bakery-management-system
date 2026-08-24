@@ -174,6 +174,16 @@ class ApiClient {
 
   OfflineQueue get queue => _queue;
 
+  /// Swaps the transport so a test can see what actually went on the wire.
+  ///
+  /// Nothing in the app calls this. It exists because the thing worth
+  /// proving about idempotency is not that the server recognises a name —
+  /// that has its own tests — but that the phone sends the same one twice,
+  /// and no assertion about the queue's contents can show that.
+  @visibleForTesting
+  // ignore: avoid_setters_without_getters
+  set transport(HttpClientAdapter adapter) => _dio.httpClientAdapter = adapter;
+
   /// When the shown copy of [path] was last fetched, or null if it is live.
   DateTime? servedFrom(String path) => _servedAt[path];
 
