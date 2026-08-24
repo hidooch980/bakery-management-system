@@ -9,6 +9,7 @@ use App\Support\Jalali;
 use App\Support\Money;
 use App\Support\SellerSettlement;
 use App\Traits\ApiResponse;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -179,7 +180,7 @@ class SellerPerformanceController extends Controller
         ];
     }
 
-    /** @return array<int, \Carbon\Carbon> */
+    /** @return array<int, Carbon> */
     private function range(Request $request): array
     {
         // The quota period rather than the calendar month: that is the

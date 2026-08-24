@@ -11,6 +11,7 @@ use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -96,7 +97,7 @@ class WhatTheSellerActuallyDidTest extends TestCase
         return $sale;
     }
 
-    private function board(array $query = []): \Illuminate\Testing\TestResponse
+    private function board(array $query = []): TestResponse
     {
         return $this->actingAs($this->owner, 'sanctum')
             ->getJson('/api/v1/reports/sellers?'.http_build_query($query));
