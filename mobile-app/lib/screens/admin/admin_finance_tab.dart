@@ -11,6 +11,7 @@ import 'customer_debts_section.dart';
 import 'follow_ups_section.dart';
 import 'income_expense_chart.dart';
 import 'seller_debts_section.dart';
+import 'seller_performance_section.dart';
 
 /// Income against expenses, with the resulting profit, for a chosen range.
 class AdminFinanceTab extends StatefulWidget {
@@ -141,6 +142,14 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
               // still owed — the money that is really in hand.
               const SizedBox(height: 22),
               BankBalancesSection(api: widget.api),
+
+              // What each seller sold, before what any of them owes. The
+              // debts list drops anybody at zero, so on its own it said
+              // that sellers are people who owe money — the one who sells
+              // all day and settles the same evening was not on any screen
+              // in this app.
+              const SizedBox(height: 22),
+              SellerPerformanceSection(api: widget.api),
 
               // What the sellers still hold sits under the report: it is
               // money the shop has earned but not yet taken in.

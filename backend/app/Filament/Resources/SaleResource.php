@@ -37,16 +37,7 @@ class SaleResource extends Resource
      * words. What a person may choose is [PAYMENT_CHOICES], which is
      * shorter.
      */
-    public const PAYMENT_LABELS = [
-        'cash' => 'نقد',
-        'card' => 'کارتخوان',
-        'credit' => 'نسیه',
-        'home' => 'منزل',
-        'schools' => 'مدارس',
-        'charity' => 'خیرات و کمک',
-        'shortfall' => 'کسری نان',
-        'other' => 'سایر',
-    ];
+    public const PAYMENT_LABELS = Sale::PAYMENT_LABELS;
 
     /**
      * What the form offers. A shortfall is worked out from the batch
