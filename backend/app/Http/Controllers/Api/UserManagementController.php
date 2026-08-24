@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Rules\NotAGuessablePassword;
+use App\Support\SameBakery;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,11 +66,15 @@ class UserManagementController extends Controller
 
     public function show(User $user): JsonResponse
     {
+        $user = SameBakery::or404($user);
+
         return $this->success($user->load('roles:id,name'));
     }
 
     public function update(Request $request, User $user): JsonResponse
     {
+        $user = SameBakery::or404($user);
+
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'email', Rule::unique('users')->ignore($user->id)],
@@ -90,6 +95,8 @@ class UserManagementController extends Controller
 
     public function destroy(Request $request, User $user): JsonResponse
     {
+        $user = SameBakery::or404($user);
+
         if ($user->id === $request->user()->id) {
             return $this->error('نمی‌توانید حساب خودتان را حذف کنید.', 422);
         }
@@ -101,6 +108,8 @@ class UserManagementController extends Controller
 
     public function toggleActive(Request $request, User $user): JsonResponse
     {
+        $user = SameBakery::or404($user);
+
         if ($user->id === $request->user()->id) {
             return $this->error('نمی‌توانید حساب خودتان را غیرفعال کنید.', 422);
         }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\User;
+use App\Support\SameBakery;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -86,6 +87,8 @@ class AttendanceController extends Controller
      */
     public function checkInFor(Request $request, User $user): JsonResponse
     {
+        $user = SameBakery::or404($user);
+
         if (! $user->is_active) {
             return $this->error('این کارمند فعال نیست.', 422);
         }

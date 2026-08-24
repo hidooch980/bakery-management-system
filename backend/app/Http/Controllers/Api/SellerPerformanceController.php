@@ -7,6 +7,7 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Support\Jalali;
 use App\Support\Money;
+use App\Support\SameBakery;
 use App\Support\SellerSettlement;
 use App\Traits\ApiResponse;
 use Carbon\Carbon;
@@ -66,6 +67,8 @@ class SellerPerformanceController extends Controller
     /** One seller, sale by sale. */
     public function show(Request $request, User $seller): JsonResponse
     {
+        $seller = SameBakery::or404($seller);
+
         [$from, $to] = $this->range($request);
 
         $sales = Sale::with('customer:id,name')
