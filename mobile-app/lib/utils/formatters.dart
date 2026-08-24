@@ -157,7 +157,7 @@ class MoneyFormat {
   static String _group(num value) =>
       _grouped.format(value).replaceAll(',', groupSeparator);
 
-  /// "100/000/000 ریال" — grouped, with the configured unit appended.
+  /// "100،000،000 ریال" — grouped, with the configured unit appended.
   static String format(num? toman, {Currency currency = Currency.toman}) {
     final amount = (toman ?? 0) * currency.multiplier;
 
@@ -183,7 +183,15 @@ class MoneyFormat {
   static double? parseInput(String? typed) {
     if (typed == null) return null;
 
-    final bare = _toLatinDigits(typed).replaceAll(RegExp(r'[/,٬\s]'), '');
+    // The current separator first, then every one this app has used
+    // before it, so a figure typed from an older screenshot or pasted out
+    // of an older build still reads. Written from the constant rather
+    // than repeated as a literal: when the separator moved from '/' to
+    // '،' this line was not updated, and the app could format a figure it
+    // could not then read back.
+    final bare = _toLatinDigits(typed)
+        .replaceAll(groupSeparator, '')
+        .replaceAll(RegExp(r'[/,٬\s]'), '');
 
     return bare.isEmpty ? null : double.tryParse(bare);
   }

@@ -22,7 +22,7 @@ void main() {
     });
 
     test('formats a compact date for chart axes', () {
-      expect(JalaliFormat.shortDate(gregorian), '05/03');
+      expect(JalaliFormat.shortDate(gregorian), '05،03');
     });
 
     test('formats a long date with weekday and month name', () {
@@ -87,14 +87,14 @@ void main() {
 
   group('MoneyFormat', () {
     test('formats stored Toman in the configured unit', () {
-      expect(MoneyFormat.format(1000), '1/000 تومان');
-      expect(MoneyFormat.format(1000, currency: Currency.rial), '10/000 ریال');
+      expect(MoneyFormat.format(1000), '1،000 تومان');
+      expect(MoneyFormat.format(1000, currency: Currency.rial), '10،000 ریال');
     });
 
     test('groups with a slash, the way the shop writes money', () {
       expect(
         MoneyFormat.format(10000000, currency: Currency.rial),
-        '100/000/000 ریال',
+        '100،000،000 ریال',
       );
     });
 
@@ -109,17 +109,41 @@ void main() {
     });
 
     test('plain output omits the unit', () {
-      expect(MoneyFormat.plain(1500), '1/500');
-      expect(MoneyFormat.plain(1500, currency: Currency.rial), '15/000');
+      expect(MoneyFormat.plain(1500), '1،500');
+      expect(MoneyFormat.plain(1500, currency: Currency.rial), '15،000');
     });
 
     test('reads back what the field shows', () {
-      expect(MoneyFormat.parseInput('100/000/000'), 100000000);
-      expect(MoneyFormat.parseInput('۱۲/۵۰۰'), 12500);
-      expect(MoneyFormat.parseInput('1/250.5'), 1250.5);
+      expect(MoneyFormat.parseInput('100،000،000'), 100000000);
+      expect(MoneyFormat.parseInput('۱۲،۵۰۰'), 12500);
+      expect(MoneyFormat.parseInput('1،250.5'), 1250.5);
       expect(MoneyFormat.parseInput(''), isNull);
       expect(MoneyFormat.parseInput(null), isNull);
     });
+
+    test('a figure the app formats can be read back by the app', () {
+      // The separator moved from '/' to '،' and parseInput was not
+      // updated with it, so the app could write a number it could not
+      // then read. Nothing caught it: the Dart tests did not run on pull
+      // requests until the day this was found.
+      for (final amount in [1500, 100000000, 1250]) {
+        final written = MoneyFormat.plain(amount);
+
+        expect(
+          MoneyFormat.parseInput(written),
+          amount,
+          reason: 'could not read back "$written"',
+        );
+      }
+    });
+
+    test('a figure written with the old separator still reads', () {
+      // Typed from an older screenshot, or pasted out of a build that
+      // predates the change. Both spellings mean the same money.
+      expect(MoneyFormat.parseInput('100/000/000'), 100000000);
+      expect(MoneyFormat.parseInput('100،000،000'), 100000000);
+    });
+
   });
 
   group('GroupedAmountInputFormatter', () {
@@ -134,17 +158,17 @@ void main() {
         formatter.formatEditUpdate(const TextEditingValue(), typed(text));
 
     test('groups the whole part as it is typed', () {
-      expect(apply('100000000').text, '100/000/000');
-      expect(apply('1500').text, '1/500');
+      expect(apply('100000000').text, '100،000،000');
+      expect(apply('1500').text, '1،500');
       expect(apply('12').text, '12');
     });
 
     test('leaves the decimal tail alone', () {
-      expect(apply('1250.75').text, '1/250.75');
+      expect(apply('1250.75').text, '1،250.75');
     });
 
     test('accepts Persian digits from the phone keyboard', () {
-      expect(apply('۱۲۳۴۵۶').text, '123/456');
+      expect(apply('۱۲۳۴۵۶').text, '123،456');
     });
 
     test('keeps the caret at the end while typing', () {
@@ -162,7 +186,7 @@ void main() {
       final bakery = Bakery.fromJson({'name': 'x', 'currency': 'rial'});
 
       expect(bakery.currency, Currency.rial);
-      expect(bakery.money(1000), '10/000 ریال');
+      expect(bakery.money(1000), '10،000 ریال');
     });
 
     test('defaults to Toman when the field is absent', () {
