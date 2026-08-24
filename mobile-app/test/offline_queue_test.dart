@@ -157,7 +157,7 @@ void main() {
     });
   });
 
-  group('where the shop's data actually sits', () {
+  group('where the data actually sits', () {
     test('a queued sale is not left in the preference file', () async {
       await queue.enqueue(QueuedRequest(
         id: 'a',
