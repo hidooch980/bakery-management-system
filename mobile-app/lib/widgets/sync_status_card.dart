@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/bakery_api.dart';
+import '../services/offline_queue.dart';
 import '../services/connection_status.dart';
 import '../theme/app_theme.dart';
 import 'common.dart';
@@ -31,6 +32,7 @@ class SyncStatusCard extends StatefulWidget {
 
 class _SyncStatusCardState extends State<SyncStatusCard> {
   int _pending = 0;
+  List<RejectedRequest> _rejected = const [];
   bool _syncing = false;
 
   @override
@@ -41,9 +43,18 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
 
   Future<void> _refreshCount() async {
     final count = await widget.api.pendingSyncCount();
+    final refused = await widget.api.rejectedWrites();
 
     if (!mounted) return;
-    setState(() => _pending = count);
+    setState(() {
+      _pending = count;
+      _rejected = refused;
+    });
+  }
+
+  Future<void> _dismiss(RejectedRequest item) async {
+    await widget.api.dismissRejectedWrite(item.request.id);
+    await _refreshCount();
   }
 
   Future<void> _sync() async {
@@ -55,6 +66,8 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
 
       if (!mounted) return;
       setState(() => _pending = result.remaining);
+      await _refreshCount();
+      if (!mounted) return;
 
       if (result.sent > 0 && mounted) {
         showMessage(context, '${result.sent} مورد ارسال شد.');
@@ -84,11 +97,20 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
       });
     }
 
-    // Nothing to say: the server is answering and nothing is waiting.
-    if (online && _pending == 0) return const SizedBox.shrink();
+    // Nothing to say: the server is answering, nothing is waiting, and
+    // nothing was refused. A refusal keeps the card on screen even when
+    // the queue is empty — vanishing is what used to lose it.
+    if (online && _pending == 0 && _rejected.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final scheme = Theme.of(context).colorScheme;
-    final color = online ? AppColors.attention : AppColors.moneyOut;
+
+    // A refusal is not the same problem as a queue waiting for signal:
+    // the queue clears itself, this one needs a person.
+    final color = _rejected.isNotEmpty
+        ? AppColors.moneyOut
+        : (online ? AppColors.attention : AppColors.moneyOut);
 
     return Card(
       color: color.withValues(alpha: 0.08),
@@ -97,7 +119,11 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
         child: Row(
           children: [
             Icon(
-              online ? Icons.cloud_sync_rounded : Icons.cloud_off_rounded,
+              _rejected.isNotEmpty
+                  ? Icons.report_problem_rounded
+                  : (online
+                      ? Icons.cloud_sync_rounded
+                      : Icons.cloud_off_rounded),
               color: color,
             ),
             const SizedBox(width: 12),
@@ -119,6 +145,46 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
+                    ),
+
+                  // Named, with the server's reason, and dismissed only by
+                  // hand. These used to be deleted the moment they were
+                  // refused, so what a seller had typed disappeared and the
+                  // only record was a counter nothing displayed.
+                  for (final item in _rejected)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.request.label,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                Text(
+                                  'ارسال نشد: ${item.reason}',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: AppColors.moneyOut),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => _dismiss(item),
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            tooltip: 'متوجه شدم',
+                          ),
+                        ],
+                      ),
                     ),
                 ],
               ),
@@ -144,6 +210,10 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
   /// No signal and "signal but no server" are different problems with
   /// different fixes, so they are not given the same sentence.
   String _headline(ConnectionStatus connection) {
+    if (_rejected.isNotEmpty) {
+      return '${_rejected.length} مورد ارسال نشد';
+    }
+
     if (connection.online) {
       return 'در حال ارسال...';
     }
