@@ -11,6 +11,4 @@ use RuntimeException;
  * and sending it again will not help. Somebody was simply ahead of them,
  * and the honest answer is to say so in the shop's own words.
  */
-class AlreadyClaimedException extends RuntimeException
-{
-}
+class AlreadyClaimedException extends RuntimeException {}

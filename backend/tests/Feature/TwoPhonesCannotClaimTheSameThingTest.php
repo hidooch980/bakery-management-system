@@ -15,6 +15,7 @@ use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -305,7 +306,7 @@ class TwoPhonesCannotClaimTheSameThingTest extends TestCase
         $this->assertNull($settlement->fresh()->rejected_at);
     }
 
-    private function sell(ChaneEntry $batch, int $breadCount = 100): \Illuminate\Testing\TestResponse
+    private function sell(ChaneEntry $batch, int $breadCount = 100): TestResponse
     {
         return $this->actingAs($this->seller, 'sanctum')->postJson('/api/v1/sales', [
             'chane_entry_id' => $batch->id,
