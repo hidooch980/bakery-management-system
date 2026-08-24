@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\AlreadyClaimedException;
 use App\Exceptions\InsufficientStockException;
 use App\Http\Middleware\IdempotentWrites;
 use Filament\Notifications\Notification;
@@ -85,6 +86,27 @@ return Application::configure(basePath: dirname(__DIR__))
                     'errors' => null,
                 ], 403);
             }
+        });
+
+        // Somebody was ahead of them. Nothing they sent was wrong and
+        // sending it again will not help, so it is a 409 and not a 422.
+        $exceptions->render(function (AlreadyClaimedException $e, Request $request) {
+            if ($request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'errors' => null,
+                ], 409);
+            }
+
+            Notification::make()
+                ->title('این کار قبلاً انجام شده')
+                ->body($e->getMessage())
+                ->warning()
+                ->persistent()
+                ->send();
+
+            return back();
         });
 
         $exceptions->render(function (InsufficientStockException $e, Request $request) {
