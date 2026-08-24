@@ -1,0 +1,66 @@
+# The Dart tests, on the pull request rather than after it.
+#
+# `flutter test` already existed — in build-apk.yml, which fires on a `v*`
+# tag or a push to main and never on a pull request. So every Dart test in
+# this repository ran for the first time *after* the branch was merged,
+# which is the one moment a red build is most expensive: main is broken,
+# and the change that broke it is already in.
+#
+# Deliberately not part of build-apk.yml. Building a signed APK takes
+# minutes and needs the keystore secret; a pull request from a branch
+# wants the analyzer and the tests and nothing else.
+name: Mobile Tests
+
+on:
+  pull_request:
+    paths:
+      - 'mobile-app/**'
+      - '.github/workflows/mobile-tests.yml'
+
+env:
+  FLUTTER_VERSION: '3.44.6'
+
+jobs:
+  test:
+    name: Flutter
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: mobile-app
+        run: flutter pub get
+
+      # Findings as GitHub error annotations, which are readable without a
+      # token — the same reasoning, and the same two traps, as the step in
+      # build-apk.yml: ten annotations per step, and `flutter analyze`
+      # prints a screenful of package versions before it says anything
+      # about the code. Analyzer findings carry a bullet, so match on that.
+      - name: Analyze
+        working-directory: mobile-app
+        run: |
+          set +e
+          flutter analyze 2>&1 | tee /tmp/analyze.txt
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            found=$(grep '•' /tmp/analyze.txt | tail -8)
+            [ -z "$found" ] && found=$(tail -8 /tmp/analyze.txt)
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              echo "::error::${line}"
+            done <<< "$found"
+          fi
+          exit "$status"
+
+      - name: Test
+        working-directory: mobile-app
+        run: flutter test --reporter expanded
