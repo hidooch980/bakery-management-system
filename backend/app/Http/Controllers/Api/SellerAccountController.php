@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\AppCalendar;
 use App\Support\Exclusively;
 use App\Support\Money;
+use App\Support\SameBakery;
 use App\Support\SellerSettlement;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -143,6 +144,8 @@ class SellerAccountController extends Controller
      */
     public function settleLoaves(Request $request, User $seller): JsonResponse
     {
+        $seller = SameBakery::or404($seller);
+
         $data = $request->validate([
             'loaves' => ['required', 'integer', 'min:1'],
         ]);
@@ -174,6 +177,8 @@ class SellerAccountController extends Controller
 
     public function settle(Request $request, User $seller): JsonResponse
     {
+        $seller = SameBakery::or404($seller);
+
         $owed = SellerSettlement::outstandingFor($seller);
 
         if ($owed['total'] <= 0) {
