@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Support\DoughFormula;
+use App\Support\Exclusively;
 use App\Support\ProductionRecorder;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ChaneEntryController extends Controller
 {
@@ -65,29 +67,38 @@ class ChaneEntryController extends Controller
             );
         }
 
-        $dough = DoughEntry::find($data['dough_entry_id']);
+        // The dough is locked for the whole of this, and both questions
+        // below are asked of the locked copy. Asked of a copy read a
+        // moment earlier, two chane makers on two phones would both see
+        // `pending` and both record — spray flour out of the warehouse
+        // twice, against a batch of dough that only exists once.
+        $entry = Exclusively::claim(
+            DoughEntry::findOrFail($data['dough_entry_id']),
+            fn (DoughEntry $dough) => $dough->status === 'pending'
+                ? null
+                : 'برای این خمیر قبلاً چانه ثبت شده است.',
+            function (DoughEntry $dough) use ($request, $data, $normalWeight, $naninoWeight, $normalCount, $trayCount, $trays) {
+                // A batch yields a known weight of dough and no more.
+                // Without this an over-long count quietly consumes the
+                // next batch's dough — and inside the lock, because it is
+                // that batch's remaining weight it is measuring.
+                if ($problem = ProductionRecorder::problemWithChane(
+                    $dough, (float) $normalWeight, (float) ($naninoWeight ?? 0)
+                )) {
+                    throw ValidationException::withMessages(['chane' => [$problem]]);
+                }
 
-        if ($dough->status !== 'pending') {
-            return $this->error('برای این خمیر قبلاً چانه ثبت شده است.', 409);
-        }
-
-        // A batch yields a known weight of dough and no more. Without this
-        // an over-long count quietly consumes the next batch's dough.
-        if ($problem = ProductionRecorder::problemWithChane(
-            $dough, (float) $normalWeight, (float) ($naninoWeight ?? 0)
-        )) {
-            return $this->error($problem, 422);
-        }
-
-        $entry = ProductionRecorder::chane(
-            dough: $dough,
-            userId: $request->user()->id,
-            normalWeightKg: (float) $normalWeight,
-            naninoWeightKg: (float) ($naninoWeight ?? 0),
-            sprayFlourKg: (float) $data['spray_flour_kg'],
-            chaneCount: $normalCount,
-            trayCount: $trayCount,
-            trayCounts: $trays,
+                return ProductionRecorder::chane(
+                    dough: $dough,
+                    userId: $request->user()->id,
+                    normalWeightKg: (float) $normalWeight,
+                    naninoWeightKg: (float) ($naninoWeight ?? 0),
+                    sprayFlourKg: (float) $data['spray_flour_kg'],
+                    chaneCount: $normalCount,
+                    trayCount: $trayCount,
+                    trayCounts: $trays,
+                );
+            },
         );
 
         return $this->success([

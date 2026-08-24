@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SalaryPayment;
 use App\Models\SalaryPaymentRequest;
+use App\Support\Exclusively;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Traits\ApiResponse;
@@ -129,11 +130,16 @@ class SalaryPaymentRequestController extends Controller
             'decision_note' => ['required', 'string', 'min:3', 'max:300'],
         ]);
 
-        if (! $salaryRequest->is_pending) {
-            return $this->error('به این درخواست قبلاً پاسخ داده شده است.', 409);
-        }
-
-        $salaryRequest->reject($request->user(), $data['decision_note']);
+        // Locked, because the other answer to a wage request is paying it.
+        // A rejection landing while a payslip is being written for the
+        // same month would leave the man both refused and paid.
+        Exclusively::claim(
+            $salaryRequest,
+            fn (SalaryPaymentRequest $r) => $r->is_pending
+                ? null
+                : 'به این درخواست قبلاً پاسخ داده شده است.',
+            fn (SalaryPaymentRequest $r) => $r->reject($request->user(), $data['decision_note']),
+        );
 
         return $this->success($this->payload($salaryRequest->fresh('user')), 'درخواست رد شد.');
     }

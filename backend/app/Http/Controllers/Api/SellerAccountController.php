@@ -7,6 +7,7 @@ use App\Models\BankAccount;
 use App\Models\SettlementRequest;
 use App\Models\User;
 use App\Support\AppCalendar;
+use App\Support\Exclusively;
 use App\Support\Money;
 use App\Support\SellerSettlement;
 use App\Traits\ApiResponse;
@@ -76,20 +77,29 @@ class SellerAccountController extends Controller
      */
     public function confirm(Request $request, SettlementRequest $settlement): JsonResponse
     {
-        if (! $settlement->is_pending) {
-            return $this->error('این درخواست قبلاً بررسی شده است.', 409);
-        }
-
+        // Validated before the lock is taken: it reads nothing about the
+        // settlement, and there is no reason to hold a row while deciding
+        // whether the caller typed a real account id.
         $data = $request->validate([
             'bank_account_id' => ['nullable', 'exists:bank_accounts,id'],
         ]);
 
-        SellerSettlement::confirm(
+        // The most expensive race in this file. Confirming posts the cash
+        // to a bank account; two admins tapping confirm a moment apart
+        // both saw `pending` and would both post it, and the shop's
+        // balance would carry a seller's takings twice.
+        Exclusively::claim(
             $settlement,
-            $request->user(),
-            isset($data['bank_account_id'])
-                ? BankAccount::find($data['bank_account_id'])
-                : null,
+            fn (SettlementRequest $s) => $s->is_pending
+                ? null
+                : 'این درخواست قبلاً بررسی شده است.',
+            fn (SettlementRequest $s) => SellerSettlement::confirm(
+                $s,
+                $request->user(),
+                isset($data['bank_account_id'])
+                    ? BankAccount::find($data['bank_account_id'])
+                    : null,
+            ),
         );
 
         return $this->success(null, 'تسویه تأیید شد.');
@@ -97,19 +107,24 @@ class SellerAccountController extends Controller
 
     public function reject(Request $request, SettlementRequest $settlement): JsonResponse
     {
-        if (! $settlement->is_pending) {
-            return $this->error('این درخواست قبلاً بررسی شده است.', 409);
-        }
-
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:500'],
         ]);
 
-        $settlement->update([
-            'rejected_at' => now(),
-            'rejection_reason' => $data['reason'],
-            'confirmed_by' => $request->user()->id,
-        ]);
+        // Confirm and reject race each other too, not just themselves: one
+        // admin approving while another turns it down leaves whichever
+        // wrote last, and the money may already have moved.
+        Exclusively::claim(
+            $settlement,
+            fn (SettlementRequest $s) => $s->is_pending
+                ? null
+                : 'این درخواست قبلاً بررسی شده است.',
+            fn (SettlementRequest $s) => $s->update([
+                'rejected_at' => now(),
+                'rejection_reason' => $data['reason'],
+                'confirmed_by' => $request->user()->id,
+            ]),
+        );
 
         return $this->success(null, 'درخواست رد شد.');
     }

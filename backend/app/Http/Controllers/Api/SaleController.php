@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
 use App\Support\AppCalendar;
+use App\Support\Exclusively;
 use App\Support\Money;
 use App\Support\SaleRecorder;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class SaleController extends Controller
 {
@@ -65,19 +67,30 @@ class SaleController extends Controller
             'payments.*.customer_id' => ['nullable', 'exists:customers,id'],
         ]);
 
-        $chane = ChaneEntry::find($data['chane_entry_id']);
+        // The batch is locked for the whole of this, and the "already
+        // sold" question is asked of the locked copy. Asked of the copy
+        // read a moment earlier — which is how it was written — two
+        // sellers tapping the same batch both saw `pending`, both passed,
+        // and both sold it: bread out of the warehouse twice and the
+        // money charged against the seller twice.
+        $sales = Exclusively::claim(
+            ChaneEntry::findOrFail($data['chane_entry_id']),
+            fn (ChaneEntry $chane) => $chane->status === 'pending'
+                ? null
+                : 'این چانه قبلاً فروخته شده است.',
+            function (ChaneEntry $chane) use ($data, $request) {
+                $lines = $this->paymentLines($data, $chane);
 
-        if ($chane->status !== 'pending') {
-            return $this->error('این چانه قبلاً فروخته شده است.', 409);
-        }
+                // Inside the lock too: it reads what has already been sold
+                // from this batch, and that is the figure a second seller
+                // would otherwise be racing.
+                if ($problem = SaleRecorder::problemWith($chane, $lines)) {
+                    throw ValidationException::withMessages(['sale' => [$problem]]);
+                }
 
-        $lines = $this->paymentLines($data, $chane);
-
-        if ($problem = SaleRecorder::problemWith($chane, $lines)) {
-            return $this->error($problem, 422);
-        }
-
-        $sales = SaleRecorder::record($chane, $lines, $request->user()->id);
+                return SaleRecorder::record($chane, $lines, $request->user()->id);
+            },
+        );
 
         // One line still answers with that single sale, so nothing that
         // already reads data.id or data.amount has to change.
