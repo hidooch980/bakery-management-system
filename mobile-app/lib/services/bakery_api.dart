@@ -1006,8 +1006,6 @@ class BakeryApi {
   /// what was refused is something a person typed and is entitled to see.
   Future<List<RejectedRequest>> rejectedWrites() => _client.queue.rejected();
 
-  Future<int> rejectedWriteCount() => _client.queue.rejectedCount();
-
   Future<void> dismissRejectedWrite(String id) =>
       _client.queue.dismissRejected(id);
 

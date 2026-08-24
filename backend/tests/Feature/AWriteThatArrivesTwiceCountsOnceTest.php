@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\IdempotentWrites;
 use App\Models\DoughEntry;
 use App\Models\IdempotentRequest;
 use App\Models\InventoryItem;
@@ -9,6 +10,8 @@ use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -191,6 +194,77 @@ class AWriteThatArrivesTwiceCountsOnceTest extends TestCase
         $this->artisan('idempotency:prune')->assertSuccessful();
 
         $this->assertSame(1, IdempotentRequest::count());
+    }
+
+    public function test_a_read_carrying_a_key_is_never_pinned(): void
+    {
+        // A read has nothing to make happen twice, and honouring a key on
+        // one would freeze its answer for three days.
+        $this->actingAs($this->baker, 'sanctum')
+            ->withHeaders(['Idempotency-Key' => $this->key(10)])
+            ->getJson('/api/v1/dough-entries/my-history')
+            ->assertSuccessful();
+
+        $this->assertSame(0, IdempotentRequest::count());
+    }
+
+    public function test_a_different_verb_is_not_given_the_other_verbs_answer(): void
+    {
+        $this->knead($this->aBatch(), $this->key(12))->assertSuccessful();
+
+        $stored = IdempotentRequest::where('idempotency_key', $this->key(12))->first();
+
+        // Method was recorded from the start and then never compared, so a
+        // row written by a POST matched on path and body alone. A DELETE
+        // could be handed the POST's answer and never run, telling the
+        // caller a thing was created that was in fact never removed.
+        $this->assertSame('POST', $stored->method);
+
+        $response = $this->actingAs($this->baker, 'sanctum')
+            ->withHeaders(['Idempotency-Key' => $this->key(12)])
+            ->deleteJson('/api/v1/dough-entries', $this->aBatch());
+
+        $response->assertHeaderMissing('Idempotent-Replay');
+        $this->assertNotSame(201, $response->status());
+    }
+
+    public function test_the_shop_keeps_writing_when_the_migration_has_not_run(): void
+    {
+        // deploy.sh pulls the code and only *reports* pending migrations,
+        // so there is a real window where this class is live and its table
+        // is not. Unguarded, the lookup at the top throws before $next has
+        // run and every write in the API answers 500 — no sale, no batch,
+        // no collection. That is worse than the duplicate it prevents, and
+        // it is the same failure a payslip hit on 1405/05/29.
+        Schema::drop('idempotent_requests');
+        IdempotentWrites::forgetTableCache();
+
+        $this->knead($this->aBatch(), $this->key(13))->assertSuccessful();
+        $this->knead($this->aBatch(), $this->key(14))->assertSuccessful();
+
+        $this->assertSame(2, DoughEntry::count());
+    }
+
+    public function test_a_key_that_cannot_be_recorded_is_reported_not_swallowed(): void
+    {
+        // The write is committed by the time the key is saved, so a save
+        // that fails for any reason other than the unique-index race
+        // leaves that write unrecognisable and the next replay does it
+        // again. The catch was written for the race and caught everything.
+        Log::spy();
+
+        Schema::table('idempotent_requests', function ($table) {
+            $table->dropColumn('body_hash');
+        });
+
+        $this->knead($this->aBatch(), $this->key(15))->assertSuccessful();
+
+        // The batch still lands. Answering a write that genuinely
+        // succeeded with a 500 would have the phone queue it and send it
+        // again — turning a logging problem into the duplicate itself.
+        $this->assertSame(1, DoughEntry::count());
+
+        Log::shouldHaveReceived('error')->atLeast()->once();
     }
 
     public function test_one_persons_key_never_answers_with_another_persons_record(): void
