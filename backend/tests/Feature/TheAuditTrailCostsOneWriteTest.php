@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Bakery;
 use App\Models\Expense;
 use Database\Seeders\BakerySeeder;
@@ -82,7 +83,7 @@ class TheAuditTrailCostsOneWriteTest extends TestCase
         // edits, and nobody would notice until a wide model was added.
         $this->assertSame(
             1,
-            \App\Models\AuditLog::where('auditable_id', $expense->id)
+            AuditLog::where('auditable_id', $expense->id)
                 ->where('event', 'updated')
                 ->count(),
         );
@@ -92,7 +93,7 @@ class TheAuditTrailCostsOneWriteTest extends TestCase
     {
         $expense = Expense::create($this->anExpense());
 
-        $before = \App\Models\AuditLog::count();
+        $before = AuditLog::count();
 
         $expense->save();
         $expense->update(['amount' => $expense->amount]);
@@ -100,6 +101,6 @@ class TheAuditTrailCostsOneWriteTest extends TestCase
         // Filament saves a form whether or not anything moved. A trail
         // that recorded those would bury the real edits in noise within a
         // week of the shop using the panel normally.
-        $this->assertSame($before, \App\Models\AuditLog::count());
+        $this->assertSame($before, AuditLog::count());
     }
 }
