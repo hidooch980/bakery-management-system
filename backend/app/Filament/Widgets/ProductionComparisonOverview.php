@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Support\DoughFormula;
+use App\Support\Qty;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -40,16 +41,16 @@ class ProductionComparisonOverview extends BaseWidget
         $equivalent = $formula->naninoEquivalentForNormalCount($normalCount);
 
         return [
-            Stat::make('چانه تولیدی امروز', number_format($normalCount).' عدد')
+            Stat::make('چانه تولیدی امروز', Qty::format($normalCount).' عدد')
                 ->description($bags > 0
-                    ? 'از '.number_format($bags).' کیسه خمیر'
+                    ? 'از '.Qty::format($bags).' کیسه خمیر'
                     : 'خمیری برای امروز ثبت نشده')
                 ->descriptionIcon('heroicon-m-squares-2x2')
                 ->color('info'),
 
             Stat::make('چانه به ازای هر کیسه', $actualPerBag === null
                 ? '—'
-                : number_format($actualPerBag, 1).' عدد')
+                : Qty::format($actualPerBag, 1).' عدد')
                 ->description($this->yieldDescription($actualPerBag, $expectedPerBag))
                 ->descriptionIcon($this->yieldIcon($actualPerBag, $expectedPerBag))
                 ->color($this->yieldColor($actualPerBag, $expectedPerBag)),
@@ -60,7 +61,7 @@ class ProductionComparisonOverview extends BaseWidget
             // nothing about how the two systems compare.
             Stat::make('معادل نانینو', $equivalent === null
                 ? '—'
-                : number_format($equivalent).' عدد')
+                : Qty::format($equivalent).' عدد')
                 ->description($this->naninoDescription($equivalent, $naninoCount, $normalCount))
                 ->descriptionIcon('heroicon-m-arrows-right-left')
                 ->color('warning'),
@@ -81,10 +82,10 @@ class ProductionComparisonOverview extends BaseWidget
             return 'چانه‌ای برای امروز ثبت نشده';
         }
 
-        $prefix = number_format($normalCount).' چانه عادی امروز، اگر نانینو شکل می‌گرفت';
+        $prefix = Qty::format($normalCount).' چانه عادی امروز، اگر نانینو شکل می‌گرفت';
 
         return $actualNanino > 0
-            ? $prefix.'   •   نانینوی واقعی: '.number_format($actualNanino).' عدد'
+            ? $prefix.'   •   نانینوی واقعی: '.Qty::format($actualNanino).' عدد'
             : $prefix;
     }
 
@@ -95,13 +96,13 @@ class ProductionComparisonOverview extends BaseWidget
         }
 
         if ($actual === null) {
-            return 'انتظار: '.number_format($expected).' عدد از هر کیسه';
+            return 'انتظار: '.Qty::format($expected).' عدد از هر کیسه';
         }
 
         $gap = round($actual - $expected, 1);
 
-        return 'انتظار '.number_format($expected).' عدد'
-            .($gap == 0 ? '' : '   •   '.($gap > 0 ? '+' : '').number_format($gap, 1));
+        return 'انتظار '.Qty::format($expected).' عدد'
+            .($gap == 0 ? '' : '   •   '.($gap > 0 ? '+' : '').Qty::format($gap, 1));
     }
 
     private function yieldIcon(?float $actual, ?int $expected): string

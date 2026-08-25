@@ -48,11 +48,21 @@ class DoughEntryResource extends Resource
                         ->required()
                         ->suffix('کیسه'),
 
+                    // Shown, never chosen. `processed` is written by
+                    // ProductionRecorder when a chane is recorded against
+                    // this dough, and by nothing else. Offered as a choice
+                    // it was a trap: a dough saved as «چانه شده» by hand
+                    // drops out of the `pending()` scope, so no chane can
+                    // ever be recorded against it — while its flour has
+                    // already left the store.
                     Forms\Components\Select::make('status')
                         ->label('وضعیت')
                         ->options(['pending' => 'در انتظار چانه', 'processed' => 'چانه شده'])
                         ->default('pending')
                         ->required()
+                        ->disabled()
+                        ->dehydrated()
+                        ->helperText('با ثبت چانه خودکار تغییر می‌کند.')
                         ->native(false),
 
                     Forms\Components\Textarea::make('note')

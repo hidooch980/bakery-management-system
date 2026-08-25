@@ -12,6 +12,16 @@
 name: Mobile Tests
 
 on:
+  # On main: every push, for the same reason the backend suite lost its
+  # path filter. A merge makes a new state, and the Dart tests should be
+  # run against it rather than only against the branch that produced it.
+  #
+  # This workflow exists because `flutter test` used to live only in
+  # build-apk.yml, which fires on a `v*` tag — so every Dart test in the
+  # repo first ran after its branch had already merged. Adding it on pull
+  # requests fixed half of that; this is the other half.
+  push:
+    branches: [main]
   pull_request:
     paths:
       - 'mobile-app/**'
