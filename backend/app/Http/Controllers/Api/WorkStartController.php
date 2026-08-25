@@ -91,6 +91,68 @@ class WorkStartController extends Controller
     /**
      * Late starts over a period — what payroll needs to apply a deduction.
      */
+    /**
+     * A person's own lateness, for their own screen.
+     *
+     * `lateReport` answers the same question for the manager and sits
+     * behind view-work-start-report, so a baker had no way to see his own
+     * record — he found out how many late days he had when somebody told
+     * him, or when it came off his wages.
+     *
+     * That is the wrong order. A tariff nobody can check is a fine, not a
+     * rule, and the whole point of an escalating one is that a person can
+     * see the next step coming while there is still time to avoid it.
+     */
+    public function mine(Request $request): JsonResponse
+    {
+        [$from, $until] = Jalali::currentMonthRange();
+
+        $records = WorkStart::where('user_id', $request->user()->id)
+            ->whereBetween('date', [$from->toDateString(), $until->toDateString()])
+            ->orderByDesc('date')
+            ->get();
+
+        $late = $records->where('is_late', true);
+
+        // Days, not ticks. A day where both shaping and baking ran late is
+        // one late day and is charged once — the same count the tariff
+        // itself uses, so the figure here and the figure on the payslip
+        // cannot disagree.
+        $lateDays = $late->pluck('date')
+            ->map(fn ($d) => $d?->toDateString())
+            ->unique()
+            ->count();
+
+        $free = LatePenalty::freeDays();
+
+        return $this->success([
+            'period_label' => AppCalendar::monthLabel($from),
+            'days_recorded' => $records->groupBy('date')->count(),
+            'late_days' => $lateDays,
+            'late_minutes_total' => (int) $late->sum('late_minutes'),
+
+            // What it stands at, and what the next one would add. The
+            // second is the number worth showing: it is the only one a
+            // person can still do anything about.
+            'penalty_formatted' => Money::format(LatePenalty::totalFor($lateDays)),
+            'free_days_left' => max(0, $free - $lateDays),
+            'next_late_day_costs_formatted' => Money::format(
+                LatePenalty::amountFor($lateDays + 1)
+            ),
+
+            'recent' => $records->take(10)->map(fn (WorkStart $w) => [
+                'date_jalali' => Jalali::date($w->date),
+                'type' => $w->type,
+                'started_at' => $w->started_at?->format('H:i'),
+                'deadline' => $w->deadline,
+                'is_late' => (bool) $w->is_late,
+                'late_minutes' => (int) $w->late_minutes,
+            ])->values(),
+
+            'tariff' => LatePenalty::tariff(),
+        ]);
+    }
+
     public function lateReport(Request $request): JsonResponse
     {
         $from = Jalali::parseFlexible($request->query('from'));

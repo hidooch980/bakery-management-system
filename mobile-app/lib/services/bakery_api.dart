@@ -406,6 +406,17 @@ class BakeryApi {
   }
 
   /// The seller's own temporary account — what they still answer for.
+  /// A person's own lateness this month, and what the next late day costs.
+  ///
+  /// The manager's version of this has always existed and sits behind a
+  /// permission, so the person it is about could not see it. An escalating
+  /// tariff only works as a rule if the next step can be seen coming.
+  Future<Map<String, dynamic>> myLateness() async {
+    final body = await _client.getCached('/work-starts/mine');
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
   Future<SellerAccount> myAccount() async {
     final body = await _client.get('/sales/my-account');
 

@@ -156,6 +156,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/work-starts', [WorkStartController::class, 'store'])
             ->middleware('permission:record-work-start');
         Route::get('/work-starts/rules', [WorkStartController::class, 'rules']);
+
+        // A person's own record, behind no permission at all: it is about
+        // them, and the tariff only works as a rule if the person it
+        // applies to can see where they stand in it.
+        Route::get('/work-starts/mine', [WorkStartController::class, 'mine']);
         Route::get('/work-starts/late-report', [WorkStartController::class, 'lateReport'])
             ->middleware('permission:view-work-start-report');
 
