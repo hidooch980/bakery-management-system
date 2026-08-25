@@ -218,12 +218,32 @@ class AnsweringAnIssueTest extends TestCase
         // An answer is about a problem, and the problem is gone. Nothing
         // derives it any more, so neither list has anywhere to show it —
         // and the answer left behind is harmless, matching no issue.
+        // Six, not five. Five lands the balance on exactly zero, which is
+        // its own issue now — a bakery with no flour has not had its data
+        // fixed. See test_flour_brought_back_to_exactly_zero_is_still_an_issue.
         InventoryItem::ofKey(InventoryItem::FLOUR)
-            ->move('in', 5, 'purchase', $this->admin->id);
+            ->move('in', 6, 'purchase', $this->admin->id);
 
         $page = $this->page();
         $this->assertSame(0, $page->getOpenIssues()->count());
         $this->assertSame(0, $page->getAnsweredIssues()->count());
+    }
+
+    public function test_flour_brought_back_to_exactly_zero_is_still_an_issue(): void
+    {
+        $this->short(5);
+        $this->answer();
+
+        // The negative is gone, so the answered issue no longer matches
+        // anything — but nothing has been bought either. The shop still
+        // cannot bake, and the page has to keep saying so.
+        InventoryItem::ofKey(InventoryItem::FLOUR)
+            ->move('in', 5, 'purchase', $this->admin->id);
+
+        $open = $this->page()->getOpenIssues();
+
+        $this->assertSame(1, $open->count());
+        $this->assertSame('empty-stock-flour', $open->first()->key);
     }
 
     /**
