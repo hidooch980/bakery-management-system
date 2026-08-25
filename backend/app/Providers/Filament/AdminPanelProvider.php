@@ -54,6 +54,13 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::HEAD_END,
                 fn (): string => view('filament.panel-ground')->render(),
             )
+            // Neither the date nor the time appeared anywhere in the panel,
+            // in a shop whose quota period runs 5th→4th and whose lateness
+            // is counted by the day.
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_END,
+                fn (): string => view('filament.topbar-clock')->render(),
+            )
             ->darkMode(true)
             // Fully, not to a strip of icons. Collapsed to icons the menu
             // still holds its column and the reports beside it still wrap;
