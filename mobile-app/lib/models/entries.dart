@@ -105,13 +105,21 @@ enum PaymentType {
   /// figure beside the derived one. `other` named nothing at all. Neither
   /// was chosen once in this shop's history.
   ///
-  /// Both stay in the enum: an older sale still has to render as words, and
-  /// [fromApi] falls back to `other` for a value this build has never heard
-  /// of.
+  /// **`credit` came off the list on 1405/06/03, at the owner's word.**
+  /// Bread let out on trust is a debt the shop then has to chase, and he
+  /// would rather it were not offered at the counter at all.
+  ///
+  /// `schools` stays, and deliberately: it is also a debt type, but it is
+  /// a standing arrangement with a named institution rather than a
+  /// judgement a seller makes at the door.
+  ///
+  /// All three stay in the enum. An older sale still has to render as
+  /// words — this shop has 179 loaves of credit in the current period
+  /// alone, and 500,000 Rial of it uncollected — and [fromApi] falls back
+  /// to `other` for a value this build has never heard of.
   static List<PaymentType> get choices => const [
         PaymentType.cash,
         PaymentType.card,
-        PaymentType.credit,
         PaymentType.home,
         PaymentType.schools,
         PaymentType.charity,
