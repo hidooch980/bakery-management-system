@@ -205,4 +205,31 @@ void main() {
       expect(size!.height, greaterThanOrEqualTo(48));
     });
   });
+
+  group('what the counter offers', () {
+    test('credit is not offered', () {
+      // Taken off at the owner's word on 1405/06/03: bread let out on
+      // trust is a debt the shop then has to chase, and he would rather
+      // it were not a choice at the door.
+      expect(PaymentType.choices, isNot(contains(PaymentType.credit)));
+    });
+
+    test('schools is still offered, and that is not an oversight', () {
+      // Also a debt type, but a standing arrangement with a named
+      // institution rather than a judgement a seller makes at the door.
+      expect(PaymentType.choices, contains(PaymentType.schools));
+    });
+
+    test('an older credit sale still reads as words', () {
+      // 179 loaves of credit in the current period alone, and 500,000
+      // Rial of it uncollected. Dropping it from the enum would render
+      // every one of those rows as «سایر».
+      expect(PaymentType.fromApi('credit'), PaymentType.credit);
+      expect(PaymentType.fromApi('credit').label, 'نسیه');
+    });
+
+    test('a type this build has never heard of does not crash a screen', () {
+      expect(PaymentType.fromApi('something_new'), PaymentType.other);
+    });
+  });
 }
