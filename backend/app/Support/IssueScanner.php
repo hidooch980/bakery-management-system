@@ -37,6 +37,7 @@ class IssueScanner
             ...$this->negativeStock(),
             ...$this->missingSettings(),
             ...$this->lowStock(),
+            ...$this->emptyStock(),
             ...$this->quotaOverrun(),
             ...$this->negativeBankBalance(),
             ...$this->sellerAccounts(),
@@ -156,8 +157,14 @@ class IssueScanner
         foreach (array_keys(InventoryItem::DEFAULTS) as $key) {
             $item = InventoryItem::ofKey($key);
 
-            // Negative stock is already reported, and more seriously.
-            if (! $item->is_low || $item->balance < 0) {
+            // Negative stock is already reported, and more seriously, and
+            // an empty one is reported by emptyStock() below.
+            //
+            // The threshold is named explicitly rather than left to
+            // `is_low`: everything this issue says quotes `low_threshold`,
+            // so an item that has none has nothing to say here.
+            if ($item->low_threshold === null || ! $item->is_low
+                || $item->balance <= 0) {
                 continue;
             }
 
@@ -174,6 +181,49 @@ class IssueScanner
                 // How far under the line, not the balance: a threshold
                 // raised later must not read as the stock falling.
                 magnitude: (float) $item->low_threshold - (float) $item->balance,
+            );
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Items that have run out.
+     *
+     * Apart from lowStock() because that one is about a line somebody drew
+     * and most items here have no line drawn. This one needs no judgement:
+     * the ledger says nothing is left.
+     *
+     * Only for items that have moved at least once. A shop opened last
+     * week has zero of everything and no problem — it has not started. An
+     * item that was stocked and is now at zero ran out, which is the thing
+     * worth saying.
+     */
+    private function emptyStock(): array
+    {
+        $issues = [];
+
+        foreach (array_keys(InventoryItem::DEFAULTS) as $key) {
+            $item = InventoryItem::ofKey($key);
+
+            if (! $item->is_empty || $item->balance < 0) {
+                continue;
+            }
+
+            if (! $item->movements()->exists()) {
+                continue;
+            }
+
+            $issues[] = new SystemIssue(
+                key: "empty-stock-{$key}",
+                severity: SystemIssue::CRITICAL,
+                title: "موجودی {$item->name} تمام شده است",
+                detail: 'چیزی در انبار باقی نمانده.',
+                cause: 'مصرف شده و دوباره تأمین نشده است.',
+                suggestion: 'تا تأمین نشود، هر کاری که به آن نیاز دارد متوقف می‌ماند.',
+                url: '/admin/inventory-items',
+                urlLabel: 'مشاهده انبار',
+                magnitude: 1.0,
             );
         }
 
