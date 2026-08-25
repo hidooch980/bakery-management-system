@@ -14,17 +14,29 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 ///
 /// A phone left in a taxi should cost the shop a phone.
 ///
-/// `encryptedSharedPreferences` is what makes this real on Android — the
-/// same flag [BiometricService] already sets, backed by Jetpack Security.
-/// On iOS it is the keychain. Neither is free: this costs more per write
-/// than a preference file did, and the read cache writes on every
-/// successful GET. Worth watching on a real handset rather than assuming.
+/// **The options here must match [ApiClient]'s, and this is not a detail.**
+///
+/// v4.68.0 shipped this class configured with
+/// `encryptedSharedPreferences: true` while ApiClient's token storage used
+/// the plain default. ApiClient builds the queue and the cache as field
+/// initialisers, so from that release three FlutterSecureStorage instances
+/// with two different Android configurations came into existence at the
+/// moment the client was constructed — the same moment the token is read.
+/// Signing in succeeded, the server issued a token, and every request
+/// after it came back 401 because the token could not be read back. The
+/// shop could not use the app.
+///
+/// It had worked until then only by accident of ordering: BiometricService
+/// has always set that flag, but it is built when somebody uses a
+/// fingerprint, which is after the token has already been read.
+///
+/// So this takes the plain default — the one the token has always used —
+/// rather than the stronger-looking one. The queue and the cache are still
+/// off the plain preference file, which was the point; the token's path is
+/// byte for byte what it was in v4.67.0.
 class SecureStore {
   SecureStore({FlutterSecureStorage? storage})
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-            );
+      : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
 

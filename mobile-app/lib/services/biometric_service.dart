@@ -21,6 +21,20 @@ enum BiometricAvailability {
 /// The credentials live in `flutter_secure_storage`, which is backed by the
 /// Android Keystore — they are never written to shared preferences and never
 /// leave the device.
+///
+/// **Do not construct this before the token has been read.** It is the one
+/// place left in the app that opens secure storage with
+/// `encryptedSharedPreferences: true` while [ApiClient] opens it with the
+/// plain default, and on Android those are two different implementations.
+/// It is safe today only because a fingerprint is used after sign-in, so
+/// the plain one is always opened first.
+///
+/// v4.68.0 broke exactly this. `SecureStore` was added with the flag and
+/// ApiClient builds it as a field initialiser, which moved the flagged
+/// configuration to the moment the client is constructed — the same moment
+/// the token is read. Signing in worked, every request after it came back
+/// 401, and the shop could not use the app. If this ever has to be built
+/// earlier, make the options match ApiClient's first.
 class BiometricService {
   BiometricService({LocalAuthentication? auth, FlutterSecureStorage? storage})
       : _auth = auth ?? LocalAuthentication(),
