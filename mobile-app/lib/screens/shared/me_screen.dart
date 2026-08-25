@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
+import '../../widgets/lateness_card.dart';
 import '../../widgets/pay_card.dart';
 import 'my_advances_screen.dart';
 
@@ -31,6 +32,13 @@ class MeScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
           AttendanceCard(api: api),
+          const SizedBox(height: 14),
+
+          // Between attendance and pay, because that is the order the two
+          // are connected in: being late is an attendance fact that turns
+          // into a pay one. It renders nothing at all on a clean month
+          // past the first line, so it costs a reader nothing.
+          LatenessCard(api: api),
           const SizedBox(height: 14),
           PayCard(api: api),
           const SizedBox(height: 14),
