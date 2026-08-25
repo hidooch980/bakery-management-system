@@ -1,18 +1,34 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/user.dart';
 import '../services/api_client.dart';
 import '../services/bakery_api.dart';
 import '../services/biometric_service.dart';
+import '../services/secure_store.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthProvider extends ChangeNotifier {
-  AuthProvider(this._api, {BiometricService? biometrics})
-      : _biometrics = biometrics ?? BiometricService();
+  AuthProvider(this._api, {BiometricService? biometrics, SecureStore? store})
+      : _biometrics = biometrics ?? BiometricService(),
+        _store = store ?? SecureStore();
 
   final BakeryApi _api;
   final BiometricService _biometrics;
+  final SecureStore _store;
+
+  /// Where the last signed-in user is kept, so a cold start with no signal
+  /// still knows whose shift it is.
+  static const _userKey = 'last_user_v1';
+
+  /// True when the session was restored from that stored copy rather than
+  /// confirmed with the server. Screens can say so; nothing depends on it
+  /// for permission checks, which come from the stored user either way.
+  bool _offline = false;
+
+  bool get isOfflineSession => _offline;
 
   BiometricService get biometrics => _biometrics;
 
@@ -26,6 +42,10 @@ class AuthProvider extends ChangeNotifier {
   String? _error;
   bool _busy = false;
 
+  /// Whether the most recent sign-in attempt failed for want of a network
+  /// rather than for a wrong password. See [loginWithBiometrics].
+  bool _lastFailureWasConnectivity = false;
+
   AuthStatus get status => _status;
 
   AppUser? get user => _user;
@@ -34,7 +54,18 @@ class AuthProvider extends ChangeNotifier {
 
   bool get busy => _busy;
 
-  /// Restores a previous session on cold start, if the stored token is valid.
+  /// Restores a previous session on cold start.
+  ///
+  /// The hard part is not the happy path but the failure: this used to
+  /// treat every ApiException the same and clear the token. With no signal
+  /// — which is the state this app was built for, and the state the
+  /// offline queue exists to serve — `me()` fails, so opening the app off
+  /// the network signed the person out and destroyed the session. They
+  /// then could not sign back in, because signing in needs the network
+  /// too. The offline queue was unreachable behind a login screen.
+  ///
+  /// A server that answers «401» and a server that never answered are
+  /// different facts. Only the first one means the token is no good.
   Future<void> bootstrap() async {
     final token = await _api.client.readToken();
 
@@ -46,13 +77,50 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       _user = await _api.me();
+      await _rememberUser(_user!);
+      _offline = false;
       _status = AuthStatus.authenticated;
-    } on ApiException {
-      await _api.client.clearToken();
-      _status = AuthStatus.unauthenticated;
+    } on ApiException catch (e) {
+      final cached = await _storedUser();
+
+      if (e.isConnectivityError && cached != null) {
+        // Unreachable, not rejected. Keep the token and carry on with what
+        // was true when there was last a signal.
+        _user = cached;
+        _offline = true;
+        _status = AuthStatus.authenticated;
+      } else if (e.isConnectivityError) {
+        // No signal and nothing stored — this is a first run, or a session
+        // from before users were stored. Leave the token alone: it may be
+        // perfectly good, and there is nothing to gain by deleting it.
+        _status = AuthStatus.unauthenticated;
+      } else {
+        // The server answered and would not have us.
+        await _api.client.clearToken();
+        await _forgetUser();
+        _status = AuthStatus.unauthenticated;
+      }
     }
 
     notifyListeners();
+  }
+
+  Future<void> _rememberUser(AppUser user) =>
+      _store.write(_userKey, jsonEncode(user.toJson()));
+
+  Future<void> _forgetUser() => _store.delete(_userKey);
+
+  Future<AppUser?> _storedUser() async {
+    final raw = await _store.read(_userKey);
+
+    if (raw == null) return null;
+
+    try {
+      return AppUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      // A stored user this build cannot read is not worth crashing over.
+      return null;
+    }
   }
 
   /// Signs in with a password. When [rememberForBiometrics] is set, the
@@ -69,6 +137,8 @@ class AuthProvider extends ChangeNotifier {
     try {
       final result = await _api.login(login, password);
       _user = result.user;
+      await _rememberUser(result.user);
+      _offline = false;
       _status = AuthStatus.authenticated;
 
       if (rememberForBiometrics) {
@@ -78,6 +148,7 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } on ApiException catch (e) {
       _error = e.message;
+      _lastFailureWasConnectivity = e.isConnectivityError;
       return false;
     } finally {
       _setBusy(false);
@@ -96,7 +167,12 @@ class AuthProvider extends ChangeNotifier {
 
     // Credentials that no longer work are worse than none: they would fail
     // silently on every launch. Drop them and make the user type again.
-    if (!ok) await _biometrics.disable();
+    //
+    // But only when the server actually refused them. A failure to reach
+    // the server says nothing about whether the password is right, and
+    // erasing them for that reason means one walk out of signal costs the
+    // fingerprint unlock permanently.
+    if (!ok && !_lastFailureWasConnectivity) await _biometrics.disable();
 
     return ok;
   }
@@ -125,7 +201,12 @@ class AuthProvider extends ChangeNotifier {
       // A shared device must not keep one employee's saved password.
       await _biometrics.disable();
     } finally {
+      // Nor one employee's name and permissions. This is the stored copy
+      // bootstrap() falls back on with no signal, so leaving it would show
+      // the next person the last person's shift.
+      await _forgetUser();
       _user = null;
+      _offline = false;
       _status = AuthStatus.unauthenticated;
       _setBusy(false);
     }
