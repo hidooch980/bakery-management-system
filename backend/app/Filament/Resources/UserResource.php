@@ -110,7 +110,7 @@ class UserResource extends Resource
                 ]),
 
             // On its own, because a wage is not an account setting. It
-                // prefills the payroll form and nothing else, and mixing it
+            // prefills the payroll form and nothing else, and mixing it
             // in with the password was how this form read as a jumble.
             Forms\Components\Section::make('حقوق')
                 ->icon('heroicon-o-banknotes')
