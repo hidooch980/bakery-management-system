@@ -29,27 +29,36 @@ class ProductionTrendChart extends ChartWidget
                     'borderColor' => '#f59e0b',
                     'backgroundColor' => 'rgba(245, 158, 11, 0.15)',
                     'fill' => true,
-                    'tension' => 0.35,
+                    // 0.35 let the spline overshoot: a day of zero between
+                    // two busy days dipped the curve well below zero, which
+                    // is not a thing a sack count can do.
+                    'tension' => 0.2,
                 ],
                 [
-                    'label' => 'تعداد چانه (÷۱۰)',
+                    'label' => 'چانه (÷۱۰)',
                     'data' => $days->map(fn ($day) => round((float) ChaneEntry::whereDate('created_at', $day->toDateString())->sum('chane_count') / 10, 1))->toArray(),
                     'borderColor' => '#0ea5e9',
-                    'backgroundColor' => 'rgba(14, 165, 233, 0.15)',
-                    'fill' => true,
-                    'tension' => 0.35,
+                    'backgroundColor' => 'rgba(14, 165, 233, 0.12)',
+                    'fill' => false,
+                    'tension' => 0.2,
                 ],
                 [
                     // The real nanino count, day by day — previously nowhere
                     // on the dashboard, only today's figure existed elsewhere.
-                    'label' => 'چانه نانینو',
-                    'data' => $days->map(fn ($day) => $formula->naninoCountForWeight(
+                    'label' => 'نانینو (÷۱۰)',
+                    // Divided by ten like the chane line beside it. It was
+                    // a raw count against two scaled series, so on a busy
+                    // day it left the top of the axis and took the chart
+                    // with it — the other two lines flattened to nothing.
+                    'data' => $days->map(fn ($day) => round($formula->naninoCountForWeight(
                         (float) ChaneEntry::whereDate('created_at', $day->toDateString())->sum('nanino_weight_kg')
-                    ))->toArray(),
-                    'borderColor' => '#3B82C4',
-                    'backgroundColor' => 'rgba(59, 130, 196, 0.15)',
-                    'fill' => true,
-                    'tension' => 0.35,
+                    ) / 10, 1))->toArray(),
+                    // Was #3B82C4 — a blue a shade away from the line above
+                    // it, which no legend could tell apart.
+                    'borderColor' => '#22C55E',
+                    'backgroundColor' => 'rgba(34, 197, 94, 0.12)',
+                    'fill' => false,
+                    'tension' => 0.2,
                 ],
             ],
             // Jalali day/month labels, so the axis matches the rest of the
@@ -62,5 +71,19 @@ class ProductionTrendChart extends ChartWidget
     protected function getType(): string
     {
         return 'line';
+    }
+
+    protected function getOptions(): array
+    {
+        return [
+            'scales' => [
+                'y' => [
+                    // The axis is a production count. Letting Chart.js pick
+                    // its own floor meant a negative gridline under a chart
+                    // where negative has no meaning.
+                    'beginAtZero' => true,
+                ],
+            ],
+        ];
     }
 }

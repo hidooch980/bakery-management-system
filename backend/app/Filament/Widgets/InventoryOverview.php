@@ -26,14 +26,20 @@ class InventoryOverview extends BaseWidget
                     ? number_format($bags, 1).' کیسه   —   '.$weightLabel
                     : $weightLabel;
 
-                $statusLabel = $item->is_low ? 'کمتر از حد هشدار' : 'موجودی کافی';
+                // Three states, not two. Empty reads as its own thing
+                // because «کمتر از حد هشدار» beside 0.0 still sounds like
+                // there is some left, and because most items here have no
+                // threshold set at all.
+                [$statusLabel, $icon, $colour] = match (true) {
+                    $item->is_empty => ['موجودی تمام شده', 'heroicon-m-x-circle', 'danger'],
+                    $item->is_low => ['کمتر از حد هشدار', 'heroicon-m-exclamation-triangle', 'warning'],
+                    default => ['موجودی کافی', 'heroicon-m-check-circle', 'success'],
+                };
 
                 return Stat::make($item->name, $value)
                     ->description($statusLabel)
-                    ->descriptionIcon($item->is_low
-                        ? 'heroicon-m-exclamation-triangle'
-                        : 'heroicon-m-check-circle')
-                    ->color($item->is_low ? 'danger' : 'success');
+                    ->descriptionIcon($icon)
+                    ->color($colour);
             })
             ->all();
     }
