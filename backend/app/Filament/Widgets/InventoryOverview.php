@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\InventoryItem;
+use App\Support\Qty;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -18,12 +19,12 @@ class InventoryOverview extends BaseWidget
             ->map(function (string $key) {
                 $item = InventoryItem::ofKey($key);
                 $bags = $item->balance_bags;
-                $weightLabel = number_format($item->balance, 1).' '.$item->unit;
+                $weightLabel = Qty::format($item->balance, 1).' '.$item->unit;
 
                 // Bag count leads, weight sits next to it — not buried in
                 // the description under the weight, as it read before.
                 $value = $bags !== null
-                    ? number_format($bags, 1).' کیسه   —   '.$weightLabel
+                    ? Qty::format($bags, 1).' کیسه   —   '.$weightLabel
                     : $weightLabel;
 
                 // Three states, not two. Empty reads as its own thing
