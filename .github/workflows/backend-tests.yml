@@ -1,11 +1,20 @@
 name: Backend Tests
 
 on:
+  # On main: every push, with no path filter.
+  #
+  # There used to be one, and it read as common sense — why run the PHP
+  # suite when only the Flutter app changed? Because main after a merge is
+  # a *state*, not a diff. Five tests in SellerAccountTest were failing on
+  # main for two days while the shop ran that code, and the runs that
+  # would have caught it never fired: 4681fc1 touched only mobile-app/, so
+  # Backend Tests was skipped, and a skipped check is reported as a green
+  # tick beside the commit. It reads exactly like a pass.
+  #
+  # The suite costs four minutes. Two days of a bakery selling one batch
+  # of bread to two people costs more.
   push:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/backend-tests.yml'
   pull_request:
     paths:
       - 'backend/**'
