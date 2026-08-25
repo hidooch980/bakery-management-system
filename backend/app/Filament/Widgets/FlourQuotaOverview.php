@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Models\FlourAllocation;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
+use App\Support\Qty;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -59,7 +60,7 @@ class FlourQuotaOverview extends BaseWidget
         $remainingBags = $bagWeight > 0 ? $period->remaining_kg / $bagWeight : 0;
 
         return [
-            Stat::make($period->label, number_format((float) $period->allocated_kg, 0).' کیلوگرم')
+            Stat::make($period->label, Qty::format((float) $period->allocated_kg, 0).' کیلوگرم')
                 ->description(AppCalendar::date($period->starts_on).' تا '.AppCalendar::date($period->ends_on))
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color('info'),
@@ -73,15 +74,15 @@ class FlourQuotaOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color($period->holiday_days > 0 ? 'warning' : 'gray'),
 
-            Stat::make('مصرف این دوره', number_format($period->used_kg, 0).' کیلوگرم')
+            Stat::make('مصرف این دوره', Qty::format($period->used_kg, 0).' کیلوگرم')
                 ->description($period->usage_percent.'٪ از سهمیه دوره')
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color($period->usage_percent > 90 ? 'danger' : ($period->usage_percent > 70 ? 'warning' : 'success')),
 
-            Stat::make('باقی‌مانده دوره', number_format($period->remaining_kg, 0).' کیلوگرم')
+            Stat::make('باقی‌مانده دوره', Qty::format($period->remaining_kg, 0).' کیلوگرم')
                 ->description($period->is_over
                     ? 'بیش از سهمیه مصرف شده'
-                    : number_format($remainingBags, 1).' کیسه')
+                    : Qty::format($remainingBags, 1).' کیسه')
                 ->descriptionIcon($period->is_over ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-circle')
                 ->color($period->is_over ? 'danger' : 'success'),
 
@@ -91,16 +92,16 @@ class FlourQuotaOverview extends BaseWidget
             Stat::make(
                 'اختلاف با کارتخوان',
                 ($period->bread_remainder >= 0 ? '+' : '−')
-                    .number_format(abs($period->bread_remainder)).' نان'
+                    .Qty::format(abs($period->bread_remainder)).' نان'
             )
-                ->description(number_format($period->allocated_bread_count).' نان سهمیه'
-                    .'   •   '.number_format($period->card_bread_count).' نان کارتخوان')
+                ->description(Qty::format($period->allocated_bread_count).' نان سهمیه'
+                    .'   •   '.Qty::format($period->card_bread_count).' نان کارتخوان')
                 ->descriptionIcon('heroicon-m-credit-card')
                 ->color($period->bread_remainder < 0 ? 'danger' : 'info'),
 
-            Stat::make('سنوات', number_format((float) $allocation->carryover_kg, 0).' کیلوگرم')
+            Stat::make('سنوات', Qty::format((float) $allocation->carryover_kg, 0).' کیلوگرم')
                 ->description((float) $allocation->carryover_bags > 0
-                    ? number_format((float) $allocation->carryover_bags, 1).' کیسه مانده از قبل'
+                    ? Qty::format((float) $allocation->carryover_bags, 1).' کیسه مانده از قبل'
                     : 'مانده‌ای از قبل ثبت نشده')
                 ->descriptionIcon('heroicon-m-archive-box')
                 ->color((float) $allocation->carryover_kg > 0 ? 'info' : 'gray'),

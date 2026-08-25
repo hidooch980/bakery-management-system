@@ -120,10 +120,27 @@ class InventoryItem extends Model
             : (float) ($this->bag_weight_kg ?? 0);
     }
 
+    /**
+     * Nothing left.
+     *
+     * Kept apart from `is_low` because a threshold is a judgement somebody
+     * has to make and most items here have never had one set, while empty
+     * is a fact the ledger already knows. Reading emptiness through the
+     * threshold is how the dashboard came to report «موجودی کافی» beside
+     * 0.0 کیلوگرم of wet yeast — on the same day that yeast stopped the
+     * dough.
+     */
+    public function getIsEmptyAttribute(): bool
+    {
+        return $this->balance <= 0;
+    }
+
     public function getIsLowAttribute(): bool
     {
-        return $this->low_threshold !== null
-            && $this->balance <= (float) $this->low_threshold;
+        // An empty item is low whether or not anybody set a threshold.
+        return $this->is_empty
+            || ($this->low_threshold !== null
+                && $this->balance <= (float) $this->low_threshold);
     }
 
     /** Records a stock movement and returns it. */

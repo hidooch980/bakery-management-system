@@ -9,6 +9,7 @@ use App\Models\InventoryItem;
 use App\Models\Sale;
 use App\Support\DoughFormula;
 use App\Support\Money;
+use App\Support\Qty;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -42,13 +43,13 @@ class BakeryStatsOverview extends BaseWidget
         $naninoEquivalent = $formula->naninoEquivalentForNormalCount($chaneCount);
 
         return [
-            Stat::make('خمیر امروز', number_format($doughBags).' کیسه')
+            Stat::make('خمیر امروز', Qty::format($doughBags).' کیسه')
                 ->description('مجموع کیسه‌های خمیرگیری‌شده')
                 ->descriptionIcon('heroicon-m-cube')
                 ->color('warning')
                 ->chart($this->trend(DoughEntry::class, 'bag_count')),
 
-            Stat::make('چانه امروز', number_format($chaneCount).' عدد')
+            Stat::make('چانه امروز', Qty::format($chaneCount).' عدد')
                 ->description('مجموع چانه‌های تولیدشده')
                 ->descriptionIcon('heroicon-m-squares-2x2')
                 ->color('info')
@@ -65,9 +66,9 @@ class BakeryStatsOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-clock')
                 ->color('primary'),
 
-            Stat::make('موجودی آرد', number_format($balanceBags, 1).' کیسه')
+            Stat::make('موجودی آرد', Qty::format($balanceBags, 1).' کیسه')
                 ->description($balance > 0
-                    ? number_format($balance, 2).' کیلوگرم'
+                    ? Qty::format($balance, 2).' کیلوگرم'
                     : 'نیاز به تأمین')
                 ->descriptionIcon($balance > 0 ? 'heroicon-m-check-circle' : 'heroicon-m-exclamation-triangle')
                 ->color($balance > 0 ? 'success' : 'danger'),
@@ -82,7 +83,7 @@ class BakeryStatsOverview extends BaseWidget
             // produced, had it been shaped as nanino instead.
             Stat::make('معادل نانینوی چانه عادی', $naninoEquivalent === null
                 ? '—'
-                : number_format($naninoEquivalent).' عدد')
+                : Qty::format($naninoEquivalent).' عدد')
                 ->description($naninoEquivalent === null
                     ? 'وزن هر دو نوع چانه در تنظیمات ثبت نشده است'
                     : $chaneCount.' چانه عادی امروز، اگر نانینو شکل می‌گرفت')
