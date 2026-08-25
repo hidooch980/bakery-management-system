@@ -101,7 +101,14 @@ class DoughDoubleTapTest extends TestCase
     {
         $this->record(13)->assertCreated();
 
-        $this->record(10)->assertCreated();
+        // A different size was never the double tap this guard was written
+        // for, and it still is not — but on 1405/06/03 the owner asked for
+        // one batch a day, and that rule sits in front of this one. The
+        // second entry is now refused until somebody confirms it is
+        // genuinely a second batch, whatever size it is.
+        $this->record(10)->assertStatus(409);
+
+        $this->record(10, force: true)->assertCreated();
 
         $this->assertSame(2, DoughEntry::count());
     }
@@ -113,8 +120,18 @@ class DoughDoubleTapTest extends TestCase
         $other = User::factory()->create(['is_active' => true]);
         $other->assignRole('dough_maker');
 
+        // Reversed on 1405/06/03. The daily rule is deliberately about
+        // the shop and not the person: the shop kneads once, whoever is
+        // holding the phone, and two people recording the same morning is
+        // the mistake it exists to catch. The double-tap guard beside it
+        // is still per person — that one is about one thumb, this one is
+        // about one bakery.
         $this->actingAs($other, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 13])
+            ->assertStatus(409);
+
+        $this->actingAs($other, 'sanctum')
+            ->postJson('/api/v1/dough-entries', ['bag_count' => 13, 'force' => true])
             ->assertCreated();
 
         $this->assertSame(2, DoughEntry::count());
@@ -124,7 +141,10 @@ class DoughDoubleTapTest extends TestCase
     {
         $this->record(13)->assertCreated();
 
-        DoughEntry::query()->update(['created_at' => now()->subHours(4)]);
+        // Yesterday, not four hours ago. Four hours clears the double-tap
+        // window but not the daily rule added on 1405/06/03, and «tomorrow
+        // is an ordinary day» is only true of an actual tomorrow.
+        DoughEntry::query()->update(['created_at' => now()->subDay()]);
 
         // This shop bakes thirteen bags most days. The guard is about a
         // double tap, not about ever baking the same amount twice.
