@@ -17,6 +17,17 @@ enum UserRole {
         _ => UserRole.unknown,
       };
 
+  /// The inverse of [fromApi]. Needed because a stored user is written
+  /// back through the same JSON shape the server sends.
+  String get apiValue => switch (this) {
+        UserRole.admin => 'admin',
+        UserRole.doughMaker => 'dough_maker',
+        UserRole.chaneGir => 'chane_gir',
+        UserRole.shater => 'shater',
+        UserRole.seller => 'seller',
+        UserRole.unknown => 'unknown',
+      };
+
   String get label => switch (this) {
         UserRole.admin => 'مدیر',
         UserRole.doughMaker => 'خمیرگیر',
@@ -56,6 +67,18 @@ class AppUser {
       permissions: (json['permissions'] as List?)?.cast<String>() ?? const [],
     );
   }
+
+  /// The shape `fromJson` reads, so a stored copy can be handed straight
+  /// back to it. Written for the offline cold start: without a user there
+  /// is no role, and without a role the app cannot choose a screen.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'roles': [role.apiValue],
+        'permissions': permissions,
+      };
 
   bool can(String permission) => permissions.contains(permission);
 }
