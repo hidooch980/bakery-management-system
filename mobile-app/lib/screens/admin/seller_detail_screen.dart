@@ -71,7 +71,11 @@ class _SellerDetailScreenState extends State<SellerDetailScreen> {
                   child: Center(child: Text('در این دوره فروشی ثبت نشده')),
                 ),
 
-              for (final day in days) _Day(day: day),
+              // Newest first from the server, so the first entry is the
+              // most recent day — the one a manager opening this screen is
+              // almost always asking about.
+              for (final (i, day) in days.indexed)
+                _Day(day: day, startOpen: i == 0),
             ],
           );
         },
@@ -142,50 +146,120 @@ class _Summary extends StatelessWidget {
   }
 }
 
-class _Day extends StatelessWidget {
-  const _Day({required this.day});
+/// One day, closed until it is asked about.
+///
+/// The first version drew every line of every day at once. Ninety-odd
+/// sales over a quota period is a wall of text on a phone, and the day
+/// totals — which are what the owner actually reads first — were lost
+/// inside it. A day is a summary now, and opens when he wants the detail.
+class _Day extends StatefulWidget {
+  const _Day({required this.day, required this.startOpen});
 
   final Map<String, dynamic> day;
+
+  /// Today is open on arrival; the rest are not. The question a manager
+  /// has when he opens this screen is almost always about today.
+  final bool startOpen;
+
+  @override
+  State<_Day> createState() => _DayState();
+}
+
+class _DayState extends State<_Day> {
+  late bool _open = widget.startOpen;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final lines =
-        (day['lines'] as List? ?? const []).cast<Map<String, dynamic>>();
+        (widget.day['lines'] as List? ?? const []).cast<Map<String, dynamic>>();
+
+    final shortfall = lines.fold<int>(
+      0,
+      (sum, l) => sum + ((l['shortfall_count'] as int?) ?? 0),
+    );
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${day['date_long'] ?? day['date_jalali']}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
+          InkWell(
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    _open ? Icons.expand_more_rounded : Icons.chevron_left_rounded,
+                    size: IconSize.row,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${widget.day['date_long'] ?? widget.day['date_jalali']}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          '${lines.length} فروش'
+                          '${shortfall > 0 ? '  ·  کسری $shortfall نان' : ''}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: shortfall > 0
+                                    ? AppColors.attention
+                                    : scheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${widget.day['bread_count']} نان',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                      ),
+                      Text(
+                        '${widget.day['amount_formatted']}',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              Text(
-                '${day['bread_count']} نان  ·  ${day['amount_formatted']}',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 6),
-          for (final line in lines) _Line(line: line),
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.only(right: 26, bottom: 4),
+              child: Column(children: [for (final l in lines) _Line(line: l)]),
+            ),
+          const Divider(height: 1),
         ],
       ),
     );
   }
 }
 
+/// One sale, on one line.
+///
+/// Four stacked lines per sale is what the first version drew, and with a
+/// hundred sales in a period nothing could be found in it. Time, kind and
+/// loaves sit in fixed columns so the eye can run down them; the customer
+/// and the note only appear when they say something, and the shortfall
+/// keeps its own colour because it is the line worth stopping on.
 class _Line extends StatelessWidget {
   const _Line({required this.line});
 
@@ -197,65 +271,58 @@ class _Line extends StatelessWidget {
     final shortfall = line['shortfall_formatted'] as String?;
     final customer = line['customer'] as String?;
     final note = line['note'] as String?;
+    final small = Theme.of(context).textTheme.bodySmall;
+    final quiet = small?.copyWith(color: scheme.onSurfaceVariant);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 44,
-            child: Text(
-              '${line['at']}',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${line['payment_label']}  ·  ${line['bread_count']} نان',
-                  style: Theme.of(context).textTheme.bodySmall,
+          Row(
+            children: [
+              SizedBox(width: 40, child: Text('${line['at']}', style: quiet)),
+              SizedBox(
+                width: 74,
+                child: Text('${line['payment_label']}', style: small),
+              ),
+              SizedBox(
+                width: 62,
+                child: Text('${line['bread_count']} نان', style: quiet),
+              ),
+              Expanded(
+                child: Text(
+                  '${line['amount_formatted']}',
+                  textAlign: TextAlign.end,
+                  style: small,
                 ),
+              ),
+            ],
+          ),
 
-                // The customer, then the note. Either can be the reason a
-                // line is worth asking about, and neither is on the row
-                // that only carries a figure.
-                if (customer != null && customer.isNotEmpty)
-                  Text(
-                    customer,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                if (note != null && note.isNotEmpty)
-                  Text(
-                    note,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                if (shortfall != null)
-                  Text(
-                    'کسری ${line['shortfall_count']} نان — $shortfall',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: AppColors.attention),
-                  ),
-              ],
+          // Only when there is something to say. On an ordinary cash sale
+          // these are all empty, and a blank line under every row is what
+          // made the first version unreadable.
+          if ((customer != null && customer.isNotEmpty) ||
+              (note != null && note.isNotEmpty) ||
+              shortfall != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 40, top: 1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (customer != null && customer.isNotEmpty)
+                    Text(customer, style: quiet),
+                  if (note != null && note.isNotEmpty)
+                    Text(note, style: quiet),
+                  if (shortfall != null)
+                    Text(
+                      'کسری ${line['shortfall_count']} نان — $shortfall',
+                      style: small?.copyWith(color: AppColors.attention),
+                    ),
+                ],
+              ),
             ),
-          ),
-          Text(
-            '${line['amount_formatted']}',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
         ],
       ),
     );
