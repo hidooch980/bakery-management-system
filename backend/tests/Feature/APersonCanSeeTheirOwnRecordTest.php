@@ -10,6 +10,7 @@ use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -74,7 +75,7 @@ class APersonCanSeeTheirOwnRecordTest extends TestCase
         return Jalali::currentMonthRange()[0]->copy()->addDays($offset)->toDateString();
     }
 
-    private function mine(?User $as = null): \Illuminate\Testing\TestResponse
+    private function mine(?User $as = null): TestResponse
     {
         return $this->actingAs($as ?? $this->baker, 'sanctum')
             ->getJson('/api/v1/work-starts/mine');
