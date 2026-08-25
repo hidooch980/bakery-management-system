@@ -1,3 +1,5 @@
+import 'dart:io' show HandshakeException, SocketException;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -355,12 +357,25 @@ class ApiClient {
     try {
       return await call();
     } on DioException catch (e) {
+      // What «could not reach the server» looks like, in all the shapes it
+      // actually arrives in.
+      //
+      // The typed cases are the easy half. The hard half is `unknown`:
+      // on Android a DNS failure — «No address associated with hostname»,
+      // which is what a phone with no data gives — comes through as
+      // `unknown` wrapping a SocketException, not as connectionError. It
+      // was classified as a server refusal, and everything downstream that
+      // asks this question got the wrong answer: sales were not queued but
+      // dropped, and a cold start deleted the session.
+      final cause = e.error;
       final isConnectivity = switch (e.type) {
         DioExceptionType.connectionTimeout ||
         DioExceptionType.receiveTimeout ||
         DioExceptionType.sendTimeout ||
         DioExceptionType.connectionError =>
           true,
+        DioExceptionType.unknown =>
+          cause is SocketException || cause is HandshakeException,
         _ => false,
       };
 
