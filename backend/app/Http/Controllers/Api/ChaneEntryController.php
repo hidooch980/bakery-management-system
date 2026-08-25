@@ -29,6 +29,11 @@ class ChaneEntryController extends Controller
             'nanino_chane_count' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'spray_flour_kg' => ['required', 'numeric', 'min:0', 'max:100000'],
 
+            // Set only after the person has been shown that today's batch
+            // is already recorded and has said this is a second one. The
+            // same shape the dough sheet uses.
+            'force' => ['nullable', 'boolean'],
+
             // Chane is counted out a tray at a time, so the app sends one
             // count per tray. The older single chane_count is still
             // accepted, so a copy of the app that has not updated keeps
@@ -64,6 +69,22 @@ class ChaneEntryController extends Controller
             return $this->error(
                 'وزن هر چانه عادی در تنظیمات نانوایی تعریف نشده است. لطفاً با مدیر تماس بگیرید.',
                 422
+            );
+        }
+
+        // One batch a day, at the owner's word on 1405/06/03. The dough
+        // guard alone was not enough: a chane entry is one per *dough*,
+        // and nothing stopped a second dough from being shaped later the
+        // same day if one somehow existed.
+        $shapedToday = ChaneEntry::whereDate('created_at', now()->toDateString())->first();
+
+        if ($shapedToday && ! $request->boolean('force')) {
+            return $this->error(
+                sprintf(
+                    'امروز %d چانه ثبت شده است. روزی یک بار.',
+                    $shapedToday->chane_count,
+                ),
+                409,
             );
         }
 

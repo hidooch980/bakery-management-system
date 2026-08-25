@@ -36,8 +36,13 @@ class UserResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\Section::make('اطلاعات کاربر')
-                ->description('ساخت و ویرایش حساب کارکنان — فقط مدیر به این بخش دسترسی دارد.')
+            // Three sections rather than one, because the seven fields
+            // answer three different questions and were being asked as
+            // though they were one. In a flat two-column grid the password
+            // landed beside the monthly wage, the password's helper text
+            // made its row taller than the one next to it, and the
+            // «حساب فعال» toggle sat alone with a gap for company.
+            Forms\Components\Section::make('کیست')
                 ->icon('heroicon-o-user-circle')
                 ->columns(2)
                 ->schema([
@@ -51,7 +56,13 @@ class UserResource extends Resource
                         ->tel()
                         ->unique(ignoreRecord: true)
                         ->maxLength(20),
+                ]),
 
+            Forms\Components\Section::make('ورود به سامانه')
+                ->description('با ایمیل یا شماره تلفن وارد می‌شود.')
+                ->icon('heroicon-o-key')
+                ->columns(2)
+                ->schema([
                     Forms\Components\TextInput::make('email')
                         ->label('ایمیل')
                         ->email()
@@ -69,6 +80,9 @@ class UserResource extends Resource
                             $component->state($record?->getRoleNames()->first());
                         }),
 
+                    // Full width: its helper text is two lines on a phone,
+                    // and in a half-width cell it dragged whatever sat
+                    // beside it out of line with the rest of the form.
                     Forms\Components\TextInput::make('password')
                         ->label('رمز عبور')
                         ->password()
@@ -82,17 +96,27 @@ class UserResource extends Resource
                         ->dehydrateStateUsing(fn ($state) => Hash::make($state))
                         ->dehydrated(fn ($state) => filled($state))
                         ->required(fn (string $operation) => $operation === 'create')
-                        ->helperText('در حالت ویرایش، خالی بگذارید تا تغییر نکند.'),
-
-                    MoneyInput::make('monthly_salary', 'حقوق ماهانه')
-                        ->helperText('برای پیش‌پر کردن فرم حقوق استفاده می‌شود.'),
+                        ->helperText('در حالت ویرایش، خالی بگذارید تا تغییر نکند.')
+                        ->columnSpanFull(),
 
                     Forms\Components\Toggle::make('is_active')
                         ->label('حساب فعال')
+                        ->helperText('حساب غیرفعال نمی‌تواند وارد شود، و سابقه‌اش می‌ماند.')
                         ->default(true)
                         ->inline(false)
                         ->onColor('success')
-                        ->offColor('danger'),
+                        ->offColor('danger')
+                        ->columnSpanFull(),
+                ]),
+
+            // On its own, because a wage is not an account setting. It
+                // prefills the payroll form and nothing else, and mixing it
+            // in with the password was how this form read as a jumble.
+            Forms\Components\Section::make('حقوق')
+                ->icon('heroicon-o-banknotes')
+                ->schema([
+                    MoneyInput::make('monthly_salary', 'حقوق ماهانه')
+                        ->helperText('برای پیش‌پر کردن فرم حقوق استفاده می‌شود. پرداخت از همین‌جا انجام نمی‌شود.'),
                 ]),
         ]);
     }

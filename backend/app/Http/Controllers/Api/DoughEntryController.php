@@ -41,6 +41,35 @@ class DoughEntryController extends Controller
             'force' => ['nullable', 'boolean'],
         ]);
 
+        // One batch a day, at the owner's word on 1405/06/03. The shop has
+        // recorded 28 dough entries across 28 days and never two on one,
+        // so this makes a rule of what already happens — and what it
+        // actually catches is the second *entry*, not the second batch.
+        //
+        // Not per person: the shop kneads once, whoever is holding the
+        // phone, and two people recording the same morning is exactly the
+        // mistake this stops. A guard scoped to the user would let it by.
+        //
+        // Behind `force`, like the double-tap guard beside it, and that is
+        // deliberate. On 24 Mordad somebody pressed «ثبت خمیر» three times
+        // in thirty-five minutes for one thirteen-bag batch and spent
+        // 1,040 kg of flour that never left the sack; the answer then was
+        // to make a genuine second batch possible but deliberate, not
+        // impossible. Refusing outright would mean a real second batch —
+        // a big order, a holiday — could not be recorded at all, and an
+        // unrecordable batch is one that goes unrecorded.
+        $today = DoughEntry::whereDate('created_at', now()->toDateString())->first();
+
+        if ($today && ! $request->boolean('force')) {
+            return $this->error(
+                sprintf(
+                    'امروز %d کیسه خمیر ثبت شده است. روزی یک بار.',
+                    $today->bag_count,
+                ),
+                409,
+            );
+        }
+
         if (! $request->boolean('force')) {
             $justRecorded = DoughEntry::where('user_id', $request->user()->id)
                 ->where('bag_count', (int) $data['bag_count'])

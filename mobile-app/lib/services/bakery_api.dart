@@ -211,6 +211,12 @@ class BakeryApi {
     int naninoChaneCount = 0,
     required double sprayFlourKg,
     List<int>? trays,
+
+    /// Repeats a shaping the server refused because today's batch is
+    /// already recorded. Set only after the person has been shown that
+    /// and said this is genuinely a second one — the same shape
+    /// [recordDough] uses.
+    bool force = false,
   }) async {
     final body = await _client.postOrQueue(
       '/chane-entries',
@@ -219,6 +225,7 @@ class BakeryApi {
         'chane_count': chaneCount,
         'nanino_chane_count': naninoChaneCount,
         'spray_flour_kg': sprayFlourKg,
+        if (force) 'force': true,
         if (trays != null && trays.isNotEmpty) 'trays': trays,
       },
       label: 'چانه — $chaneCount عدد',

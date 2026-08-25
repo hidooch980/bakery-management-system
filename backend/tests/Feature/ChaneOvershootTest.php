@@ -60,8 +60,12 @@ class ChaneOvershootTest extends TestCase
         $maker = User::factory()->create();
         $maker->assignRole('dough_maker');
 
+        // `force` throughout: this test needs two batches on one day to
+        // show that an overshoot does not eat the next one's dough, and
+        // since 1405/06/03 a second batch has to be confirmed. The rule is
+        // not what this test is about, so it says yes and moves on.
         $this->actingAs($maker, 'sanctum')
-            ->postJson('/api/v1/dough-entries', ['bag_count' => $bags])
+            ->postJson('/api/v1/dough-entries', ['bag_count' => $bags, 'force' => true])
             ->assertCreated();
 
         return DoughEntry::latest('id')->first();
@@ -124,11 +128,17 @@ class ChaneOvershootTest extends TestCase
 
         $second = $this->batch();
 
+        // `force`, because of the one-batch-a-day rule added on
+        // 1405/06/03. What this test is about is the overshoot not eating
+        // the next batch's dough, and that has not changed — but a second
+        // shaping on one day now needs somebody to say it is genuinely a
+        // second one, which in this scenario it is.
         $this->actingAs($this->chaneGir, 'sanctum')
             ->postJson('/api/v1/chane-entries', [
                 'dough_entry_id' => $second->id,
                 'chane_count' => 760,
                 'spray_flour_kg' => 0,
+                'force' => true,
             ])
             ->assertCreated();
     }
