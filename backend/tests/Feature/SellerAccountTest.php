@@ -57,7 +57,28 @@ class SellerAccountTest extends TestCase
         return $user;
     }
 
-    /** Records a sale through the API, so the difference is computed for real. */
+    /**
+     * Records a sale through the API, so the difference is computed for
+     * real.
+     *
+     * Every step asserts, and every id is carried from the answer that
+     * created it rather than fetched back with `latest()`. That is the
+     * whole of the fix here: this helper used to fire three requests
+     * without looking at any of them, then ask the database what the
+     * newest row was.
+     *
+     * Called twice in a row it recorded two identical five-bag batches
+     * seconds apart, the second was refused as a double tap, and
+     * `latest()` handed back the *first* batch — so the second sale went
+     * against a chane that had already been sold. Nothing said so: the
+     * refusal was a 409 nobody read, and the sale of an already-sold
+     * batch was silently allowed. PR #5's row lock started refusing that
+     * second sale, which is how five tests here began failing on main
+     * with CI still green.
+     *
+     * `force` on the dough because two batches in one test is deliberate,
+     * and the shop now allows a second only when somebody says so.
+     */
     private function sell(User $seller, string $paymentType, int $breadCount, ?float $amount): Sale
     {
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 500, 'purchase');
@@ -68,16 +89,23 @@ class SellerAccountTest extends TestCase
         $dough = $this->userWithRole('dough_maker');
         $chaneGir = $this->userWithRole('chane_gir');
 
-        $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 5]);
+        $doughId = $this->actingAs($dough, 'sanctum')
+            ->postJson('/api/v1/dough-entries', ['bag_count' => 5, 'force' => true])
+            ->assertCreated()
+            ->json('data.entry.id');
 
-        $this->actingAs($chaneGir, 'sanctum')->postJson('/api/v1/chane-entries', [
-            'dough_entry_id' => DoughEntry::latest('id')->first()->id,
-            'chane_count' => $breadCount,
-            'spray_flour_kg' => 0,
-        ]);
+        $chaneId = $this->actingAs($chaneGir, 'sanctum')
+            ->postJson('/api/v1/chane-entries', [
+                'dough_entry_id' => $doughId,
+                'chane_count' => $breadCount,
+                'spray_flour_kg' => 0,
+                'force' => true,
+            ])
+            ->assertCreated()
+            ->json('data.entry.id');
 
         $this->actingAs($seller, 'sanctum')->postJson('/api/v1/sales', [
-            'chane_entry_id' => ChaneEntry::latest('id')->first()->id,
+            'chane_entry_id' => $chaneId,
             'payment_type' => $paymentType,
             'bread_count' => $breadCount,
             'amount' => $amount,
