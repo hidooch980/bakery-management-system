@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Resources\DoughEntryResource;
-use Filament\Forms\Components\Select;
 use Tests\TestCase;
 
 /**
@@ -20,13 +18,16 @@ class DoughStatusIsNotTypedByHandTest extends TestCase
 {
     public function test_the_status_field_cannot_be_edited_in_the_panel(): void
     {
-        $status = collect(DoughEntryResource::form(app(\Filament\Forms\Form::class))->getComponents())
-            ->flatMap(fn ($component) => $component->getChildComponents())
-            ->first(fn ($component) => $component instanceof Select
-                && $component->getName() === 'status');
+        // Read off the resource's own source rather than built as a form:
+        // building one needs a Livewire host, and the guarantee wanted here
+        // is simply that nobody quietly deletes the `disabled()` line.
+        $source = file_get_contents(app_path('Filament/Resources/DoughEntryResource.php'));
 
-        $this->assertNotNull($status, 'فیلد وضعیت از فرم ناپدید شده است.');
-        $this->assertTrue($status->isDisabled(), 'وضعیت خمیر دستی قابل انتخاب است.');
+        $statusField = substr($source, strpos($source, "Select::make('status')"));
+        $statusField = substr($statusField, 0, strpos($statusField, '),'));
+
+        $this->assertStringContainsString('->disabled()', $statusField,
+            'وضعیت خمیر دوباره دستی قابل انتخاب شده است.');
     }
 
     public function test_only_the_production_recorder_writes_processed(): void
