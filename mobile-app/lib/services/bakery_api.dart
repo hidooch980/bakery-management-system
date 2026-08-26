@@ -403,8 +403,22 @@ class BakeryApi {
   }
 
   /// Schools and offices the admin has defined, for attributing a sale.
-  Future<List<Customer>> customers() async {
-    final body = await _client.get('/customers');
+  /// The customer list.
+  ///
+  /// [partnersOnly] narrows it to partner bakeries — the ones flour is lent
+  /// to and borrowed from. The server has answered this filter since the
+  /// consignment endpoints were written («the consignment screen wants
+  /// partners», says the comment beside it) and nothing ever asked for it,
+  /// so the consignment form made you type a partner's name from memory
+  /// every time, with no way to tell «عبدالرئوف» from «عبد الرئوف».
+  Future<List<Customer>> customers({
+    bool partnersOnly = false,
+    bool buyersOnly = false,
+  }) async {
+    final body = await _client.get('/customers', query: {
+      if (partnersOnly) 'partners_only': true,
+      if (buyersOnly) 'buyers_only': true,
+    });
 
     return (body['data'] as List)
         .cast<Map<String, dynamic>>()
@@ -969,8 +983,15 @@ class BakeryApi {
   /// Flour lent to or borrowed from another bakery.
   /// Flour lent to or borrowed from a neighbouring bakery, counted in
   /// sacks — the weight follows from the sack size on the server.
+  /// Records flour lent to or borrowed from a partner bakery.
+  ///
+  /// [customerId] names a partner already on file; [partnerName] is the
+  /// one-off for a bakery that has never been recorded. The server takes
+  /// either, and prefers the id — a defined partner keeps its history
+  /// together instead of scattering it across spellings of a name.
   Future<bool> recordConsignmentFlour({
     required String partnerName,
+    int? customerId,
     required String direction,
     required double bags,
     String? note,
@@ -978,7 +999,8 @@ class BakeryApi {
     final body = await _client.postOrQueue(
       '/consignment-flour',
       {
-        'partner_name': partnerName,
+        if (customerId != null) 'customer_id': customerId,
+        if (customerId == null) 'partner_name': partnerName,
         'direction': direction,
         'bags': bags,
         if (note != null && note.isNotEmpty) 'note': note,

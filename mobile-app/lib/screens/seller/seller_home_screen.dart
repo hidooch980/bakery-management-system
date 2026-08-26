@@ -479,7 +479,10 @@ class _SaleTile extends StatelessWidget {
           sale.amount != null
               ? MoneyFormat.format(sale.amount, currency: unit)
               : 'بدون مبلغ',
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
         ),
         subtitle: Text(JalaliFormat.time(sale.createdAt)),
         trailing: Chip(
