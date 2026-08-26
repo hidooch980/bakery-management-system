@@ -48,6 +48,13 @@ class _SellerWorkbenchState extends State<SellerWorkbench> {
           onChanged: widget.onChanged,
         ),
         const SizedBox(height: 22),
+        // The quota before the store, because it is the number that
+        // decides whether there will be a store to draw from. It was
+        // computed on the server and drawn only in the panel and the
+        // manager's app; the seller, who is the one watching the card
+        // reader all day, could not see it.
+        _QuotaSection(api: widget.api),
+        const SizedBox(height: 22),
         _FlourSection(
           api: widget.api,
           bakery: widget.bakery,
@@ -832,6 +839,185 @@ class _Round extends StatelessWidget {
 ///
 /// Sacks lead and the weight follows: sacks are what arrive at the door,
 /// what the quota is counted in, and what the shop says out loud.
+/// The four figures the shop is judged on, for the delivery period that
+/// is running now.
+///
+/// «نان دوره، سهمیه دوره، فروش کارتخوان، باقی‌مانده» — asked for by name.
+/// All four already came back from `/flour-allocations/current`, which
+/// the seller has had permission to read all along; nothing on their
+/// screen ever asked for it.
+///
+/// The card reader is the only thing the flour is ever measured against.
+/// Chane counts move with the day's shaping and settle nothing, so they
+/// are deliberately not what is shown here.
+class _QuotaSection extends StatefulWidget {
+  const _QuotaSection({required this.api});
+
+  final BakeryApi api;
+
+  @override
+  State<_QuotaSection> createState() => _QuotaSectionState();
+}
+
+class _QuotaSectionState extends State<_QuotaSection> {
+  Map<String, dynamic>? _period;
+  String? _label;
+  bool _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final allocation = await widget.api.currentFlourAllocation();
+      final periods = (allocation?['periods'] as List?) ?? const [];
+      final current = periods
+          .cast<Map<String, dynamic>>()
+          .where((p) => p['is_current'] == true)
+          .firstOrNull;
+
+      if (!mounted) return;
+      setState(() {
+        _period = current;
+        _label = current?['label'] as String?;
+        _done = true;
+      });
+    } on ApiException {
+      // A shop with no quota recorded yet is not an error state, and a
+      // red box above the day's work would be read as one.
+      if (mounted) setState(() => _done = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_done || _period == null) return const SizedBox.shrink();
+
+    final scheme = Theme.of(context).colorScheme;
+    final period = _period!;
+    final allocated = (period['allocated_bread_count'] as num?)?.toInt() ?? 0;
+    final sold = (period['card_bread_count'] as num?)?.toInt() ?? 0;
+    final left = (period['bread_remainder'] as num?)?.toInt() ?? 0;
+    final over = left < 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _Heading(
+          title: 'سهمیه دوره',
+          icon: Icons.confirmation_number_outlined,
+          trailing: _label == null
+              ? null
+              : Text(
+                  _label!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+        ),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _QuotaFigure(
+                        label: 'نان دوره',
+                        value: allocated,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    Expanded(
+                      child: _QuotaFigure(
+                        label: 'فروش کارتخوان',
+                        value: sold,
+                        color: AppColors.moneyIn,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 26),
+                Row(
+                  children: [
+                    Icon(
+                      over
+                          ? Icons.error_outline_rounded
+                          : Icons.trending_flat_rounded,
+                      size: IconSize.row,
+                      color: over ? AppColors.moneyOut : scheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      over ? 'بیش از سهمیه' : 'باقی‌مانده',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      // The absolute value with a word beside it, never a
+                      // minus sign: «-۴۰۰ نان باقی‌مانده» is a sentence
+                      // nobody can act on.
+                      '${left.abs()} نان',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color:
+                                over ? AppColors.moneyOut : AppColors.moneyIn,
+                          ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuotaFigure extends StatelessWidget {
+  const _QuotaFigure({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        Text(
+          '$value',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
 class _FlourSection extends StatefulWidget {
   const _FlourSection({
     required this.api,
