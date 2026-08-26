@@ -1028,6 +1028,18 @@ class BakeryApi {
     return _paginated(body);
   }
 
+  /// Who is holding the shop's flour, how much, and for how long.
+  ///
+  /// The list answers «what happened»; this answers the question asked in
+  /// the store. Outstanding only — a partner whose account is square is
+  /// not a line worth reading past every time.
+  Future<List<Map<String, dynamic>>> consignmentPartners() async {
+    final body = await _client.getCached('/consignment-flour/partners');
+
+    return ((body['data'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>();
+  }
+
   /// The net position: sacks lent out, sacks borrowed, and the difference.
   Future<Map<String, dynamic>> consignmentBalance() async {
     final body = await _client.getCached('/consignment-flour/balance');
