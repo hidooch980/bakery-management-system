@@ -85,18 +85,20 @@ class InventoryItemResource extends Resource
 
                 Tables\Columns\TextColumn::make('balance')
                     ->label('موجودی فعلی')
-                    // Bag count leads, weight follows on the same line — not
-                    // stacked as a badge-plus-description, so both read at a
-                    // glance together rather than one being a footnote.
+                    // Sacks alone, where the item has a sack. «کیلو در انبار
+                    // معنی نداره، فقط کیسه بیاد» — this shop counts flour in
+                    // sacks, orders it in sacks and lends it in sacks, and
+                    // the weight beside the count restated the same fact in
+                    // a unit nobody uses at the door.
+                    //
+                    // Salt and yeast arrive in no fixed sack, so there is no
+                    // bag count for them and the weight is all there is.
                     ->state(function (InventoryItem $record) {
-                        $weight = number_format($record->balance, 3).' '.$record->unit;
-
                         if ($record->balance_bags === null) {
-                            return $weight;
+                            return number_format($record->balance, 3).' '.$record->unit;
                         }
 
-                        return number_format($record->balance_bags, 2).' کیسه'
-                            .'   —   '.$weight;
+                        return number_format($record->balance_bags, 2).' کیسه';
                     })
                     ->badge()
                     ->color(fn (InventoryItem $record) => $record->is_low ? 'danger' : 'success')

@@ -207,9 +207,12 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
                   const SizedBox(height: 4),
                   if (_options != null)
                     Text(
+                      // Sacks alone. What is being sold below may be
+                      // weighed out by the kilo — that is the customer's
+                      // side of the counter — but what is *in the store*
+                      // is counted in sacks.
                       'موجودی انبار: '
-                      '${_options!.availableKg.toStringAsFixed(1)} کیلوگرم'
-                      '  •  ${_options!.availableBags.toStringAsFixed(1)} کیسه',
+                      '${_options!.availableBags.toStringAsFixed(1)} کیسه',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),

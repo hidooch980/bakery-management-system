@@ -19,13 +19,18 @@ class InventoryOverview extends BaseWidget
             ->map(function (string $key) {
                 $item = InventoryItem::ofKey($key);
                 $bags = $item->balance_bags;
-                $weightLabel = Qty::format($item->balance, 1).' '.$item->unit;
-
-                // Bag count leads, weight sits next to it — not buried in
-                // the description under the weight, as it read before.
+                // Sacks alone where the item has a sack. «کیلو در انبار
+                // معنی نداره، فقط کیسه بیاد» — the shop counts its flour
+                // in sacks, orders it in sacks and lends it in sacks, and
+                // the weight beside the count was a second number saying
+                // the same thing in a unit nobody uses at the door.
+                //
+                // Salt and yeast keep their weight: they arrive in no
+                // fixed sack, so the server sends no bag count for them
+                // and there is nothing else to say.
                 $value = $bags !== null
-                    ? Qty::format($bags, 1).' کیسه   —   '.$weightLabel
-                    : $weightLabel;
+                    ? Qty::format($bags, 1).' کیسه'
+                    : Qty::format($item->balance, 1).' '.$item->unit;
 
                 // Three states, not two. Empty reads as its own thing
                 // because «کمتر از حد هشدار» beside 0.0 still sounds like
