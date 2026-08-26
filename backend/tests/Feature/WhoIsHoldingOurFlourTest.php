@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ConsignmentFlour;
 use App\Models\Customer;
+use App\Models\InventoryItem;
 use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -34,6 +35,14 @@ class WhoIsHoldingOurFlourTest extends TestCase
 
         $this->admin = User::factory()->create(['is_active' => true]);
         $this->admin->assignRole('admin');
+
+        // Lending flour actually takes it out of the store — the model
+        // moves stock, it does not merely note the loan — so a bakery
+        // with an empty warehouse cannot lend a sack. That the first run
+        // of these tests failed with InsufficientStockException is the
+        // system working: the sacks in these rows are real sacks.
+        InventoryItem::ofKey(InventoryItem::FLOUR)
+            ->move('in', 200 * 45, 'purchase', $this->admin->id);
     }
 
     private function lend(string $partner, float $bags, int $daysAgo, ?string $settled = null): ConsignmentFlour
