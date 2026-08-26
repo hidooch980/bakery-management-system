@@ -107,7 +107,10 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                   ),
                   title: Text(
                     '${user?['name'] ?? '—'}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                   subtitle: Text(JalaliFormat.date(checkedInAt)),
                   trailing: Chip(

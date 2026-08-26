@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/bakery.dart';
+import '../../models/customer.dart';
 import '../../models/ledger_entry.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
@@ -64,6 +65,14 @@ class AdminRecordSheet extends StatefulWidget {
 class _AdminRecordSheetState extends State<AdminRecordSheet> {
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
+
+  /// Partner bakeries already on file. Empty until they load, and empty
+  /// for good if the shop has never defined one — in which case the form
+  /// falls back to the free-text field it has always been.
+  List<Customer> _partners = const [];
+  Customer? _partner;
+  bool _partnersLoading = false;
+  bool _newPartner = false;
   final _amount = TextEditingController();
   final _note = TextEditingController();
 
@@ -87,6 +96,10 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
   @override
   void initState() {
     super.initState();
+
+    if (widget.kind == AdminRecordKind.consignment) {
+      _loadPartners();
+    }
     if (_isMoney) _loadCategories();
   }
 
@@ -104,6 +117,30 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
       }
     } on ApiException {
       // Without categories the form blocks rather than guessing one.
+    }
+  }
+
+  Future<void> _loadPartners() async {
+    setState(() => _partnersLoading = true);
+
+    try {
+      final partners = await widget.api.customers(partnersOnly: true);
+      if (!mounted) return;
+      setState(() {
+        _partners = partners;
+        // One partner and nothing to choose between: pick it. Two taps
+        // saved on the commonest case.
+        if (partners.length == 1) _partner = partners.first;
+        _partnersLoading = false;
+      });
+    } on ApiException {
+      // Not fatal: the name can still be typed. Better a form that works
+      // without the list than one that refuses to open without it.
+      if (!mounted) return;
+      setState(() {
+        _partnersLoading = false;
+        _newPartner = true;
+      });
     }
   }
 
@@ -152,7 +189,8 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
             note: note.isEmpty ? _title.text.trim() : note,
           ),
         AdminRecordKind.consignment => await widget.api.recordConsignmentFlour(
-            partnerName: _title.text.trim(),
+            partnerName: _partner?.name ?? _title.text.trim(),
+            customerId: _partner?.id,
             direction: _direction,
             bags: value,
             note: note,
@@ -312,20 +350,66 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                   const SizedBox(height: 16),
                 ],
 
-                TextFormField(
-                  controller: _title,
-                  decoration: InputDecoration(
-                    labelText: _titleLabel,
-                    prefixIcon: const Icon(Icons.label_outline_rounded),
+                // On the consignment form the partner is chosen from the
+                // bakeries already on file rather than typed from memory.
+                // Typing it every time scattered one partner's history
+                // across «عبدالرئوف» and «عبد الرئوف» with no way to see
+                // that they were the same shop.
+                if (widget.kind == AdminRecordKind.consignment &&
+                    !_newPartner &&
+                    (_partners.isNotEmpty || _partnersLoading)) ...[
+                  DropdownButtonFormField<Customer>(
+                    // `value` was deprecated after Flutter 3.33 in favour
+                    // of `initialValue`, which — unlike `value` — is read
+                    // once and then owned by the field's own state. The
+                    // single partner is selected after the list loads,
+                    // which is after the first build, so without a key
+                    // that would leave the box looking empty while a
+                    // partner was in fact chosen. The key re-creates the
+                    // field when the selection changes underneath it.
+                    key: ValueKey(_partner?.id),
+                    initialValue: _partner,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: _titleLabel,
+                      prefixIcon: const Icon(Icons.storefront_outlined),
+                      helperText: _partnersLoading ? 'در حال بارگذاری…' : null,
+                    ),
+                    items: [
+                      for (final p in _partners)
+                        DropdownMenuItem(value: p, child: Text(p.name)),
+                    ],
+                    onChanged: (value) => setState(() => _partner = value),
+                    validator: (value) =>
+                        value == null ? 'نانوایی همکار را انتخاب کنید' : null,
                   ),
-                  validator: (value) {
-                    if (!_titleRequired) return null;
-                    if (value == null || value.trim().isEmpty) {
-                      return 'این مورد را وارد کنید';
-                    }
-                    return null;
-                  },
-                ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      onPressed: () => setState(() {
+                        _newPartner = true;
+                        _partner = null;
+                      }),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('همکار جدید'),
+                    ),
+                  ),
+                ] else
+                  TextFormField(
+                    controller: _title,
+                    decoration: InputDecoration(
+                      labelText: _titleLabel,
+                      prefixIcon: const Icon(Icons.label_outline_rounded),
+                    ),
+                    validator: (value) {
+                      if (!_titleRequired) return null;
+                      if (value == null || value.trim().isEmpty) {
+                        return 'این مورد را وارد کنید';
+                      }
+                      return null;
+                    },
+                  ),
                 const SizedBox(height: 16),
 
                 TextFormField(

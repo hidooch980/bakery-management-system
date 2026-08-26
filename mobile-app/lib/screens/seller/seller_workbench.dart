@@ -298,7 +298,10 @@ class _ProductionSectionState extends State<_ProductionSection> {
                       ),
                       title: Text(
                         '${dough.bagCount} کیسه خمیر',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                       ),
                       subtitle: Text(JalaliFormat.time(dough.createdAt)),
                       trailing: FilledButton(
@@ -987,6 +990,10 @@ class StaffAttendanceSection extends StatefulWidget {
 class _StaffAttendanceSectionState extends State<StaffAttendanceSection> {
   late Future<List<Map<String, dynamic>>> _records;
 
+  /// Why the list is empty, when it is empty for a reason other than
+  /// nobody having ticked in yet.
+  String? _failure;
+
   @override
   void initState() {
     super.initState();
@@ -995,8 +1002,16 @@ class _StaffAttendanceSectionState extends State<StaffAttendanceSection> {
 
   Future<List<Map<String, dynamic>>> _load() async {
     try {
-      return await widget.api.adminAttendanceToday();
-    } on ApiException {
+      final records = await widget.api.adminAttendanceToday();
+      if (mounted) setState(() => _failure = null);
+      return records;
+    } on ApiException catch (e) {
+      // This used to swallow the error and return an empty list, so a
+      // refusal, a timeout and a genuinely quiet morning all rendered as
+      // «هنوز کسی تیک حضور نزده» — a sentence that is a fact in one case
+      // and a lie in the other two, with nothing on screen to tell them
+      // apart.
+      if (mounted) setState(() => _failure = e.message);
       return const [];
     }
   }
@@ -1033,9 +1048,32 @@ class _StaffAttendanceSectionState extends State<StaffAttendanceSection> {
                 child: Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                  child: Text(
-                    'هنوز کسی تیک حضور نزده.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  child: Row(
+                    children: [
+                      if (_failure != null) ...[
+                        Icon(
+                          Icons.cloud_off_rounded,
+                          size: 18,
+                          color: scheme.error,
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Expanded(
+                        child: Text(
+                          _failure ?? 'هنوز کسی تیک حضور نزده.',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: _failure != null ? scheme.error : null,
+                                  ),
+                        ),
+                      ),
+                      if (_failure != null)
+                        TextButton(
+                          onPressed: () =>
+                              setState(() => _records = _load()),
+                          child: const Text('دوباره'),
+                        ),
+                    ],
                   ),
                 ),
               )
@@ -1077,7 +1115,10 @@ class _AttendanceRow extends StatelessWidget {
           Expanded(
             child: Text(
               '${user?['name'] ?? '—'}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
             ),
           ),
           Text(
