@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/biometric_tile.dart';
+import '../admin/backup_screen.dart';
 import 'change_password_screen.dart';
 import 'my_advances_screen.dart';
 import 'update_screen.dart';
@@ -170,6 +171,26 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Only the owner. It is his data and his decision, and
+                  // the same permission already gates the shop's other
+                  // settings.
+                  if (user?.can('manage-bakery') ?? false) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.backup_rounded),
+                      title: const Text('پشتیبان‌گیری'),
+                      subtitle: const Text('آخرین پشتیبان و گرفتن نسخه تازه'),
+                      trailing: const Icon(Icons.chevron_left_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BackupScreen(
+                            api: context.read<BakeryApi>(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.system_update_rounded),

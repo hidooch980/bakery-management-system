@@ -8,6 +8,7 @@ import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
+import '../shared/consignment_flour_screen.dart';
 
 /// What the admin can record from the phone, without opening the panel.
 enum AdminRecordKind {
@@ -410,6 +411,31 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                       return null;
                     },
                   ),
+
+                // Straight to what is already out. Deciding whether to
+                // lend twenty more sacks means knowing about the
+                // fifty-six that have not come back, and that list lived
+                // only in the panel — the app could write a consignment
+                // and had no way to read one back.
+                //
+                // Outside the branch above on purpose: a shop with no
+                // partner on file yet is exactly one that needs to see
+                // the list is empty.
+                if (widget.kind == AdminRecordKind.consignment)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ConsignmentFlourScreen(api: widget.api),
+                        ),
+                      ),
+                      icon: const Icon(Icons.list_alt_rounded, size: 18),
+                      label: const Text('آرد امانی‌های باز'),
+                    ),
+                  ),
+
                 const SizedBox(height: 16),
 
                 TextFormField(

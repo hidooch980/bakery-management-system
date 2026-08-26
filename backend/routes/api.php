@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BackupController;
 use App\Http\Controllers\Api\BakeryController;
 use App\Http\Controllers\Api\BakeryShareController;
 use App\Http\Controllers\Api\BalanceSheetController;
@@ -206,6 +207,9 @@ Route::prefix('v1')->group(function () {
             Route::delete('/diesel/deliveries/{delivery}', [QuotaController::class, 'destroyDieselDelivery']);
 
             Route::get('/consignment-flour/balance', [ConsignmentFlourController::class, 'balance']);
+            // Before the {consignment} routes below, or «partners» is read
+            // as an id and matched by the model binding.
+            Route::get('/consignment-flour/partners', [ConsignmentFlourController::class, 'partners']);
             Route::get('/consignment-flour', [ConsignmentFlourController::class, 'index']);
             Route::post('/consignment-flour', [ConsignmentFlourController::class, 'store']);
             Route::patch('/consignment-flour/{consignment}/settle', [ConsignmentFlourController::class, 'settle']);
@@ -225,6 +229,15 @@ Route::prefix('v1')->group(function () {
         // --- Admin: bakery settings ---
         Route::put('/bakery', [BakeryController::class, 'update'])
             ->middleware('permission:manage-bakery');
+
+        // --- Admin: backups ---
+        // Status and a «take one now», nothing that hands the file over:
+        // the whole shop in one download is not a convenience worth the
+        // risk, and a .sql.gz is no use on a phone.
+        Route::middleware('permission:manage-bakery')->group(function () {
+            Route::get('/backups', [BackupController::class, 'index']);
+            Route::post('/backups', [BackupController::class, 'store']);
+        });
 
         // --- Admin: reports & flour stock ---
         Route::middleware('permission:view-all-reports')->group(function () {

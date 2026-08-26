@@ -1011,6 +1011,63 @@ class BakeryApi {
     return body['queued'] == true;
   }
 
+  /// Flour still out with partners, or still owed to them.
+  ///
+  /// [outstandingOnly] is the view that matters day to day — settled rows
+  /// are history. The server has answered both this and `/balance` since
+  /// the consignment endpoints were written; the app recorded into them
+  /// and never once read back, so the only way to see who was holding the
+  /// shop's flour was to open the panel.
+  Future<List<Map<String, dynamic>>> consignmentFlour({
+    bool outstandingOnly = true,
+  }) async {
+    final body = await _client.getCached('/consignment-flour', query: {
+      if (outstandingOnly) 'outstanding_only': true,
+    });
+
+    return _paginated(body);
+  }
+
+  /// Whether the shop's data is being kept.
+  ///
+  /// Status only. The files are not downloadable and should not be: the
+  /// whole shop in one file over the API is not a convenience worth the
+  /// risk, and a .sql.gz is no use on a phone.
+  Future<Map<String, dynamic>> backupStatus() async {
+    final body = await _client.getCached('/backups');
+
+    return (body['data'] as Map).cast<String, dynamic>();
+  }
+
+  /// Takes one now. Runs the same command the nightly schedule runs.
+  Future<void> takeBackup() async {
+    await _client.post('/backups', const {});
+  }
+
+  /// Who is holding the shop's flour, how much, and for how long.
+  ///
+  /// The list answers «what happened»; this answers the question asked in
+  /// the store. Outstanding only — a partner whose account is square is
+  /// not a line worth reading past every time.
+  Future<List<Map<String, dynamic>>> consignmentPartners() async {
+    final body = await _client.getCached('/consignment-flour/partners');
+
+    return ((body['data'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>();
+  }
+
+  /// The net position: sacks lent out, sacks borrowed, and the difference.
+  Future<Map<String, dynamic>> consignmentBalance() async {
+    final body = await _client.getCached('/consignment-flour/balance');
+
+    return (body['data'] as Map).cast<String, dynamic>();
+  }
+
+  /// Marks one consignment as returned.
+  Future<void> settleConsignment(int id) async {
+    await _client.patch('/consignment-flour/$id/settle', const {});
+  }
+
   /// Income against expenses, with profit, for a date range.
   Future<Map<String, dynamic>> financialReport({String? from, String? to}) async {
     final body = await _client.get('/reports/financial', query: {
