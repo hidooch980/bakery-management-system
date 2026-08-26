@@ -206,6 +206,9 @@ Route::prefix('v1')->group(function () {
             Route::delete('/diesel/deliveries/{delivery}', [QuotaController::class, 'destroyDieselDelivery']);
 
             Route::get('/consignment-flour/balance', [ConsignmentFlourController::class, 'balance']);
+            // Before the {consignment} routes below, or «partners» is read
+            // as an id and matched by the model binding.
+            Route::get('/consignment-flour/partners', [ConsignmentFlourController::class, 'partners']);
             Route::get('/consignment-flour', [ConsignmentFlourController::class, 'index']);
             Route::post('/consignment-flour', [ConsignmentFlourController::class, 'store']);
             Route::patch('/consignment-flour/{consignment}/settle', [ConsignmentFlourController::class, 'settle']);
