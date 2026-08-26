@@ -20,6 +20,8 @@ import 'package:bakery_app/services/bakery_api.dart';
 class _Canned implements HttpClientAdapter {
   _Canned(this.byPath);
 
+  /// Longest key first when matching, so «/consignment-flour/partners»
+  /// is not swallowed by «/consignment-flour».
   final Map<String, Object> byPath;
 
   final List<String> seen = [];
@@ -32,9 +34,12 @@ class _Canned implements HttpClientAdapter {
   ) async {
     seen.add('${options.method} ${options.path}');
 
-    final match = byPath.entries
-        .where((e) => options.path.contains(e.key))
-        .map((e) => e.value)
+    final keys = byPath.keys.toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+
+    final match = keys
+        .where((k) => options.path.contains(k))
+        .map((k) => byPath[k]!)
         .firstOrNull;
 
     return ResponseBody.fromString(
@@ -50,7 +55,10 @@ class _Canned implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
-Map<String, Object> _row({
+// Object?, not Object: the server sends nulls here — an unsettled row has
+// no settled_on, and a one-off partner has no id — and a map that cannot
+// hold one is not the shape being tested against.
+Map<String, Object?> _row({
   required int id,
   required String partner,
   required String direction,
@@ -81,9 +89,15 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
   });
 
-  Future<_Canned> pump(WidgetTester tester, {required Object list, required Object balance}) async {
+  Future<_Canned> pump(
+    WidgetTester tester, {
+    required Object list,
+    required Object balance,
+    Object partners = const <Map<String, Object?>>[],
+  }) async {
     final adapter = _Canned({
       '/consignment-flour/balance': balance,
+      '/consignment-flour/partners': partners,
       '/consignment-flour': list,
     });
     final client = ApiClient(baseUrl: 'http://server.test/api/v1');
@@ -194,5 +208,77 @@ void main() {
       adapter.seen.any((r) => r.contains('/consignment-flour')),
       isTrue,
     );
+  });
+
+  group('the report, gathered by partner', () {
+    Map<String, Object?> partner(String name, num net, int? days, int entries) => {
+          'partner_name': name,
+          'lent_kg': net * 45,
+          'borrowed_kg': 0,
+          'net_kg': net * 45,
+          'lent_bags': net,
+          'borrowed_bags': 0,
+          'net_bags': net,
+          'entries': entries,
+          'since': '2026-08-03',
+          'since_display': '۱۴۰۵/۰۵/۱۲',
+          'days': days,
+        };
+
+    testWidgets('says how much each partner holds and for how long',
+        (tester) async {
+      await pump(
+        tester,
+        list: {'data': const []},
+        balance: {'lent_bags': 76, 'borrowed_bags': 0, 'net_bags': 76},
+        partners: [
+          partner('عبدالرئوف', 56, 23, 2),
+          partner('ممد زاکر', 20, 18, 1),
+        ],
+      );
+
+      expect(find.text('به تفکیک همکار'), findsOneWidget);
+      expect(find.text('عبدالرئوف'), findsOneWidget);
+      // The shop says it in days. A date would make the reader subtract.
+      expect(find.textContaining('۲۳ روز'), findsNothing);
+      expect(find.textContaining('23 روز'), findsOneWidget);
+    });
+
+    testWidgets('flour lent today reads as today, not as zero days',
+        (tester) async {
+      await pump(
+        tester,
+        list: {'data': const []},
+        balance: {'lent_bags': 5, 'borrowed_bags': 0, 'net_bags': 5},
+        partners: [partner('رحیم', 5, 0, 1)],
+      );
+
+      expect(find.text('از امروز'), findsOneWidget);
+    });
+
+    testWidgets('owing a partner is labelled as owing, not as holding',
+        (tester) async {
+      await pump(
+        tester,
+        list: {'data': const []},
+        balance: {'lent_bags': 0, 'borrowed_bags': 10, 'net_bags': -10},
+        partners: [partner('رحیم', -10, 4, 1)],
+      );
+
+      // «۱۰ کیسه» with no word beside it would read as ten sacks of ours
+      // out there, when it is ten of theirs in our store.
+      expect(find.text('بدهکاریم'), findsWidgets);
+    });
+
+    testWidgets('with no partner out, the section is absent rather than empty',
+        (tester) async {
+      await pump(
+        tester,
+        list: {'data': const []},
+        balance: {'lent_bags': 0, 'borrowed_bags': 0, 'net_bags': 0},
+      );
+
+      expect(find.text('به تفکیک همکار'), findsNothing);
+    });
   });
 }
