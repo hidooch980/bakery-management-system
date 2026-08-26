@@ -359,7 +359,9 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                     !_newPartner &&
                     (_partners.isNotEmpty || _partnersLoading)) ...[
                   DropdownButtonFormField<Customer>(
-                    value: _partner,
+                    // `value` was deprecated after Flutter 3.33; this is
+                    // the same field under its current name.
+                    initialValue: _partner,
                     isExpanded: true,
                     decoration: InputDecoration(
                       labelText: _titleLabel,
