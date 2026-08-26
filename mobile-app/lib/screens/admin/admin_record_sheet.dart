@@ -359,8 +359,15 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                     !_newPartner &&
                     (_partners.isNotEmpty || _partnersLoading)) ...[
                   DropdownButtonFormField<Customer>(
-                    // `value` was deprecated after Flutter 3.33; this is
-                    // the same field under its current name.
+                    // `value` was deprecated after Flutter 3.33 in favour
+                    // of `initialValue`, which — unlike `value` — is read
+                    // once and then owned by the field's own state. The
+                    // single partner is selected after the list loads,
+                    // which is after the first build, so without a key
+                    // that would leave the box looking empty while a
+                    // partner was in fact chosen. The key re-creates the
+                    // field when the selection changes underneath it.
+                    key: ValueKey(_partner?.id),
                     initialValue: _partner,
                     isExpanded: true,
                     decoration: InputDecoration(
