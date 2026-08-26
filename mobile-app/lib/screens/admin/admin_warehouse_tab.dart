@@ -209,18 +209,20 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
       };
 
 
-  /// "۴ کیسه  •  ۱۰۰ کیلوگرم" — the bag count leads, the weight follows.
+  /// "۴ کیسه" — sacks alone, where the item has a sack.
   ///
-  /// Only flour comes in fixed sacks. Salt arrives in sacks of no set size
-  /// and dough is never bagged, so the server sends no bag count for them
-  /// and they show their weight alone.
+  /// «کیلو در انبار معنی نداره، فقط کیسه بیاد». The shop counts flour in
+  /// sacks, orders it in sacks and lends it in sacks; the weight beside
+  /// the count was the same fact in a unit nobody uses at the door.
+  ///
+  /// Salt and yeast arrive in no fixed sack, so the server sends no bag
+  /// count for them and their weight is all there is to say.
   static String _balanceLabel(Map<String, dynamic> item) {
-    final weight = '${_fmt(item['balance'])} ${item['unit']}';
     final bags = item['balance_bags'];
 
-    if (bags == null) return weight;
+    if (bags == null) return '${_fmt(item['balance'])} ${item['unit']}';
 
-    return '${_fmt(bags)} کیسه  •  $weight';
+    return '${_fmt(bags)} کیسه';
   }
 }
 

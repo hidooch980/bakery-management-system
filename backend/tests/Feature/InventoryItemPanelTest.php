@@ -38,7 +38,7 @@ class InventoryItemPanelTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
-    public function test_the_bag_count_is_visible_next_to_the_weight(): void
+    public function test_the_bag_count_is_what_the_warehouse_shows(): void
     {
         InventoryItem::ofKey('flour')->move('in', 120, 'purchase');
 
@@ -50,7 +50,7 @@ class InventoryItemPanelTest extends TestCase
         $this->assertStringContainsString('3.00 کیسه', $html);
     }
 
-    public function test_the_bag_count_comes_before_the_weight(): void
+    public function test_flour_shows_no_weight_beside_the_sacks(): void
     {
         InventoryItem::ofKey('flour')->move('in', 120, 'purchase');
 
@@ -58,16 +58,27 @@ class InventoryItemPanelTest extends TestCase
             ListInventoryItems::class
         )->html();
 
-        $bagsPosition = strpos($html, '3.00 کیسه');
-        $weightPosition = strpos($html, '120.000 کیلوگرم');
+        // «کیلو در انبار معنی نداره، فقط کیسه بیاد». The weight next to the
+        // sack count said the same thing twice, in the unit the shop does
+        // not use for flour. This test used to assert the opposite — that
+        // the count came *before* the weight — which was the right rule
+        // while both were shown.
+        $this->assertStringContainsString('3.00 کیسه', $html);
+        $this->assertStringNotContainsString('120.000 کیلوگرم', $html);
+    }
 
-        $this->assertNotFalse($bagsPosition);
-        $this->assertNotFalse($weightPosition);
-        $this->assertLessThan(
-            $weightPosition,
-            $bagsPosition,
-            'the bag count should be shown before the weight, not after it'
-        );
+    public function test_salt_keeps_its_weight_because_it_has_no_sack(): void
+    {
+        InventoryItem::ofKey('salt')->move('in', 25, 'purchase');
+
+        $html = Livewire::test(
+            ListInventoryItems::class
+        )->html();
+
+        // Salt arrives in sacks of no set size, so there is no bag count
+        // to show instead. Hiding the weight here would leave the row
+        // saying nothing at all.
+        $this->assertStringContainsString('25.000 کیلوگرم', $html);
     }
 
     public function test_recording_stock_in_bags_creates_the_right_movement(): void
