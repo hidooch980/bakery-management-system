@@ -385,17 +385,16 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                         value == null ? 'نانوایی همکار را انتخاب کنید' : null,
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => setState(() {
-                          _newPartner = true;
-                          _partner = null;
-                        }),
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('همکار جدید'),
-                      ),
-                    ],
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      onPressed: () => setState(() {
+                        _newPartner = true;
+                        _partner = null;
+                      }),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('همکار جدید'),
+                    ),
                   ),
                 ] else
                   TextFormField(
@@ -418,6 +417,10 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                 // fifty-six that have not come back, and that list lived
                 // only in the panel — the app could write a consignment
                 // and had no way to read one back.
+                //
+                // Outside the branch above on purpose: a shop with no
+                // partner on file yet is exactly one that needs to see
+                // the list is empty.
                 if (widget.kind == AdminRecordKind.consignment)
                   Align(
                     alignment: AlignmentDirectional.centerStart,
