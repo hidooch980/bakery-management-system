@@ -28,6 +28,64 @@ class ConsignmentFlourController extends Controller
         return $this->success($records);
     }
 
+    /**
+     * The same flour, gathered by the person holding it.
+     *
+     * The list answers «what happened»; this answers the question actually
+     * asked in the store — «who has our sacks, how many, and since when».
+     * The owner already thinks in these terms, down to the days: «۵۶ کیسه
+     * دست عبدالرئوف، ۲۳ روز». Until now that had to be worked out by
+     * reading the rows.
+     *
+     * Only outstanding flour is counted. Settled rows are history, and a
+     * partner whose account is square should not appear at all — a list
+     * that grows for ever stops being read.
+     */
+    public function partners(): JsonResponse
+    {
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+        $inBags = fn (float $kg) => $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
+
+        $rows = ConsignmentFlour::outstanding()
+            ->with('partner:id,name')
+            ->get()
+            ->groupBy(fn (ConsignmentFlour $c) => $c->partner_label)
+            ->map(function ($group, $name) use ($inBags) {
+                $lent = (float) $group->where('direction', 'lent')->sum('amount_kg');
+                $borrowed = (float) $group->where('direction', 'borrowed')->sum('amount_kg');
+
+                // The oldest unsettled row is the one worth chasing, so the
+                // age of the account is the age of that row and not an
+                // average, which would flatter a partner sitting on sacks
+                // from two months ago behind one from yesterday.
+                $oldest = $group->min('occurred_on');
+
+                return [
+                    'partner_name' => $name,
+                    'lent_kg' => round($lent, 3),
+                    'borrowed_kg' => round($borrowed, 3),
+                    'net_kg' => round($lent - $borrowed, 3),
+                    'lent_bags' => $inBags($lent),
+                    'borrowed_bags' => $inBags($borrowed),
+                    'net_bags' => $inBags($lent - $borrowed),
+                    'entries' => $group->count(),
+                    'since' => $oldest?->toDateString(),
+                    'since_display' => AppCalendar::date($oldest),
+                    // Whole days, so «امروز» is 0 rather than a fraction.
+                    'days' => $oldest
+                        ? (int) $oldest->copy()->startOfDay()->diffInDays(now()->startOfDay())
+                        : null,
+                ];
+            })
+            ->values()
+            // Most out first: that is the order somebody chasing sacks
+            // wants to read them in.
+            ->sortByDesc(fn (array $row) => abs($row['net_bags']))
+            ->values();
+
+        return $this->success($rows);
+    }
+
     /** Net position: how much flour we owe partners, and they owe us. */
     public function balance(): JsonResponse
     {

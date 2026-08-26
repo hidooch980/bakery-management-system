@@ -25,6 +25,7 @@ class ConsignmentFlourScreen extends StatefulWidget {
 
 typedef _Data = ({
   List<Map<String, dynamic>> records,
+  List<Map<String, dynamic>> partners,
   Map<String, dynamic> balance,
 });
 
@@ -39,9 +40,10 @@ class _ConsignmentFlourScreenState extends State<ConsignmentFlourScreen> {
 
   Future<_Data> _load() async {
     final records = await widget.api.consignmentFlour();
+    final partners = await widget.api.consignmentPartners();
     final balance = await widget.api.consignmentBalance();
 
-    return (records: records, balance: balance);
+    return (records: records, partners: partners, balance: balance);
   }
 
   Future<void> _refresh() async {
@@ -120,6 +122,22 @@ class _ConsignmentFlourScreenState extends State<ConsignmentFlourScreen> {
               children: [
                 _BalanceCard(balance: data.balance),
                 const SizedBox(height: 16),
+
+                // Who has them, before what happened. Standing in the
+                // store the question is «چقدر دست کیست», and reading it
+                // off a list of individual entries is arithmetic done in
+                // the head, at the moment of deciding to lend more.
+                if (data.partners.isNotEmpty) ...[
+                  const _SectionTitle('به تفکیک همکار'),
+                  const SizedBox(height: 8),
+                  for (final partner in data.partners) ...[
+                    _PartnerTile(partner: partner),
+                    const SizedBox(height: 8),
+                  ],
+                  const SizedBox(height: 14),
+                  const _SectionTitle('ثبت‌ها'),
+                  const SizedBox(height: 8),
+                ],
                 if (data.records.isEmpty)
                   const _Message(text: 'هیچ آرد امانی‌ای باز نیست.')
                 else
@@ -240,6 +258,95 @@ class _Figure extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+    );
+  }
+}
+
+/// One partner's whole account on one line: how much of it is out, and
+/// how long the oldest of it has been.
+class _PartnerTile extends StatelessWidget {
+  const _PartnerTile({required this.partner});
+
+  final Map<String, dynamic> partner;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final net = (partner['net_bags'] as num?)?.toDouble() ?? 0;
+    final days = partner['days'] as int?;
+    final owed = net > 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${partner['partner_name']}',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
+                        ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    // Days, because that is how the shop talks about it —
+                    // «۵۶ کیسه، ۲۳ روز» — and because a date makes the
+                    // reader do the subtraction.
+                    days == null
+                        ? '${partner['entries']} ثبت'
+                        : days == 0
+                            ? 'از امروز'
+                            : '$days روز  •  ${partner['entries']} ثبت',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _bags(net.abs()),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: owed ? AppColors.moneyIn : AppColors.moneyOut,
+                      ),
+                ),
+                Text(
+                  owed ? 'دست ایشان' : 'بدهکاریم',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
