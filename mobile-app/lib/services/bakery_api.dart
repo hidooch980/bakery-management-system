@@ -1028,6 +1028,22 @@ class BakeryApi {
     return _paginated(body);
   }
 
+  /// Whether the shop's data is being kept.
+  ///
+  /// Status only. The files are not downloadable and should not be: the
+  /// whole shop in one file over the API is not a convenience worth the
+  /// risk, and a .sql.gz is no use on a phone.
+  Future<Map<String, dynamic>> backupStatus() async {
+    final body = await _client.getCached('/backups');
+
+    return (body['data'] as Map).cast<String, dynamic>();
+  }
+
+  /// Takes one now. Runs the same command the nightly schedule runs.
+  Future<void> takeBackup() async {
+    await _client.post('/backups', const {});
+  }
+
   /// Who is holding the shop's flour, how much, and for how long.
   ///
   /// The list answers «what happened»; this answers the question asked in
