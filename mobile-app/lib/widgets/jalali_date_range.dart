@@ -87,6 +87,14 @@ class _JalaliDayPickerState extends State<JalaliDayPicker> {
               Expanded(
                 flex: 3,
                 child: DropdownButtonFormField<int>(
+                  // Keyed on the value, because `initialValue` is read
+                  // once and then owned by the field's own state.
+                  // Changing month to a shorter one clamps the day — and
+                  // without this the field would still hold the old one,
+                  // which is no longer in `items`. Flutter asserts on
+                  // that: «There should be exactly one item with this
+                  // value». A crash, not a wrong label.
+                  key: ValueKey('day-${_value.day}-$_daysInMonth'),
                   initialValue: _value.day,
                   decoration: const InputDecoration(labelText: 'روز'),
                   items: [
@@ -100,6 +108,7 @@ class _JalaliDayPickerState extends State<JalaliDayPicker> {
               Expanded(
                 flex: 5,
                 child: DropdownButtonFormField<int>(
+                  key: ValueKey('month-${_value.month}'),
                   initialValue: _value.month,
                   decoration: const InputDecoration(labelText: 'ماه'),
                   items: [
@@ -113,6 +122,7 @@ class _JalaliDayPickerState extends State<JalaliDayPicker> {
               Expanded(
                 flex: 4,
                 child: DropdownButtonFormField<int>(
+                  key: ValueKey('year-${_value.year}'),
                   initialValue: _value.year,
                   decoration: const InputDecoration(labelText: 'سال'),
                   items: [

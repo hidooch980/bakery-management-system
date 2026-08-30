@@ -131,6 +131,24 @@ void main() {
     expect(find.text('انصراف'), findsNothing);
   });
 
+  testWidgets('moving to a shorter month does not leave the day past its end',
+      (tester) async {
+    // 30 Farvardin. Esfand of a common year has 29 days, so the day has
+    // to come back to 29 — and the field must come with it. Left holding
+    // 30 while `items` only goes to 29, Flutter asserts «There should be
+    // exactly one item with this value» and the dialog crashes. A wrong
+    // label would be a nuisance; this is a dead screen.
+    await _pick(tester, initial: Jalali(1405, 1, 30).toDateTime());
+
+    await tester.tap(find.text('فروردین').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('اسفند').last);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('اسفند'), findsWidgets);
+  });
+
   testWidgets('the month dropdown offers all twelve Jalali months',
       (tester) async {
     await _pick(tester, initial: today);
