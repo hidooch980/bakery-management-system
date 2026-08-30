@@ -66,6 +66,13 @@ class Bakery extends Model
             'flour_bag_weight_kg' => 'decimal:3',
             'water_ratio' => 'decimal:3',
             'yeast_ratio' => 'decimal:5',
+            // A nanino session grants the same access as signing in for
+            // as long as it lasts, so it does not sit on the disk in
+            // clear. There is no password to encrypt — nanino signs in
+            // with a captcha and an SMS code — and none is stored.
+            'nanino_token' => 'encrypted',
+            'nanino_refresh_token' => 'encrypted',
+            'nanino_connected_at' => 'datetime',
             'proof_gain_ratio' => 'decimal:4',
             'salt_ratio' => 'decimal:4',
             'dough_loss_ratio' => 'decimal:4',
