@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Bakery;
+use App\Models\BankAccount;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
@@ -191,6 +192,11 @@ class EntryDeletionReversalTest extends TestCase
         // money into the bank account; if the row is erased by the database
         // instead of the model, the posting stays behind with no sale to
         // explain it — 7,290,000 Rial sat in the account that way once.
+        $account = BankAccount::create([
+            'title' => 'حساب اصلی',
+            'is_default' => true,
+        ]);
+
         $dough = $this->recordDough(2);
         $chane = $this->recordChane($dough, 100);
 
@@ -202,7 +208,6 @@ class EntryDeletionReversalTest extends TestCase
             ])
             ->assertCreated();
 
-        $account = Sale::latest('id')->first()->bankAccount;
         $balanceBefore = $account->refresh()->balance;
 
         $dough->delete();
