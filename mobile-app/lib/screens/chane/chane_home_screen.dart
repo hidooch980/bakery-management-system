@@ -4,7 +4,6 @@ import '../../models/bakery.dart';
 import '../../models/entries.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
-import '../../services/last_used.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/one_task.dart';
@@ -46,7 +45,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
   DoughEntry? _chosen;
 
   int _count = 0;
-  double _spray = 5;
+  double _spray = 0;
   int _nanino = 0;
 
   Bakery? _bakery;
@@ -61,14 +60,10 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
   }
 
   Future<void> _prepare() async {
-    _spray = await LastUsed.sprayFlourKg();
-
-    // Spray flour is remembered; nanino deliberately is not. Five kilos go
-    // on every single batch, so carrying that forward saves a question
-    // already answered. Nanino is shaped about one day in twenty, and a
-    // remembered count would ride along on every batch after it —
-    // submitted without the extras screen ever being opened again, and
-    // eating a kilo of dough per phantom loaf on the way through.
+    // Neither spray flour nor nanino is carried over from the last batch.
+    // The owner's rule (1405/06/08): spray flour starts at zero and the
+    // chane maker enters what actually went on — a remembered figure is
+    // submitted without the extras screen ever being opened again.
 
     try {
       final bakery = await widget.api.bakery();
@@ -139,8 +134,6 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
         naninoChaneCount: _nanino,
         sprayFlourKg: _spray,
       );
-
-      await LastUsed.rememberSprayFlourKg(_spray);
 
       if (!mounted) return;
       setState(() {
@@ -343,15 +336,15 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
     );
   }
 
-  /// The two numbers that are the same nearly every batch, kept off the
-  /// main question and remembered between batches.
+  /// The two numbers that are usually zero, kept off the main question.
+  /// Both start at zero every batch — what went on is what gets typed.
   Widget _extras() {
     final theme = Theme.of(context);
 
     return OneTaskScaffold(
       question: 'آرد پاششی و نانینو',
       onBack: () => setState(() => _stage = _Stage.counting),
-      hint: 'اینها را به یاد می‌سپارم؛ دفعهٔ بعد لازم نیست دوباره بزنی.',
+      hint: 'هر دو از صفر شروع می‌شوند؛ هر چه واقعاً رفت همان را بزن.',
       actionLabel: 'برگرد به ثبت',
       onAction: () => setState(() => _stage = _Stage.counting),
       child: Column(
