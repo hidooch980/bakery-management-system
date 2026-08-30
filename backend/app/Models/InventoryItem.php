@@ -37,7 +37,6 @@ class InventoryItem extends Model
         self::YEAST_DRY => 'خمیرمایه خشک',
     ];
 
-
     protected $fillable = ['key', 'name', 'unit', 'bag_weight_kg', 'low_threshold'];
 
     /**
