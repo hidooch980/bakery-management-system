@@ -513,39 +513,16 @@ class _ChaneSheetState extends State<_ChaneSheet> {
   final _formKey = GlobalKey<FormState>();
   final _count = TextEditingController();
   final _nanino = TextEditingController(text: '0');
-  final _spray = TextEditingController(text: '5');
+  final _spray = TextEditingController(text: '0');
 
-  /// Nanino and spray flour are folded away. This shop shapes nanino about
-  /// one day in twenty and puts on five kilos of spray flour every single
-  /// time, so two of the three boxes were asking a question already
-  /// answered on almost every batch —
-  /// and a form of three identical-looking number fields is where the
-  /// wrong one gets filled in.
+  /// Nanino and spray flour are folded away, and both start at zero every
+  /// batch — the owner's rule (1405/06/08): spray flour is typed by the
+  /// person who put it on, never carried over. A remembered figure gets
+  /// submitted batch after batch without anyone opening the panel to see
+  /// it.
   bool _showMore = false;
 
-  bool _ready = false;
   bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _restore();
-  }
-
-  Future<void> _restore() async {
-    final spray = await LastUsed.sprayFlourKg();
-
-    if (!mounted) return;
-    setState(() {
-      _spray.text = spray.toStringAsFixed(spray % 1 == 0 ? 0 : 1);
-      // Nanino starts at zero every time. It is shaped about one day in
-      // twenty here, and both these fields are folded away — so a
-      // remembered count would be submitted batch after batch without
-      // anyone opening the panel to see it, taking a kilo of dough with
-      // each phantom loaf.
-      _ready = true;
-    });
-  }
 
   @override
   void dispose() {
@@ -585,8 +562,6 @@ class _ChaneSheetState extends State<_ChaneSheet> {
         sprayFlourKg: spray,
       );
 
-      await LastUsed.rememberSprayFlourKg(spray);
-
       if (!mounted) return;
       Navigator.pop(context, true);
       showMessage(
@@ -612,12 +587,7 @@ class _ChaneSheetState extends State<_ChaneSheet> {
       title: 'ثبت چانه — ${widget.dough.bagCount} کیسه',
       icon: Icons.blur_circular_rounded,
       color: AppColors.moneyNeutral,
-      child: !_ready
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          : Form(
+      child: Form(
               key: _formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
