@@ -6,6 +6,7 @@ use App\Models\Bakery;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
+use App\Models\Sale;
 use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -201,12 +202,12 @@ class EntryDeletionReversalTest extends TestCase
             ])
             ->assertCreated();
 
-        $account = \App\Models\Sale::latest('id')->first()->bankAccount;
+        $account = Sale::latest('id')->first()->bankAccount;
         $balanceBefore = $account->refresh()->balance;
 
         $dough->delete();
 
-        $this->assertSame(0, \App\Models\Sale::count());
+        $this->assertSame(0, Sale::count());
         $this->assertSame($balanceBefore - 500000, $account->refresh()->balance);
     }
 }
