@@ -7,6 +7,7 @@ use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -157,7 +158,7 @@ class ConnectingToTheCardTerminalTest extends TestCase
             'code' => '1234',
         ])->assertOk();
 
-        $raw = \Illuminate\Support\Facades\DB::table('bakeries')
+        $raw = DB::table('bakeries')
             ->where('id', Bakery::first()->id)
             ->value('nanino_token');
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\AppCalendar;
 use App\Support\CurrentBakery;
 use App\Support\Nanino;
 use App\Traits\ApiResponse;
@@ -34,7 +35,7 @@ class NaninoController extends Controller
         return $this->success([
             'connected' => filled($bakery?->nanino_token),
             'connected_at_display' => $bakery?->nanino_connected_at
-                ? \App\Support\AppCalendar::dateTime($bakery->nanino_connected_at)
+                ? AppCalendar::dateTime($bakery->nanino_connected_at)
                 : null,
             'last_error' => $bakery?->nanino_last_error,
             // Prefilled so the owner is not typing his own national number
