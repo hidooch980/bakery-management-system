@@ -165,6 +165,23 @@ class ConnectingToTheCardTerminalTest extends TestCase
         $this->assertNotSame('a-session-token', $raw);
     }
 
+    public function test_a_session_that_cannot_be_decrypted_reads_as_not_connected(): void
+    {
+        // A rotated APP_KEY, or a restore from a dump taken under a
+        // different one. An `encrypted` cast throws rather than returning
+        // null, so reading it straight would turn this into a 500 on the
+        // settings screen instead of «you are not connected» — which is
+        // both true and something the owner can act on.
+        DB::table('bakeries')
+            ->where('id', Bakery::first()->id)
+            ->update(['nanino_token' => 'not-a-valid-payload']);
+
+        $this->actingAs($this->admin)
+            ->getJson('/api/v1/nanino')
+            ->assertOk()
+            ->assertJsonPath('data.connected', false);
+    }
+
     public function test_disconnecting_forgets_the_session(): void
     {
         Bakery::first()->forceFill(['nanino_token' => 'a-session-token'])->save();

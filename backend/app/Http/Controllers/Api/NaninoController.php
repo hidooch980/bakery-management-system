@@ -33,7 +33,9 @@ class NaninoController extends Controller
         $bakery = CurrentBakery::get();
 
         return $this->success([
-            'connected' => filled($bakery?->nanino_token),
+            // Through naninoToken(), which answers null rather than
+            // throwing when the stored session cannot be decrypted.
+            'connected' => filled($bakery?->naninoToken()),
             'connected_at_display' => $bakery?->nanino_connected_at
                 ? AppCalendar::dateTime($bakery->nanino_connected_at)
                 : null,

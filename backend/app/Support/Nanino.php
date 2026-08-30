@@ -126,7 +126,7 @@ class Nanino
      */
     public static function orders(Bakery $bakery, string $from, string $to, int $page = 0): array
     {
-        $token = $bakery->nanino_token;
+        $token = $bakery->naninoToken();
 
         if (blank($token)) {
             throw new RuntimeException('هنوز به نانینو وصل نشده‌اید.');
