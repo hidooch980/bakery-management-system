@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../models/bakery.dart';
 import '../../services/bakery_api.dart';
+import '../../widgets/jalali_date_range.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import 'balance_sheet_section.dart';
@@ -27,7 +29,11 @@ class AdminFinanceTab extends StatefulWidget {
 enum _Range {
   today('امروز'),
   week('۷ روز اخیر'),
-  month('۳۰ روز اخیر');
+  month('۳۰ روز اخیر'),
+  // «گزارش تاریخ تا تاریخ». The three presets answer «how is it going»;
+  // this answers a question with a date in it — a delivery period, the
+  // days before a payroll, the fortnight somebody is arguing about.
+  custom('بازهٔ دلخواه');
 
   const _Range(this.label);
 
@@ -37,6 +43,12 @@ enum _Range {
 class _AdminFinanceTabState extends State<AdminFinanceTab> {
   _Range _range = _Range.today;
   late Future<Map<String, dynamic>> _report;
+
+  /// Only set while [_Range.custom] is chosen. Kept when the person
+  /// switches to a preset and back, so picking two dates again to correct
+  /// one of them is not the price of a glance at the week.
+  DateTime? _customFrom;
+  DateTime? _customTo;
 
   @override
   void initState() {
@@ -51,13 +63,16 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
       _Range.today => now,
       _Range.week => now.subtract(const Duration(days: 6)),
       _Range.month => now.subtract(const Duration(days: 29)),
+      _Range.custom => _customFrom ?? now,
     };
+
+    final to = _range == _Range.custom ? (_customTo ?? now) : now;
 
     // Sent as Gregorian; the API takes either calendar and tells them apart
     // by the year, so no conversion is needed on this side.
     return widget.api.financialReport(
       from: _toApiDate(from),
-      to: _toApiDate(now),
+      to: _toApiDate(to),
     );
   }
 
@@ -82,6 +97,16 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
           to: _toApiDate(now),
           granularity: 'day',
         ),
+      _Range.custom => (
+          from: _toApiDate(_customFrom ?? now),
+          to: _toApiDate(_customTo ?? now),
+          // A day per bar reads on a fortnight and turns to noise on a
+          // year, so long spans are grouped by month.
+          granularity:
+              (_customTo ?? now).difference(_customFrom ?? now).inDays > 92
+                  ? 'month'
+                  : 'day',
+        ),
     };
   }
 
@@ -89,6 +114,43 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
       '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
   void _reload() => setState(() => _report = _load());
+
+  /// Asks for the two ends of the span, «از» then «تا».
+  ///
+  /// Returns false if the person backed out of either dialog, so the
+  /// segmented button can stay where it was rather than land on a custom
+  /// range that was never chosen.
+  Future<bool> _askForDates() async {
+    final now = DateTime.now();
+
+    final from = await pickJalaliDay(
+      context,
+      title: 'از تاریخ',
+      initial: _customFrom ?? now.subtract(const Duration(days: 29)),
+      last: now,
+    );
+
+    if (from == null || !mounted) return false;
+
+    final to = await pickJalaliDay(
+      context,
+      title: 'تا تاریخ',
+      initial: _customTo != null && _customTo!.isAfter(from) ? _customTo! : now,
+      // Not before the day already chosen, so the range cannot come out
+      // backwards and quietly report nothing.
+      first: from,
+      last: now,
+    );
+
+    if (to == null) return false;
+
+    setState(() {
+      _customFrom = from;
+      _customTo = to;
+    });
+
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -106,12 +168,55 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                     ButtonSegment(value: range, label: Text(range.label)),
                 ],
                 selected: {_range},
-                onSelectionChanged: (selection) {
-                  setState(() => _range = selection.first);
+                onSelectionChanged: (selection) async {
+                  final chosen = selection.first;
+
+                  if (chosen == _Range.custom) {
+                    if (!await _askForDates()) return;
+                  }
+
+                  if (!mounted) return;
+                  setState(() => _range = chosen);
                   _reload();
                 },
                 showSelectedIcon: false,
               ),
+              // Which days these figures are about. Without it the custom
+              // range is four numbers concerning an unknown fortnight —
+              // and the preset labels say it for themselves.
+              if (_range == _Range.custom && _customFrom != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.event_rounded,
+                        size: IconSize.inline,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${JalaliFormat.date(_customFrom)}  تا  '
+                          '${JalaliFormat.date(_customTo)}',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          if (await _askForDates()) _reload();
+                        },
+                        child: const Text('تغییر'),
+                      ),
+                    ],
+                  ),
+                ),
+
               const SizedBox(height: 20),
 
               if (snapshot.connectionState == ConnectionState.waiting)
