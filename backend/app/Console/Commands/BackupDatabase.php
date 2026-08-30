@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\BaleSetting;
 use App\Models\MailSetting;
+use App\Support\BaleNotifier;
 use App\Support\Jalali;
 use App\Support\MailConfigurator;
 use Illuminate\Console\Command;
@@ -11,20 +13,21 @@ use Symfony\Component\Process\Process;
 
 /**
  * Takes a compressed dump of the database, keeps a rolling set on disk and
- * mails a copy off the machine.
+ * sends a copy off the machine by mail and/or Bale.
  *
  * A backup that only ever lives on the same server is not a backup — it is
- * the same disk, and the same mistake reaches both. The mailed copy is the
- * one that survives; the local set is there so a restore does not have to
- * wait on an inbox.
+ * the same disk, and the same mistake reaches both. The copy that leaves is
+ * the one that survives; the local set is there so a restore does not have
+ * to wait on either channel.
  */
 class BackupDatabase extends Command
 {
     protected $signature = 'backup:database
         {--keep=14 : How many daily backups to keep on disk}
-        {--no-mail : Write the file but do not send it}';
+        {--no-mail : Write the file but do not mail it}
+        {--no-bale : Write the file but do not send it to Bale}';
 
-    protected $description = 'پشتیبان‌گیری از دیتابیس و ارسال به ایمیل';
+    protected $description = 'پشتیبان‌گیری از دیتابیس و ارسال به ایمیل و بله';
 
     public function handle(): int
     {
@@ -53,6 +56,10 @@ class BackupDatabase extends Command
 
         if (! $this->option('no-mail')) {
             $this->mail($path, $size);
+        }
+
+        if (! $this->option('no-bale')) {
+            $this->bale($path, $size);
         }
 
         return self::SUCCESS;
@@ -163,6 +170,46 @@ class BackupDatabase extends Command
         }
 
         $this->line('فایل روی دیسک: '.$path);
+    }
+
+    private function bale(string $path, int $size): void
+    {
+        $settings = BaleSetting::query()->first();
+
+        if ($settings && ! $settings->backup_bale_enabled) {
+            $this->line('ارسال بله در پنل خاموش است — فایل فقط روی دیسک ماند.');
+
+            return;
+        }
+
+        if (! $settings || ! $settings->is_configured) {
+            $this->warn('بازوی بله تنظیم نشده؛ ارسال نمی‌شود. صفحه‌ی «ربات بله» در پنل را پر کنید.');
+
+            return;
+        }
+
+        if ($size > BaleNotifier::MAX_DOCUMENT_BYTES) {
+            $this->warn('فایل پشتیبان از سقف بله (۵۰ مگابایت) بزرگ‌تر است — فقط روی دیسک ماند.');
+
+            return;
+        }
+
+        $shop = config('app.name');
+        $date = Jalali::date(now());
+
+        $result = BaleNotifier::sendDocument(
+            $settings->bot_token,
+            $settings->chat_id,
+            $path,
+            "پشتیبان دیتابیس {$shop}\nتاریخ: {$date}\nحجم: {$this->human($size)}",
+        );
+
+        if ($result['ok']) {
+            $this->info('به بله ارسال شد.');
+        } else {
+            // A failed send must not lose the backup that was just written.
+            $this->error('ارسال به بله ناموفق بود: '.$result['error']);
+        }
     }
 
     private function human(int $bytes): string
