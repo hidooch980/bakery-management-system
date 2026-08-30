@@ -58,9 +58,21 @@ class PeriodBreadReconciliationTest extends TestCase
 
     private function allocationOf(float $bags): FlourAllocation
     {
+        // The *Jalali* month, not `now()->startOfMonth()`, which is the
+        // Gregorian one. The periods run 5th→4th of the Shamsi month, so a
+        // quota built from 1 August covers days that may not include
+        // today — and `/flour-allocations/current`, which looks for the
+        // period containing today, then finds nothing.
+        //
+        // That is why this test failed on 1405/06/08 and passed on the
+        // days either side of it. It is the fourth time in this project
+        // that a Gregorian month start has been used where the shop means
+        // a Shamsi one.
+        [$monthStart] = Jalali::currentMonthRange();
+
         $allocation = FlourAllocation::create([
-            'month_start' => now()->startOfMonth(),
-            'month_label' => Jalali::monthLabel(now()->startOfMonth()) ?? '',
+            'month_start' => $monthStart,
+            'month_label' => Jalali::monthLabel($monthStart) ?? '',
             'total_bags' => $bags,
         ]);
 
