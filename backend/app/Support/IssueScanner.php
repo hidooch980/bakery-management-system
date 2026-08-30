@@ -39,6 +39,7 @@ class IssueScanner
             ...$this->lowStock(),
             ...$this->emptyStock(),
             ...$this->quotaOverrun(),
+            ...$this->quotaLeftOnTheTable(),
             ...$this->negativeBankBalance(),
             ...$this->sellerAccounts(),
             ...$this->unsettledShortfalls(),
@@ -256,6 +257,79 @@ class IssueScanner
                 url: '/admin/flour-allocations',
                 urlLabel: 'مدیریت سهمیه',
                 magnitude: (float) $period->used_kg - (float) $period->allocated_kg,
+            );
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Quota that is going to expire undrawn.
+     *
+     * quotaOverrun() above says something when the shop uses *more* than
+     * its ration. Using much less, with the period nearly over, is the
+     * other way to lose it: the period's allowance does not roll forward.
+     *
+     * «Used» here is flour that went into production, which is how every
+     * other quota figure in this system is counted — not flour collected
+     * from the mill, which it does not separately record.
+     *
+     * Only in the second half of the period, and only when the gap is big
+     * enough to matter. Baking is uneven across a fortnight and a warning
+     * on day two would teach the owner to ignore the page.
+     */
+    private function quotaLeftOnTheTable(): array
+    {
+        $allocation = FlourAllocation::forJalaliMonthOf(now());
+
+        if (! $allocation) {
+            return [];
+        }
+
+        $issues = [];
+
+        foreach ($allocation->periods as $period) {
+            $total = $period->total_days;
+            $elapsed = (int) $period->starts_on->copy()->startOfDay()
+                ->diffInDays(now()->startOfDay()) + 1;
+
+            // Not this period, or not far enough into it to judge.
+            if ($elapsed < 1 || $elapsed > $total) {
+                continue;
+            }
+
+            $daysLeft = $total - $elapsed;
+            $allocated = (float) $period->allocated_kg;
+            $remaining = (float) $period->remaining_kg;
+
+            if ($allocated <= 0 || $remaining <= 0) {
+                continue;
+            }
+
+            // Past the halfway mark, and more than a third of the ration
+            // still unlifted. Both together, so a slow start says nothing
+            // and only a period that is genuinely running out does.
+            $throughPeriod = $elapsed / $total;
+            $unlifted = $remaining / $allocated;
+
+            if ($throughPeriod < 0.5 || $unlifted < 0.34) {
+                continue;
+            }
+
+            $bags = DoughFormula::fromBakery()->bagWeightKg;
+            $inBags = $bags > 0 ? round($remaining / $bags, 1) : null;
+
+            $issues[] = new SystemIssue(
+                key: "quota-unlifted-{$period->id}",
+                severity: SystemIssue::WARNING,
+                title: "مصرف {$period->label} خیلی عقب است",
+                detail: ($inBags !== null ? "{$inBags} کیسه" : number_format($remaining, 1).' کیلوگرم')
+                    .' از سهمیهٔ دوره مصرف نشده و '.$daysLeft.' روز تا پایان آن مانده.',
+                cause: 'سهمیهٔ دوره به دورهٔ بعد منتقل نمی‌شود.',
+                suggestion: 'اگر قرار است مصرف شود، پیش از پایان دوره برنامه‌ریزی کنید.',
+                url: '/admin/flour-allocations',
+                urlLabel: 'مدیریت سهمیه',
+                magnitude: $remaining,
             );
         }
 
