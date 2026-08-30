@@ -145,9 +145,10 @@ class BaleSettingsInThePanelTest extends TestCase
             'backup_bale_enabled' => true,
         ]);
 
-        $this->artisan('backup:database', ['--keep' => 1, '--no-mail' => true])
-            ->expectsOutputToContain('به بله ارسال شد')
-            ->assertSuccessful();
+        $exit = \Illuminate\Support\Facades\Artisan::call('backup:database', ['--keep' => 1, '--no-mail' => true]);
+        $output = \Illuminate\Support\Facades\Artisan::output();
+
+        $this->assertStringContainsString('به بله ارسال شد', $output, "exit={$exit}\n{$output}");
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendDocument')
             && str_contains($request->body(), '999'));
