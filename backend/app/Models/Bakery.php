@@ -51,6 +51,24 @@ class Bakery extends Model
         'late_tier2_amount',
     ];
 
+    /**
+     * The nanino session, or null if there isn't a readable one.
+     *
+     * An `encrypted` cast throws when the stored value cannot be
+     * decrypted — a rotated APP_KEY, a restore from a dump taken under a
+     * different one — and reading it straight would turn that into a 500
+     * on the settings screen rather than «you are not connected», which
+     * is both true and actionable.
+     */
+    public function naninoToken(): ?string
+    {
+        try {
+            return $this->nanino_token;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     protected function casts(): array
     {
         return [
@@ -66,6 +84,16 @@ class Bakery extends Model
             'flour_bag_weight_kg' => 'decimal:3',
             'water_ratio' => 'decimal:3',
             'yeast_ratio' => 'decimal:5',
+            // A nanino session grants the same access as signing in for
+            // as long as it lasts, so it does not sit on the disk in
+            // clear. There is no password to encrypt — nanino signs in
+            // with a captcha and an SMS code — and none is stored.
+            'nanino_token' => 'encrypted',
+            'nanino_refresh_token' => 'encrypted',
+            // See naninoToken(): an encrypted cast throws rather than
+            // returning null when the value cannot be decrypted, so it is
+            // never read through the attribute directly.
+            'nanino_connected_at' => 'datetime',
             'proof_gain_ratio' => 'decimal:4',
             'salt_ratio' => 'decimal:4',
             'dough_loss_ratio' => 'decimal:4',

@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\FlourStockController;
 use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\IncomeController;
 use App\Http\Controllers\Api\InventoryController;
+use App\Http\Controllers\Api\NaninoController;
 use App\Http\Controllers\Api\PowerBiExportController;
 use App\Http\Controllers\Api\QuotaController;
 use App\Http\Controllers\Api\ReportController;
@@ -229,6 +230,19 @@ Route::prefix('v1')->group(function () {
         // --- Admin: bakery settings ---
         Route::put('/bakery', [BakeryController::class, 'update'])
             ->middleware('permission:manage-bakery');
+
+        // --- Admin: the shop's own card terminal on nanino ---
+        // Signing in needs a captcha and an SMS code, both supplied by a
+        // person. Reading the sales history is deliberately not here yet:
+        // where the token sits in nanino's answer is an informed guess
+        // until somebody has connected once.
+        Route::middleware('permission:manage-bakery')->group(function () {
+            Route::get('/nanino', [NaninoController::class, 'show']);
+            Route::get('/nanino/captcha', [NaninoController::class, 'captcha']);
+            Route::post('/nanino/code', [NaninoController::class, 'requestCode']);
+            Route::post('/nanino/connect', [NaninoController::class, 'connect']);
+            Route::delete('/nanino', [NaninoController::class, 'disconnect']);
+        });
 
         // --- Admin: backups ---
         // Status and a «take one now», nothing that hands the file over:

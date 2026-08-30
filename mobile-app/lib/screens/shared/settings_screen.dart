@@ -6,6 +6,7 @@ import '../../providers/theme_provider.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/biometric_tile.dart';
 import '../admin/backup_screen.dart';
+import '../admin/nanino_screen.dart';
 import 'change_password_screen.dart';
 import 'my_advances_screen.dart';
 import 'update_screen.dart';
@@ -175,6 +176,21 @@ class SettingsScreen extends StatelessWidget {
                   // the same permission already gates the shop's other
                   // settings.
                   if (user?.can('manage-bakery') ?? false) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.point_of_sale_rounded),
+                      title: const Text('اتصال به نانینو'),
+                      subtitle: const Text('خواندن سوابق کارتخوان'),
+                      trailing: const Icon(Icons.chevron_left_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => NaninoScreen(
+                            api: context.read<BakeryApi>(),
+                          ),
+                        ),
+                      ),
+                    ),
                     const Divider(height: 1),
                     ListTile(
                       leading: const Icon(Icons.backup_rounded),
