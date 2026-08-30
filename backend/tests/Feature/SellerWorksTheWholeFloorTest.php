@@ -40,7 +40,6 @@ class SellerWorksTheWholeFloorTest extends TestCase
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 100, 'purchase');
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
     }
 
     public function test_the_seller_can_record_the_dough_they_kneaded(): void

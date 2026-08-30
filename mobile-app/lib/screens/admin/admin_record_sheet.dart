@@ -33,8 +33,10 @@ enum AdminRecordKind {
 enum StockItem {
   flour('flour', 'آرد', true, 'کیسه'),
   salt('salt', 'نمک', false, 'کیلوگرم'),
-  yeastDry('yeast_dry', 'خمیرمایه خشک', false, 'کیلوگرم'),
-  yeastWet('yeast_wet', 'خمیرمایه تر', false, 'کیلوگرم');
+  // The fresh-yeast tub was taken out of the store on 1405/06/08, unused
+  // after thirty-one batches. Offering it here would let somebody book
+  // stock into an item the server no longer has.
+  yeastDry('yeast_dry', 'خمیرمایه خشک', false, 'کیلوگرم');
 
   const StockItem(this.apiValue, this.label, this.inSacks, this.unit);
 

@@ -101,7 +101,6 @@ class ApiCoverageTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 1])->assertCreated();
 
@@ -157,9 +156,10 @@ class ApiCoverageTest extends TestCase
             ->getJson('/api/v1/inventory')
             ->assertOk()
             // The stocked goods are created on first read: flour, salt and
-            // the two yeasts. Dough is not among them — it is mixed and
-            // shaped the same day and never sits on a shelf.
-            ->assertJsonCount(4, 'data');
+            // dry yeast. The fresh-yeast tub was removed on 1405/06/08;
+            // dough was never here at all — it is mixed and shaped the
+            // same day and never sits on a shelf.
+            ->assertJsonCount(3, 'data');
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson('/api/v1/inventory/movements', [
@@ -183,7 +183,6 @@ class ApiCoverageTest extends TestCase
         InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
 
         InventoryItem::ofKey('yeast_dry')->move('in', 50, 'purchase');
-        InventoryItem::ofKey('yeast_wet')->move('in', 50, 'purchase');
         $data = $this->actingAs($this->admin, 'sanctum')
             ->getJson('/api/v1/inventory')
             ->assertOk()

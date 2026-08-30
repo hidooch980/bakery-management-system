@@ -51,7 +51,7 @@ class AWriteThatArrivesTwiceCountsOnceTest extends TestCase
         // Enough of everything the formula draws on that none of these
         // tests is accidentally a stock test.
         foreach ([InventoryItem::FLOUR, InventoryItem::SALT,
-            InventoryItem::YEAST_DRY, InventoryItem::YEAST_WET] as $key) {
+            InventoryItem::YEAST_DRY] as $key) {
             InventoryItem::ofKey($key)->move('in', 5000, 'purchase');
         }
     }

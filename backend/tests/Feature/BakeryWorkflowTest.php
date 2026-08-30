@@ -78,7 +78,6 @@ class BakeryWorkflowTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         // 1. Dough maker records bags.
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 10])
@@ -141,7 +140,6 @@ class BakeryWorkflowTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 5]);
 

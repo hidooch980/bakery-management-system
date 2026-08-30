@@ -88,7 +88,9 @@ class SaltAndYeastComeInSacksTest extends TestCase
 
     public function test_a_good_with_no_package_size_still_reads_in_kilos_only(): void
     {
-        $wet = $this->stock(InventoryItem::YEAST_WET, 12);
+        // Dry yeast, since the fresh tub was removed on 1405/06/08. It
+        // is the same case: nobody has said what a sack of it weighs.
+        $wet = $this->stock(InventoryItem::YEAST_DRY, 12);
 
         // Null, not zero and not a made-up bag count. Nobody has said what
         // a sack of this weighs, so nothing can be said in sacks.
@@ -117,7 +119,7 @@ class SaltAndYeastComeInSacksTest extends TestCase
         // And says why, rather than «این فقط به کیلوگرم ثبت می‌شود» — which
         // read as a rule about the good when it is really a missing setting.
         $this->postJson('/api/v1/inventory/movements', [
-            'item' => InventoryItem::YEAST_WET,
+            'item' => InventoryItem::YEAST_DRY,
             'direction' => 'in',
             'bags' => 2,
             'reason' => 'purchase',

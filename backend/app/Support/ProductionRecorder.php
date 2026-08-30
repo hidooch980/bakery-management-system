@@ -25,25 +25,23 @@ class ProductionRecorder
     /**
      * Kneading: flour, salt and yeast out, dough in.
      *
-     * @param  string  $yeastType  'dry', or 'wet' for the fresh yeast that
-     *                             proves faster and is what winter calls
-     *                             for. Both are stocked, so the batch says
-     *                             which tub it came out of.
+     * The fresh-yeast tub was removed on 1405/06/08 — every batch had been
+     * mixed with dry and the choice was one nobody made. The parameter is
+     * gone; the column stays, because the batches already recorded carry
+     * the value and a report reads it.
      */
     public static function dough(
         int $bags,
         int $userId,
         ?string $note = null,
-        string $yeastType = DoughFormula::DRY,
     ): DoughEntry {
         $formula = DoughFormula::fromBakery();
-        $yeastType = $yeastType === DoughFormula::WET ? DoughFormula::WET : DoughFormula::DRY;
 
-        return DB::transaction(function () use ($bags, $userId, $note, $formula, $yeastType) {
+        return DB::transaction(function () use ($bags, $userId, $note, $formula) {
             $entry = DoughEntry::create([
                 'user_id' => $userId,
                 'bag_count' => $bags,
-                'yeast_type' => $yeastType,
+                'yeast_type' => DoughFormula::DRY,
                 'note' => $note,
                 'status' => 'pending',
             ]);
@@ -55,12 +53,10 @@ class ProductionRecorder
                 'out', $formula->saltKg($bags), 'production', $userId, $entry
             );
 
-            // Drawn from whichever tub was actually opened, so a winter run
-            // does not quietly eat into the dry stock.
             $yeast = $formula->yeastKg($bags);
 
             if ($yeast > 0) {
-                InventoryItem::forYeastType($yeastType)->move(
+                InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move(
                     'out', $yeast, 'production', $userId, $entry
                 );
             }
