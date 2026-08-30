@@ -27,6 +27,17 @@ class DoughEntry extends Model
 
     protected static function booted(): void
     {
+        // chane_entries cascades on this key, so a bare delete would kill
+        // the chane rows inside the database where no model hook runs —
+        // their spray flour never reversed, their sales gone with the bank
+        // postings left behind. Deleting them here first keeps the whole
+        // chain on the model path. (This happened on 06/06: the batch was
+        // deleted, the dough's own movements reversed, and the chane's
+        // 5 kg of spray flour stayed spent with no owner.)
+        static::deleting(function (self $entry) {
+            $entry->chaneEntries()->get()->each->delete();
+        });
+
         // Kneading moved real stock, so deleting the entry has to put it
         // back. The original movements stay on the record and a reversing
         // one is added beside each, rather than erasing what happened — an
