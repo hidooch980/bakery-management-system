@@ -53,7 +53,6 @@ class PanelMovesStockTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 200, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->admin = User::factory()->create(['is_active' => true]);
         $this->admin->assignRole('admin');
 

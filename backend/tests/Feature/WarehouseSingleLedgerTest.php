@@ -91,7 +91,6 @@ class WarehouseSingleLedgerTest extends TestCase
         // Kneading takes salt as well, so the store needs some of that too.
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $before = $this->flourBalance();
 
         $dough = ProductionRecorder::dough(2, $this->admin->id);

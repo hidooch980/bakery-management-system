@@ -52,7 +52,6 @@ class ChaneOvershootTest extends TestCase
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 100, 'purchase');
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
     }
 
     private function batch(int $bags = 10): DoughEntry

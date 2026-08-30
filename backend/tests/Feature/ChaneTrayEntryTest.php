@@ -55,7 +55,6 @@ class ChaneTrayEntryTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 100, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($this->userWithRole('dough_maker'), 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => $bags]);
 

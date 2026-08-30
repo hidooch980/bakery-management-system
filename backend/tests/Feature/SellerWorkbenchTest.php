@@ -38,7 +38,6 @@ class SellerWorkbenchTest extends TestCase
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 100, 'purchase');
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
     }
 
     public function test_a_seller_can_knead_and_shape_a_batch(): void

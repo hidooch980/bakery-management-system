@@ -56,7 +56,7 @@ class TwoPhonesCannotClaimTheSameThingTest extends TestCase
         Money::forgetCache();
 
         foreach ([InventoryItem::FLOUR, InventoryItem::SALT,
-            InventoryItem::YEAST_DRY, InventoryItem::YEAST_WET] as $key) {
+            InventoryItem::YEAST_DRY] as $key) {
             InventoryItem::ofKey($key)->move('in', 5000, 'purchase');
         }
 

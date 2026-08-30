@@ -46,7 +46,6 @@ class EntryDeletionReversalTest extends TestCase
         InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 1000, 'purchase');
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 100, 'purchase');
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
     }
 
     private function userWithRole(string $role): User

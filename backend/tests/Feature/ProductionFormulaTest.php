@@ -128,7 +128,6 @@ class ProductionFormulaTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 2])
             ->assertCreated();
@@ -160,7 +159,6 @@ class ProductionFormulaTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 1]);
 
         $this->actingAs($chane, 'sanctum')
@@ -183,7 +181,6 @@ class ProductionFormulaTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             // 3 bags to cover both the normal and nanino weight shaped below.
             ->postJson('/api/v1/dough-entries', ['bag_count' => 3])
@@ -216,7 +213,6 @@ class ProductionFormulaTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 5])
             ->assertCreated();
@@ -249,7 +245,6 @@ class ProductionFormulaTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 3])
             ->assertCreated();
@@ -278,7 +273,6 @@ class ProductionFormulaTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 3]);
 
         $this->actingAs($chane, 'sanctum')
@@ -305,7 +299,6 @@ class ProductionFormulaTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')->postJson('/api/v1/dough-entries', ['bag_count' => 2]);
         // Kept low enough (with the 100 normal chane) to fit the 129.2kg of
         // dough 2 bags actually yield — bag_count stays at 2 here because
@@ -335,7 +328,6 @@ class ProductionFormulaTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 50, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $this->actingAs($dough, 'sanctum')
             ->postJson('/api/v1/dough-entries', ['bag_count' => 2])
             ->assertCreated()
@@ -1113,7 +1105,6 @@ class ProductionFormulaTest extends TestCase
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 75, 'purchase');
 
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 50, 'purchase');
-        InventoryItem::ofKey(InventoryItem::YEAST_WET)->move('in', 50, 'purchase');
         $salt = InventoryItem::ofKey(InventoryItem::SALT)->fresh();
 
         $this->assertSame(75.0, $salt->balance);
