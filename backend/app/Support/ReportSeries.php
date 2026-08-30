@@ -95,8 +95,10 @@ class ReportSeries
                     // counted as consumption.
                     'flour_sold_kg' => $used($flour, ['flour_sale', 'consignment_out']),
                     'salt_kg' => $used($items->get(InventoryItem::SALT), ['production']),
+                    // yeast_wet_kg was here until 1405/06/08. The tub was
+                    // removed, and a series that is zero for ever is a line
+                    // on a chart saying nothing.
                     'yeast_dry_kg' => $used($items->get('yeast_dry'), ['production']),
-                    'yeast_wet_kg' => $used($items->get('yeast_wet'), ['production']),
                 ];
             })
             ->values();

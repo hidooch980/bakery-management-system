@@ -34,6 +34,9 @@ class DoughEntryController extends Controller
             'bag_count' => ['required', 'integer', 'min:1', 'max:1000'],
             // Which yeast: fresh proves faster, so it is what winter calls
             // for; dry is the rest of the year.
+            // Still accepts «wet» from a phone on an older build, and
+            // ignores it. The tub is gone; refusing the field would stop
+            // that phone recording a batch at all.
             'yeast_type' => ['nullable', 'in:dry,wet'],
             'note' => ['nullable', 'string', 'max:500'],
             // Set only after the person has been shown the batch they
@@ -89,15 +92,17 @@ class DoughEntryController extends Controller
             }
         }
 
-        $type = $data['yeast_type'] ?? DoughFormula::DRY;
         $formula = DoughFormula::fromBakery();
         $bags = (int) $data['bag_count'];
 
+        // A `yeast_type` still arriving from an older build is accepted and
+        // ignored rather than refused: the fresh tub is gone, and a phone
+        // that has not been updated should not stop being able to record a
+        // batch over it.
         $entry = ProductionRecorder::dough(
             $bags,
             $request->user()->id,
             $data['note'] ?? null,
-            $type,
         );
 
         return $this->success([

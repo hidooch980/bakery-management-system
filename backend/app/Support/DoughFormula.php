@@ -20,14 +20,20 @@ use App\Models\Bakery;
  */
 class DoughFormula
 {
-    /** Which yeast a batch was mixed with. Fresh proves faster in the cold. */
+    /**
+     * Which yeast a batch was mixed with. Only the dry kind is stocked
+     * now — the fresh tub was removed on 1405/06/08, unused after
+     * thirty-one batches. The constant and the column stay because the
+     * batches already recorded carry the value.
+     */
     public const DRY = 'dry';
-
-    public const WET = 'wet';
 
     public const YEAST_LABELS = [
         self::DRY => 'خمیرمایه خشک',
-        self::WET => 'خمیرمایه تر',
+        // Not offered any more, but a batch recorded before 1405/06/08
+        // still says «wet», and reading it back as «خشک» would be this
+        // system telling a story about its own past that is not true.
+        'wet' => 'خمیرمایه تر',
     ];
 
     public function __construct(

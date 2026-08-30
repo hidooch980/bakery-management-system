@@ -16,19 +16,15 @@ class InventoryItem extends Model
     public const SALT = 'salt';
 
     /**
-     * Yeast, in the two forms the shop keeps. Fresh proves faster, so it is
-     * what winter calls for; dry is the rest of the year. Both are bought
-     * and both are stocked, so a batch says which one it took rather than
-     * the warehouse drawing down whichever it happens to hold.
+     * Yeast. Only the dry kind, since 1405/06/08.
+     *
+     * The shop was set up to stock both, on the idea that fresh yeast
+     * proves faster and is what winter calls for. In practice every one of
+     * the first thirty-one batches was mixed with dry, and the owner asked
+     * for the fresh tub to be taken out rather than carried as a choice
+     * nobody makes. See the migration that removes it.
      */
     public const YEAST_DRY = 'yeast_dry';
-
-    public const YEAST_WET = 'yeast_wet';
-
-    public const YEAST_TYPES = [
-        'dry' => self::YEAST_DRY,
-        'wet' => self::YEAST_WET,
-    ];
 
     /**
      * What the shop buys and therefore counts. Dough is not here: it is
@@ -39,14 +35,8 @@ class InventoryItem extends Model
         self::FLOUR => 'آرد',
         self::SALT => 'نمک',
         self::YEAST_DRY => 'خمیرمایه خشک',
-        self::YEAST_WET => 'خمیرمایه تر',
     ];
 
-    /** The warehouse item the given kind of yeast is drawn from. */
-    public static function forYeastType(string $type): self
-    {
-        return self::ofKey(self::YEAST_TYPES[$type] ?? self::YEAST_DRY);
-    }
 
     protected $fillable = ['key', 'name', 'unit', 'bag_weight_kg', 'low_threshold'];
 
