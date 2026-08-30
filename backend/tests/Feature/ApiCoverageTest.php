@@ -182,7 +182,6 @@ class ApiCoverageTest extends TestCase
         InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
 
         InventoryItem::ofKey('yeast_dry')->move('in', 50, 'purchase');
-        InventoryItem::ofKey('yeast_wet')->move('in', 50, 'purchase');
         $data = $this->actingAs($this->admin, 'sanctum')
             ->getJson('/api/v1/inventory')
             ->assertOk()

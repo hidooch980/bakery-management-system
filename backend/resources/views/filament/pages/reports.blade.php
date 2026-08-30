@@ -189,7 +189,7 @@
 
                 <x-bakery.figure
                     label="نمک و خمیرمایه"
-                    :value="number_format((float) $consumption->sum('salt_kg'), 1).' + '.number_format((float) $consumption->sum('yeast_dry_kg') + (float) $consumption->sum('yeast_wet_kg'), 1).' کیلو'"
+                    :value="number_format((float) $consumption->sum('salt_kg'), 1).' + '.number_format((float) $consumption->sum('yeast_dry_kg'), 1).' کیلو'"
                     icon="heroicon-m-sparkles"
                     tone="info"
                 />
@@ -217,7 +217,7 @@
                             <td class="py-2.5 pe-3 tabular-nums text-gray-400 dark:text-gray-500">{{ number_format($row['flour_sold_kg'], 1) }}</td>
                             <td class="py-2.5 pe-3 tabular-nums text-gray-500 dark:text-gray-400">{{ number_format($row['salt_kg'], 2) }}</td>
                             <td class="py-2.5 pe-3 tabular-nums text-gray-500 dark:text-gray-400">
-                                {{ number_format($row['yeast_dry_kg'] + $row['yeast_wet_kg'], 2) }}
+                                {{ number_format($row['yeast_dry_kg'], 2) }}
                             </td>
                         </tr>
                     @endforeach
@@ -231,7 +231,7 @@
                         <td class="py-3 pe-3 tabular-nums">{{ number_format((float) $consumption->sum('flour_sold_kg'), 1) }}</td>
                         <td class="py-3 pe-3 tabular-nums">{{ number_format((float) $consumption->sum('salt_kg'), 2) }}</td>
                         <td class="py-3 pe-3 tabular-nums">
-                            {{ number_format((float) $consumption->sum('yeast_dry_kg') + (float) $consumption->sum('yeast_wet_kg'), 2) }}
+                            {{ number_format((float) $consumption->sum('yeast_dry_kg'), 2) }}
                         </td>
                     </x-slot>
                 </x-bakery.report-table>
