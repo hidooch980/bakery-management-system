@@ -42,7 +42,12 @@ class BackupDatabase extends Command
             return self::FAILURE;
         }
 
-        $stamp = now()->format('Y-m-d_His');
+        // Microseconds, not just seconds: two dumps started within the same
+        // second — the manual "take one now" button pressed twice, or a test
+        // calling this command back to back — would otherwise share one
+        // filename and one mtime, and prune() below would have no reliable
+        // way to tell which is actually newer.
+        $stamp = now()->format('Y-m-d_His_u');
         $path = "{$dir}/{$config['database']}_{$stamp}.sql.gz";
 
         if (! $this->dump($config, $path)) {

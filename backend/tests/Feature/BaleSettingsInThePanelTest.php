@@ -10,7 +10,6 @@ use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -146,10 +145,9 @@ class BaleSettingsInThePanelTest extends TestCase
             'backup_bale_enabled' => true,
         ]);
 
-        $exit = Artisan::call('backup:database', ['--keep' => 1, '--no-mail' => true]);
-        $output = Artisan::output();
-
-        $this->assertStringContainsString('به بله ارسال شد', $output, "exit={$exit}\n{$output}");
+        $this->artisan('backup:database', ['--keep' => 1, '--no-mail' => true])
+            ->expectsOutputToContain('به بله ارسال شد')
+            ->assertSuccessful();
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendDocument')
             && str_contains($request->body(), '999'));
