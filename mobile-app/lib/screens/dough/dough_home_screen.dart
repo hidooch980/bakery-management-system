@@ -179,7 +179,8 @@ class _DoughHomeScreenState extends State<DoughHomeScreen> {
       hint: _today.isEmpty
           ? 'دفعهٔ پیش $bags کیسه بود'
           : 'امروز ${_today.length} بار ثبت کرده‌ای — '
-              '${_today.fold<int>(0, (sum, e) => sum + e.bagCount)} کیسه',
+              '${_today.fold<int>(0, (sum, e) => sum + e.bagCount)} کیسه '
+              '(ساعت ${_today.map((e) => JalaliFormat.time(e.createdAt)).join('، ')})',
       actionLabel: 'ثبت کن',
       busy: _saving,
       onAction: _repeat == null ? _save : null,
@@ -207,7 +208,7 @@ class _DoughHomeScreenState extends State<DoughHomeScreen> {
         if (_queued)
           'اینترنت وصل نیست — با اتصال بعدی می‌رود'
         else
-          'ساعت ${JalaliFormat.time(DateTime.now())}',
+          '${JalaliFormat.date(DateTime.now())} — ساعت ${JalaliFormat.time(DateTime.now())}',
         if (_today.length > 1) 'امروز روی هم ${_today.fold<int>(0, (s, e) => s + e.bagCount)} کیسه',
       ],
       actionLabel: 'یک دستهٔ دیگر',

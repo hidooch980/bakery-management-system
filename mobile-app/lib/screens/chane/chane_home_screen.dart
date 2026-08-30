@@ -5,6 +5,7 @@ import '../../models/entries.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import '../../widgets/one_task.dart';
 import '../shared/me_screen.dart';
@@ -280,11 +281,22 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
                     const SizedBox(width: 10),
                     Text('کیسه', style: theme.textTheme.titleMedium),
                     const Spacer(),
-                    Text(
-                      dough.userName ?? '',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          dough.userName ?? '',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        Text(
+                          'ساعت ${JalaliFormat.time(dough.createdAt)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -381,6 +393,7 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
       headline: _queued ? 'ذخیره شد' : 'ثبت شد',
       summary: [
         '$_count چانه از ${_chosen?.bagCount ?? 0} کیسه',
+        '${JalaliFormat.date(DateTime.now())} — ساعت ${JalaliFormat.time(DateTime.now())}',
         if (_queued)
           'اینترنت وصل نیست — با اتصال بعدی می‌رود'
         else if (weight != null)
