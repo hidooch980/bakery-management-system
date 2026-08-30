@@ -140,13 +140,22 @@ void main() {
     // label would be a nuisance; this is a dead screen.
     await _pick(tester, initial: Jalali(1405, 1, 30).toDateTime());
 
-    await tester.tap(find.text('فروردین').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('اسفند').last);
+    // Driven through the field's own onChanged rather than by tapping
+    // through the menu: the menu opens in an overlay and Esfand is the
+    // twelfth item, off-screen in a test viewport, so tapping it is a
+    // test of scrolling rather than of the bug.
+    final month = tester
+        .widgetList<DropdownButtonFormField<int>>(
+          find.byType(DropdownButtonFormField<int>),
+        )
+        .elementAt(1);
+
+    month.onChanged!(12);
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.textContaining('اسفند'), findsWidgets);
+    // 30 is gone from the list; the field must not still be holding it.
+    expect(find.text('30'), findsNothing);
   });
 
   testWidgets('the month dropdown offers all twelve Jalali months',
