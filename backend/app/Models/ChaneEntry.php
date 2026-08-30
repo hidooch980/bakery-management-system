@@ -29,6 +29,17 @@ class ChaneEntry extends Model
 
     protected static function booted(): void
     {
+        // The sales table cascades on this entry's key, so a bare delete
+        // would erase the sales inside the database where no model hook
+        // runs — leaving their bank postings in the account with nothing
+        // behind them. Deleting them here first keeps every reversal on
+        // the model path. (This happened: the 06/06 batch was deleted, its
+        // card sale vanished by cascade, and 7,290,000 Rial sat in the
+        // account with no record to explain it.)
+        static::deleting(function (self $entry) {
+            $entry->sales()->get()->each->delete();
+        });
+
         // Shaping consumed dough and spray flour, so deleting the entry
         // gives both back and frees the batch to be shaped again —
         // otherwise the dough stays spent and the batch stays stuck as
@@ -61,6 +72,12 @@ class ChaneEntry extends Model
     public function sale()
     {
         return $this->hasOne(Sale::class);
+    }
+
+    /** A batch can carry several sales — card, cash, home, charity. */
+    public function sales()
+    {
+        return $this->hasMany(Sale::class);
     }
 
     public function scopePending($query)

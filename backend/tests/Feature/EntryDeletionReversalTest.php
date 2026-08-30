@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Bakery;
+use App\Models\BankAccount;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
+use App\Models\Sale;
 use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -158,5 +160,59 @@ class EntryDeletionReversalTest extends TestCase
         ChaneEntry::latest('id')->first()->delete();
 
         // Both systems consume dough, so both shares have to come back.
+    }
+
+    public function test_deleting_the_dough_entry_reverses_its_chane_too(): void
+    {
+        // chane_entries cascades on dough_entry_id, so without the model
+        // deleting its children itself, the chane row dies inside the
+        // database and its spray flour stays spent with no owner — which
+        // is exactly what stock:audit caught after the 06/06 batch was
+        // deleted from the panel.
+        $flourBefore = InventoryItem::ofKey(InventoryItem::FLOUR)->balance;
+        $dough = $this->recordDough(2);
+
+        $this->actingAs($this->userWithRole('chane_gir'), 'sanctum')
+            ->postJson('/api/v1/chane-entries', [
+                'dough_entry_id' => $dough->id,
+                'chane_count' => 100,
+                'spray_flour_kg' => 2.5,
+            ])
+            ->assertCreated();
+
+        $dough->delete();
+
+        $this->assertSame(0, ChaneEntry::count());
+        $this->assertSame($flourBefore, InventoryItem::ofKey(InventoryItem::FLOUR)->balance);
+    }
+
+    public function test_deleting_the_dough_entry_clears_its_sales_bank_posting(): void
+    {
+        // sales cascades on chane_entry_id the same way. A card sale posts
+        // money into the bank account; if the row is erased by the database
+        // instead of the model, the posting stays behind with no sale to
+        // explain it — 7,290,000 Rial sat in the account that way once.
+        $account = BankAccount::create([
+            'title' => 'حساب اصلی',
+            'is_default' => true,
+        ]);
+
+        $dough = $this->recordDough(2);
+        $chane = $this->recordChane($dough, 100);
+
+        $this->actingAs($this->userWithRole('seller'), 'sanctum')
+            ->postJson('/api/v1/sales', [
+                'chane_entry_id' => $chane->id,
+                'payment_type' => 'card',
+                'amount' => 500000,
+            ])
+            ->assertCreated();
+
+        $balanceBefore = $account->refresh()->balance;
+
+        $dough->delete();
+
+        $this->assertSame(0, Sale::count());
+        $this->assertSame($balanceBefore - 500000, $account->refresh()->balance);
     }
 }
