@@ -113,7 +113,10 @@ class BackupDatabase extends Command
         $files = glob("{$dir}/*.sql.gz") ?: [];
 
         // Newest first, so everything past the keep count is the old end.
-        usort($files, fn ($a, $b) => filemtime($b) <=> filemtime($a));
+        // mtime only resolves to the second, and two dumps can land within
+        // one — the filename's microsecond stamp breaks the tie, so the
+        // file just written is never the one deleted.
+        usort($files, fn ($a, $b) => [filemtime($b), $b] <=> [filemtime($a), $a]);
 
         foreach (array_slice($files, $keep) as $old) {
             @unlink($old);

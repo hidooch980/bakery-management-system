@@ -152,4 +152,42 @@ class BaleSettingsInThePanelTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendDocument')
             && str_contains($request->body(), '999'));
     }
+
+    public function test_a_leftover_dump_from_the_same_second_does_not_eat_the_fresh_one(): void
+    {
+        // mtime resolves to the second; on a fast runner a file left by an
+        // earlier test lands in the same second as the fresh dump, and
+        // prune() with --keep=1 then had no reliable newest — sometimes it
+        // deleted the file just written, and the send failed on a path that
+        // no longer existed. The filename's microsecond stamp is the tie-break.
+        Http::fake(['tapi.bale.ai/*' => Http::response(['ok' => true, 'result' => []])]);
+
+        BaleSetting::current()->update([
+            'bot_token' => '123456:abcdef',
+            'chat_id' => '999',
+            'backup_bale_enabled' => true,
+        ]);
+
+        $dir = storage_path('app/backups');
+
+        if (! is_dir($dir)) {
+            mkdir($dir, 0750, true);
+        }
+
+        // Stamped well in the past, but touched to *now*: same mtime second
+        // as the dump the command is about to write.
+        $leftover = "{$dir}/aaa_2000-01-01_000000_000000.sql.gz";
+        file_put_contents($leftover, 'old');
+        touch($leftover, time());
+
+        try {
+            $this->artisan('backup:database', ['--keep' => 1, '--no-mail' => true])
+                ->expectsOutputToContain('به بله ارسال شد')
+                ->assertSuccessful();
+
+            $this->assertFileDoesNotExist($leftover);
+        } finally {
+            @unlink($leftover);
+        }
+    }
 }

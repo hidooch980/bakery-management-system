@@ -49,8 +49,15 @@ class ProfitAndLoss extends Page implements HasForms
 
     protected static string $view = 'filament.pages.profit-and-loss';
 
-    /** 'quota' — the 5th to the 4th — or 'month', the Jalali calendar one. */
-    public string $period = 'quota';
+    /**
+     * 'quota' — the 5th to the 4th — or 'month', the Jalali calendar one.
+     *
+     * Nullable because Livewire delivers a cleared select as null by
+     * unsetting a non-nullable property, and the very next render then
+     * throws PropertyNotFound — it happened to the owner on 1405/06/09.
+     * Null simply reads as the default period.
+     */
+    public ?string $period = 'quota';
 
     public function mount(): void
     {
