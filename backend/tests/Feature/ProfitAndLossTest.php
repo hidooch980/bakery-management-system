@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\ProfitAndLoss;
 use App\Models\Bakery;
 use App\Models\Expense;
 use App\Models\Income;
@@ -12,6 +13,7 @@ use App\Support\Money;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -197,5 +199,19 @@ class ProfitAndLossTest extends TestCase
 
         // Cash profit ignores the flour, as it always has.
         $this->assertEquals(5_000_000, $response->json('data.profit.amount'));
+    }
+
+    public function test_a_cleared_period_select_falls_back_to_the_quota_period(): void
+    {
+        // Livewire delivers a cleared select as null by unsetting the
+        // property; while $period was a non-nullable string, the very next
+        // render threw PropertyNotFound. The owner hit it on 1405/06/09.
+        Livewire::actingAs($this->admin)
+            ->test(ProfitAndLoss::class)
+            ->assertOk()
+            ->set('period', 'month')
+            ->assertOk()
+            ->set('period', null)
+            ->assertOk();
     }
 }
