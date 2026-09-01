@@ -79,6 +79,17 @@ class ApiClient {
     _dio.httpClientAdapter = adapter;
   }
 
+  /// Called when the server answers 401 — the session is gone, not the
+  /// signal. Set by AuthProvider, which sends the user back to sign in.
+  ///
+  /// Nothing acted on a 401 before this. `ApiException.isUnauthorized` had
+  /// existed unused since it was written, so a revoked session left the app
+  /// sitting on a screen that still looked usable, failing one call at a
+  /// time. Signing in on a second device revokes the first, and the first
+  /// then showed «برای دسترسی باید وارد شوید» under a form that
+  /// invited you to keep typing.
+  void Function()? onSessionExpired;
+
   /// Points every later call at a different backend.
   ///
   /// Changed on the live Dio instance rather than by building a new client,
@@ -403,6 +414,17 @@ class ApiClient {
 
     if (response.statusCode! >= 200 && response.statusCode! < 300) {
       return body;
+    }
+
+    // A 401 is the server refusing this token, which is not the same as
+    // not reaching the server — that arrives as isConnectivityError and
+    // must never end a session, or a lift with no signal signs everyone
+    // out. Sign-in itself answers 422 for a wrong password, so it cannot
+    // land here, but it is excluded anyway: a failed sign-in has no
+    // session to expire.
+    if (response.statusCode == 401 &&
+        !response.requestOptions.path.endsWith('/login')) {
+      onSessionExpired?.call();
     }
 
     throw ApiException(

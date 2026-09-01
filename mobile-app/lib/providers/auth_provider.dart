@@ -13,7 +13,9 @@ enum AuthStatus { unknown, authenticated, unauthenticated }
 class AuthProvider extends ChangeNotifier {
   AuthProvider(this._api, {BiometricService? biometrics, SecureStore? store})
       : _biometrics = biometrics ?? BiometricService(),
-        _store = store ?? SecureStore();
+        _store = store ?? SecureStore() {
+    _api.client.onSessionExpired = sessionExpired;
+  }
 
   final BakeryApi _api;
   final BiometricService _biometrics;
@@ -191,6 +193,33 @@ class AuthProvider extends ChangeNotifier {
     } on ApiException {
       return false;
     }
+  }
+
+  /// The server refused this token mid-session, so the session is over.
+  ///
+  /// Sign-in revokes every other token for that user, so opening the app on
+  /// a second phone ends the first one's session. The first phone had no
+  /// way to know: it kept showing screens drawn before the refusal and
+  /// failed one request at a time, which reads as a broken app rather than
+  /// as being signed out.
+  ///
+  /// Only ever reached from a real 401. A request that never arrived is an
+  /// `isConnectivityError` and is left alone — see bootstrap(), where
+  /// treating the two the same once signed the shop out for having no
+  /// signal.
+  void sessionExpired() {
+    if (_status == AuthStatus.unauthenticated) return;
+
+    _status = AuthStatus.unauthenticated;
+    _user = null;
+    _offline = false;
+    _error = 'نشست شما پایان یافته — دوباره وارد شوید.';
+
+    // Fire-and-forget: the screen must change now, not after the disk.
+    _api.client.clearToken();
+    _forgetUser();
+
+    notifyListeners();
   }
 
   Future<void> logout() async {

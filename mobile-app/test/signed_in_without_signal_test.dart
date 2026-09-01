@@ -64,6 +64,40 @@ class _Refuses implements HttpClientAdapter {
 const _storedUser = '{"id":7,"name":"محمد حنیف","email":null,"phone":null,'
     '"roles":["seller"],"permissions":["record-sale"]}';
 
+
+/// Answers `/me` but refuses everything else — which is exactly what the
+/// shop's server did on 1405/06/11: `/me` and `/chane-board` 200, and
+/// `/nanino` 401 four seconds later, on the same token.
+class _RefusesAllButMe implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    if (options.path.endsWith('/me')) {
+      return ResponseBody.fromString(
+        '{"success":true,"data":$_storedUser}',
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
+
+    return ResponseBody.fromString(
+      '{"success":false,"message":"برای دسترسی باید وارد شوید."}',
+      401,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -194,4 +228,66 @@ void main() {
       expect(await storage.read(key: 'biometric_password'), isNotNull);
     });
   });
+
+  group('the session is revoked while the app is open', () {
+    setUp(() {
+      FlutterSecureStorage.setMockInitialValues({
+        'auth_token': 'a-token-another-device-just-killed',
+        'last_user_v1': _storedUser,
+      });
+    });
+
+    test('a 401 mid-session sends the person back to sign in', () async {
+      final auth = providerWith(_RefusesAllButMe());
+
+      await auth.bootstrap();
+      expect(auth.status, AuthStatus.authenticated, reason: 'signed in first');
+
+      // Any later call the server refuses. Nothing acted on a 401 before
+      // this: the app stayed on a screen that still looked usable and
+      // failed one request at a time.
+      await expectLater(
+        auth.api.client.get('/nanino'),
+        throwsA(isA<ApiException>()),
+      );
+
+      expect(auth.status, AuthStatus.unauthenticated);
+    });
+
+    test('and the dead token is not kept', () async {
+      final auth = providerWith(_RefusesAllButMe());
+
+      await auth.bootstrap();
+      await auth.api.client.get('/nanino').catchError((_) => <String, dynamic>{});
+
+      const storage = FlutterSecureStorage();
+      expect(await storage.read(key: 'auth_token'), isNull);
+    });
+
+    test('and says so, rather than leaving the screen to explain', () async {
+      final auth = providerWith(_RefusesAllButMe());
+
+      await auth.bootstrap();
+      await auth.api.client.get('/nanino').catchError((_) => <String, dynamic>{});
+
+      expect(auth.error, contains('دوباره وارد شوید'));
+    });
+
+    test('no signal does not end the session', () async {
+      // The whole point of the distinction: a request that never arrived
+      // says nothing about the token. This is the case that once signed the
+      // shop out for being in a lift.
+      final auth = providerWith(_NoSignal());
+
+      await auth.bootstrap();
+      expect(auth.status, AuthStatus.authenticated);
+
+      await auth.api.client.get('/nanino').catchError((_) => <String, dynamic>{});
+
+      expect(auth.status, AuthStatus.authenticated);
+      const storage = FlutterSecureStorage();
+      expect(await storage.read(key: 'auth_token'), isNotNull);
+    });
+  });
+
 }
