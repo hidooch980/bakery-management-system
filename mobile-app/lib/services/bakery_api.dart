@@ -354,33 +354,6 @@ class BakeryApi {
 
   // --------------------------------------------------------------- sales
 
-  /// The chane batch being sold was already fetched from the server (the
-  /// seller only ever sees pending chane loaded while online), so its id
-  /// is always real — queueing the sale itself offline is safe.
-  Future<bool> recordSale({
-    required int chaneEntryId,
-    required PaymentType paymentType,
-    int? breadCount,
-    int? customerId,
-    double? amount,
-    String? note,
-  }) async {
-    final body = await _client.postOrQueue(
-      '/sales',
-      {
-        'chane_entry_id': chaneEntryId,
-        'payment_type': paymentType.apiValue,
-        if (breadCount != null) 'bread_count': breadCount,
-        if (customerId != null) 'customer_id': customerId,
-        if (amount != null) 'amount': amount,
-        if (note != null && note.isNotEmpty) 'note': note,
-      },
-      label: 'فروش — چانه #$chaneEntryId',
-    );
-
-    return body['queued'] == true;
-  }
-
   /// Records one batch paid for in several ways at once — part cash, part
   /// card — as a single request, so the batch is closed once and any
   /// shortfall is counted once rather than per line.
