@@ -200,21 +200,24 @@ class Sale extends Model
      */
     public static function staffBreadOutstandingFor(int $userId, ?int $ignoringSalaryId = null): float
     {
-        $sales = static::where('consumed_by_user_id', $userId)
+        // One query, not one per sale. The payroll page asks this for
+        // every employee at once, and the per-sale version of it would
+        // have put a query on the page for every loaf anybody ever took
+        // home — the shape that once added 320 queries to every panel
+        // page through a sidebar badge.
+        $recovered = 'select coalesce(sum(amount), 0) from salary_bread_recoveries'
+            .' where salary_bread_recoveries.sale_id = sales.id'
+            .($ignoringSalaryId === null ? '' : ' and salary_payment_id <> ?');
+
+        $total = static::where('consumed_by_user_id', $userId)
             ->where('consumed_amount', '>', 0)
-            ->get();
+            ->selectRaw(
+                "coalesce(sum(greatest(consumed_amount - ({$recovered}), 0)), 0) as total",
+                $ignoringSalaryId === null ? [] : [$ignoringSalaryId],
+            )
+            ->value('total');
 
-        $total = 0.0;
-
-        foreach ($sales as $sale) {
-            $recovered = (float) $sale->breadRecoveries()
-                ->when($ignoringSalaryId, fn ($q) => $q->where('salary_payment_id', '!=', $ignoringSalaryId))
-                ->sum('amount');
-
-            $total += max(0, (float) $sale->consumed_amount - $recovered);
-        }
-
-        return round($total, 2);
+        return round((float) $total, 2);
     }
 
     public function getIsDebtAttribute(): bool
