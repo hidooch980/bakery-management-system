@@ -160,10 +160,12 @@ class IssueScanner
             // an empty one is reported by emptyStock() below.
             //
             // The threshold is named explicitly rather than left to
-            // `is_low`: everything this issue says quotes `low_threshold`,
-            // so an item that has none has nothing to say here.
-            if ($item->low_threshold === null || ! $item->is_low
-                || $item->balance <= 0) {
+            // `is_low`: everything this issue says quotes a figure, so an
+            // item with no line at all — the owner's or the default sack —
+            // has nothing to say here.
+            $threshold = $item->effective_low_threshold;
+
+            if ($threshold === null || ! $item->is_low || $item->balance <= 0) {
                 continue;
             }
 
@@ -171,15 +173,22 @@ class IssueScanner
                 key: "low-stock-{$key}",
                 severity: SystemIssue::WARNING,
                 title: "موجودی {$item->name} به حد هشدار رسیده",
+                // A line the owner drew is quoted back to him as a
+                // threshold; the default one is quoted as what it is, so
+                // he is not shown a figure he never entered as though he
+                // had agreed to it.
                 detail: number_format($item->balance, 2).' '.$item->unit
-                    .' باقی مانده (حد هشدار: '.number_format((float) $item->low_threshold, 2).').',
+                    .($item->low_threshold_is_a_sack
+                        ? ' باقی مانده — کمتر از یک کیسه ('
+                            .number_format($threshold, 2).' '.$item->unit.').'
+                        : ' باقی مانده (حد هشدار: '.number_format($threshold, 2).').'),
                 cause: 'مصرف از تأمین جلو زده است.',
                 suggestion: 'برای جلوگیری از توقف تولید، تأمین کنید.',
                 url: '/admin/inventory-items',
                 urlLabel: 'مشاهده انبار',
                 // How far under the line, not the balance: a threshold
                 // raised later must not read as the stock falling.
-                magnitude: (float) $item->low_threshold - (float) $item->balance,
+                magnitude: $threshold - (float) $item->balance,
             );
         }
 

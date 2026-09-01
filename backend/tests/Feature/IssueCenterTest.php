@@ -463,4 +463,88 @@ class IssueCenterTest extends TestCase
 
         $this->assertNull($this->issue('expenses-mostly-other'));
     }
+
+    /** Puts `$in` kg of a good into stock, then takes `$out` back out. */
+    private function stock(string $key, float $in, float $out = 0): InventoryItem
+    {
+        $item = InventoryItem::ofKey($key);
+
+        InventoryMovement::create([
+            'inventory_item_id' => $item->id,
+            'direction' => 'in',
+            'quantity' => $in,
+            'reason' => 'purchase',
+        ]);
+
+        if ($out > 0) {
+            InventoryMovement::create([
+                'inventory_item_id' => $item->id,
+                'direction' => 'out',
+                'quantity' => $out,
+                'reason' => 'production',
+            ]);
+        }
+
+        return $item->refresh();
+    }
+
+    public function test_a_good_under_one_sack_is_reported_without_anyone_setting_a_line(): void
+    {
+        // The real case: dry yeast comes in sacks of 10, the shop uses
+        // 2.33 kg a day, and nobody had ever set a threshold — so the
+        // warning never fired and the shop ran out three times in nine
+        // days, learning each time only when the app refused the dough.
+        $yeast = $this->stock(InventoryItem::YEAST_DRY, 12, 4);
+
+        $this->assertNull($yeast->low_threshold, 'nobody set a line');
+        // The line is one sack — 10 kg — and the balance is 8, under it.
+        $this->assertSame(10.0, $yeast->effective_low_threshold);
+        $this->assertSame(8.0, $yeast->balance);
+        $this->assertTrue($yeast->is_low);
+
+        $issue = $this->scan()->firstWhere('key', 'low-stock-'.InventoryItem::YEAST_DRY);
+
+        $this->assertNotNull($issue);
+        $this->assertSame(SystemIssue::WARNING, $issue->severity);
+        // Told as an instruction, not as a figure he never entered.
+        $this->assertStringContainsString('کمتر از یک کیسه', $issue->detail);
+    }
+
+    public function test_a_full_sack_is_not_low(): void
+    {
+        // The boundary from the other side: this must not fire on a shop
+        // that has just been resupplied, or it becomes noise and is
+        // ignored on the day it matters.
+        $yeast = $this->stock(InventoryItem::YEAST_DRY, 30, 4);
+
+        $this->assertFalse($yeast->is_low);
+        $this->assertNull($this->scan()->firstWhere('key', 'low-stock-'.InventoryItem::YEAST_DRY));
+    }
+
+    public function test_the_owners_own_line_still_wins(): void
+    {
+        $yeast = $this->stock(InventoryItem::YEAST_DRY, 30, 4);
+        $yeast->update(['low_threshold' => 40]);
+
+        $yeast = $yeast->refresh();
+        $this->assertSame(40.0, $yeast->effective_low_threshold);
+        $this->assertFalse($yeast->low_threshold_is_a_sack);
+        $this->assertTrue($yeast->is_low);
+
+        // And it is quoted back to him as a threshold, not as a sack.
+        $issue = $this->scan()->firstWhere('key', 'low-stock-'.InventoryItem::YEAST_DRY);
+        $this->assertStringContainsString('حد هشدار', $issue->detail);
+        $this->assertStringNotContainsString('یک کیسه', $issue->detail);
+    }
+
+    public function test_flour_is_left_to_the_quota(): void
+    {
+        // Flour moves 600 kg a day here, so one sack of it is under an
+        // hour's baking rather than days of notice — and it is the one
+        // good the quota already watches.
+        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+
+        $this->assertNull($flour->effective_low_threshold);
+        $this->assertFalse($flour->low_threshold_is_a_sack);
+    }
 }
