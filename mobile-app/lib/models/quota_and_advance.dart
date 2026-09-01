@@ -221,6 +221,8 @@ class PaySummary {
     required this.periodLabel,
     required this.advanceOutstandingFormatted,
     required this.advanceOutstanding,
+    required this.breadOutstandingFormatted,
+    required this.breadOutstanding,
     required this.unpaidPayslipsFormatted,
     required this.unpaidPayslipsCount,
     required this.carriesOver,
@@ -237,6 +239,9 @@ class PaySummary {
         advanceOutstanding: _d(json['advance_outstanding']),
         advanceOutstandingFormatted:
             json['advance_outstanding_formatted'] as String? ?? '',
+        breadOutstanding: _d(json['bread_outstanding']),
+        breadOutstandingFormatted:
+            json['bread_outstanding_formatted'] as String? ?? '',
         unpaidPayslipsFormatted:
             json['unpaid_payslips_total_formatted'] as String? ?? '',
         unpaidPayslipsCount: json['unpaid_payslips_count'] as int? ?? 0,
@@ -255,6 +260,12 @@ class PaySummary {
 
   final double advanceOutstanding;
   final String advanceOutstandingFormatted;
+
+  /// Bread this person took home and has not settled. Kept apart from the
+  /// advance rather than summed: a deduction on a payslip is easier to
+  /// argue with when you can see which of the two it came from.
+  final double breadOutstanding;
+  final String breadOutstandingFormatted;
 
   final String unpaidPayslipsFormatted;
   final int unpaidPayslipsCount;
@@ -276,6 +287,8 @@ class PaySummary {
   final String summary;
 
   bool get owesAdvance => advanceOutstanding > 0;
+
+  bool get owesBread => breadOutstanding > 0;
 
   bool get hasUnpaidPayslips => unpaidPayslipsCount > 0;
 }
