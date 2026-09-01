@@ -15,6 +15,13 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /**
+     * How many devices may hold a session at once. Three covers his phone,
+     * a second one, and the shop's own — more than that is a key nobody is
+     * watching.
+     */
+    private const MAX_SESSIONS = 3;
+
     use ApiResponse;
 
     /**
@@ -42,7 +49,7 @@ class AuthController extends Controller
         }
 
         $user->forceFill(['last_login_at' => now()])->save();
-        $user->tokens()->delete();
+        $this->closeOldestSessions($user);
         $token = $user->createToken('mobile-app')->plainTextToken;
 
         return $this->success([
@@ -218,5 +225,34 @@ class AuthController extends Controller
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
         ];
+    }
+
+    /**
+     * Room for a few devices, and no more.
+     *
+     * Signing in used to delete *every* other token, so a session lived on
+     * exactly one phone: opening the app on a second one silently killed
+     * the first, which then failed one request at a time without ever
+     * saying it had been signed out. That is what «نانینو وصل نمی‌شه»
+     * turned out to be on 1405/06/11 — 96 refused requests from a phone
+     * whose key had been revoked four seconds earlier.
+     *
+     * Not simply removed, though: a pile of forgotten keys is exactly what
+     * `tokens:prune-idle` was written to clear, and a token nobody uses is
+     * the one whose loss nobody notices. So the newest few stay and the
+     * rest are closed — a shop with three devices keeps all three, and the
+     * fourth sign-in retires the oldest rather than everybody.
+     *
+     * A password change or reset still closes every session; those are
+     * deliberate and are left alone.
+     */
+    private function closeOldestSessions(User $user): void
+    {
+        $keep = $user->tokens()
+            ->orderByDesc('id')
+            ->take(self::MAX_SESSIONS - 1)
+            ->pluck('id');
+
+        $user->tokens()->whereNotIn('id', $keep)->delete();
     }
 }
