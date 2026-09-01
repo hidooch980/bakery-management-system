@@ -109,7 +109,7 @@ class HolidayController extends Controller
             'type' => $holiday->type,
             'type_label' => $holiday->type_label,
             'note' => $holiday->note,
-            'is_past' => $holiday->date?->isPast() ?? false,
+            'is_past' => $holiday->is_past,
         ];
     }
 }

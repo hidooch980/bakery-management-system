@@ -93,6 +93,41 @@ class LoanInstalmentIsChasedTest extends TestCase
         $this->assertStringContainsString('عقب افتاده', $issue->title);
     }
 
+    public function test_an_instalment_due_today_is_not_late_yet(): void
+    {
+        // Found on the shop's own data: the machine loan fell due on
+        // 1405/06/10 and the panel called it «عقب افتاده است» at critical,
+        // with «۰ روز از سررسید گذشته» underneath — a sentence that
+        // contradicts itself. `first_due_on` is a date cast, so `isPast()`
+        // turned true at midnight. The bank takes the transfer during the
+        // day.
+        $issue = $this->issue($this->loan(0));
+
+        $this->assertNotNull($issue);
+        $this->assertSame(SystemIssue::WARNING, $issue->severity);
+        $this->assertStringNotContainsString('عقب افتاده', $issue->title);
+        $this->assertStringContainsString('امروز سررسید است', $issue->title);
+        $this->assertStringContainsString('امروز سررسید است', $issue->detail);
+        // Nothing is late, so nothing has grown.
+        $this->assertSame(0.0, $issue->magnitude);
+    }
+
+    public function test_an_instalment_a_day_past_is_late(): void
+    {
+        // The boundary from the other side, so the fix above cannot be
+        // over-applied into never reporting an overdue loan at all.
+        $issue = $this->issue($this->loan(-1));
+
+        $this->assertSame(SystemIssue::CRITICAL, $issue->severity);
+        $this->assertStringContainsString('عقب افتاده', $issue->title);
+    }
+
+    public function test_the_loan_itself_does_not_call_today_overdue(): void
+    {
+        $this->assertFalse($this->loan(0)->is_overdue);
+        $this->assertTrue($this->loan(-1)->is_overdue);
+    }
+
     public function test_it_says_what_is_owed_and_what_is_left(): void
     {
         $issue = $this->issue($this->loan(-5));

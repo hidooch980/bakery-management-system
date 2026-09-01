@@ -627,20 +627,25 @@ class IssueScanner
             $issues[] = new SystemIssue(
                 key: "loan-due-{$loan->id}",
                 severity: $overdue ? SystemIssue::CRITICAL : SystemIssue::WARNING,
-                title: $overdue
-                    ? "قسط «{$loan->title}» عقب افتاده است"
-                    : "قسط «{$loan->title}» نزدیک است",
+                title: match (true) {
+                    $overdue => "قسط «{$loan->title}» عقب افتاده است",
+                    $days === 0 => "قسط «{$loan->title}» امروز سررسید است",
+                    default => "قسط «{$loan->title}» نزدیک است",
+                },
                 // Says the date has passed, not why. The check cannot tell
                 // an unpaid instalment from a paid one nobody entered, and
                 // claiming the second when it is the first sends the owner
                 // looking for a bank entry that was never there.
                 detail: 'قسط '.Money::format((float) $loan->instalment_amount)
                     .' سررسید '.$loan->next_due_on_display
-                    .($overdue
-                        ? " — {$days} روز از سررسید گذشته."
-                        : " — {$days} روز مانده.")
-                    .' تا امروز '.$loan->paid_formatted.' پرداخت شده،'
-                    .' مانده‌ی وام '.$loan->remaining_formatted.'.',
+                    .match (true) {
+                        $overdue => " — {$days} روز از سررسید گذشته.",
+                        // «۰ روز مانده» is not something anyone says.
+                        $days === 0 => ' — امروز سررسید است.',
+                        default => " — {$days} روز مانده.",
+                    }
+                .' تا امروز '.$loan->paid_formatted.' پرداخت شده،'
+                .' مانده‌ی وام '.$loan->remaining_formatted.'.',
                 cause: $overdue
                     ? 'یا قسط پرداخت نشده، یا پرداخت شده و در سامانه ثبت نشده است.'
                     : 'موعد ماهانه‌ی این وام نزدیک شده است.',

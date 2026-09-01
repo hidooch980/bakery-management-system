@@ -34,6 +34,19 @@ class Holiday extends Model
         ];
     }
 
+    /**
+     * Before today — not «not in the future».
+     *
+     * `date` is a date cast, i.e. midnight, so `isPast()` marks *today's*
+     * holiday as gone the moment the day begins, while the shop is in fact
+     * shut for it. Lived in two places that had to agree and did not have
+     * to; it lives here now.
+     */
+    public function getIsPastAttribute(): bool
+    {
+        return $this->date !== null && $this->date->lt(today());
+    }
+
     public function generatedOccurrences()
     {
         return $this->hasMany(self::class, 'repeats_from_id');

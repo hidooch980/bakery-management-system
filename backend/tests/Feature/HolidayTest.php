@@ -277,4 +277,38 @@ class HolidayTest extends TestCase
             // Closed days are not counted against the staff.
             ->assertJsonPath('data.working_days', 3);
     }
+
+    public function test_todays_holiday_has_not_passed_yet(): void
+    {
+        // `date` is a date cast, so it is midnight and `isPast()` was true
+        // from 00:00 — the shop was shut for the day while the panel showed
+        // the holiday as already gone.
+        $today = Holiday::create([
+            'date' => now(), 'title' => 'تعطیل امروز', 'type' => 'official',
+        ]);
+        $yesterday = Holiday::create([
+            'date' => now()->subDay(), 'title' => 'دیروز', 'type' => 'official',
+        ]);
+
+        $this->assertFalse($today->is_past);
+        $this->assertTrue($yesterday->is_past);
+    }
+
+    public function test_the_api_agrees_with_the_model_about_today(): void
+    {
+        // The two used to compute this separately, from the same wrong
+        // expression. Now there is one of it.
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('admin');
+
+        Holiday::create([
+            'date' => now(), 'title' => 'تعطیل امروز', 'type' => 'official',
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/holidays/today')
+            ->assertOk();
+
+        $this->assertFalse(Holiday::first()->is_past);
+    }
 }
