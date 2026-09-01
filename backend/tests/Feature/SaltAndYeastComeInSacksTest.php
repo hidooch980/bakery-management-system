@@ -88,13 +88,16 @@ class SaltAndYeastComeInSacksTest extends TestCase
 
     public function test_a_good_with_no_package_size_still_reads_in_kilos_only(): void
     {
-        // Dry yeast, since the fresh tub was removed on 1405/06/08. It
-        // is the same case: nobody has said what a sack of it weighs.
-        $wet = $this->stock(InventoryItem::YEAST_DRY, 12);
+        // Every good the shop stocks is sized now, so the missing setting
+        // is made rather than borrowed. The rule under test is about the
+        // setting being absent, not about which good is being weighed.
+        $this->item(InventoryItem::YEAST_DRY)->update(['bag_weight_kg' => null]);
+
+        $unsized = $this->stock(InventoryItem::YEAST_DRY, 12);
 
         // Null, not zero and not a made-up bag count. Nobody has said what
         // a sack of this weighs, so nothing can be said in sacks.
-        $this->assertNull($wet->balance_bags);
+        $this->assertNull($unsized->balance_bags);
     }
 
     public function test_stock_can_be_taken_in_by_the_sack(): void
@@ -114,6 +117,8 @@ class SaltAndYeastComeInSacksTest extends TestCase
 
     public function test_a_good_with_no_package_size_refuses_a_sack_count(): void
     {
+        $this->item(InventoryItem::YEAST_DRY)->update(['bag_weight_kg' => null]);
+
         Sanctum::actingAs($this->admin);
 
         // And says why, rather than «این فقط به کیلوگرم ثبت می‌شود» — which

@@ -83,6 +83,9 @@ class InventoryItemPanelTest extends TestCase
 
     public function test_a_good_with_no_sack_size_keeps_its_weight(): void
     {
+        // Made rather than borrowed: every good the shop stocks is sized
+        // now, and the rule under test is about the missing setting.
+        InventoryItem::ofKey('yeast_dry')->update(['bag_weight_kg' => null]);
         InventoryItem::ofKey('yeast_dry')->move('in', 8.5, 'purchase');
 
         $html = Livewire::test(
@@ -140,9 +143,29 @@ class InventoryItemPanelTest extends TestCase
      * And a good whose sack size nobody has given still reads in
      * kilograms, rather than having one invented for it.
      */
-    public function test_dry_yeast_is_still_recorded_in_kilograms(): void
+    public function test_dry_yeast_is_recorded_in_sacks_of_ten(): void
     {
         $yeast = InventoryItem::ofKey('yeast_dry');
+
+        Livewire::test(
+            ListInventoryItems::class
+        )
+            ->callTableAction('recordStock', $yeast, data: [
+                'direction' => 'in',
+                'bags' => 3,
+                'reason' => 'purchase',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertEquals(30.0, $yeast->fresh()->balance);
+        $this->assertEquals(3.0, $yeast->fresh()->balance_bags);
+    }
+
+    /** And an unsized good still asks for, and keeps, kilograms. */
+    public function test_an_unsized_good_is_recorded_in_kilograms(): void
+    {
+        $yeast = InventoryItem::ofKey('yeast_dry');
+        $yeast->update(['bag_weight_kg' => null]);
 
         Livewire::test(
             ListInventoryItems::class

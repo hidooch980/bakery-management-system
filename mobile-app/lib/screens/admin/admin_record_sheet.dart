@@ -41,7 +41,7 @@ enum StockItem {
   // The fresh-yeast tub was taken out of the store on 1405/06/08, unused
   // after thirty-one batches. Offering it here would let somebody book
   // stock into an item the server no longer has.
-  yeastDry('yeast_dry', 'خمیرمایه خشک', false);
+  yeastDry('yeast_dry', 'خمیرمایه خشک', true);
 
   const StockItem(this.apiValue, this.label, this.sacksByDefault);
 
@@ -99,14 +99,18 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
   /// is offline — in which case each item falls back to its own default.
   Map<String, double> _bagWeights = const {};
 
-  /// Whether the chosen good is counted in sacks.
-  bool get _inSacks {
-    final weight = _bagWeights[_item.apiValue];
+  /// Whether a good is counted in sacks, as the shop has recorded it.
+  bool _sacksFor(StockItem item) {
+    final weight = _bagWeights[item.apiValue];
 
-    return weight == null ? _item.sacksByDefault : weight > 0;
+    return weight == null ? item.sacksByDefault : weight > 0;
   }
 
-  String get _itemUnit => _inSacks ? 'کیسه' : 'کیلوگرم';
+  String _unitOf(StockItem item) => _sacksFor(item) ? 'کیسه' : 'کیلوگرم';
+
+  bool get _inSacks => _sacksFor(_item);
+
+  String get _itemUnit => _unitOf(_item);
 
   bool _saving = false;
 
@@ -354,7 +358,7 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                       for (final item in StockItem.values)
                         DropdownMenuItem(
                           value: item,
-                          child: Text('${item.label} — ${item.unit}'),
+                          child: Text('${item.label} — ${_unitOf(item)}'),
                         ),
                     ],
                     // The amount field's label and suffix follow the item,

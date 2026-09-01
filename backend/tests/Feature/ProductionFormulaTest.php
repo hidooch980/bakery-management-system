@@ -1097,10 +1097,10 @@ class ProductionFormulaTest extends TestCase
      * rid of. Dry yeast has no default because nobody has said what a
      * sack of it weighs.
      */
-    public function test_salt_starts_with_the_sack_size_the_shop_gave_it(): void
+    public function test_the_goods_start_with_the_sack_sizes_the_shop_gave_them(): void
     {
         $this->assertSame(25.0, (float) InventoryItem::ofKey(InventoryItem::SALT)->bag_weight_kg);
-        $this->assertNull(InventoryItem::ofKey(InventoryItem::YEAST_DRY)->bag_weight_kg);
+        $this->assertSame(10.0, (float) InventoryItem::ofKey(InventoryItem::YEAST_DRY)->bag_weight_kg);
     }
 
     /** So the store reads in sacks, which is how the shop counts it. */
@@ -1115,14 +1115,26 @@ class ProductionFormulaTest extends TestCase
         $this->assertSame(3.0, $salt->balance_bags);
     }
 
-    public function test_yeast_balance_is_not_reported_in_bags(): void
+    public function test_yeast_balance_is_reported_in_bags(): void
     {
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 25, 'purchase');
 
         $yeast = InventoryItem::ofKey(InventoryItem::YEAST_DRY)->fresh();
 
+        // 25kg at 10kg a sack. Two and a half — the shop is told it is
+        // under three, not handed «۲۵ کیلوگرم» to divide in its head.
         $this->assertSame(25.0, $yeast->balance);
-        $this->assertNull($yeast->balance_bags);
+        $this->assertSame(2.5, $yeast->balance_bags);
+    }
+
+    /** With nothing set, still nothing is said in sacks. */
+    public function test_an_unsized_good_is_not_reported_in_bags(): void
+    {
+        $yeast = InventoryItem::ofKey(InventoryItem::YEAST_DRY);
+        $yeast->update(['bag_weight_kg' => null]);
+        $yeast->move('in', 25, 'purchase');
+
+        $this->assertNull($yeast->fresh()->balance_bags);
     }
 
     /**
@@ -1155,9 +1167,10 @@ class ProductionFormulaTest extends TestCase
         $admin = User::factory()->create();
         $admin->assignRole('admin');
 
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->update(['bag_weight_kg' => null]);
+
         $this->actingAs($admin, 'sanctum')
             ->postJson('/api/v1/inventory/movements', [
-                // Dry yeast, the one good nobody has sized.
                 'item' => 'yeast_dry',
                 'direction' => 'in',
                 'bags' => 3,

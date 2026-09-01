@@ -87,9 +87,15 @@ class InventoryBagIntakeTest extends TestCase
     /**
      * A good whose sack size nobody has given still refuses a sack count,
      * rather than converting it at some invented figure.
+     *
+     * Every good this shop stocks has a size now, so the missing setting
+     * is made rather than borrowed from an item that happens to lack one
+     * — the guard is about the setting, not about which good it is.
      */
     public function test_a_good_with_no_sack_size_refuses_a_sack_count(): void
     {
+        InventoryItem::ofKey('yeast_dry')->update(['bag_weight_kg' => null]);
+
         $this->actingAs($this->admin, 'sanctum')
             ->postJson('/api/v1/inventory/movements', [
                 'item' => 'yeast_dry',
@@ -109,6 +115,22 @@ class InventoryBagIntakeTest extends TestCase
             ->assertCreated();
 
         $this->assertSame(8.5, InventoryItem::ofKey('yeast_dry')->balance);
+    }
+
+    /** And with a size, the sack count is accepted and weighed here. */
+    public function test_dry_yeast_is_recorded_by_the_sack(): void
+    {
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/v1/inventory/movements', [
+                'item' => 'yeast_dry',
+                'direction' => 'in',
+                'bags' => 3,
+                'reason' => 'purchase',
+            ])
+            ->assertCreated();
+
+        // Three sacks of 10.
+        $this->assertSame(30.0, InventoryItem::ofKey('yeast_dry')->balance);
     }
 
     public function test_recording_by_weight_still_works(): void

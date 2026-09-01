@@ -41,16 +41,20 @@ class InventoryItem extends Model
      * What one sack of each good weighs, for a shop that has not said.
      *
      * Only what the owner has actually stated: «هر کیسه نمک ۲۵»
-     * (2026-08-17). Flour is absent because its size lives on the
-     * production formula, and dry yeast because nobody has said what a
-     * sack of it weighs — a bag count converted at an invented figure is
-     * worse than a plain weight.
+     * (2026-08-17) and «خمیر خشک کیسه ۱۰ کیلو» (1405/06/10). Flour is
+     * absent because its size lives on the production formula.
      *
-     * Without this a newly opened bakery starts with salt in kilograms
-     * again, which is the state the shop asked to be rid of.
+     * Without this a newly opened bakery starts in kilograms again,
+     * which is the state the shop asked to be rid of.
+     *
+     * A good added later with no size still reads in kilograms and still
+     * refuses a sack count. That path is not dead code because it is the
+     * default for anything new — it is just that every good the shop
+     * stocks today has now been sized.
      */
     public const DEFAULT_BAG_WEIGHTS = [
         self::SALT => 25,
+        self::YEAST_DRY => 10,
     ];
 
     protected $fillable = ['key', 'name', 'unit', 'bag_weight_kg', 'low_threshold'];

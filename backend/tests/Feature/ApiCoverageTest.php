@@ -199,10 +199,9 @@ class ApiCoverageTest extends TestCase
         $this->assertEqualsWithDelta(75, $salt['balance'], 0.001);
         $this->assertEqualsWithDelta(25, $salt['bag_weight_kg'], 0.001);
 
-        // Dry yeast is the good nobody has given a sack size, so it is
-        // still weighed and says so by answering null rather than zero.
+        // Dry yeast too: «خمیر خشک کیسه ۱۰ کیلو». 50kg is five sacks.
         $yeast = collect($data)->firstWhere('key', 'yeast_dry');
-        $this->assertNull($yeast['balance_bags']);
+        $this->assertEqualsWithDelta(5, $yeast['balance_bags'], 0.001);
     }
 
     public function test_inventory_threshold_can_be_set(): void
