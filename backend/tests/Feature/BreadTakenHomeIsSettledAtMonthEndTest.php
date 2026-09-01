@@ -143,6 +143,76 @@ class BreadTakenHomeIsSettledAtMonthEndTest extends TestCase
         );
     }
 
+    public function test_correcting_the_count_corrects_what_is_owed(): void
+    {
+        $sale = $this->tookHome(10); // 100,000
+
+        // Ten loaves were recorded and four actually went. The count stays
+        // editable on a recorded sale, and nothing used to keep the charge
+        // in step with it — so the worker owed ten at month end, quietly.
+        $sale->update(['bread_count' => 4]);
+
+        $this->assertEqualsWithDelta(40000, (float) $sale->fresh()->consumed_amount, 0.01);
+    }
+
+    public function test_correcting_the_count_keeps_the_price_it_was_frozen_at(): void
+    {
+        $sale = $this->tookHome(10);
+
+        Bakery::first()->update(['bread_price' => 25000]);
+        Money::forgetCache();
+
+        $sale->update(['bread_count' => 4]);
+
+        // Four loaves at the day's ten thousand, not at today's twenty-five.
+        // Fixing a miscount must not be a way to reprice an old debt.
+        $this->assertEqualsWithDelta(40000, (float) $sale->fresh()->consumed_amount, 0.01);
+    }
+
+    public function test_the_payslip_follows_the_corrected_count(): void
+    {
+        $sale = $this->tookHome(30); // 300,000
+        $sale->update(['bread_count' => 10]);
+
+        $payslip = $this->payslip();
+
+        $this->assertEqualsWithDelta(100000, (float) $payslip->bread_deduction, 0.01);
+        $this->assertEqualsWithDelta(4900000, (float) $payslip->net_amount, 0.01);
+    }
+
+    public function test_a_sale_that_stops_being_home_bread_is_owed_by_nobody(): void
+    {
+        $sale = $this->tookHome(10);
+
+        // Recorded as «منزل» by mistake; it was really sold for cash. The
+        // charge has to go with the type, or somebody is deducted at month
+        // end for bread that was paid for.
+        $sale->update(['payment_type' => 'cash', 'amount' => 100000]);
+
+        $this->assertNull($sale->fresh()->consumed_by_user_id);
+        $this->assertNull($sale->fresh()->consumed_amount);
+        $this->assertEqualsWithDelta(
+            0,
+            Sale::staffBreadOutstandingFor($this->worker->id),
+            0.01,
+        );
+    }
+
+    public function test_unnaming_the_worker_clears_the_charge(): void
+    {
+        $sale = $this->tookHome(10);
+
+        // Named the wrong person and took the name off again.
+        $sale->update(['consumed_by_user_id' => null]);
+
+        $this->assertNull($sale->fresh()->consumed_amount);
+        $this->assertEqualsWithDelta(
+            0,
+            Sale::staffBreadOutstandingFor($this->worker->id),
+            0.01,
+        );
+    }
+
     public function test_the_price_is_frozen_when_the_bread_goes(): void
     {
         $sale = $this->tookHome(10);

@@ -113,6 +113,57 @@ class Sale extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Bread charged to a worker has to keep agreeing with the row it
+        // is charged for.
+        //
+        // The count stays editable on a recorded sale, and nothing kept
+        // `consumed_amount` in step with it: ten loaves corrected to four
+        // left the worker owing ten at month end, quietly. That is the
+        // same shape as the consignment row whose stock never moved on
+        // update — a write that does not move the thing it should.
+        //
+        // The price is still frozen. What is recomputed is the count, at
+        // whatever the loaf cost on the day, so a later price change
+        // still cannot rewrite an old debt.
+        static::saving(function (self $sale) {
+            // No longer bread that went home, or nobody named: nothing is
+            // owed, and a leftover figure here would be charged to
+            // somebody at month end.
+            if ($sale->payment_type !== self::HOME_TYPE) {
+                $sale->consumed_by_user_id = null;
+                $sale->consumed_amount = null;
+
+                return;
+            }
+
+            if ($sale->consumed_by_user_id === null) {
+                $sale->consumed_amount = null;
+
+                return;
+            }
+
+            $wasCount = (int) $sale->getOriginal('bread_count');
+            $wasAmount = (float) $sale->getOriginal('consumed_amount');
+
+            // Only an existing row with something to hold the price at.
+            // A new one arrives priced by SaleRecorder, which is the one
+            // place that knows the day's rate.
+            if (! $sale->exists || $wasCount <= 0 || $wasAmount <= 0) {
+                return;
+            }
+
+            if (! $sale->isDirty('bread_count')) {
+                return;
+            }
+
+            $frozenLoafPrice = $wasAmount / $wasCount;
+
+            $sale->consumed_amount = round((int) $sale->bread_count * $frozenLoafPrice, 2);
+        });
+    }
+
     public function chaneEntry()
     {
         return $this->belongsTo(ChaneEntry::class);
