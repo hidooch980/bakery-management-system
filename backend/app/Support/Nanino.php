@@ -67,9 +67,12 @@ class Nanino
         string $captcha,
     ): void {
         $response = Http::timeout(self::TIMEOUT)->post(self::BASE.'/api/otp/generate', [
-            'mobile' => $mobile,
-            'nationalNumber' => $nationalNumber,
+            'mobile' => self::mobile($mobile),
+            'nationalNumber' => self::digits($nationalNumber),
             'accessKey' => $accessKey,
+            // Untouched, deliberately. A captcha is Latin letters and
+            // figures read off an image, and what the person typed is
+            // the whole point of asking them.
             'captcha' => $captcha,
             'userType' => 'MERCHANT',
         ]);
@@ -90,10 +93,13 @@ class Nanino
         string $nationalNumber,
         string $code,
     ): void {
+        $mobile = self::mobile($mobile);
+        $nationalNumber = self::digits($nationalNumber);
+
         $response = Http::timeout(self::TIMEOUT)->post(self::BASE.'/api/otp/validate', [
             'mobile' => $mobile,
             'nationalNumber' => $nationalNumber,
-            'otp' => $code,
+            'otp' => self::digits($code),
             'userType' => 'MERCHANT',
         ]);
 
@@ -165,6 +171,35 @@ class Nanino
         $bakery->forceFill(['nanino_last_error' => null])->save();
 
         return (array) ($response->json('content') ?? []);
+    }
+
+    /**
+     * The mobile number as nanino wants it: Latin figures, 09xxxxxxxxx.
+     *
+     * A Persian keyboard produces «۰۹۱۵…», which is the same number to
+     * a person and a different string to everyone else. The shop's own
+     * sign-in has always put phone numbers through here; this did not,
+     * so a number typed the way he types every other number was handed
+     * to nanino verbatim and refused.
+     */
+    private static function mobile(string $value): string
+    {
+        $normalised = Sms::normalise($value);
+
+        if ($normalised === null) {
+            throw new RuntimeException('شمارهٔ همراه درست نیست.');
+        }
+
+        return $normalised;
+    }
+
+    /**
+     * Latin figures only — for the national number and the texted code,
+     * which are digits and nothing else.
+     */
+    private static function digits(string $value): string
+    {
+        return preg_replace('/\D+/', '', Sms::latinDigits($value)) ?? '';
     }
 
     /**

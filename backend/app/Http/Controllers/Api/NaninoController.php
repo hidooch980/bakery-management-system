@@ -75,8 +75,15 @@ class NaninoController extends Controller
                 $data['captcha'],
             );
         } catch (RuntimeException $e) {
+            // Kept, so a shop that cannot get in leaves a trace. Until
+            // this was written a failed attempt looked exactly like one
+            // that was never made.
+            self::remember($e->getMessage());
+
             return $this->error($e->getMessage(), 502);
         }
+
+        self::remember(null);
 
         return $this->success([], 'کد به گوشی شما ارسال شد.');
     }
@@ -104,6 +111,8 @@ class NaninoController extends Controller
                 $data['code'],
             );
         } catch (RuntimeException $e) {
+            self::remember($e->getMessage());
+
             return $this->error($e->getMessage(), 502);
         }
 
@@ -111,6 +120,17 @@ class NaninoController extends Controller
             ['connected' => true],
             'به نانینو وصل شد.',
         );
+    }
+
+    /**
+     * The last thing that went wrong, on the shop's own record.
+     *
+     * `show()` has always reported this field and nothing ever wrote it
+     * on the way in, so «وصل نمی‌شود» left no evidence anywhere.
+     */
+    private static function remember(?string $error): void
+    {
+        CurrentBakery::get()?->forceFill(['nanino_last_error' => $error])->save();
     }
 
     /** Forgets the session. */

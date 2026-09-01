@@ -193,6 +193,94 @@ class ConnectingToTheCardTerminalTest extends TestCase
         $this->assertNull(Bakery::first()->nanino_token);
     }
 
+    public function test_a_number_typed_on_a_persian_keyboard_still_reaches_nanino(): void
+    {
+        // What the owner's phone actually produces. Every other number he
+        // types goes through Sms::normalise(); this path did not, so the
+        // figures were handed to nanino as «۰۹۱۵…» and refused — which is
+        // «نانینو وصل نمی‌شه», with nothing on either side to show why.
+        Http::fake(['*/api/otp/generate' => Http::response([])]);
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/v1/nanino/code', [
+                'mobile' => '۰۹۱۵۹۹۹۱۶۶۹',
+                'national_number' => '۳۷۰۱۱۲۸۸۷۱',
+                'access_key' => 'key-123',
+                'captcha' => 'X7K2',
+            ])
+            ->assertOk();
+
+        Http::assertSent(fn ($request) => $request['mobile'] === '09159991669'
+            && $request['nationalNumber'] === '3701128871'
+            // Still untouched. It is read off an image, not typed from
+            // memory, and solving one is not this system's business.
+            && $request['captcha'] === 'X7K2');
+    }
+
+    public function test_a_texted_code_typed_in_persian_figures_is_accepted(): void
+    {
+        Http::fake([
+            '*/api/otp/validate' => Http::response(['token' => 'a-session-token']),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/v1/nanino/connect', [
+                'mobile' => '۰۹۱۵۹۹۹۱۶۶۹',
+                'national_number' => '۳۷۰۱۱۲۸۸۷۱',
+                'code' => '۱۲۳۴۵۶',
+            ])
+            ->assertOk();
+
+        Http::assertSent(fn ($request) => $request['otp'] === '123456');
+
+        // And what is kept for the prefill is the Latin form, so the next
+        // sign-in starts from something nanino accepts.
+        $this->assertSame('09159991669', Bakery::first()->nanino_mobile);
+    }
+
+    public function test_a_number_that_is_not_a_mobile_is_refused_before_nanino_sees_it(): void
+    {
+        Http::preventStrayRequests();
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/v1/nanino/code', [
+                'mobile' => '12345',
+                'national_number' => '0000000000',
+                'access_key' => 'key-123',
+                'captcha' => 'X7K2',
+            ])
+            ->assertStatus(502)
+            // The specific complaint, not just a refusal: without it the
+            // owner is told «کد ارسال نشد» and left guessing which of the
+            // four boxes he got wrong.
+            ->assertJsonPath('message', 'شمارهٔ همراه درست نیست.');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_an_attempt_that_failed_leaves_a_trace(): void
+    {
+        // Before this, a shop that could not get in and a shop that had
+        // never tried were indistinguishable on the record.
+        Http::fake(['*/api/otp/validate' => Http::response([], 400)]);
+
+        $this->actingAs($this->admin)
+            ->postJson('/api/v1/nanino/connect', [
+                'mobile' => '09150000000',
+                'national_number' => '0000000000',
+                'code' => '1111',
+            ])
+            ->assertStatus(502);
+
+        $this->assertNotNull(Bakery::first()->nanino_last_error);
+
+        $this->actingAs($this->admin)
+            ->getJson('/api/v1/nanino')
+            ->assertOk()
+            ->assertJsonPath('data.connected', false)
+            ->assertJsonPath('data.last_error', 'کد وارد شده درست نبود.');
+    }
+
     public function test_staff_cannot_connect_or_read_the_link(): void
     {
         $seller = User::factory()->create(['is_active' => true]);
