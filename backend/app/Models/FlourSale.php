@@ -9,6 +9,7 @@ use App\Support\AppCalendar;
 use App\Support\CurrentBakery;
 use App\Support\DoughFormula;
 use App\Support\Money;
+use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -99,16 +100,62 @@ class FlourSale extends Model
             );
         });
 
-        static::deleted(function (self $sale) {
-            InventoryItem::ofKey(InventoryItem::FLOUR)->move(
-                'in',
-                (float) $sale->weight_kg,
-                'flour_sale_reversal',
-                $sale->user_id,
-                null,
-                'ابطال فروش آرد',
-            );
+        // A sale whose quantity is corrected has to take the warehouse
+        // with it. Without this the weight was recomputed above and the
+        // store never heard: ten kilos corrected to a hundred left ninety
+        // on the shelf that the books had already sold.
+        static::updated(function (self $sale) {
+            if ($sale->wasChanged(['weight_kg', 'quantity', 'unit', 'bag_weight_kg'])) {
+                $sale->reconcileStock();
+            }
         });
+
+        // Reads what actually left rather than reversing today's weight.
+        //
+        // It used to move back `weight_kg` as it stood at the moment of
+        // deletion, which for an edited sale is not what went out: ten
+        // kilos sold, corrected to a hundred, then deleted put a hundred
+        // back and conjured ninety out of nothing. StockReversal walks
+        // the movements on file, which is the only account of what the
+        // sale really did, and tags each reversal to the movement it
+        // undoes so a quota period can tell whose flour it was.
+        static::deleted(fn (self $sale) => StockReversal::of($sale, 'ابطال فروش آرد'));
+    }
+
+    /**
+     * Posts whatever it takes to make the warehouse agree with this sale.
+     *
+     * A flour sale should have taken its weight out of the store, once.
+     * The difference between that and what the ledger says it actually
+     * took is posted as a single correcting movement, tagged back to the
+     * sale so deleting it still gives everything back.
+     */
+    public function reconcileStock(): void
+    {
+        $shouldBe = -1 * (float) $this->weight_kg;
+
+        $actual = 0.0;
+
+        foreach (InventoryMovement::where('source_type', self::class)
+            ->where('source_id', $this->getKey())
+            ->get() as $movement) {
+            $actual += ($movement->direction === 'in' ? 1 : -1) * (float) $movement->quantity;
+        }
+
+        $delta = round($shouldBe - $actual, 3);
+
+        if (abs($delta) < 0.001) {
+            return;
+        }
+
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move(
+            $delta > 0 ? 'in' : 'out',
+            abs($delta),
+            $delta > 0 ? 'flour_sale_reversal' : 'flour_sale',
+            $this->user_id,
+            $this,
+            'اصلاح فروش آرد',
+        );
     }
 
     public function user()
