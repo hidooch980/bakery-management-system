@@ -75,12 +75,18 @@ sudo systemctl stop nginx && sudo systemctl enable --now bakery.service
 نسخه). آن نسخه‌ها روی **همان دیسکی** هستند که دیتابیس روی آن است، پس اگر آن
 دیسک برود همه با هم می‌روند.
 
-> **کران با کاربر `ubuntu` اجرا می‌شود، پس پوشه‌ی `storage/app/backups` باید
-> برای گروه `ubuntu` نوشتنی بماند.** یک بار مالکیتش به `www-data:www-data`
-> رفت و از ۱۴۰۵/۰۶/۰۸ تا ۱۴۰۵/۰۶/۱۰ هیچ نسخه‌ای گرفته نشد — بی‌هیچ خطایی که
-> کسی ببیند، چون خروجی کران به فایلی می‌رود که کسی نمی‌خواندش. `www-data`
-> عضو گروه `ubuntu` هست، ولی عکسش نه؛ به همین دلیل گروهِ این پوشه `ubuntu`
-> است و بیت `setgid` دارد، تا هر دو کاربر بتوانند بنویسند:
+> **کران با `sudo -u www-data` اجرا می‌شود.** دو بار مرد و هر دو بار
+> بی‌صدا: ۱۴۰۵/۰۶/۰۸ تا ۱۰ چون مالکیت *پوشهٔ* dump به `www-data:www-data`
+> رفته بود؛ و باز در ۱۴۰۵/۰۶/۱۰ چون آن یکی درست شده بود ولی
+> `storage/logs/backup.log` — جایی که خط cron ریدایرکت می‌کند — نه.
+> اجرا به‌عنوان `www-data` هر دو فایل را یک طرف مجوز می‌برد:
+>
+> ```bash
+> 0 2 * * * sudo -u www-data sh -c "cd /home/ubuntu/bakery-management-system/backend && HOME=/tmp XDG_CONFIG_HOME=/tmp php artisan backup:database --keep=60 >> storage/logs/backup.log 2>&1"
+> ```
+>
+> پوشهٔ dump هم گروه `ubuntu` و بیت `setgid` دارد، تا پشتیبان‌کش ویندوز
+> که با `ubuntu` وصل می‌شود بتواند فایل‌ها را بخواند:
 >
 > ```bash
 > sudo chgrp -R ubuntu backend/storage/app/backups && sudo chmod -R g+w backend/storage/app/backups && sudo chmod g+s backend/storage/app/backups
@@ -119,12 +125,15 @@ mysql -e 'CREATE DATABASE bakery_restore_check' && gunzip -c backend/storage/app
 cd backend && php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:clear && php artisan view:cache
 ```
 
-> **هرگز `composer install --no-dev` نزنید.** در این پروژه
-> `filament/filament` در `require-dev` نشسته، در حالی که کل پنل مدیریت روی
-> آن سوار است. `--no-dev` حذفش می‌کند و هم پنل و هم API را ۵۰۰ می‌کند —
-> ۱۴۰۵/۰۶/۱۰ همین اتفاق افتاد و چند دقیقه مغازه بی‌پنل ماند. اگر لازم شد،
-> `composer install` بدون هیچ پرچمی. جای درست این بسته `require` است و
-> جابه‌جا کردنش، قفل را هم می‌خواهد بازسازی کند؛ تا آن روز، این خط.
+> **`composer install --no-dev` دیگر مغازه را نمی‌خواباند.** ۱۴۰۵/۰۶/۱۰
+> می‌خواباند: `filament/filament` در `require-dev` نشسته بود در حالی که کل
+> پنل روی آن سوار است، و `--no-dev` حذفش می‌کرد. حالا در `require` است.
+>
+> قفل فقط دوباره دسته‌بندی شد، نه به‌روز: ۲۳ بسته از `packages-dev` به
+> `packages` رفتند و **نسخهٔ هیچ بسته‌ای عوض نشد**. اگر روزی لازم شد
+> دوباره این کار را بکنید، تأییدش این است که `composer install --no-dev` در
+> یک کپی اجرا شود و `php artisan route:list` مسیرهای `admin` را بدهد — نه
+> اینکه composer خطا نداد.
 
 > **artisan را با کاربر `www-data` اجرا کنید، نه `ubuntu`.** فایل‌های
 > `storage/logs` مال `www-data` هستند و `ubuntu` عضو گروهش نیست، پس هر
@@ -135,6 +144,15 @@ cd backend && php artisan migrate --force && php artisan config:cache && php art
 > ```bash
 > sudo -u www-data env HOME=/tmp XDG_CONFIG_HOME=/tmp php artisan tinker
 > ```
+
+> **یک خط cron دو فایل دارد، نه یکی.** جایی که دستور می‌نویسد، و جایی
+> که *خروجی‌اش* می‌رود. پشتیبان‌گیری ۱۴۰۵/۰۶/۱۰ دو روز مرده بود چون
+> مالکیت *پوشهٔ* dump درست شده بود ولی خط cron به `>> storage/logs/backup.log`
+> ختم می‌شد و آن فایل هنوز مال `www-data` بود. **شل ریدایرکت را قبل از
+> اجرای `php` باز می‌کند**، پس کل دستور همان‌جا می‌مرد: نه dump، نه لاگ،
+> نه خطا. کار را همان‌طور که cron اجرا می‌کند تست کنید — با `env -i` و با
+> همان ریدایرکت — نه در شل لاگین خودتان، که پاس می‌شود در حالی که
+> مسیر واقعی خراب است.
 
 php-fpm کد را در opcache نگه می‌دارد، پس بعد از تغییر کد باید تازه شود:
 
