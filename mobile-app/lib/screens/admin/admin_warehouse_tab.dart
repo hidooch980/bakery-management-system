@@ -179,6 +179,18 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
             icon: Icons.scale_rounded,
             emphasise: true,
           ),
+          // What the shop may actually still take. Quota rolls forward —
+          // period after period, month after month — so this is the
+          // figure to plan against, not any one period's leftover below.
+          if (quota['carried_balance'] is Map<String, dynamic>)
+            AdminRow(
+              label: 'ماندهٔ سهمیه — منتقل می‌شود',
+              value: _carriedBalance(
+                quota['carried_balance'] as Map<String, dynamic>,
+              ),
+              icon: Icons.savings_rounded,
+              emphasise: true,
+            ),
         ],
       ),
       const SizedBox(height: 14),
@@ -199,6 +211,17 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
           isTotal: true,
         ),
     ];
+  }
+
+  /// «N کیسه · M کیلوگرم», or just the kilos when no sack size is
+  /// known — sacks are what the shop counts flour in.
+  static String _carriedBalance(Map<String, dynamic> balance) {
+    final kg = _fmt(balance['remaining_kg']);
+    final bags = balance['remaining_bags'];
+
+    if (bags == null) return '$kg کیلوگرم';
+
+    return '${_fmt(bags)} کیسه · $kg کیلوگرم';
   }
 
   static IconData _iconFor(String key) => switch (key) {
@@ -351,7 +374,10 @@ class _PeriodCard extends StatelessWidget {
               kg: period['used_kg'],
             ),
             _FlourRow(
-              label: isOver ? 'بیش از سهمیه' : 'باقی‌مانده',
+              // «دوره» said out loud, because this is what the period
+              // itself has left — not what the shop may still take. That
+              // total is on the card above and does not expire.
+              label: isOver ? 'بیش از سهمیهٔ دوره' : 'باقی‌ماندهٔ دوره',
               bags: _bags(period['remaining_bags'] ?? _bagsFromKg(period, 'remaining_kg')),
               kg: period['remaining_kg'],
               colour: wordsColour,
