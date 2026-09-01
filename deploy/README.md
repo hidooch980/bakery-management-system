@@ -75,6 +75,20 @@ sudo systemctl stop nginx && sudo systemctl enable --now bakery.service
 نسخه). آن نسخه‌ها روی **همان دیسکی** هستند که دیتابیس روی آن است، پس اگر آن
 دیسک برود همه با هم می‌روند.
 
+> **کران با کاربر `ubuntu` اجرا می‌شود، پس پوشه‌ی `storage/app/backups` باید
+> برای گروه `ubuntu` نوشتنی بماند.** یک بار مالکیتش به `www-data:www-data`
+> رفت و از ۱۴۰۵/۰۶/۰۸ تا ۱۴۰۵/۰۶/۱۰ هیچ نسخه‌ای گرفته نشد — بی‌هیچ خطایی که
+> کسی ببیند، چون خروجی کران به فایلی می‌رود که کسی نمی‌خواندش. `www-data`
+> عضو گروه `ubuntu` هست، ولی عکسش نه؛ به همین دلیل گروهِ این پوشه `ubuntu`
+> است و بیت `setgid` دارد، تا هر دو کاربر بتوانند بنویسند:
+>
+> ```bash
+> sudo chgrp -R ubuntu backend/storage/app/backups && sudo chmod -R g+w backend/storage/app/backups && sudo chmod g+s backend/storage/app/backups
+> ```
+>
+> **نبودِ خطا یعنی نبودِ پشتیبان هم می‌تواند باشد.** تاریخ تازه‌ترین فایل را
+> نگاه کنید، نه اینکه دستور به‌ظاهر سالم است.
+
 [pull-backups.ps1](pull-backups.ps1) روی ویندوز مدیر همین نسخه‌ها را هر شب
 ساعت ۹ می‌کشد و در `D:\aziz\backups` نگه می‌دارد. جهت **کشیدن** است نه
 فرستادن: سرور به کامپیوتر پشت مودم خانگی دسترسی ندارد.
@@ -104,6 +118,23 @@ mysql -e 'CREATE DATABASE bakery_restore_check' && gunzip -c backend/storage/app
 ```bash
 cd backend && php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:clear && php artisan view:cache
 ```
+
+> **هرگز `composer install --no-dev` نزنید.** در این پروژه
+> `filament/filament` در `require-dev` نشسته، در حالی که کل پنل مدیریت روی
+> آن سوار است. `--no-dev` حذفش می‌کند و هم پنل و هم API را ۵۰۰ می‌کند —
+> ۱۴۰۵/۰۶/۱۰ همین اتفاق افتاد و چند دقیقه مغازه بی‌پنل ماند. اگر لازم شد،
+> `composer install` بدون هیچ پرچمی. جای درست این بسته `require` است و
+> جابه‌جا کردنش، قفل را هم می‌خواهد بازسازی کند؛ تا آن روز، این خط.
+
+> **artisan را با کاربر `www-data` اجرا کنید، نه `ubuntu`.** فایل‌های
+> `storage/logs` مال `www-data` هستند و `ubuntu` عضو گروهش نیست، پس هر
+> دستوری که چیزی لاگ کند با «could not be opened in append mode» می‌ایستد —
+> از جمله `package:discover` که خودِ composer صدایش می‌زند. psysh هم برای
+> `tinker` جای نوشتن می‌خواهد:
+>
+> ```bash
+> sudo -u www-data env HOME=/tmp XDG_CONFIG_HOME=/tmp php artisan tinker
+> ```
 
 php-fpm کد را در opcache نگه می‌دارد، پس بعد از تغییر کد باید تازه شود:
 
