@@ -156,7 +156,8 @@ class _PayCardState extends State<PayCard> {
               const SizedBox(height: 10),
               Text(pay.summary, style: theme.textTheme.bodySmall),
               if (pay.monthlySalaryFormatted != null ||
-                  pay.owesAdvance) ...[
+                  pay.owesAdvance ||
+                  pay.owesBread) ...[
                 const Divider(height: 22),
                 if (pay.monthlySalaryFormatted != null)
                   _row(theme, 'حقوق ماهانه', pay.monthlySalaryFormatted!),
@@ -165,6 +166,16 @@ class _PayCardState extends State<PayCard> {
                     theme,
                     'علی‌الحساب تسویه‌نشده',
                     pay.advanceOutstandingFormatted,
+                    colour: AppColors.attention,
+                  ),
+                // Its own row rather than added to the advance: a person
+                // reading this will want to know which of the two a
+                // deduction on their payslip was.
+                if (pay.owesBread)
+                  _row(
+                    theme,
+                    'نان برده‌شده تسویه‌نشده',
+                    pay.breadOutstandingFormatted,
                     colour: AppColors.attention,
                   ),
                 if (pay.hasUnpaidPayslips)

@@ -37,6 +37,26 @@ class InventoryItem extends Model
         self::YEAST_DRY => 'خمیرمایه خشک',
     ];
 
+    /**
+     * What one sack of each good weighs, for a shop that has not said.
+     *
+     * Only what the owner has actually stated: «هر کیسه نمک ۲۵»
+     * (2026-08-17) and «خمیر خشک کیسه ۱۰ کیلو» (1405/06/10). Flour is
+     * absent because its size lives on the production formula.
+     *
+     * Without this a newly opened bakery starts in kilograms again,
+     * which is the state the shop asked to be rid of.
+     *
+     * A good added later with no size still reads in kilograms and still
+     * refuses a sack count. That path is not dead code because it is the
+     * default for anything new — it is just that every good the shop
+     * stocks today has now been sized.
+     */
+    public const DEFAULT_BAG_WEIGHTS = [
+        self::SALT => 25,
+        self::YEAST_DRY => 10,
+    ];
+
     protected $fillable = ['key', 'name', 'unit', 'bag_weight_kg', 'low_threshold'];
 
     /**
@@ -164,7 +184,11 @@ class InventoryItem extends Model
     {
         return static::firstOrCreate(
             ['key' => $key],
-            ['name' => self::DEFAULTS[$key] ?? $key, 'unit' => 'کیلوگرم']
+            [
+                'name' => self::DEFAULTS[$key] ?? $key,
+                'unit' => 'کیلوگرم',
+                'bag_weight_kg' => self::DEFAULT_BAG_WEIGHTS[$key] ?? null,
+            ]
         );
     }
 }

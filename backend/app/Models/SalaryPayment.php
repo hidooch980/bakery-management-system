@@ -21,6 +21,7 @@ class SalaryPayment extends Model
         'bonus',
         'deduction',
         'advance_deduction',
+        'bread_deduction',
         'net_amount',
         'paid_on',
         'bank_account_id',
@@ -36,6 +37,7 @@ class SalaryPayment extends Model
             'bonus' => 'decimal:2',
             'deduction' => 'decimal:2',
             'advance_deduction' => 'decimal:2',
+            'bread_deduction' => 'decimal:2',
             'net_amount' => 'decimal:2',
         ];
     }
@@ -46,11 +48,15 @@ class SalaryPayment extends Model
         // the total can never disagree.
         static::saving(function (self $payment) {
             $payment->advance_deduction = $payment->advanceToRecover();
+            // After the advance, out of what the advance left. Money
+            // already handed over is recovered before bread is.
+            $payment->bread_deduction = $payment->breadToRecover();
 
             $payment->net_amount = (float) $payment->base_amount
                 + (float) $payment->bonus
                 - (float) $payment->deduction
-                - (float) $payment->advance_deduction;
+                - (float) $payment->advance_deduction
+                - (float) $payment->bread_deduction;
 
             $payment->period_label ??= Jalali::monthLabel($payment->period_start) ?? '';
         });
@@ -59,6 +65,7 @@ class SalaryPayment extends Model
         // point at, and released again if it is taken away.
         static::saved(function (self $payment) {
             $payment->applyAdvanceRecovery();
+            $payment->applyBreadRecovery();
             $payment->claimAdjustments();
             $payment->answerRequests();
         });
@@ -75,6 +82,7 @@ class SalaryPayment extends Model
 
         static::deleted(function (self $payment) {
             $payment->releaseAdvanceRecovery();
+            $payment->releaseBreadRecovery();
             $payment->releaseAdjustments();
         });
     }
@@ -146,6 +154,81 @@ class SalaryPayment extends Model
     public function releaseAdvanceRecovery(): void
     {
         $this->recoveries()->delete();
+    }
+
+    // ------------------------------------------- bread taken home, month end
+
+    /**
+     * How much of this employee's unpaid bread this payslip absorbs.
+     *
+     * «کارکنان نان اگه بدون پول بردن، در فیش حقوقشان پایان ماه حساب بشه و
+     * کسر بشه». Capped the same way an advance is, and out of what the
+     * advance left rather than out of the gross — otherwise a month of
+     * advance plus bread could between them hand somebody a negative
+     * payslip, which is the one thing this shop has never done.
+     *
+     * What does not fit waits for next month. Nothing is written off.
+     */
+    public function breadToRecover(): float
+    {
+        if (! $this->user_id) {
+            return 0.0;
+        }
+
+        $available = (float) $this->base_amount
+            + (float) $this->bonus
+            - (float) $this->deduction
+            - (float) $this->advance_deduction;
+
+        if ($available <= 0) {
+            return 0.0;
+        }
+
+        $outstanding = Sale::staffBreadOutstandingFor($this->user_id, $this->id);
+
+        return round(min($outstanding, $available), 2);
+    }
+
+    /** Writes this payslip's recovery against the bread, oldest first. */
+    public function applyBreadRecovery(): void
+    {
+        $this->breadRecoveries()->delete();
+
+        $remaining = (float) $this->bread_deduction;
+
+        if ($remaining <= 0) {
+            return;
+        }
+
+        $sales = Sale::where('consumed_by_user_id', $this->user_id)
+            ->staffBreadOutstanding()
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($sales as $sale) {
+            if ($remaining <= 0) {
+                break;
+            }
+
+            $take = round(min($sale->consumed_outstanding, $remaining), 2);
+
+            if ($take <= 0) {
+                continue;
+            }
+
+            $this->breadRecoveries()->create([
+                'sale_id' => $sale->id,
+                'amount' => $take,
+            ]);
+
+            $remaining = round($remaining - $take, 2);
+        }
+    }
+
+    public function releaseBreadRecovery(): void
+    {
+        $this->breadRecoveries()->delete();
     }
 
     /**
@@ -259,6 +342,11 @@ class SalaryPayment extends Model
     public function recoveries()
     {
         return $this->hasMany(SalaryAdvanceRecovery::class);
+    }
+
+    public function breadRecoveries()
+    {
+        return $this->hasMany(SalaryBreadRecovery::class);
     }
 
     /**

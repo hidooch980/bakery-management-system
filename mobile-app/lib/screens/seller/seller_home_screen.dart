@@ -521,7 +521,12 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   /// Buyer per payment type, needed for نسیه and مدارس.
   final Map<PaymentType, int?> _customers = {};
 
+  /// Who took the bread, for the «منزل» row. Left empty it behaves as it
+  /// always has — bread owed by nobody — so an older habit still works.
+  int? _consumedBy;
+
   List<Customer> _customerOptions = const [];
+  List<StaffName> _staff = const [];
   bool _saving = false;
 
   @override
@@ -538,6 +543,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     }
 
     _loadCustomers();
+    _loadStaff();
   }
 
   Future<void> _loadCustomers() async {
@@ -546,6 +552,16 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
       if (mounted) setState(() => _customerOptions = list);
     } on ApiException {
       // Only نسیه and مدارس need it; the rest of the sheet still works.
+    }
+  }
+
+  Future<void> _loadStaff() async {
+    try {
+      final list = await widget.api.saleStaff();
+      if (mounted) setState(() => _staff = list);
+    } on ApiException {
+      // Only «منزل» needs it, and naming somebody is optional there, so
+      // a failure here must not stop a sale being recorded.
     }
   }
 
@@ -628,6 +644,11 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                 // read as money that went missing.
                 amount: type.expectsNoAmount ? null : _countFor(type) * _unitPrice,
                 customerId: _customers[type],
+                // Only «منزل» carries a person. Charity is a gift and is
+                // owed by nobody, so naming one there would charge
+                // somebody for bread they gave away.
+                consumedByUserId:
+                    type == PaymentType.home ? _consumedBy : null,
               ))
           .toList();
 
@@ -723,6 +744,9 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                   onFill: () => _fill(type),
                   onCustomerChanged: (id) =>
                       setState(() => _customers[type] = id),
+                  staff: _staff,
+                  selectedConsumer: _consumedBy,
+                  onConsumerChanged: (id) => setState(() => _consumedBy = id),
                 ),
 
               const SizedBox(height: 16),
@@ -838,6 +862,9 @@ class _PaymentRow extends StatelessWidget {
     required this.canFill,
     required this.onFill,
     required this.onCustomerChanged,
+    required this.staff,
+    required this.selectedConsumer,
+    required this.onConsumerChanged,
   });
 
   final PaymentType type;
@@ -850,6 +877,9 @@ class _PaymentRow extends StatelessWidget {
   final bool canFill;
   final VoidCallback onFill;
   final ValueChanged<int?> onCustomerChanged;
+  final List<StaffName> staff;
+  final int? selectedConsumer;
+  final ValueChanged<int?> onConsumerChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -954,6 +984,33 @@ class _PaymentRow extends StatelessWidget {
                     ),
                 ],
                 onChanged: onCustomerChanged,
+              ),
+            ),
+
+          // «منزل» only, and only once used. Optional on purpose: leaving
+          // it empty records what the shop has always recorded — bread
+          // owed by nobody. Naming somebody charges their payslip.
+          if (active && type == PaymentType.home && staff.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 4),
+              child: DropdownButtonFormField<int>(
+                initialValue: selectedConsumer,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'چه کسی برد (اختیاری)',
+                  helperText: 'اگر انتخاب کنید، آخر ماه از حقوقش کسر می‌شود',
+                  isDense: true,
+                  prefixIcon: Icon(Icons.person_rounded, size: IconSize.button),
+                ),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('—')),
+                  for (final person in staff)
+                    DropdownMenuItem(
+                      value: person.id,
+                      child: Text(person.name),
+                    ),
+                ],
+                onChanged: onConsumerChanged,
               ),
             ),
         ],

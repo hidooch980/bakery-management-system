@@ -7,6 +7,7 @@ use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\SaleResource\Pages;
 use App\Models\Customer;
 use App\Models\Sale;
+use App\Models\User;
 use App\Support\CurrentBakery;
 use App\Support\Jalali;
 use App\Support\Money;
@@ -143,6 +144,21 @@ class SaleResource extends Resource
                                 ->visible(fn (Forms\Get $get) => in_array(
                                     $get('payment_type'), ['schools', 'credit'], true
                                 )),
+
+                            // Who took it home. Optional on purpose: the
+                            // shop's older «منزل» rows name nobody, and a
+                            // required field here would make the panel
+                            // refuse to record what it has always recorded.
+                            Forms\Components\Select::make('consumed_by_user_id')
+                                ->label('چه کسی برد')
+                                ->options(fn () => User::query()
+                                    ->where('is_active', true)
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id'))
+                                ->searchable()
+                                ->native(false)
+                                ->helperText('اگر نام را انتخاب کنید، بهای آن آخر ماه از فیش حقوقی همان نفر کسر می‌شود.')
+                                ->visible(fn (Forms\Get $get) => $get('payment_type') === Sale::HOME_TYPE),
                         ])
                         ->dehydrated(false),
 
@@ -229,6 +245,26 @@ class SaleResource extends Resource
                     ->searchable()
                     ->toggleable(),
 
+                // Which loaves a worker is being charged for, so a
+                // deduction on a payslip is something the shop can show
+                // rather than only assert. A figure nobody can break
+                // down is a figure that gets argued about, and this shop
+                // has already had one conversation like that.
+                Tables\Columns\TextColumn::make('consumer.name')
+                    ->label('چه کسی برد')
+                    ->placeholder('—')
+                    ->icon('heroicon-m-user')
+                    ->color('warning')
+                    ->searchable()
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('consumed_amount')
+                    ->label('بدهی نان')
+                    ->money('IRR')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->summarize(Tables\Columns\Summarizers\Sum::make()->label('جمع')),
+
                 Tables\Columns\TextColumn::make('payment_type')
                     ->label('نوع پرداخت')
                     ->badge()
@@ -309,9 +345,25 @@ class SaleResource extends Resource
                     ->searchable()
                     ->preload(),
 
+                Tables\Filters\SelectFilter::make('consumed_by_user_id')
+                    ->label('چه کسی برد')
+                    ->relationship('consumer', 'name')
+                    ->searchable()
+                    ->preload(),
+
                 Tables\Filters\Filter::make('outstanding')
                     ->label('فقط بدهی‌های تسویه‌نشده')
                     ->query(fn ($query) => $query->outstanding())
+                    ->toggle(),
+
+                // What a payslip's bread deduction is actually made of.
+                // Answered against the recoveries rather than a settled
+                // flag, because a payslip absorbs what it can and the
+                // rest waits — so «unsettled» is a running figure, not a
+                // date somebody stamped.
+                Tables\Filters\Filter::make('bread_unsettled')
+                    ->label('فقط نان تسویه‌نشدهٔ کارکنان')
+                    ->query(fn ($query) => $query->staffBreadOutstanding())
                     ->toggle(),
 
                 Tables\Filters\Filter::make('today')

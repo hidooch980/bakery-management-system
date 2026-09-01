@@ -7,6 +7,7 @@ use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\SalaryPaymentResource\Pages;
 use App\Models\BankAccount;
 use App\Models\SalaryPayment;
+use App\Models\Sale;
 use App\Models\StaffAdvance;
 use App\Models\User;
 use App\Support\Jalali;
@@ -102,22 +103,46 @@ class SalaryPaymentResource extends Resource
                                 : Money::convert(StaffAdvance::outstandingFor($userId, $record?->id));
 
                             $advance = max(0.0, min($outstanding, max(0.0, $gross)));
-                            $net = $gross - $advance;
+
+                            // Bread the worker took home and has not paid
+                            // for, out of what the advance left — the same
+                            // order the model uses, because a preview that
+                            // agrees with the model only sometimes is worse
+                            // than none.
+                            $breadOwed = $userId === 0
+                                ? 0.0
+                                : Money::convert(Sale::staffBreadOutstandingFor($userId, $record?->id));
+
+                            $bread = max(0.0, min($breadOwed, max(0.0, $gross - $advance)));
+
+                            $net = $gross - $advance - $bread;
 
                             $say = fn (float $v) => number_format($v, 0, '.', Money::GROUP_SEPARATOR)
                                 .' '.Money::label();
 
-                            if ($advance <= 0) {
+                            if ($advance <= 0 && $bread <= 0) {
                                 return $say($net);
                             }
 
-                            $line = $say($net).'  —  پس از کسر '.$say($advance).' علی‌الحساب';
+                            $taken = [];
 
-                            // An advance larger than the month's pay is not a
+                            if ($advance > 0) {
+                                $taken[] = $say($advance).' علی‌الحساب';
+                            }
+
+                            if ($bread > 0) {
+                                $taken[] = $say($bread).' نان برده‌شده';
+                            }
+
+                            $line = $say($net).'  —  پس از کسر '.implode(' و ', $taken);
+
+                            // A debt larger than the month's pay is not a
                             // negative payslip; what is left of it stands and
                             // comes off the month after.
-                            return $outstanding > $advance
-                                ? $line.'، '.$say($outstanding - $advance).' به ماه بعد می‌ماند'
+                            $carried = ($outstanding - $advance) + ($breadOwed - $bread);
+
+                            return $carried > 0
+                                ? $line.'، '.$say($carried).' به ماه بعد می‌ماند'
                                 : $line;
                         }),
                 ]),
@@ -189,6 +214,13 @@ class SalaryPaymentResource extends Resource
                 // owner looking for it.
                 Tables\Columns\TextColumn::make('advance_deduction')
                     ->label('کسر علی‌الحساب')
+                    ->formatStateUsing(fn ($state) => (float) $state > 0 ? Money::format($state) : '—')
+                    ->color(fn ($state) => (float) $state > 0 ? 'warning' : 'gray'),
+
+                // Shown beside the advance rather than folded into it: they
+                // are two different debts and the worker will ask which.
+                Tables\Columns\TextColumn::make('bread_deduction')
+                    ->label('کسر نان برده‌شده')
                     ->formatStateUsing(fn ($state) => (float) $state > 0 ? Money::format($state) : '—')
                     ->color(fn ($state) => (float) $state > 0 ? 'warning' : 'gray'),
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\SalaryPayment;
 use App\Models\SalaryPaymentRequest;
+use App\Models\Sale;
 use App\Models\StaffAdjustment;
 use App\Models\StaffAdvance;
 use App\Models\StaffAdvanceRequest;
@@ -176,6 +177,7 @@ class SalaryController extends Controller
 
         $salary = $user->monthly_salary === null ? null : (float) $user->monthly_salary;
         $outstanding = StaffAdvance::outstandingFor($user->id);
+        $breadOwed = Sale::staffBreadOutstandingFor($user->id);
 
         $unpaid = SalaryPayment::where('user_id', $user->id)
             ->unpaid()
@@ -186,8 +188,14 @@ class SalaryController extends Controller
         // Floored at zero: an advance larger than a month's wage is not a
         // negative wage, it is recovered over as many months as it takes —
         // which is what the payslip itself does.
-        $remaining = $salary === null ? null : max(0.0, $salary - $outstanding);
-        $carriesOver = $salary !== null && $outstanding > $salary;
+        // Bread taken home counts here too. It is the same kind of debt as
+        // an advance — value already had, settled out of the month's pay —
+        // and a card that showed one and hid the other would tell somebody
+        // they had more coming than they do.
+        $owed = $outstanding + $breadOwed;
+
+        $remaining = $salary === null ? null : max(0.0, $salary - $owed);
+        $carriesOver = $salary !== null && $owed > $salary;
 
         return $this->success([
             // Through AppCalendar, not Jalali outright: the shop chooses its
@@ -200,6 +208,9 @@ class SalaryController extends Controller
 
             'advance_outstanding' => Money::convert($outstanding),
             'advance_outstanding_formatted' => Money::format($outstanding),
+
+            'bread_outstanding' => Money::convert($breadOwed),
+            'bread_outstanding_formatted' => Money::format($breadOwed),
 
             'unpaid_payslips_total' => Money::convert($unpaidTotal),
             'unpaid_payslips_total_formatted' => Money::format($unpaidTotal),
@@ -293,6 +304,7 @@ class SalaryController extends Controller
         $users = $users
             ->map(function (User $u) use ($fallback, $adjustments, $requests) {
                 $outstanding = StaffAdvance::outstandingFor($u->id);
+                $breadOwed = Sale::staffBreadOutstandingFor($u->id);
 
                 return [
                     'id' => $u->id,
@@ -301,6 +313,11 @@ class SalaryController extends Controller
                     'monthly_salary_formatted' => Money::format($u->monthly_salary),
                     'advance_outstanding' => Money::convert($outstanding),
                     'advance_outstanding_formatted' => Money::format($outstanding),
+                    // So the payroll sheet can show the same deduction the
+                    // server is about to make, rather than a net the owner
+                    // never saw before pressing the button.
+                    'bread_outstanding' => Money::convert($breadOwed),
+                    'bread_outstanding_formatted' => Money::format($breadOwed),
                     // Where this person's money has come from before, so the
                     // sheet opens on an answer instead of a question. A wage
                     // paid from no account records the cost and moves
@@ -375,6 +392,8 @@ class SalaryController extends Controller
             'deduction' => Money::convert($payment->deduction),
             'advance_deduction' => Money::convert($payment->advance_deduction),
             'advance_deduction_formatted' => Money::format($payment->advance_deduction),
+            'bread_deduction' => Money::convert($payment->bread_deduction),
+            'bread_deduction_formatted' => Money::format($payment->bread_deduction),
             'net_amount' => Money::convert($payment->net_amount),
             'net_amount_formatted' => Money::format($payment->net_amount),
             'bank_account_id' => $payment->bank_account_id,

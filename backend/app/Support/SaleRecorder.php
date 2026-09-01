@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
  * Both the API and the admin panel come through here, so the two cannot
  * drift apart on how a shortfall or a money gap is worked out.
  *
- * @phpstan-type PaymentLine array{payment_type: string, bread_count: int, amount: float|null, customer_id: int|null, note: string|null}
+ * @phpstan-type PaymentLine array{payment_type: string, bread_count: int, amount: float|null, customer_id: int|null, consumed_by_user_id: int|null, note: string|null}
  */
 class SaleRecorder
 {
@@ -85,9 +85,24 @@ class SaleRecorder
                     && ! $shortfallApplied
                     && $shortfallCount > 0;
 
+                // Bread a worker took home is charged to that worker, not
+                // to the seller who handed it over. The seller names them
+                // at the moment it goes — «فروشنده انتخاب می‌کنه» — and the
+                // value is frozen here for the same reason a shortfall's
+                // is: a later price change must not rewrite what somebody
+                // already owed. Only «منزل» carries a person; charity is a
+                // gift and is owed by nobody.
+                $consumedBy = $line['payment_type'] === Sale::HOME_TYPE
+                    ? ($line['consumed_by_user_id'] ?? null)
+                    : null;
+
                 $created[] = Sale::create([
                     'chane_entry_id' => $chane->id,
                     'user_id' => $userId,
+                    'consumed_by_user_id' => $consumedBy,
+                    'consumed_amount' => $consumedBy !== null && $breadPrice > 0
+                        ? round($line['bread_count'] * $breadPrice, 2)
+                        : null,
                     'payment_type' => $line['payment_type'],
                     'bread_count' => $line['bread_count'],
                     // The batch's shortfall belongs to the batch, so it

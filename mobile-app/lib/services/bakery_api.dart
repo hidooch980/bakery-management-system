@@ -354,33 +354,6 @@ class BakeryApi {
 
   // --------------------------------------------------------------- sales
 
-  /// The chane batch being sold was already fetched from the server (the
-  /// seller only ever sees pending chane loaded while online), so its id
-  /// is always real — queueing the sale itself offline is safe.
-  Future<bool> recordSale({
-    required int chaneEntryId,
-    required PaymentType paymentType,
-    int? breadCount,
-    int? customerId,
-    double? amount,
-    String? note,
-  }) async {
-    final body = await _client.postOrQueue(
-      '/sales',
-      {
-        'chane_entry_id': chaneEntryId,
-        'payment_type': paymentType.apiValue,
-        if (breadCount != null) 'bread_count': breadCount,
-        if (customerId != null) 'customer_id': customerId,
-        if (amount != null) 'amount': amount,
-        if (note != null && note.isNotEmpty) 'note': note,
-      },
-      label: 'فروش — چانه #$chaneEntryId',
-    );
-
-    return body['queued'] == true;
-  }
-
   /// Records one batch paid for in several ways at once — part cash, part
   /// card — as a single request, so the batch is closed once and any
   /// shortfall is counted once rather than per line.
@@ -423,6 +396,20 @@ class BakeryApi {
     return (body['data'] as List)
         .cast<Map<String, dynamic>>()
         .map(Customer.fromJson)
+        .toList();
+  }
+
+  /// Who the seller can name as having taken bread home.
+  ///
+  /// Cached like the other lists a sale sheet opens on: it changes when
+  /// somebody is hired, not between sales, and the sheet must open with
+  /// no signal.
+  Future<List<StaffName>> saleStaff() async {
+    final body = await _client.getCached('/sales/staff');
+
+    return (body['data'] as List)
+        .cast<Map<String, dynamic>>()
+        .map(StaffName.fromJson)
         .toList();
   }
 

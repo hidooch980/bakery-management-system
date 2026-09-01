@@ -211,7 +211,8 @@ class _PayrollSectionState extends State<PayrollSection> {
                 // above is not what this person is going to be handed, and
                 // finding that out only once the sum is on screen is how the
                 // deduction came to look like it was not happening.
-                if (person.owesAdvance && !paidThisPeriod.contains(person.id))
+                if ((person.owesAdvance || person.owesBread) &&
+                    !paidThisPeriod.contains(person.id))
                   Padding(
                     padding: const EdgeInsetsDirectional.only(start: 4, bottom: Gap.tight),
                     child: Row(
@@ -220,7 +221,12 @@ class _PayrollSectionState extends State<PayrollSection> {
                             size: IconSize.inline, color: AppColors.moneyOut),
                         const SizedBox(width: Gap.tight),
                         Text(
-                          'علی‌الحساب ${person.advanceOutstandingFormatted}',
+                          person.owesAdvance && person.owesBread
+                              ? 'علی‌الحساب ${person.advanceOutstandingFormatted}'
+                                  '  •  نان ${person.breadOutstandingFormatted}'
+                              : person.owesAdvance
+                                  ? 'علی‌الحساب ${person.advanceOutstandingFormatted}'
+                                  : 'نان برده‌شده ${person.breadOutstandingFormatted}',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
@@ -234,9 +240,14 @@ class _PayrollSectionState extends State<PayrollSection> {
               const Divider(height: 24),
               for (final slip in slips.take(6))
                 AdminRow(
-                  label: slip.recoveredAdvance
+                  label: slip.recoveredAdvance || slip.recoveredBread
                       ? '${slip.userName}  •  ${slip.periodLabel}\n'
-                          'پس از کسر ${slip.advanceDeductionFormatted} علی‌الحساب'
+                          'پس از کسر ${[
+                          if (slip.recoveredAdvance)
+                            '${slip.advanceDeductionFormatted} علی‌الحساب',
+                          if (slip.recoveredBread)
+                            '${slip.breadDeductionFormatted} نان',
+                        ].join(' و ')}'
                       : '${slip.userName}  •  ${slip.periodLabel}'
                           '${slip.bankAccountTitle == null ? '' : '  •  ${slip.bankAccountTitle}'}',
                   value: slip.netAmountFormatted,
@@ -346,9 +357,26 @@ class _PaySheetState extends State<_PaySheet> {
     return owed < _gross ? owed : _gross;
   }
 
-  double get _net => _gross - _advance;
+  /// Bread the person took home, out of what the advance left. The same
+  /// order the server uses — a sheet that showed a different net from the
+  /// one about to be stored is the bug this shop spent 2026-08-17 finding
+  /// in the panel's own preview.
+  double get _bread {
+    final left = _gross - _advance;
 
-  bool get _carriesOver => widget.person.advanceOutstanding > _advance;
+    if (left <= 0) return 0;
+
+    final owed = widget.person.breadOutstanding;
+
+    return owed < left ? owed : left;
+  }
+
+  double get _net => _gross - _advance - _bread;
+
+  bool get _carriesOver =>
+      (widget.person.advanceOutstanding - _advance) +
+          (widget.person.breadOutstanding - _bread) >
+      0;
 
   @override
   Widget build(BuildContext context) {
@@ -434,14 +462,27 @@ class _PaySheetState extends State<_PaySheet> {
                 ),
                 child: Column(
                   children: [
-                    if (_advance > 0) ...[
+                    if (_advance > 0 || _bread > 0) ...[
                       _SumLine(label: 'حقوق و پاداش', amount: _gross),
-                      const SizedBox(height: Gap.tight),
-                      _SumLine(
-                        label: 'کسر علی‌الحساب',
-                        amount: -_advance,
-                        color: AppColors.moneyOut,
-                      ),
+                      if (_advance > 0) ...[
+                        const SizedBox(height: Gap.tight),
+                        _SumLine(
+                          label: 'کسر علی‌الحساب',
+                          amount: -_advance,
+                          color: AppColors.moneyOut,
+                        ),
+                      ],
+                      // Its own line, never folded into the advance: they
+                      // are two different debts and the person will ask
+                      // which one a deduction was.
+                      if (_bread > 0) ...[
+                        const SizedBox(height: Gap.tight),
+                        _SumLine(
+                          label: 'کسر نان برده‌شده',
+                          amount: -_bread,
+                          color: AppColors.moneyOut,
+                        ),
+                      ],
                       const Divider(height: 20),
                     ],
                     _SumLine(label: 'خالص پرداختی', amount: _net, strong: true),
@@ -461,8 +502,8 @@ class _PaySheetState extends State<_PaySheet> {
                     const SizedBox(width: Gap.tight),
                     Expanded(
                       child: Text(
-                        '${MoneyFormat.plain(widget.person.advanceOutstanding - _advance)} '
-                        'از علی‌الحساب به ماه بعد می‌ماند.',
+                        '${MoneyFormat.plain((widget.person.advanceOutstanding - _advance) + (widget.person.breadOutstanding - _bread))} '
+                        'از بدهی به ماه بعد می‌ماند.',
                         style: theme.textTheme.bodySmall
                             ?.copyWith(color: AppColors.attention),
                       ),

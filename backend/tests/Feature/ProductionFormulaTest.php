@@ -1090,17 +1090,21 @@ class ProductionFormulaTest extends TestCase
     // --------------------------------------------------- salt and dough bags
 
     /**
-     * Salt arrives in sacks of no fixed size and dough is never bagged at
-     * all, so counting either in bags invented a number nobody weighs.
-     * Both are kept in kilograms only.
+     * Salt starts with the size the owner gave it — «هر کیسه نمک ۲۵».
+     *
+     * Without a default here a newly opened bakery began with salt in
+     * kilograms again, which is the state «کیسه بیاد» was asking to be
+     * rid of. Dry yeast has no default because nobody has said what a
+     * sack of it weighs.
      */
-    public function test_salt_and_dough_are_kept_in_kilograms_only(): void
+    public function test_the_goods_start_with_the_sack_sizes_the_shop_gave_them(): void
     {
-        $this->assertNull(InventoryItem::ofKey(InventoryItem::SALT)->bag_weight_kg);
+        $this->assertSame(25.0, (float) InventoryItem::ofKey(InventoryItem::SALT)->bag_weight_kg);
+        $this->assertSame(10.0, (float) InventoryItem::ofKey(InventoryItem::YEAST_DRY)->bag_weight_kg);
     }
 
-    /** Until the shop says what a sack of it weighs, nothing is in sacks. */
-    public function test_salt_balance_is_not_reported_in_sacks(): void
+    /** So the store reads in sacks, which is how the shop counts it. */
+    public function test_salt_balance_is_reported_in_sacks(): void
     {
         InventoryItem::ofKey(InventoryItem::SALT)->move('in', 75, 'purchase');
 
@@ -1108,17 +1112,29 @@ class ProductionFormulaTest extends TestCase
         $salt = InventoryItem::ofKey(InventoryItem::SALT)->fresh();
 
         $this->assertSame(75.0, $salt->balance);
-        $this->assertNull($salt->balance_bags);
+        $this->assertSame(3.0, $salt->balance_bags);
     }
 
-    public function test_yeast_balance_is_not_reported_in_bags(): void
+    public function test_yeast_balance_is_reported_in_bags(): void
     {
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 25, 'purchase');
 
         $yeast = InventoryItem::ofKey(InventoryItem::YEAST_DRY)->fresh();
 
+        // 25kg at 10kg a sack. Two and a half — the shop is told it is
+        // under three, not handed «۲۵ کیلوگرم» to divide in its head.
         $this->assertSame(25.0, $yeast->balance);
-        $this->assertNull($yeast->balance_bags);
+        $this->assertSame(2.5, $yeast->balance_bags);
+    }
+
+    /** With nothing set, still nothing is said in sacks. */
+    public function test_an_unsized_good_is_not_reported_in_bags(): void
+    {
+        $yeast = InventoryItem::ofKey(InventoryItem::YEAST_DRY);
+        $yeast->update(['bag_weight_kg' => null]);
+        $yeast->move('in', 25, 'purchase');
+
+        $this->assertNull($yeast->fresh()->balance_bags);
     }
 
     /**
@@ -1146,14 +1162,16 @@ class ProductionFormulaTest extends TestCase
     }
 
     /** With no sack weight recorded, a sack count has nothing to convert at. */
-    public function test_recording_salt_in_bags_is_refused(): void
+    public function test_recording_a_sack_count_is_refused_when_no_size_is_known(): void
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
 
+        InventoryItem::ofKey(InventoryItem::YEAST_DRY)->update(['bag_weight_kg' => null]);
+
         $this->actingAs($admin, 'sanctum')
             ->postJson('/api/v1/inventory/movements', [
-                'item' => 'salt',
+                'item' => 'yeast_dry',
                 'direction' => 'in',
                 'bags' => 3,
                 'reason' => 'purchase',

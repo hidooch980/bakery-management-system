@@ -72,14 +72,21 @@ class ConsignmentFlour extends Model
             $record->partner_label,
         ));
 
-        // Settling means the sacks went back the way they came.
+        // Anything that changes what this record says about the flour —
+        // settling it, correcting the sacks, or correcting which way they
+        // went — is answered by making the warehouse agree with the row
+        // again.
+        //
+        // It used to answer only settling, so editing a record moved
+        // nothing: the ledger squared and the flour was somewhere else.
+        // That is why the twelve sacks recorded as twelve kilograms had
+        // to be deleted and rewritten rather than corrected, and it is
+        // the same shape as three other bugs in this project — see the
+        // note on the sale whose count could be corrected while the
+        // charge stayed put.
         static::updated(function (self $record) {
-            if ($record->wasChanged('settled_on') && $record->settled_on !== null) {
-                $record->moveStock(
-                    $record->direction === 'borrowed' ? 'out' : 'in',
-                    'consignment_return',
-                    'تسویه آرد امانی — '.$record->partner_label,
-                );
+            if ($record->wasChanged(['settled_on', 'bags', 'amount_kg', 'direction'])) {
+                $record->reconcileStock();
             }
         });
 
@@ -88,12 +95,59 @@ class ConsignmentFlour extends Model
         static::deleted(fn (self $record) => StockReversal::of($record, 'ابطال آرد امانی'));
     }
 
+    /**
+     * Posts whatever it takes to make the warehouse agree with this row.
+     *
+     * The effect a consignment should have on the store is a fact about
+     * its current state, not about the history of edits that got it
+     * there: flour borrowed and not yet given back is in the store,
+     * flour lent and not yet returned is out of it, and a settled record
+     * has had both halves and nets to nothing.
+     *
+     * What it has *actually* moved is read from the ledger rather than
+     * recomputed, the same way StockReversal reads it — a record made
+     * before the model moved stock at all has moved nothing, and
+     * inventing its history would conjure flour out of the air.
+     *
+     * One correcting movement, for the difference. Nothing is rewritten,
+     * so the ledger still says what happened and when.
+     */
+    public function reconcileStock(): void
+    {
+        $shouldBe = $this->settled_on !== null
+            ? 0.0
+            : ($this->direction === 'borrowed' ? 1 : -1) * (float) $this->amount_kg;
+
+        $movements = InventoryMovement::where('source_type', self::class)
+            ->where('source_id', $this->getKey())
+            ->get();
+
+        $actual = 0.0;
+
+        foreach ($movements as $movement) {
+            $actual += ($movement->direction === 'in' ? 1 : -1) * (float) $movement->quantity;
+        }
+
+        $delta = round($shouldBe - $actual, 3);
+
+        if (abs($delta) < 0.001) {
+            return;
+        }
+
+        $this->moveStock(
+            $delta > 0 ? 'in' : 'out',
+            'consignment_return',
+            'اصلاح آرد امانی — '.$this->partner_label,
+            abs($delta),
+        );
+    }
+
     /** Moves the warehouse by this record's weight, tagged back to it. */
-    protected function moveStock(string $direction, string $reason, ?string $note = null): void
+    protected function moveStock(string $direction, string $reason, ?string $note = null, ?float $quantity = null): void
     {
         InventoryItem::ofKey(InventoryItem::FLOUR)->move(
             $direction,
-            (float) $this->amount_kg,
+            $quantity ?? (float) $this->amount_kg,
             $reason,
             $this->user_id,
             $this,

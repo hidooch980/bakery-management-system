@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
+use App\Models\User;
 use App\Support\AppCalendar;
 use App\Support\Exclusively;
 use App\Support\Money;
@@ -57,6 +58,10 @@ class SaleController extends Controller
             'payment_type' => ['required_without:payments', 'in:'.implode(',', self::PAYMENT_TYPES)],
             'bread_count' => ['nullable', 'integer', 'min:0', 'max:1000000'],
             'customer_id' => ['nullable', 'exists:customers,id'],
+            // Who took the bread home, for a «منزل» line. The seller names
+            // them; the server charges that person's payslip, not the
+            // seller's account.
+            'consumed_by_user_id' => ['nullable', 'exists:users,id'],
             'amount' => ['nullable', 'numeric', 'min:0'],
             'note' => ['nullable', 'string', 'max:500'],
 
@@ -65,6 +70,7 @@ class SaleController extends Controller
             'payments.*.bread_count' => ['required', 'integer', 'min:1', 'max:1000000'],
             'payments.*.amount' => ['nullable', 'numeric', 'min:0'],
             'payments.*.customer_id' => ['nullable', 'exists:customers,id'],
+            'payments.*.consumed_by_user_id' => ['nullable', 'exists:users,id'],
         ]);
 
         // The batch is locked for the whole of this, and the "already
@@ -104,7 +110,7 @@ class SaleController extends Controller
     /**
      * Normalises either request shape into one list of payment lines.
      *
-     * @return array<int, array{payment_type: string, bread_count: int, amount: float|null, customer_id: int|null, note: string|null}>
+     * @return array<int, array{payment_type: string, bread_count: int, amount: float|null, customer_id: int|null, consumed_by_user_id: int|null, note: string|null}>
      */
     private function paymentLines(array $data, ChaneEntry $chane): array
     {
@@ -117,6 +123,7 @@ class SaleController extends Controller
                 'bread_count' => (int) ($data['bread_count'] ?? $chane->chane_count),
                 'amount' => isset($data['amount']) ? (float) $data['amount'] : null,
                 'customer_id' => $data['customer_id'] ?? null,
+                'consumed_by_user_id' => $data['consumed_by_user_id'] ?? null,
                 'note' => $note,
             ]];
         }
@@ -127,6 +134,9 @@ class SaleController extends Controller
             'amount' => isset($line['amount']) ? (float) $line['amount'] : null,
             // A line may name its own buyer; otherwise the sale's does.
             'customer_id' => $line['customer_id'] ?? $data['customer_id'] ?? null,
+            // Same for who took it home: a split sale can send one line
+            // home with one worker and sell the rest for cash.
+            'consumed_by_user_id' => $line['consumed_by_user_id'] ?? $data['consumed_by_user_id'] ?? null,
             'note' => $note,
         ], $data['payments']);
     }
@@ -163,6 +173,23 @@ class SaleController extends Controller
     public function paymentTypes(): JsonResponse
     {
         return $this->success(self::PAYMENT_TYPES);
+    }
+
+    /**
+     * Who the seller can name as having taken bread home.
+     *
+     * The attendance roster already lists the staff, but it deliberately
+     * leaves the asker out — it exists so somebody ticks in the people who
+     * are not holding a phone. A seller takes bread home like anyone else,
+     * so this one includes them.
+     */
+    public function staff(): JsonResponse
+    {
+        return $this->success(
+            User::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+        );
     }
 
     /**
