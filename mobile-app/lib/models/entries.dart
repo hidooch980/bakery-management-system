@@ -147,12 +147,30 @@ enum PaymentType {
 
 /// One way a batch was paid for: how many loaves went out under this
 /// payment type, and the money taken for them.
+/// A member of staff, by name, for the «چه کسی برد» picker.
+///
+/// Deliberately not the full User model: this list is read by a seller,
+/// who has no business seeing wages or roles, and the server sends only
+/// the two fields the picker needs.
+class StaffName {
+  const StaffName({required this.id, required this.name});
+
+  final int id;
+  final String name;
+
+  factory StaffName.fromJson(Map<String, dynamic> json) => StaffName(
+        id: json['id'] as int,
+        name: (json['name'] ?? '') as String,
+      );
+}
+
 class SalePaymentLine {
   const SalePaymentLine({
     required this.paymentType,
     required this.breadCount,
     this.amount,
     this.customerId,
+    this.consumedByUserId,
   });
 
   final PaymentType paymentType;
@@ -160,11 +178,17 @@ class SalePaymentLine {
   final double? amount;
   final int? customerId;
 
+  /// Who took the bread home, on a «منزل» line. The seller names them and
+  /// the price comes off that person's payslip at month end — it is never
+  /// charged to the seller, who only handed it over.
+  final int? consumedByUserId;
+
   Map<String, dynamic> toJson() => {
         'payment_type': paymentType.apiValue,
         'bread_count': breadCount,
         if (amount != null) 'amount': amount,
         if (customerId != null) 'customer_id': customerId,
+        if (consumedByUserId != null) 'consumed_by_user_id': consumedByUserId,
       };
 }
 

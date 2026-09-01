@@ -41,6 +41,7 @@ class CreateSale extends CreateRecord
                     ? Money::toToman((float) $line['amount'])
                     : null,
                 'customer_id' => $line['customer_id'] ?? null,
+                'consumed_by_user_id' => $line['consumed_by_user_id'] ?? null,
                 'note' => $data['note'] ?? null,
             ])
             ->filter(fn (array $line) => $line['bread_count'] > 0)

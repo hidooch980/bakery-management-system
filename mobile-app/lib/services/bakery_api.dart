@@ -426,6 +426,20 @@ class BakeryApi {
         .toList();
   }
 
+  /// Who the seller can name as having taken bread home.
+  ///
+  /// Cached like the other lists a sale sheet opens on: it changes when
+  /// somebody is hired, not between sales, and the sheet must open with
+  /// no signal.
+  Future<List<StaffName>> saleStaff() async {
+    final body = await _client.getCached('/sales/staff');
+
+    return (body['data'] as List)
+        .cast<Map<String, dynamic>>()
+        .map(StaffName.fromJson)
+        .toList();
+  }
+
   /// The seller's own temporary account — what they still answer for.
   /// A person's own lateness this month, and what the next late day costs.
   ///

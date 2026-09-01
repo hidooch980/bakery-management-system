@@ -7,6 +7,7 @@ use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\SaleResource\Pages;
 use App\Models\Customer;
 use App\Models\Sale;
+use App\Models\User;
 use App\Support\CurrentBakery;
 use App\Support\Jalali;
 use App\Support\Money;
@@ -143,6 +144,21 @@ class SaleResource extends Resource
                                 ->visible(fn (Forms\Get $get) => in_array(
                                     $get('payment_type'), ['schools', 'credit'], true
                                 )),
+
+                            // Who took it home. Optional on purpose: the
+                            // shop's older «منزل» rows name nobody, and a
+                            // required field here would make the panel
+                            // refuse to record what it has always recorded.
+                            Forms\Components\Select::make('consumed_by_user_id')
+                                ->label('چه کسی برد')
+                                ->options(fn () => User::query()
+                                    ->where('is_active', true)
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id'))
+                                ->searchable()
+                                ->native(false)
+                                ->helperText('اگر نام را انتخاب کنید، بهای آن آخر ماه از فیش حقوقی همان نفر کسر می‌شود.')
+                                ->visible(fn (Forms\Get $get) => $get('payment_type') === Sale::HOME_TYPE),
                         ])
                         ->dehydrated(false),
 

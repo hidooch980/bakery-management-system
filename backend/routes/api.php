@@ -118,6 +118,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/sales/today', [SaleController::class, 'today'])
             ->middleware('permission:view-own-sales');
         Route::get('/sales/payment-types', [SaleController::class, 'paymentTypes']);
+        // Named on a «منزل» line, so it needs exactly the permission that
+        // records one.
+        Route::get('/sales/staff', [SaleController::class, 'staff'])
+            ->middleware('permission:record-sale');
         Route::get('/sales/my-account', [SaleController::class, 'myAccount'])
             ->middleware('permission:view-own-sales');
 
