@@ -144,12 +144,52 @@ class InventoryItem extends Model
         return $this->balance <= 0;
     }
 
+    /**
+     * The line under which this good is worth mentioning — the owner's own
+     * figure, or one sack when he has not set one.
+     *
+     * The warning was inert for three years' worth of goods because it
+     * waited for a number nobody had entered: on 1405/06 the shop ran out
+     * of dry yeast three times in nine days and heard nothing until the
+     * app refused the dough. A net that needs configuring before it
+     * catches anything is not a net.
+     *
+     * One sack is the unit the shop actually buys in, so it explains
+     * itself — «کمتر از یک کیسه مانده» is an instruction, not a
+     * reading. It also lands where it should: at 2.33 kg of yeast a day
+     * that is four days' warning, and at 7.67 kg of salt, three.
+     *
+     * Flour is deliberately excluded. It moves 600 kg a day here, so one
+     * sack of it is under an hour's baking rather than days of notice, and
+     * flour is the one good already watched — by the quota, which knows
+     * about the period as well as the balance.
+     */
+    public function getEffectiveLowThresholdAttribute(): ?float
+    {
+        if ($this->low_threshold !== null) {
+            return (float) $this->low_threshold;
+        }
+
+        if ($this->key === self::FLOUR || $this->bag_weight_kg === null) {
+            return null;
+        }
+
+        return (float) $this->bag_weight_kg;
+    }
+
+    /** True when the fallback above is doing the work, not the owner. */
+    public function getLowThresholdIsASackAttribute(): bool
+    {
+        return $this->low_threshold === null
+            && $this->effective_low_threshold !== null;
+    }
+
     public function getIsLowAttribute(): bool
     {
         // An empty item is low whether or not anybody set a threshold.
         return $this->is_empty
-            || ($this->low_threshold !== null
-                && $this->balance <= (float) $this->low_threshold);
+            || ($this->effective_low_threshold !== null
+                && $this->balance <= $this->effective_low_threshold);
     }
 
     /** Records a stock movement and returns it. */
