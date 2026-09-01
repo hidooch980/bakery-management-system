@@ -230,7 +230,28 @@ class OpenBakeryFromThePanelTest extends TestCase
         // The file itself, not the live config — setUp turns it on for
         // every other test here, and the thing worth holding down is what
         // arrives on the server when nobody has said anything.
-        $shipped = require config_path('bakery.php');
+        //
+        // «Nobody has said anything» has to be arranged rather than
+        // assumed. The file reads env(), so a machine with
+        // BAKERY_MULTI_SHOP set answers for the default instead of it —
+        // one did, and this failed there while the shipped default was
+        // perfectly fine. Pinning the variable to false in phpunit.xml
+        // would have quietened it and tested nothing: the point is what
+        // happens when it is *unset*.
+        $said = getenv('BAKERY_MULTI_SHOP');
+        putenv('BAKERY_MULTI_SHOP');
+        unset($_ENV['BAKERY_MULTI_SHOP'], $_SERVER['BAKERY_MULTI_SHOP']);
+
+        try {
+            $shipped = require config_path('bakery.php');
+        } finally {
+            // Put the machine back as it was, whatever it was.
+            if ($said !== false) {
+                putenv('BAKERY_MULTI_SHOP='.$said);
+                $_ENV['BAKERY_MULTI_SHOP'] = $said;
+                $_SERVER['BAKERY_MULTI_SHOP'] = $said;
+            }
+        }
 
         $this->assertFalse(
             $shipped['multi_shop'],
