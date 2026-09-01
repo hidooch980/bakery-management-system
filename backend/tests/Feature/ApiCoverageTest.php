@@ -177,7 +177,7 @@ class ApiCoverageTest extends TestCase
             ->assertJsonPath('data.total', 1);
     }
 
-    public function test_flour_is_reported_in_bags_but_salt_only_in_kilograms(): void
+    public function test_the_store_is_reported_in_sacks_wherever_a_sack_size_is_known(): void
     {
         InventoryItem::ofKey('flour')->move('in', 200, 'purchase');
         InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
@@ -193,9 +193,16 @@ class ApiCoverageTest extends TestCase
 
         // 200kg at the default 40kg sack.
         $this->assertEqualsWithDelta(5, $flour['balance_bags'], 0.001);
-        // Salt has no fixed sack size, so no bag count is invented for it.
-        $this->assertNull($salt['balance_bags']);
+        // Salt arrives in sacks of 25 — «هر کیسه نمک ۲۵», and «کیسه بیاد»
+        // for the store. 75kg is three of them.
+        $this->assertEqualsWithDelta(3, $salt['balance_bags'], 0.001);
         $this->assertEqualsWithDelta(75, $salt['balance'], 0.001);
+        $this->assertEqualsWithDelta(25, $salt['bag_weight_kg'], 0.001);
+
+        // Dry yeast is the good nobody has given a sack size, so it is
+        // still weighed and says so by answering null rather than zero.
+        $yeast = collect($data)->firstWhere('key', 'yeast_dry');
+        $this->assertNull($yeast['balance_bags']);
     }
 
     public function test_inventory_threshold_can_be_set(): void

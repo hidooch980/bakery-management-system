@@ -67,18 +67,32 @@ class InventoryItemPanelTest extends TestCase
         $this->assertStringNotContainsString('120.000 کیلوگرم', $html);
     }
 
-    public function test_salt_keeps_its_weight_because_it_has_no_sack(): void
+    public function test_salt_reads_in_sacks_too_now_that_its_size_is_known(): void
     {
-        InventoryItem::ofKey('salt')->move('in', 25, 'purchase');
+        InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
 
         $html = Livewire::test(
             ListInventoryItems::class
         )->html();
 
-        // Salt arrives in sacks of no set size, so there is no bag count
-        // to show instead. Hiding the weight here would leave the row
-        // saying nothing at all.
-        $this->assertStringContainsString('25.000 کیلوگرم', $html);
+        // Three sacks of 25. The same rule as flour, for the same reason:
+        // the shop counts sacks, so «کیلو در انبار معنی نداره».
+        $this->assertStringContainsString('3.00 کیسه', $html);
+        $this->assertStringNotContainsString('75.000 کیلوگرم', $html);
+    }
+
+    public function test_a_good_with_no_sack_size_keeps_its_weight(): void
+    {
+        InventoryItem::ofKey('yeast_dry')->move('in', 8.5, 'purchase');
+
+        $html = Livewire::test(
+            ListInventoryItems::class
+        )->html();
+
+        // Nobody has said what a sack of dry yeast weighs. Hiding the
+        // weight here would leave the row saying nothing at all, and
+        // inventing a sack count would be worse than either.
+        $this->assertStringContainsString('8.500 کیلوگرم', $html);
     }
 
     public function test_recording_stock_in_bags_creates_the_right_movement(): void
@@ -101,10 +115,10 @@ class InventoryItemPanelTest extends TestCase
     }
 
     /**
-     * Salt and dough are weighed rather than bagged, so their entry form
-     * asks for kilograms directly instead of a sack count.
+     * Salt arrives in sacks of 25 — «هر کیسه نمک ۲۵» — so its entry form
+     * asks for a sack count and does the weighing itself.
      */
-    public function test_salt_is_recorded_in_kilograms(): void
+    public function test_salt_is_recorded_in_sacks(): void
     {
         $salt = InventoryItem::ofKey('salt');
 
@@ -113,13 +127,35 @@ class InventoryItemPanelTest extends TestCase
         )
             ->callTableAction('recordStock', $salt, data: [
                 'direction' => 'in',
-                'quantity' => 75,
+                'bags' => 3,
                 'reason' => 'purchase',
             ])
             ->assertHasNoTableActionErrors();
 
         $this->assertEquals(75.0, $salt->fresh()->balance);
-        $this->assertNull($salt->fresh()->balance_bags);
+        $this->assertEquals(3.0, $salt->fresh()->balance_bags);
+    }
+
+    /**
+     * And a good whose sack size nobody has given still reads in
+     * kilograms, rather than having one invented for it.
+     */
+    public function test_dry_yeast_is_still_recorded_in_kilograms(): void
+    {
+        $yeast = InventoryItem::ofKey('yeast_dry');
+
+        Livewire::test(
+            ListInventoryItems::class
+        )
+            ->callTableAction('recordStock', $yeast, data: [
+                'direction' => 'in',
+                'quantity' => 8.5,
+                'reason' => 'purchase',
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertEquals(8.5, $yeast->fresh()->balance);
+        $this->assertNull($yeast->fresh()->balance_bags);
     }
 
     public function test_recording_stock_for_flour_uses_the_formula_bag_weight(): void
@@ -150,12 +186,12 @@ class InventoryItemPanelTest extends TestCase
         )
             ->callTableAction('recordStock', $salt, data: [
                 'direction' => 'out',
-                'quantity' => 30,
+                'bags' => 1.2,
                 'reason' => 'production',
             ])
             ->assertHasNoTableActionErrors();
 
-        // 100kg in, 30kg out: 70kg left.
+        // 100kg in, 1.2 sacks of 25 out: 70kg left.
         $this->assertEquals(70.0, $salt->fresh()->balance);
     }
 

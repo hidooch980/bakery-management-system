@@ -126,8 +126,10 @@ class InventoryItemResource extends Resource
             ])
             ->actions([
                 Tables\Actions\Action::make('recordStock')
-                    // Salt and dough are weighed, not bagged, so the form
-                    // asks them for kilograms and the label follows suit.
+                    // A good whose sack size the shop has recorded is
+                    // counted in sacks; one it has not is weighed. Which
+                    // is which is the shop's answer, on the item — not a
+                    // list here naming salt.
                     ->label(fn (InventoryItem $record) => self::bagWeightFor($record) > 0
                         ? 'ثبت موجودی (کیسه‌ای)'
                         : 'ثبت موجودی (کیلویی)')

@@ -66,11 +66,11 @@ class InventoryBagIntakeTest extends TestCase
     }
 
     /**
-     * Salt sacks come in no fixed size, so a bag count would be guesswork.
-     * It is weighed instead, and a bag entry is refused rather than
-     * silently converted at some invented figure.
+     * Salt comes in sacks of 25 — «هر کیسه نمک ۲۵» — so a sack count is
+     * accepted and weighed here, where the size lives, rather than in a
+     * client that could be holding a stale figure.
      */
-    public function test_salt_is_recorded_by_weight_not_by_sacks(): void
+    public function test_salt_is_recorded_by_the_sack(): void
     {
         $this->actingAs($this->admin, 'sanctum')
             ->postJson('/api/v1/inventory/movements', [
@@ -79,18 +79,36 @@ class InventoryBagIntakeTest extends TestCase
                 'bags' => 3,
                 'reason' => 'purchase',
             ])
+            ->assertCreated();
+
+        $this->assertSame(75.0, InventoryItem::ofKey('salt')->balance);
+    }
+
+    /**
+     * A good whose sack size nobody has given still refuses a sack count,
+     * rather than converting it at some invented figure.
+     */
+    public function test_a_good_with_no_sack_size_refuses_a_sack_count(): void
+    {
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/v1/inventory/movements', [
+                'item' => 'yeast_dry',
+                'direction' => 'in',
+                'bags' => 3,
+                'reason' => 'purchase',
+            ])
             ->assertStatus(422);
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson('/api/v1/inventory/movements', [
-                'item' => 'salt',
+                'item' => 'yeast_dry',
                 'direction' => 'in',
-                'quantity' => 75,
+                'quantity' => 8.5,
                 'reason' => 'purchase',
             ])
             ->assertCreated();
 
-        $this->assertSame(75.0, InventoryItem::ofKey('salt')->balance);
+        $this->assertSame(8.5, InventoryItem::ofKey('yeast_dry')->balance);
     }
 
     public function test_recording_by_weight_still_works(): void

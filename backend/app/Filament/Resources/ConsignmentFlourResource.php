@@ -7,6 +7,8 @@ use App\Filament\Resources\ConsignmentFlourResource\Pages;
 use App\Models\ConsignmentFlour;
 use App\Models\Customer;
 use App\Support\AppCalendar;
+use App\Support\DoughFormula;
+use App\Support\Qty;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -69,12 +71,21 @@ class ConsignmentFlourResource extends Resource
                         ->required()
                         ->native(false),
 
-                    Forms\Components\TextInput::make('amount_kg')
+                    // Sacks, because sacks are what changes hands at the
+                    // door. Asking for a weight is how twelve sacks from
+                    // نانوایی کنت were once recorded as twelve kilograms:
+                    // the number a person has in mind is the sack count,
+                    // and the box in front of them said کیلوگرم. The
+                    // weight is derived on save from the shop's sack size.
+                    Forms\Components\TextInput::make('bags')
                         ->label('مقدار')
                         ->numeric()
-                        ->minValue(0.001)
+                        ->minValue(0.01)
                         ->required()
-                        ->suffix('کیلوگرم'),
+                        ->suffix('کیسه')
+                        ->helperText(fn () => 'هر کیسه '
+                            .Qty::format(DoughFormula::fromBakery()->bagWeightKg, 0)
+                            .' کیلوگرم'),
 
                     JalaliDateInput::today('occurred_on', 'تاریخ')
                         ->required(),
@@ -112,12 +123,15 @@ class ConsignmentFlourResource extends Resource
                     ->formatStateUsing(fn ($state) => ConsignmentFlour::DIRECTIONS[$state] ?? $state)
                     ->color(fn ($state) => $state === 'borrowed' ? 'success' : 'warning'),
 
-                Tables\Columns\TextColumn::make('amount_kg')
+                // Sacks lead, the weight follows — the sack count is what
+                // was counted at the door, the weight is for the books.
+                Tables\Columns\TextColumn::make('bags')
                     ->label('مقدار')
-                    ->numeric(3)
-                    ->suffix(' کیلوگرم')
+                    ->state(fn (ConsignmentFlour $record) => $record->quantity_label)
                     ->sortable()
-                    ->summarize(Tables\Columns\Summarizers\Sum::make()->label('جمع')),
+                    ->summarize(Tables\Columns\Summarizers\Sum::make()
+                        ->label('جمع کیسه')
+                        ->numeric(2)),
 
                 Tables\Columns\TextColumn::make('settled_on')
                     ->label('وضعیت')

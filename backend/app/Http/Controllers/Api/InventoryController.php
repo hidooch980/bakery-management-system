@@ -31,6 +31,12 @@ class InventoryController extends Controller
             'balance' => $item->balance,
             // Null only when this item has no configured bag/sack size.
             'balance_bags' => $item->balance_bags,
+            // The size itself, so a client can label a sack without
+            // holding its own copy of the figure. Zero means this good
+            // has no fixed package and reads in kilograms only — which
+            // is the shop's answer, carried on the item, not a rule in
+            // the app about which goods are weighed.
+            'bag_weight_kg' => $item->bagWeightKg(),
             'low_threshold' => $item->low_threshold ? (float) $item->low_threshold : null,
             'is_low' => $item->is_low,
         ]);
@@ -90,13 +96,6 @@ class InventoryController extends Controller
             if ($bagWeight <= 0) {
                 return $this->error(
                     $item->name.' فقط به کیلوگرم ثبت می‌شود چون وزن کیسه‌اش ثبت نشده است.',
-                    422
-                );
-            }
-
-            if ($bagWeight <= 0) {
-                return $this->error(
-                    'وزن هر کیسه '.$item->name.' در تنظیمات ثبت نشده است.',
                     422
                 );
             }

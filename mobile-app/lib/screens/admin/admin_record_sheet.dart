@@ -24,26 +24,32 @@ enum AdminRecordKind {
   final Color color;
 }
 
-/// What the warehouse can take in, and the unit each arrives in.
+/// What the warehouse can take in.
 ///
-/// Flour comes in sacks and is counted that way; salt and yeast are
-/// weighed. The server enforces this — a sack count for salt is refused
-/// rather than converted at a weight nobody measures — so the form asks
-/// for whichever the chosen item actually uses.
+/// Whether a good is counted in sacks is **not** decided here. It is a
+/// fact about the good — what one sack of it weighs — and the shop
+/// answers it, on the item, so the server is the one that knows. This
+/// list used to hardcode «آرد کیسه‌ای، نمک و خمیرمایه کیلویی» and would
+/// have gone on asking for kilograms of salt after the shop said a sack
+/// of it is 25kg.
+///
+/// The flag below is only the fallback used before the item list has
+/// loaded, or when the phone is offline.
 enum StockItem {
-  flour('flour', 'آرد', true, 'کیسه'),
-  salt('salt', 'نمک', false, 'کیلوگرم'),
+  flour('flour', 'آرد', true),
+  salt('salt', 'نمک', true),
   // The fresh-yeast tub was taken out of the store on 1405/06/08, unused
   // after thirty-one batches. Offering it here would let somebody book
   // stock into an item the server no longer has.
-  yeastDry('yeast_dry', 'خمیرمایه خشک', false, 'کیلوگرم');
+  yeastDry('yeast_dry', 'خمیرمایه خشک', false);
 
-  const StockItem(this.apiValue, this.label, this.inSacks, this.unit);
+  const StockItem(this.apiValue, this.label, this.sacksByDefault);
 
   final String apiValue;
   final String label;
-  final bool inSacks;
-  final String unit;
+
+  /// What to assume until the server says. See the note above.
+  final bool sacksByDefault;
 }
 
 /// A single sheet that records money in, money out, flour bought, or flour
@@ -88,6 +94,20 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
   /// What is being brought in. Flour first: it is most of what arrives.
   StockItem _item = StockItem.flour;
 
+  /// What one sack of each good weighs, as the shop has recorded it.
+  /// Empty until the item list loads, and empty for good when the phone
+  /// is offline — in which case each item falls back to its own default.
+  Map<String, double> _bagWeights = const {};
+
+  /// Whether the chosen good is counted in sacks.
+  bool get _inSacks {
+    final weight = _bagWeights[_item.apiValue];
+
+    return weight == null ? _item.sacksByDefault : weight > 0;
+  }
+
+  String get _itemUnit => _inSacks ? 'کیسه' : 'کیلوگرم';
+
   bool _saving = false;
 
   bool get _isMoney =>
@@ -104,6 +124,30 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
       _loadPartners();
     }
     if (_isMoney) _loadCategories();
+    if (widget.kind == AdminRecordKind.intake) _loadBagWeights();
+  }
+
+  /// Asks the shop what a sack of each good weighs. A failure is silent
+  /// on purpose: the form still works on the defaults, and an error
+  /// banner over a unit label would be noise while somebody is trying to
+  /// book in a delivery.
+  Future<void> _loadBagWeights() async {
+    try {
+      final items = await widget.api.inventory();
+
+      if (!mounted) return;
+
+      setState(() {
+        _bagWeights = {
+          for (final item in items)
+            if (item['key'] is String)
+              item['key'] as String:
+                  (item['bag_weight_kg'] as num?)?.toDouble() ?? 0,
+        };
+      });
+    } catch (_) {
+      // Keep the defaults.
+    }
   }
 
   Future<void> _loadCategories() async {
@@ -188,7 +232,7 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
         AdminRecordKind.intake => await widget.api.recordStockIntake(
             item: _item.apiValue,
             quantity: value,
-            inSacks: _item.inSacks,
+            inSacks: _inSacks,
             note: note.isEmpty ? _title.text.trim() : note,
           ),
         AdminRecordKind.consignment => await widget.api.recordConsignmentFlour(
@@ -218,13 +262,13 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
 
   String get _amountLabel => switch (widget.kind) {
         AdminRecordKind.intake =>
-          _item.inSacks ? 'تعداد کیسه' : 'مقدار به کیلوگرم',
+          _inSacks ? 'تعداد کیسه' : 'مقدار به کیلوگرم',
         AdminRecordKind.consignment => 'تعداد کیسه',
         _ => 'مبلغ',
       };
 
   String get _amountSuffix => switch (widget.kind) {
-        AdminRecordKind.intake => _item.unit,
+        AdminRecordKind.intake => _itemUnit,
         AdminRecordKind.consignment => 'کیسه',
         _ => _unit.label,
       };
