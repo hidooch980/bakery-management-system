@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FlourAllocation;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
+use App\Support\FlourQuota;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Traits\ApiResponse;
@@ -105,6 +106,8 @@ class FlourAllocationController extends Controller
     private function payload(FlourAllocation $allocation, $highlightDate = null): array
     {
         $current = $highlightDate ? $allocation->periodFor($highlightDate) : null;
+        $balance = FlourQuota::balance();
+        $balanceBags = FlourQuota::remainingBags();
 
         return [
             'id' => $allocation->id,
@@ -120,6 +123,11 @@ class FlourAllocationController extends Controller
             'bag_weight_kg' => DoughFormula::fromBakery()->bagWeightKg,
             'note' => $allocation->note,
             'current_period_number' => $current?->period_number,
+            // What the shop may actually still take. Quota rolls forward
+            // — period after period, month after month — so the per-period
+            // `remaining_kg` below is a fact about that fortnight, not the
+            // headroom. Reading it as headroom understates it.
+            'carried_balance' => $balance + ['remaining_bags' => $balanceBags],
             'periods' => $allocation->periods->map(fn ($p) => [
                 'number' => $p->period_number,
                 'label' => $p->label,
