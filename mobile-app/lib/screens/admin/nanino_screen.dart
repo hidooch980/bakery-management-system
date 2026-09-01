@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 
 /// Signing the shop in to its own card terminal on nanino.
@@ -110,9 +111,12 @@ class _NaninoScreenState extends State<NaninoScreen> {
 
     try {
       await widget.api.naninoRequestCode(
-        mobile: _mobile.text.trim(),
-        nationalNumber: _national.text.trim(),
+        // A Persian keyboard types «۰۹۱۵…», and nanino reads figures.
+        mobile: latinDigits(_mobile.text.trim()),
+        nationalNumber: latinDigits(_national.text.trim()),
         accessKey: _accessKey ?? '',
+        // Not the captcha: it is letters and figures read off an image,
+        // and what the person typed is the point of asking them.
         captcha: _captcha.text.trim(),
       );
 
@@ -138,9 +142,9 @@ class _NaninoScreenState extends State<NaninoScreen> {
 
     try {
       await widget.api.naninoConnect(
-        mobile: _mobile.text.trim(),
-        nationalNumber: _national.text.trim(),
-        code: _code.text.trim(),
+        mobile: latinDigits(_mobile.text.trim()),
+        nationalNumber: latinDigits(_national.text.trim()),
+        code: latinDigits(_code.text.trim()),
       );
 
       if (!mounted) return;
