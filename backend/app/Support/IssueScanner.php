@@ -8,7 +8,6 @@ use App\Models\ConsignmentFlour;
 use App\Models\DieselAllocation;
 use App\Models\DoughEntry;
 use App\Models\Expense;
-use App\Models\FlourAllocation;
 use App\Models\InventoryItem;
 use App\Models\Loan;
 use App\Models\SalaryPayment;
@@ -39,7 +38,6 @@ class IssueScanner
             ...$this->lowStock(),
             ...$this->emptyStock(),
             ...$this->quotaOverrun(),
-            ...$this->quotaLeftOnTheTable(),
             ...$this->negativeBankBalance(),
             ...$this->sellerAccounts(),
             ...$this->unsettledShortfalls(),
@@ -231,109 +229,45 @@ class IssueScanner
         return $issues;
     }
 
+    /**
+     * More flour through the ovens than the shop is entitled to.
+     *
+     * Measured against the **accumulated** entitlement. Quota rolls
+     * forward — period after period, month after month — so a fortnight
+     * that draws more than its own allocation is not an overrun if
+     * earlier periods left enough behind; only a negative balance is.
+     * Reported once, about the account, rather than once per period.
+     */
     private function quotaOverrun(): array
     {
-        $allocation = FlourAllocation::forJalaliMonthOf(now());
+        $balance = FlourQuota::balance();
 
-        if (! $allocation) {
+        // Against the accumulated entitlement, not one period's slice.
+        // Quota rolls forward, so a period may quite properly draw more
+        // than its own allocation on what earlier periods left behind;
+        // the shop is only over when the whole account is.
+        if ($balance['remaining'] >= 0) {
             return [];
         }
 
-        $issues = [];
+        $over = abs($balance['remaining']);
+        $bag = DoughFormula::fromBakery()->bagWeightKg;
+        $inBags = $bag > 0 ? round($over / $bag, 1) : null;
 
-        foreach ($allocation->periods as $period) {
-            if (! $period->is_over) {
-                continue;
-            }
-
-            $issues[] = new SystemIssue(
-                key: "quota-over-{$period->id}",
-                severity: SystemIssue::WARNING,
-                title: "مصرف {$period->label} از سهمیه گذشته است",
-                detail: number_format($period->used_kg, 1).' کیلوگرم مصرف در برابر '
-                    .number_format((float) $period->allocated_kg, 1).' کیلوگرم سهمیه.',
-                cause: 'مصرف بیش از برنامه، یا آردی که خارج از تولید از انبار رفته.',
-                suggestion: 'اگر آرد امانی یا سنوات دارید ثبت کنید تا تراز درست شود.',
-                url: '/admin/flour-allocations',
-                urlLabel: 'مدیریت سهمیه',
-                magnitude: (float) $period->used_kg - (float) $period->allocated_kg,
-            );
-        }
-
-        return $issues;
-    }
-
-    /**
-     * Quota that is going to expire undrawn.
-     *
-     * quotaOverrun() above says something when the shop uses *more* than
-     * its ration. Using much less, with the period nearly over, is the
-     * other way to lose it: the period's allowance does not roll forward.
-     *
-     * «Used» here is flour that went into production, which is how every
-     * other quota figure in this system is counted — not flour collected
-     * from the mill, which it does not separately record.
-     *
-     * Only in the second half of the period, and only when the gap is big
-     * enough to matter. Baking is uneven across a fortnight and a warning
-     * on day two would teach the owner to ignore the page.
-     */
-    private function quotaLeftOnTheTable(): array
-    {
-        $allocation = FlourAllocation::forJalaliMonthOf(now());
-
-        if (! $allocation) {
-            return [];
-        }
-
-        $issues = [];
-
-        foreach ($allocation->periods as $period) {
-            $total = $period->total_days;
-            $elapsed = (int) $period->starts_on->copy()->startOfDay()
-                ->diffInDays(now()->startOfDay()) + 1;
-
-            // Not this period, or not far enough into it to judge.
-            if ($elapsed < 1 || $elapsed > $total) {
-                continue;
-            }
-
-            $daysLeft = $total - $elapsed;
-            $allocated = (float) $period->allocated_kg;
-            $remaining = (float) $period->remaining_kg;
-
-            if ($allocated <= 0 || $remaining <= 0) {
-                continue;
-            }
-
-            // Past the halfway mark, and more than a third of the ration
-            // still unlifted. Both together, so a slow start says nothing
-            // and only a period that is genuinely running out does.
-            $throughPeriod = $elapsed / $total;
-            $unlifted = $remaining / $allocated;
-
-            if ($throughPeriod < 0.5 || $unlifted < 0.34) {
-                continue;
-            }
-
-            $bags = DoughFormula::fromBakery()->bagWeightKg;
-            $inBags = $bags > 0 ? round($remaining / $bags, 1) : null;
-
-            $issues[] = new SystemIssue(
-                key: "quota-unlifted-{$period->id}",
-                severity: SystemIssue::WARNING,
-                title: "مصرف {$period->label} خیلی عقب است",
-                detail: ($inBags !== null ? "{$inBags} کیسه" : number_format($remaining, 1).' کیلوگرم')
-                    .' از سهمیهٔ دوره مصرف نشده و '.$daysLeft.' روز تا پایان آن مانده.',
-                cause: 'سهمیهٔ دوره به دورهٔ بعد منتقل نمی‌شود.',
-                suggestion: 'اگر قرار است مصرف شود، پیش از پایان دوره برنامه‌ریزی کنید.',
-                url: '/admin/flour-allocations',
-                urlLabel: 'مدیریت سهمیه',
-                magnitude: $remaining,
-            );
-        }
-
-        return $issues;
+        return [new SystemIssue(
+            key: 'quota-over',
+            severity: SystemIssue::WARNING,
+            title: 'مصرف آرد از سهمیه گذشته است',
+            detail: number_format($balance['used'], 1).' کیلوگرم مصرف در برابر '
+                .number_format($balance['allocated'], 1).' کیلوگرم سهمیهٔ انباشته،'
+                .' یعنی '.number_format($over, 1).' کیلوگرم'
+                .($inBags !== null ? ' ('.$inBags.' کیسه)' : '').' بیشتر.',
+            cause: 'مصرف بیش از برنامه، یا آردی که خارج از تولید از انبار رفته.',
+            suggestion: 'اگر آرد امانی یا سنوات دارید ثبت کنید تا تراز درست شود.',
+            url: '/admin/flour-allocations',
+            urlLabel: 'مدیریت سهمیه',
+            magnitude: $over,
+        )];
     }
 
     /**

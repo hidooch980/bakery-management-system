@@ -4,7 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Models\FlourAllocation;
 use App\Support\AppCalendar;
-use App\Support\DoughFormula;
+use App\Support\FlourQuota;
 use App\Support\Qty;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -56,8 +56,8 @@ class FlourQuotaOverview extends BaseWidget
             ];
         }
 
-        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
-        $remainingBags = $bagWeight > 0 ? $period->remaining_kg / $bagWeight : 0;
+        $balance = FlourQuota::balance();
+        $balanceBags = FlourQuota::remainingBags();
 
         return [
             Stat::make($period->label, Qty::format((float) $period->allocated_kg, 0).' کیلوگرم')
@@ -79,12 +79,17 @@ class FlourQuotaOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color($period->usage_percent > 90 ? 'danger' : ($period->usage_percent > 70 ? 'warning' : 'success')),
 
-            Stat::make('باقی‌مانده دوره', Qty::format($period->remaining_kg, 0).' کیلوگرم')
-                ->description($period->is_over
+            // The accumulated balance, not this period's leftover. Quota
+            // rolls forward, so what the shop may still take is every
+            // started period's allocation less everything it has used —
+            // showing one fortnight's remainder understated it and
+            // implied a deadline that does not exist.
+            Stat::make('ماندهٔ سهمیه', Qty::format($balance['remaining'], 0).' کیلوگرم')
+                ->description($balance['remaining'] < 0
                     ? 'بیش از سهمیه مصرف شده'
-                    : Qty::format($remainingBags, 1).' کیسه')
-                ->descriptionIcon($period->is_over ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-circle')
-                ->color($period->is_over ? 'danger' : 'success'),
+                    : ($balanceBags !== null ? Qty::format($balanceBags, 1).' کیسه — منتقل می‌شود' : 'منتقل می‌شود'))
+                ->descriptionIcon($balance['remaining'] < 0 ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-circle')
+                ->color($balance['remaining'] < 0 ? 'danger' : 'success'),
 
             // The one comparison the flour is held to: the quota restated as
             // nanino loaves against what the card reader actually rang up.
