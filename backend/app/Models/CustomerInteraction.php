@@ -71,8 +71,13 @@ class CustomerInteraction extends Model
         return $this->follow_up_on !== null && $this->completed_at === null;
     }
 
+    /**
+     * `follow_up_on` is a date cast, so it is midnight — `isPast()` would
+     * call a follow-up due *today* overdue from the moment the day starts.
+     * Same mistake as the loan schedule; see Loan::getIsOverdueAttribute().
+     */
     public function getIsOverdueAttribute(): bool
     {
-        return $this->is_open && $this->follow_up_on->isPast();
+        return $this->is_open && $this->follow_up_on->lt(today());
     }
 }

@@ -120,11 +120,21 @@ class Loan extends Model
         return AppCalendar::date($this->next_due_on);
     }
 
-    /** Past its date and still not paid — the one state worth chasing. */
+    /**
+     * Past its date and still not paid — the one state worth chasing.
+     *
+     * Compared against `today()`, not `now()`. `first_due_on` is a date
+     * cast, so it is midnight; `isPast()` on it turns true at 00:00 of the
+     * due day itself and an instalment due *today* was reported as
+     * overdue, at critical, all day — with «۰ روز از سررسید گذشته»
+     * underneath it, which says the opposite of what it means. The bank
+     * takes the transfer during the day; a due date is a deadline, not a
+     * moment.
+     */
     public function getIsOverdueAttribute(): bool
     {
         $due = $this->next_due_on;
 
-        return $due !== null && $due->isPast();
+        return $due !== null && $due->lt(today());
     }
 }

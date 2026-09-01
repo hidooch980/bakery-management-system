@@ -114,7 +114,7 @@ class HolidayResource extends Resource
 
                 Tables\Columns\IconColumn::make('is_past')
                     ->label('گذشته')
-                    ->state(fn (Holiday $record) => $record->date->isPast())
+                    ->state(fn (Holiday $record) => $record->is_past)
                     ->boolean()
                     ->trueIcon('heroicon-o-check-circle')
                     ->falseIcon('heroicon-o-clock')
