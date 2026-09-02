@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\StaffAdjustmentController;
 use App\Http\Controllers\Api\StaffAdvanceController;
 use App\Http\Controllers\Api\StaffAdvanceRequestController;
+use App\Http\Controllers\Api\TodayController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\WorkStartController;
 use Illuminate\Support\Facades\Route;
@@ -254,6 +255,11 @@ Route::prefix('v1')->group(function () {
 
         // --- Admin: reports & flour stock ---
         Route::middleware('permission:view-all-reports')->group(function () {
+            // One answer, before the dashboard it stands in front of: is
+            // the shop sound, and what is the owner's to do. Same words as
+            // the panel, composed in one class so the two cannot drift.
+            Route::get('/today', [TodayController::class, 'show']);
+
             Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
             Route::get('/reports/production', [ReportController::class, 'production']);
             Route::get('/reports/sales', [ReportController::class, 'sales']);

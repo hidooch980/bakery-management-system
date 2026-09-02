@@ -6,13 +6,19 @@ import '../../services/bakery_api.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/role_home_scaffold.dart';
 import 'admin_finance_tab.dart';
+import 'admin_today_tab.dart';
 import 'admin_overview_tab.dart';
 import 'admin_staff_tab.dart';
 import 'admin_warehouse_tab.dart';
 import '../../theme/app_theme.dart';
 
-/// The admin's own app: today's numbers, money, stock and staff — the same
-/// information as the web panel, laid out for a phone.
+/// The admin's own app: one answer, then today's numbers, money, stock and
+/// staff — the same information as the web panel, laid out for a phone.
+///
+/// «امروز» leads, because four tabs of correct figures are what the owner
+/// had on 1405/06/07 while 400 kg of flour was missing from the ledger.
+/// Nothing was wrong with what he could see; what he needed was a screen
+/// willing to say whether it added up.
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key, required this.api});
 
@@ -46,6 +52,16 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       api: widget.api,
       bakery: _bakery,
       tabs: [
+        // First, and first for a reason: an answer before four tabs of
+        // figures. «خلاصه» keeps everything it had for anyone who wants
+        // to read the numbers themselves.
+        HomeTab(
+          label: 'امروز',
+          title: 'امروز',
+          icon: Icons.wb_sunny_outlined,
+          selectedIcon: Icons.wb_sunny_rounded,
+          builder: (_) => AdminTodayTab(api: widget.api),
+        ),
         HomeTab(
           label: 'خلاصه',
           title: 'خلاصه امروز',
