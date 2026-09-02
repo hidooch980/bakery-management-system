@@ -278,7 +278,12 @@ class ConnectingToTheCardTerminalTest extends TestCase
             ->getJson('/api/v1/nanino')
             ->assertOk()
             ->assertJsonPath('data.connected', false)
-            ->assertJsonPath('data.last_error', 'کد وارد شده درست نبود.');
+            // Contains rather than equals: the reason nanino gave is
+            // appended, and that is the useful half.
+            ->assertJsonPath(
+                'data.last_error',
+                fn (?string $e) => str_contains((string) $e, 'کد وارد شده درست نبود.'),
+            );
     }
 
     public function test_staff_cannot_connect_or_read_the_link(): void
@@ -294,5 +299,57 @@ class ConnectingToTheCardTerminalTest extends TestCase
             'national_number' => '0000000000',
             'code' => '1234',
         ])->assertForbidden();
+    }
+
+    public function test_the_reason_nanino_refused_reaches_the_owner(): void
+    {
+        // 1405/06/12: the sign-in failed and every record of it said only
+        // «کد ارسال نشد» — our own sentence. Nanino's answer was
+        // thrown away unread, so working out why meant asking nanino by
+        // hand instead of reading it off the record.
+        Http::fake([
+            '*/api/otp/generate' => Http::response([
+                'title' => 'Internal Server Error',
+                'status' => 500,
+                'detail' => 'Full authentication is required to access this resource',
+                'message' => 'error.http.500',
+            ], 500),
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->postJson('/api/v1/nanino/code', [
+                'mobile' => '09150000000',
+                'national_number' => '0000000000',
+                'access_key' => 'key-123',
+                'captcha' => 'X7K2',
+            ]);
+
+        $message = $response->json('message');
+
+        $this->assertStringContainsString('Full authentication is required', $message);
+        $this->assertStringContainsString('500', $message);
+        // And it is kept, so the next person does not have to be watching
+        // the screen at the moment it happens.
+        $this->assertStringContainsString(
+            'Full authentication is required',
+            Bakery::first()->nanino_last_error,
+        );
+    }
+
+    public function test_a_bare_refusal_still_says_something_useful(): void
+    {
+        // No problem document, no body — the status is then the only
+        // fact there is, and it is better than nothing.
+        Http::fake(['*/api/otp/generate' => Http::response([], 429)]);
+
+        $message = $this->actingAs($this->admin)
+            ->postJson('/api/v1/nanino/code', [
+                'mobile' => '09150000000',
+                'national_number' => '0000000000',
+                'access_key' => 'key-123',
+                'captcha' => 'X7K2',
+            ])->json('message');
+
+        $this->assertStringContainsString('429', $message);
     }
 }

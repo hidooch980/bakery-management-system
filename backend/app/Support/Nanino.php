@@ -3,7 +3,9 @@
 namespace App\Support;
 
 use App\Models\Bakery;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -40,12 +42,69 @@ class Nanino
      *
      * @return array{image: string, access_key: string}
      */
+    /**
+     * What nanino said, short enough to put in front of the owner.
+     *
+     * Its gateway answers a refusal as an RFC-7807 problem document with
+     * the reason in `detail`; a plain body is used as-is. Without this the
+     * only record of a refusal was a fixed sentence of ours, and working
+     * out why the shop could not connect meant asking nanino by hand
+     * instead of reading it off `nanino_last_error`.
+     *
+     * The status is included because the two mean different things: 400
+     * is «you sent the wrong thing», 500 from this gateway has meant
+     * «this request is not welcome» — and telling them apart is the
+     * difference between retyping a captcha and asking nanino for access.
+     */
+    /**
+     * Writes a refusal down where it can be read later.
+     *
+     * Only the status and the reason: no mobile, no national number, no
+     * captcha, no code. What went wrong is worth keeping; who it belonged
+     * to is not, and this file ends up in a log nobody guards.
+     */
+    private static function log(string $endpoint, Response $response): void
+    {
+        Log::warning('nanino refused a request', [
+            'endpoint' => $endpoint,
+            'status' => $response->status(),
+            'said' => self::saidBy($response),
+        ]);
+    }
+
+    private static function saidBy(Response $response): string
+    {
+        $detail = $response->json('detail')
+            ?? $response->json('message')
+            ?? $response->json('error');
+
+        $detail = is_string($detail) ? trim($detail) : '';
+
+        if ($detail === '' || $detail === 'error.http.'.$response->status()) {
+            $detail = trim(substr((string) $response->body(), 0, 120));
+        }
+
+        // An empty body reads as «[]» or «{}», which looks like a reason
+        // and is not one. The status on its own is more honest.
+        if (in_array($detail, ['[]', '{}', 'null'], true)) {
+            $detail = '';
+        }
+
+        return $detail === ''
+            ? 'پاسخ '.$response->status()
+            : 'پاسخ '.$response->status().': '.$detail;
+    }
+
     public static function captcha(): array
     {
         $response = Http::timeout(self::TIMEOUT)->get(self::BASE.'/api/captcha');
 
         if (! $response->successful()) {
-            throw new RuntimeException('نانینو پاسخ نداد. بعداً دوباره امتحان کنید.');
+            self::log('captcha', $response);
+
+            throw new RuntimeException(
+                'نانینو پاسخ نداد. بعداً دوباره امتحان کنید. ('.self::saidBy($response).')'
+            );
         }
 
         return [
@@ -78,8 +137,10 @@ class Nanino
         ]);
 
         if (! $response->successful()) {
+            self::log('otp/generate', $response);
+
             throw new RuntimeException(
-                'کد ارسال نشد. کد امنیتی یا شمارهٔ همراه را بررسی کنید.'
+                'کد ارسال نشد. کد امنیتی یا شمارهٔ همراه را بررسی کنید. ('.self::saidBy($response).')'
             );
         }
     }
@@ -104,7 +165,11 @@ class Nanino
         ]);
 
         if (! $response->successful()) {
-            throw new RuntimeException('کد وارد شده درست نبود.');
+            self::log('otp/validate', $response);
+
+            throw new RuntimeException(
+                'کد وارد شده درست نبود. ('.self::saidBy($response).')'
+            );
         }
 
         $token = self::tokenFrom($response->json());
