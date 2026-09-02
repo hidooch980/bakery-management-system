@@ -13,6 +13,7 @@ use App\Support\ReportSeries;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -59,7 +60,7 @@ class WhereTheFlourWentTest extends TestCase
         InventoryItem::ofKey(InventoryItem::YEAST_DRY)->move('in', 100, 'purchase');
     }
 
-    /** @return array{0: \Illuminate\Support\Carbon, 1: \Illuminate\Support\Carbon} */
+    /** @return array{0: Carbon, 1: Carbon} */
     private function today(): array
     {
         return [now()->copy()->startOfDay(), now()->copy()->endOfDay()];
