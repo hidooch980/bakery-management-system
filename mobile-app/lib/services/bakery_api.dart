@@ -7,6 +7,7 @@ import '../models/customer.dart';
 import '../models/entries.dart';
 import '../models/payroll.dart';
 import '../models/staff_adjustment.dart';
+import '../models/today_answer.dart';
 import '../models/flour_sale.dart';
 import '../models/ledger_entry.dart';
 import '../models/seller_account.dart';
@@ -868,6 +869,16 @@ class BakeryApi {
   }
 
   // --------------------------------------------------------------- admin
+
+  /// The shop's answer for today, in the same words the panel opens with.
+  ///
+  /// Not cached: the whole point of the screen is that the figure on it is
+  /// current, and a stale «سالم» is exactly the failure it exists to stop.
+  Future<TodayAnswer> today() async {
+    final body = await _client.get('/today');
+
+    return TodayAnswer.fromJson(body['data'] as Map<String, dynamic>);
+  }
 
   /// Admin dashboard counters for today.
   Future<Map<String, dynamic>> dashboard() async {

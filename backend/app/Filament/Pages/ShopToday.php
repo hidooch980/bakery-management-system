@@ -2,14 +2,9 @@
 
 namespace App\Filament\Pages;
 
-use App\Models\BankAccount;
-use App\Models\ChaneEntry;
-use App\Models\FlourAllocation;
-use App\Models\InventoryItem;
-use App\Support\IssueScanner;
-use App\Support\Money;
 use App\Support\ShopHealth;
 use App\Support\SystemIssue;
+use App\Support\TodayAnswer;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 
@@ -46,6 +41,10 @@ use Illuminate\Support\Collection;
  *
  * Nothing is removed: the old dashboard is still there for anyone who
  * wants the grid.
+ *
+ * The sentence itself lives in `TodayAnswer`, because the phone shows it
+ * too — the same words on both screens or the owner learns to trust
+ * neither.
  */
 class ShopToday extends Page
 {
@@ -61,128 +60,38 @@ class ShopToday extends Page
 
     protected static string $view = 'filament.pages.shop-today';
 
-    private ?ShopHealth $health = null;
+    private ?TodayAnswer $answer = null;
 
-    /** @var Collection<int, SystemIssue>|null */
-    private ?Collection $issues = null;
+    private function answerer(): TodayAnswer
+    {
+        return $this->answer ??= TodayAnswer::now();
+    }
 
     public function health(): ShopHealth
     {
-        return $this->health ??= ShopHealth::inspect();
+        return $this->answerer()->health;
     }
 
     /** @return Collection<int, SystemIssue> */
     public function issues(): Collection
     {
-        return $this->issues ??= app(IssueScanner::class)->scan();
+        return $this->answerer()->needs;
     }
 
-    /**
-     * The sentence the page opens with.
-     *
-     * Deliberately in two halves: how the *system* is, then how much is
-     * the *owner's*. Reading «سالم» beside «سه چیز کار شماست» is the whole
-     * point — a sound system and a busy shop are not in tension, and a
-     * page that mixed them would cry wolf about a debt or stay silent
-     * about a fault.
-     *
-     * @return array{tone: string, system: string, yours: string}
-     */
+    /** @return array{tone: string, system: string, yours: string} */
     public function answer(): array
     {
-        $health = $this->health();
-        $open = $this->issues()->count();
-
-        $yours = match (true) {
-            $open === 0 => 'هیچ چیز کار شما نیست.',
-            $open === 1 => 'یک چیز کار شماست.',
-            default => "{$this->digits($open)} چیز کار شماست.",
-        };
-
-        if (! $health->isSound()) {
-            return [
-                'tone' => 'fail',
-                'system' => 'سیستم با خودش نمی‌خواند.',
-                'yours' => 'تا این درست نشود به عددهای پایین اعتماد نکنید.',
-            ];
-        }
-
-        return [
-            'tone' => $open === 0 ? 'clear' : 'sound',
-            'system' => 'مغازه امروز سالم است.',
-            'yours' => $yours,
-        ];
-    }
-
-    /**
-     * How many cycles were checked, for the line under the sentence.
-     *
-     * Counted rather than written as a constant, so adding a cycle cannot
-     * leave the page claiming the old number.
-     */
-    public function cycleCount(): int
-    {
-        return count($this->health()->cycles());
+        return $this->answerer()->sentence();
     }
 
     public function cycleCountLabel(): string
     {
-        return $this->digits($this->cycleCount());
+        return TodayAnswer::digits($this->answerer()->cycleCount());
     }
 
-    /**
-     * The figures, last and quiet.
-     *
-     * One line, no cards. They are here because the owner will sometimes
-     * want them, not because they are the answer — the moment they are
-     * laid out as a grid they become the page again.
-     *
-     * @return list<array{label: string, value: string}>
-     */
+    /** @return list<array{label: string, value: string}> */
     public function figures(): array
     {
-        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
-        $bags = $flour->balance_bags;
-
-        $rows = [[
-            'label' => 'آرد',
-            'value' => $bags === null
-                ? number_format($flour->balance, 0).' کیلو'
-                : $this->trim($bags).' کیسه',
-        ]];
-
-        foreach (BankAccount::all() as $account) {
-            $rows[] = [
-                'label' => $account->title,
-                'value' => Money::format((float) $account->balance),
-            ];
-        }
-
-        $allocation = FlourAllocation::with('periods')->orderByDesc('month_start')->first();
-        $period = $allocation?->periodFor(now());
-
-        if ($period) {
-            $rows[] = ['label' => 'سهمیه', 'value' => $this->digits($period->usage_percent).'٪'];
-        }
-
-        $rows[] = [
-            'label' => 'چانهٔ امروز',
-            'value' => $this->digits((int) ChaneEntry::whereDate('created_at', now())->sum('chane_count')),
-        ];
-
-        return $rows;
-    }
-
-    /** Persian digits, because every other figure on this screen is. */
-    private function digits(int|float|string $value): string
-    {
-        return strtr((string) $value, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴',
-            '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹', '.' => '٫']);
-    }
-
-    /** «۶۵٫۲» rather than «۶۵٫۱۵» — a fraction of a sack nobody counts. */
-    private function trim(float $bags): string
-    {
-        return $this->digits(rtrim(rtrim(number_format($bags, 1), '0'), '.'));
+        return $this->answerer()->figures();
     }
 }
