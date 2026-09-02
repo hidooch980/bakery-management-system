@@ -148,6 +148,82 @@ class SaleRecorder
     }
 
     /**
+     * Works the batch's shortfall out again from what is on file now.
+     *
+     * The shortfall is a figure about the *batch* — chane shaped, less
+     * bread accounted for — that rides on one of its sale rows. So it goes
+     * stale the moment any row's bread count changes, and `bread_count`
+     * stays editable after a sale is recorded.
+     *
+     * It went stale on batch #142 (1405/06/07): four lines written
+     * together, then each corrected by hand a few minutes later. The
+     * counts went up by 33 loaves and the shortfall stayed where it was,
+     * so the seller was answering for 66 loaves when 33 were missing —
+     * 3,300,000 rial of shortfall that was not there.
+     *
+     * This is the fourth thing on this model to go stale behind an edit,
+     * after consignment stock, a worker's bread debt and a flour sale's
+     * weight. The rule those three taught: a derived figure needs the edit
+     * path as much as the create path.
+     *
+     * Rules kept identical to `record()`, which is the only other place
+     * that decides this:
+     *   - a line the seller *named* as shortfall carries its own count and
+     *     is never overwritten here;
+     *   - the automatic remainder rides on one unnamed line;
+     *   - a shortfall already settled is money that changed hands, and
+     *     stands whatever the arithmetic now says.
+     */
+    public static function refreshBatchShortfall(ChaneEntry $chane): void
+    {
+        $sales = Sale::where('chane_entry_id', $chane->id)->orderBy('id')->get();
+
+        if ($sales->isEmpty()) {
+            return;
+        }
+
+        $breadPrice = (float) (CurrentBakery::get()?->bread_price ?? 0);
+
+        $remainder = max(0, (int) $chane->chane_count - (int) $sales->sum('bread_count'));
+
+        $carried = false;
+
+        foreach ($sales as $sale) {
+            // Named shortfall: the seller said these loaves were missing,
+            // and that is not a derived figure at all.
+            if (in_array($sale->payment_type, Sale::SHORTFALL_TYPES, true)) {
+                continue;
+            }
+
+            // Settled means somebody paid for it. Rewriting it would move
+            // a debt that is already closed.
+            if ($sale->shortfall_settled_on !== null) {
+                $carried = true;
+
+                continue;
+            }
+
+            $count = (! $carried && $remainder > 0) ? $remainder : null;
+
+            $carried = $carried || $count !== null;
+
+            $amount = $count === null ? null : round($count * $breadPrice, 2);
+
+            if ((int) $sale->shortfall_count === (int) $count
+                && (float) $sale->shortfall_amount === (float) $amount) {
+                continue;
+            }
+
+            // Quietly: this is called *from* a model event, and a normal
+            // save here would call it straight back.
+            $sale->updateQuietly([
+                'shortfall_count' => $count,
+                'shortfall_amount' => $amount,
+            ]);
+        }
+    }
+
+    /**
      * Why a set of lines cannot be recorded, or null when they can.
      *
      * @param  array<int, PaymentLine>  $lines

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Models\Concerns\RecordsAudit;
+use App\Support\SaleRecorder;
 use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
@@ -115,6 +116,25 @@ class Sale extends Model
 
     protected static function booted(): void
     {
+        // The batch's shortfall is derived from every row's bread count,
+        // so any edit to one of them can leave it wrong. Only on update
+        // and delete: a new row arrives through SaleRecorder, which is the
+        // one place that decides where the figure rides.
+        //
+        // See SaleRecorder::refreshBatchShortfall() for what went wrong
+        // without this.
+        static::updated(function (self $sale) {
+            if ($sale->wasChanged('bread_count') && $sale->chaneEntry) {
+                SaleRecorder::refreshBatchShortfall($sale->chaneEntry);
+            }
+        });
+
+        static::deleted(function (self $sale) {
+            if ($sale->chaneEntry) {
+                SaleRecorder::refreshBatchShortfall($sale->chaneEntry);
+            }
+        });
+
         // Bread charged to a worker has to keep agreeing with the row it
         // is charged for.
         //
