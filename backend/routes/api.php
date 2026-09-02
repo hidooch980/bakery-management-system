@@ -21,7 +21,6 @@ use App\Http\Controllers\Api\FlourStockController;
 use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\IncomeController;
 use App\Http\Controllers\Api\InventoryController;
-use App\Http\Controllers\Api\NaninoController;
 use App\Http\Controllers\Api\PowerBiExportController;
 use App\Http\Controllers\Api\QuotaController;
 use App\Http\Controllers\Api\ReportController;
@@ -235,18 +234,14 @@ Route::prefix('v1')->group(function () {
         Route::put('/bakery', [BakeryController::class, 'update'])
             ->middleware('permission:manage-bakery');
 
-        // --- Admin: the shop's own card terminal on nanino ---
-        // Signing in needs a captcha and an SMS code, both supplied by a
-        // person. Reading the sales history is deliberately not here yet:
-        // where the token sits in nanino's answer is an informed guess
-        // until somebody has connected once.
-        Route::middleware('permission:manage-bakery')->group(function () {
-            Route::get('/nanino', [NaninoController::class, 'show']);
-            Route::get('/nanino/captcha', [NaninoController::class, 'captcha']);
-            Route::post('/nanino/code', [NaninoController::class, 'requestCode']);
-            Route::post('/nanino/connect', [NaninoController::class, 'connect']);
-            Route::delete('/nanino', [NaninoController::class, 'disconnect']);
-        });
+        // The card-terminal link to nanino was here. Removed 1405/06/12:
+        // their gateway answers «Full authentication is required to
+        // access this resource» to any server-to-server call, and the
+        // owner confirmed nanino does not offer this as a service.
+        // Getting past it would mean defeating bot protection, which is
+        // the same line as solving the captcha, so it was not attempted.
+        // The support class and the bakeries columns are kept, so it can
+        // be reconnected in an afternoon if nanino ever publishes an API.
 
         // --- Admin: backups ---
         // Status and a «take one now», nothing that hands the file over:

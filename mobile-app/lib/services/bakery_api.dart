@@ -1015,52 +1015,6 @@ class BakeryApi {
     return _paginated(body);
   }
 
-  // ------------------------------------------------------------- nanino
-
-  /// Whether the shop is signed in to its own card terminal.
-  Future<Map<String, dynamic>> naninoStatus() async {
-    final body = await _client.get('/nanino');
-
-    return (body['data'] as Map).cast<String, dynamic>();
-  }
-
-  /// A fresh captcha for the person to read. Nothing solves it for them.
-  Future<Map<String, dynamic>> naninoCaptcha() async {
-    final body = await _client.get('/nanino/captcha');
-
-    return (body['data'] as Map).cast<String, dynamic>();
-  }
-
-  Future<void> naninoRequestCode({
-    required String mobile,
-    required String nationalNumber,
-    required String accessKey,
-    required String captcha,
-  }) async {
-    await _client.post('/nanino/code', {
-      'mobile': mobile,
-      'national_number': nationalNumber,
-      'access_key': accessKey,
-      'captcha': captcha,
-    });
-  }
-
-  Future<void> naninoConnect({
-    required String mobile,
-    required String nationalNumber,
-    required String code,
-  }) async {
-    await _client.post('/nanino/connect', {
-      'mobile': mobile,
-      'national_number': nationalNumber,
-      'code': code,
-    });
-  }
-
-  Future<void> naninoDisconnect() async {
-    await _client.delete('/nanino');
-  }
-
   /// Whether the shop's data is being kept.
   ///
   /// Status only. The files are not downloadable and should not be: the
