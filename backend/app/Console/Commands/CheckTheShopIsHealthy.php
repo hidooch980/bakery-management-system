@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Bakery;
 use App\Models\BankAccount;
 use App\Models\ChaneEntry;
+use App\Models\Customer;
 use App\Models\DoughEntry;
 use App\Models\FlourAllocation;
 use App\Models\FlourSale;
@@ -55,6 +56,7 @@ class CheckTheShopIsHealthy extends Command
         $checks = [
             'زیرساخت' => fn () => $this->infrastructure(),
             'انبار آرد' => fn () => $this->flourLedger(),
+            'دفتر همکاران' => fn () => $this->partnerRegister(),
             'چرخهٔ تولید' => fn () => $this->productionChain(),
             'چرخهٔ فروش' => fn () => $this->salesChain(),
             'پول و حساب‌ها' => fn () => $this->money(),
@@ -144,6 +146,59 @@ class CheckTheShopIsHealthy extends Command
             if ($item->balance < 0) {
                 $this->failures[] = "موجودی {$item->name} منفی است: ".number_format($item->balance);
             }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * A bakery filed under the wrong kind of customer.
+     *
+     * The consignment page offers only customers typed «همکار / نانوایی»
+     * — `Customer::partners()` — so a bakery saved as anything else does
+     * not appear in it at all, and nothing on the screen says why. The
+     * name is simply absent, and the person entering flour picks the
+     * nearest one they can find.
+     *
+     * نانوایی ناهوت sat as «مدرسه» from the day the customer list was
+     * typed in, and that is how twenty sacks lent to منصور پرکی went a
+     * month with no record anywhere: not a mistake in the entry, a name
+     * that could not be entered. It surfaced only because the owner said
+     * it out loud.
+     *
+     * Only the name gives this away — a bakery is a bakery because it is
+     * called one. So this catches «نانوایی» in the name against any type
+     * but partner, and misses a partner named without the word. That is
+     * the whole of what it claims, and it is worth having anyway: every
+     * partner this shop has is named that way.
+     *
+     * A warning, not a failure. Nothing here is broken; a record is
+     * mis-filed, and the flour it hides is the shop's to chase.
+     */
+    private function partnerRegister(): array
+    {
+        $misfiled = Customer::query()
+            ->where('name', 'like', '%نانوایی%')
+            ->where('type', '!=', Customer::PARTNER_TYPE)
+            ->orderBy('id')
+            ->get();
+
+        $rows = [
+            $this->verdict(
+                $misfiled->isEmpty(),
+                "نانوایی ثبت‌شده زیر نوعی جز همکار: {$misfiled->count()}",
+                warnOnly: true
+            ),
+        ];
+
+        // Named one by one, because the fix is per record and a count
+        // alone would send someone reading the whole customer list.
+        foreach ($misfiled as $customer) {
+            $rows[] = sprintf(
+                '    «%s» زیر «%s» — در فهرست آرد امانی دیده نمی‌شود',
+                trim($customer->name),
+                $customer->type_label
+            );
         }
 
         return $rows;
