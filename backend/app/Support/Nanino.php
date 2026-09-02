@@ -11,6 +11,25 @@ use RuntimeException;
 /**
  * Reading the shop's own card-terminal history from nanino.
  *
+ * **Nothing calls this. Kept on purpose, not by neglect.**
+ *
+ * The routes, the controller and the app screen were removed on
+ * 1405/06/12. nanino's gateway answers «Full authentication is
+ * required to access this resource» to any call that is not a browser,
+ * whatever is sent — the body and base URL were checked against their
+ * own bundle, and carrying its cookies changes nothing. The owner
+ * confirmed nanino does not offer this as a service, so there is
+ * nothing here to wait for.
+ *
+ * Getting past that gateway would mean defeating bot protection, which
+ * is the same line as solving the captcha, and that line does not move.
+ *
+ * This file and the `nanino_*` columns on `bakeries` survive so the
+ * feature can be put back in an afternoon if nanino ever publishes an
+ * API. Note the quota does **not** depend on any of it:
+ * SystemVersusOven reads the shop's own card sales.
+ *
+ *
  * The card reader is what the flour quota is measured against, and its
  * figures reached this system by somebody opening another website and
  * typing them in. This reads them.
