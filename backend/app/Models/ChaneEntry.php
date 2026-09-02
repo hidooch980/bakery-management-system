@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Support\StockLedger;
 use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
 
@@ -49,6 +50,36 @@ class ChaneEntry extends Model
 
             $entry->doughEntry?->update(['status' => 'pending']);
         });
+
+        // Correcting the spray flour moves it too. Seven entries had been
+        // edited without it — two raised to 40 kg and five cleared to
+        // nought — and every one of them still had the 5 kg from the
+        // moment it was written sitting in the ledger.
+        static::updated(function (self $entry) {
+            if ($entry->wasChanged('spray_flour_kg')) {
+                $entry->reconcileStock();
+            }
+        });
+    }
+
+    /**
+     * Makes the warehouse agree with the spray flour this entry claims.
+     *
+     * Taken straight from the column rather than scaled, because unlike a
+     * batch's sack count this is already a weight — what was entered is
+     * what was dusted on the bench, and nothing derives it from a formula
+     * that could have moved underneath it.
+     */
+    public function reconcileStock(): void
+    {
+        StockLedger::reconcile(
+            $this,
+            InventoryItem::ofKey(InventoryItem::FLOUR),
+            (float) $this->spray_flour_kg,
+            'spray',
+            'اصلاح آرد پاششی ثبت چانه',
+            $this->user_id,
+        );
     }
 
     /** "۳۰ + ۳۰ + ۱۲" — how the batch was actually counted out. */

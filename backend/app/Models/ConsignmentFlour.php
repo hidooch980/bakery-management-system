@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
 use App\Support\DoughFormula;
+use App\Support\StockLedger;
 use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
 
@@ -114,31 +115,20 @@ class ConsignmentFlour extends Model
      */
     public function reconcileStock(): void
     {
-        $shouldBe = $this->settled_on !== null
+        // Out of the store is the positive direction here, which is why
+        // lending is the one that counts up: `StockLedger` speaks the same
+        // language for every model that shares this rule.
+        $shouldBeOut = $this->settled_on !== null
             ? 0.0
-            : ($this->direction === 'borrowed' ? 1 : -1) * (float) $this->amount_kg;
+            : ($this->direction === 'borrowed' ? -1 : 1) * (float) $this->amount_kg;
 
-        $movements = InventoryMovement::where('source_type', self::class)
-            ->where('source_id', $this->getKey())
-            ->get();
-
-        $actual = 0.0;
-
-        foreach ($movements as $movement) {
-            $actual += ($movement->direction === 'in' ? 1 : -1) * (float) $movement->quantity;
-        }
-
-        $delta = round($shouldBe - $actual, 3);
-
-        if (abs($delta) < 0.001) {
-            return;
-        }
-
-        $this->moveStock(
-            $delta > 0 ? 'in' : 'out',
+        StockLedger::reconcile(
+            $this,
+            InventoryItem::ofKey(InventoryItem::FLOUR),
+            $shouldBeOut,
             'consignment_return',
             'اصلاح آرد امانی — '.$this->partner_label,
-            abs($delta),
+            $this->user_id,
         );
     }
 

@@ -6,7 +6,10 @@ use App\Models\ChaneEntry;
 use App\Models\ConsignmentFlour;
 use App\Models\DoughEntry;
 use App\Models\FlourSale;
+use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
+use App\Support\DoughFormula;
+use App\Support\StockLedger;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
 
@@ -81,10 +84,15 @@ class AuditStockMovements extends Command
             }
         }
 
-        if ($this->option('json')) {
-            $this->line(json_encode($gaps, JSON_UNESCAPED_UNICODE));
+        $mismatches = $this->mismatches();
 
-            return $gaps === [] ? self::SUCCESS : self::FAILURE;
+        if ($this->option('json')) {
+            $this->line(json_encode(
+                ['gaps' => $gaps, 'mismatches' => $mismatches],
+                JSON_UNESCAPED_UNICODE
+            ));
+
+            return $gaps === [] && $mismatches === [] ? self::SUCCESS : self::FAILURE;
         }
 
         $this->table(['نوع', 'تعداد', 'بدون حرکت انبار'], $rows);
@@ -92,7 +100,7 @@ class AuditStockMovements extends Command
         $orphans = $this->orphans();
         $misLinked = $this->misLinkedReversals();
 
-        if ($gaps === [] && $orphans === [] && $misLinked === []) {
+        if ($gaps === [] && $mismatches === [] && $orphans === [] && $misLinked === []) {
             $this->info('هر رکوردی که باید انبار را جابه‌جا می‌کرد، کرده است.');
             $this->info('هر حرکتی هم صاحبی دارد یا برگردانده شده است.');
             $this->info('و هر ابطالی به همان حرکتی وصل است که باطلش کرده.');
@@ -101,6 +109,7 @@ class AuditStockMovements extends Command
         }
 
         if ($gaps === []) {
+            $this->reportMismatches($mismatches);
             $this->reportOrphans($orphans);
             $this->reportMisLinked($misLinked);
 
@@ -110,8 +119,9 @@ class AuditStockMovements extends Command
         $this->newLine();
         $this->error(count($gaps).' رکورد انبار را جابه‌جا نکرده‌اند:');
         $this->table(['نوع', 'شناسه', 'تاریخ'], $gaps);
-        $this->reportOrphans($this->orphans());
-        $this->reportMisLinked($this->misLinkedReversals());
+        $this->reportMismatches($mismatches);
+        $this->reportOrphans($orphans);
+        $this->reportMisLinked($misLinked);
 
         // Deliberately not offered as an auto-fix. What the missing
         // movement should be depends on the shop's formula on the day, and
@@ -120,6 +130,93 @@ class AuditStockMovements extends Command
         $this->line('اصلاحشان باید با تاریخ روز خودش نوشته شود، وگرنه در دورهٔ سهمیهٔ اشتباه می‌نشیند.');
 
         return self::FAILURE;
+    }
+
+    /**
+     * Records whose movement exists but is for the wrong quantity.
+     *
+     * For a long time this command asked only whether a record had moved
+     * *any* stock, and that is a narrower question than it sounds. On
+     * 1405/06/07 a batch was entered as ten sacks, moved its 400 kg, and
+     * was corrected to twenty three minutes later — the model had no hook
+     * on editing, so the second ten sacks were kneaded, shaped and sold
+     * without ever leaving the ledger. The entry had moved flour, so it
+     * passed. Four days and 400 kg later the only reason anyone knew was
+     * that the owner said the cycles felt wrong.
+     *
+     * Flour only. The shop's salt and yeast ratios have both been changed
+     * since the older batches were mixed, so recomputing those against
+     * today's formula would report every old record as wrong; the sack a
+     * batch is measured in has not changed, and flour is what the shop
+     * counts anyway.
+     *
+     * Records that moved nothing at all are left to the pass above rather
+     * than reported twice.
+     *
+     * @return array<int, array{0: string, 1: int, 2: string, 3: string}>
+     */
+    private function mismatches(): array
+    {
+        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $rows = [];
+
+        foreach (self::SOURCES as $class => $label) {
+            foreach ($class::query()->withoutGlobalScopes()->orderBy('id')->get() as $record) {
+                $claims = $this->flourItShouldHaveMoved($record);
+
+                if ($claims === null || ! $this->moved($record)) {
+                    continue;
+                }
+
+                $moved = StockLedger::netMoved($record, $flour->getKey());
+                $delta = round($claims - $moved, 3);
+
+                if (abs($delta) < 0.001) {
+                    continue;
+                }
+
+                $rows[] = [
+                    $label,
+                    $record->id,
+                    $this->when($record),
+                    sprintf('ادعا %s، جابه‌جا %s، اختلاف %s کیلو', $claims, $moved, $delta),
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * The flour this record says left the store, or null when the record
+     * is not one that can say.
+     */
+    private function flourItShouldHaveMoved(Model $record): ?float
+    {
+        return match (true) {
+            $record instanceof DoughEntry => round(
+                (float) $record->bag_count * DoughFormula::fromBakery()->bagWeightKg,
+                3
+            ),
+            $record instanceof ChaneEntry => round((float) $record->spray_flour_kg, 3),
+            $record instanceof FlourSale => round((float) $record->weight_kg, 3),
+            $record instanceof ConsignmentFlour => $record->settled_on !== null
+                ? 0.0
+                : round(($record->direction === 'borrowed' ? -1 : 1) * (float) $record->amount_kg, 3),
+            default => null,
+        };
+    }
+
+    private function reportMismatches(array $rows): void
+    {
+        if ($rows === []) {
+            return;
+        }
+
+        $this->newLine();
+        $this->error(count($rows).' رکورد مقدارِ درستی جابه‌جا نکرده‌اند:');
+        $this->table(['نوع', 'شناسه', 'تاریخ', 'آرد'], $rows);
+        $this->line('ویرایش این رکوردها حالا انبار را هم می‌برد؛ اینها از پیش از آن مانده‌اند.');
     }
 
     /**
