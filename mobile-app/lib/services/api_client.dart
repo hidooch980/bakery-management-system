@@ -45,8 +45,16 @@ class ApiClient {
             connectTimeout: const Duration(seconds: 15),
             receiveTimeout: const Duration(seconds: 20),
             headers: {'Accept': 'application/json'},
-            // Let non-2xx flow through so we can map them to ApiException.
-            validateStatus: (status) => status != null && status < 500,
+            // Let every answer flow through to _unwrap, 5xx included.
+            //
+            // This used to stop at 500, so a 502 became a transport
+            // failure and the screen said «خطا در ارتباط با سرور.» —
+            // while the server had answered with the actual reason. The
+            // nanino sign-in returns 502 with what nanino said, and the
+            // owner was shown a connection error for a request that
+            // arrived, was understood, and was refused for a reason he
+            // was never told.
+            validateStatus: (status) => status != null && status < 600,
           ),
         ) {
     _dio.interceptors.add(
@@ -409,7 +417,18 @@ class ApiClient {
     final body = response.data;
 
     if (body is! Map<String, dynamic>) {
-      throw ApiException('پاسخ سرور نامعتبر بود.', statusCode: response.statusCode);
+      // A 5xx that is not ours — nginx's own page when php-fpm is down,
+      // say — arrives as HTML. Saying «the server is having trouble» is
+      // true and useful; «the response was invalid» blames the wrong
+      // thing and tells nobody what to do.
+      final status = response.statusCode ?? 0;
+
+      throw ApiException(
+        status >= 500
+            ? 'سرور در حال حاضر پاسخ نمی‌دهد. کمی بعد دوباره امتحان کنید.'
+            : 'پاسخ سرور نامعتبر بود.',
+        statusCode: response.statusCode,
+      );
     }
 
     if (response.statusCode! >= 200 && response.statusCode! < 300) {

@@ -98,6 +98,50 @@ class _RefusesAllButMe implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+
+/// Answers 502 with a reason, the way the nanino sign-in does when nanino
+/// itself refuses.
+class _RefusesWithAReason implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return ResponseBody.fromString(
+      '{"success":false,"message":"کد ارسال نشد. پاسخ 500: Full authentication is required."}',
+      502,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+/// A 5xx that is not ours: nginx's own HTML page.
+class _NginxIsDown implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    return ResponseBody.fromString(
+      '<html><head><title>502 Bad Gateway</title></head></html>',
+      502,
+      headers: {
+        Headers.contentTypeHeader: ['text/html'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -287,6 +331,41 @@ void main() {
       expect(auth.status, AuthStatus.authenticated);
       const storage = FlutterSecureStorage();
       expect(await storage.read(key: 'auth_token'), isNotNull);
+    });
+  });
+
+
+  group('a 502 carrying a reason', () {
+    test('shows what the server said, not a connection error', () async {
+      // The whole point. The request arrived, was understood, and was
+      // refused for a reason — and the screen used to replace that reason
+      // with «خطا در ارتباط با سرور.» because the status was 5xx.
+      final client = ApiClient(baseUrl: 'http://server.test/api/v1');
+      client.transport = _RefusesWithAReason();
+
+      await expectLater(
+        client.get('/nanino/captcha'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.message, 'message', contains('کد ارسال نشد'))
+              .having((e) => e.statusCode, 'status', 502)
+              // It arrived. Queueing it for later would be wrong.
+              .having((e) => e.isConnectivityError, 'connectivity', isFalse),
+        ),
+      );
+    });
+
+    test('a 5xx that is not ours blames the server, not the answer', () async {
+      final client = ApiClient(baseUrl: 'http://server.test/api/v1');
+      client.transport = _NginxIsDown();
+
+      await expectLater(
+        client.get('/nanino/captcha'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.message, 'message', contains('پاسخ نمی‌دهد')),
+        ),
+      );
     });
   });
 
