@@ -37,7 +37,17 @@ say "۲/۶  وابستگی‌ها"
 cd "$BACK" || exit 1
 # Never --no-dev. See the note at the top; it has taken the shop down
 # twice.
-composer install --no-interaction --prefer-dist --quiet 2>&1 | tail -3
+#
+# And --no-scripts, because composer's post-autoload-dump runs three
+# artisan commands as whoever invoked composer — which is ubuntu, who
+# cannot write bootstrap/cache. They failed on every deploy behind a
+# «returned with error code 1» that said nothing about which command or
+# why, and the package manifest quietly stayed as it was. Run below as
+# the user who owns the files.
+composer install --no-interaction --prefer-dist --quiet --no-scripts 2>&1 | tail -3
+artisan clear-compiled -q          # what ComposerScripts::postAutoloadDump does
+artisan package:discover -q
+artisan filament:upgrade -q
 echo "    نصب شد"
 
 say "۳/۶  قالب‌بندی"
