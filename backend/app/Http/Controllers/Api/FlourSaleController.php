@@ -31,6 +31,28 @@ class FlourSaleController extends Controller
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
+        // A price of zero is either the truth or a slip, and only the
+        // payment type says which. «منزل» and «خیرات» mean nobody paid, so
+        // zero is right. «نقدی» and «کارتی» mean somebody did, so zero is a
+        // price that went missing — 40kg once left the store that way and
+        // read as a cash sale of nothing for a month.
+        //
+        // Left as a message rather than a validation rule so it can name
+        // the way out: the shop does have a category for a free sack.
+        $isGiveaway = in_array($data['payment_type'], FlourSale::GIVEAWAY_TYPES, true);
+
+        $price = isset($data['unit_price'])
+            ? Money::toToman($data['unit_price'])
+            : FlourSale::defaultUnitPrice($data['unit']);
+
+        if (! $isGiveaway && $price <= 0) {
+            return $this->error(
+                'قیمت واحد وارد نشده است. اگر این آرد فروخته نشده و مجانی'
+                    .' رفته، نوع پرداخت را «منزل» یا «خیرات و کمک» بگذارید.',
+                422
+            );
+        }
+
         // Credit sales must name the buyer, or the debt cannot be chased.
         if (in_array($data['payment_type'], FlourSale::DEBT_TYPES, true)
             && empty($data['customer_id'])) {
@@ -62,11 +84,10 @@ class FlourSaleController extends Controller
             'unit' => $data['unit'],
             'quantity' => $data['quantity'],
             'bag_weight_kg' => $data['unit'] === FlourSale::BAG ? $bagWeight : null,
-            // An overridden price arrives in the display unit and is stored
-            // as Toman; the configured fallback is already in Toman.
-            'unit_price' => isset($data['unit_price'])
-                ? Money::toToman($data['unit_price'])
-                : FlourSale::defaultUnitPrice($data['unit']),
+            // Resolved above, where it is also checked: an overridden price
+            // arrives in the display unit and is stored as Toman, and the
+            // configured fallback is already in Toman.
+            'unit_price' => $price,
             'payment_type' => $data['payment_type'],
             'sold_on' => now()->toDateString(),
             'note' => $data['note'] ?? null,

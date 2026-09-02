@@ -365,4 +365,80 @@ class FlourSaleTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.summary.currency', 'rial');
     }
+
+    // ------------------------------------------------- a sack that is free
+
+    /**
+     * A price of zero is the truth or a slip, and only the type says which.
+     *
+     * The owner took a sack of his own flour on 1405/05/12 and recorded it
+     * as «نقدی» with the price left at zero. It was not a mistake — but for
+     * a month it was indistinguishable from one, because a cash sale of
+     * nothing and a sack somebody forgot to price look exactly alike.
+     */
+    public function test_a_cash_sale_with_no_price_is_refused_and_says_what_to_do(): void
+    {
+        $this->actingAs($this->seller(), 'sanctum')
+            ->postJson('/api/v1/flour-sales', [
+                'unit' => 'bag',
+                'quantity' => 1,
+                'unit_price' => 0,
+                'payment_type' => 'cash',
+            ])
+            ->assertStatus(422)
+            // The message has to name the way out, or it just blocks him.
+            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'منزل'));
+
+        $this->assertSame(0, FlourSale::count());
+    }
+
+    public function test_a_sack_taken_home_may_be_free(): void
+    {
+        $this->actingAs($this->seller(), 'sanctum')
+            ->postJson('/api/v1/flour-sales', [
+                'unit' => 'bag',
+                'quantity' => 1,
+                'unit_price' => 0,
+                'payment_type' => 'home',
+            ])
+            ->assertCreated();
+
+        $sale = FlourSale::first();
+
+        $this->assertSame('home', $sale->payment_type);
+        $this->assertTrue($sale->isGiveaway());
+        $this->assertEquals(0.0, (float) $sale->amount);
+        // And the flour still left the store.
+        $this->assertEquals(40.0, (float) $sale->weight_kg);
+    }
+
+    public function test_charity_flour_may_be_free_too(): void
+    {
+        $this->actingAs($this->seller(), 'sanctum')
+            ->postJson('/api/v1/flour-sales', [
+                'unit' => 'kg',
+                'quantity' => 5,
+                'unit_price' => 0,
+                'payment_type' => 'charity',
+            ])
+            ->assertCreated();
+
+        $this->assertTrue(FlourSale::first()->isGiveaway());
+    }
+
+    public function test_leaving_the_price_out_still_uses_the_going_rate(): void
+    {
+        // The fallback is deliberate and must survive the new rule: an
+        // ordinary sale with no price typed is charged at the shop's rate,
+        // not refused.
+        $this->actingAs($this->seller(), 'sanctum')
+            ->postJson('/api/v1/flour-sales', [
+                'unit' => 'kg',
+                'quantity' => 10,
+                'payment_type' => 'cash',
+            ])
+            ->assertCreated();
+
+        $this->assertEquals(10 * 30000, (float) FlourSale::first()->amount);
+    }
 }

@@ -32,6 +32,24 @@ class FlourSale extends Model
     /** Payment types that leave money owed until it is collected. */
     public const DEBT_TYPES = ['credit', 'schools'];
 
+    /**
+     * Flour that leaves without being sold: the owner's own sack, or flour
+     * given away. Money never changed hands, so a price of zero is the
+     * truth here rather than a figure somebody forgot to type.
+     *
+     * The same two types bread already uses. Naming them is what lets a
+     * free sack be told apart from a cash sale whose price went missing —
+     * before this, both were «نقدی، صفر ریال» and nothing could
+     * distinguish them.
+     */
+    public const GIVEAWAY_TYPES = ['home', 'charity'];
+
+    /** Whether this row is flour that left without being paid for. */
+    public function isGiveaway(): bool
+    {
+        return in_array($this->payment_type, self::GIVEAWAY_TYPES, true);
+    }
+
     protected $fillable = [
         'user_id',
         'customer_id',

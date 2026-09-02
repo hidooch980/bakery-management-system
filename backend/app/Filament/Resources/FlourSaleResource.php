@@ -65,9 +65,32 @@ class FlourSaleResource extends Resource
                             ? 'هر کیسه '.DoughFormula::fromBakery()->bagWeightKg.' کیلوگرم'
                             : null),
 
+                    // Zero is the truth for a free sack and a slip for a sold
+                    // one, and only the payment type tells them apart. See
+                    // FlourSale::GIVEAWAY_TYPES.
                     MoneyInput::make('unit_price', 'قیمت واحد')
                         ->default(fn () => Money::convert(FlourSale::defaultUnitPrice(FlourSale::KG)))
-                        ->helperText('قیمت هر کیلو یا هر کیسه، بسته به واحد انتخابی'),
+                        ->helperText(fn (Forms\Get $get) => in_array(
+                            $get('payment_type'),
+                            FlourSale::GIVEAWAY_TYPES,
+                            true,
+                        )
+                            ? 'برای «منزل» و «خیرات» می‌تواند صفر بماند'
+                            : 'قیمت هر کیلو یا هر کیسه، بسته به واحد انتخابی')
+                        ->rules([
+                            fn (Forms\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                $isGiveaway = in_array(
+                                    $get('payment_type'),
+                                    FlourSale::GIVEAWAY_TYPES,
+                                    true,
+                                );
+
+                                if (! $isGiveaway && Money::toToman((float) $value) <= 0) {
+                                    $fail('قیمت واحد وارد نشده است. اگر این آرد مجانی رفته،'
+                                        .' نوع پرداخت را «منزل» یا «خیرات و کمک» بگذارید.');
+                                }
+                            },
+                        ]),
 
                     Forms\Components\Placeholder::make('computed')
                         ->label('وزن و مبلغ محاسبه‌شده')
@@ -92,6 +115,9 @@ class FlourSaleResource extends Resource
                     Forms\Components\Select::make('payment_type')
                         ->label('نوع پرداخت')
                         ->options(SaleResource::PAYMENT_LABELS)
+                        // Live so the price field can say, as the type is
+                        // chosen, whether zero is allowed here.
+                        ->live()
                         ->default('cash')
                         ->required()
                         ->live()
