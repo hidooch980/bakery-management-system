@@ -36,6 +36,10 @@
             <x-filament::tabs.item icon="heroicon-m-beaker" alpine-active="tab === 'consumption'" x-on:click="tab = 'consumption'">
                 مصارف
             </x-filament::tabs.item>
+
+            <x-filament::tabs.item icon="heroicon-m-archive-box" alpine-active="tab === 'flour'" x-on:click="tab = 'flour'">
+                آرد کجا رفت
+            </x-filament::tabs.item>
         </x-filament::tabs>
 
         {{-- ------------------------------------------------------ money --}}
@@ -235,6 +239,108 @@
                         </td>
                     </x-slot>
                 </x-bakery.report-table>
+            </x-filament::section>
+        </div>
+
+        {{-- ------------------------------------------ where the flour went --}}
+        <div x-show="tab === 'flour'" x-cloak class="space-y-5">
+            @php $journey = $this->flourJourney(); @endphp
+
+            <div class="grid gap-4 sm:grid-cols-3">
+                <x-bakery.figure
+                    label="مانده اول دوره"
+                    :value="$this->sacks($journey['opening_bags'])"
+                    :caption="$this->kilos($journey['opening_kg'])"
+                    icon="heroicon-m-archive-box"
+                    tone="gray"
+                />
+
+                <x-bakery.figure
+                    label="جمع خروجی"
+                    :value="$this->sacks($journey['out_bags'])"
+                    :caption="$this->kilos($journey['out_kg'])"
+                    icon="heroicon-m-arrow-up-tray"
+                    tone="danger"
+                />
+
+                <x-bakery.figure
+                    label="مانده آخر دوره"
+                    :value="$this->sacks($journey['closing_bags'])"
+                    :caption="$this->kilos($journey['closing_kg'])"
+                    icon="heroicon-m-archive-box"
+                    tone="success"
+                />
+            </div>
+
+            <x-filament::section>
+                <x-slot name="heading">آرد کجا رفت</x-slot>
+                <x-slot name="description">
+                    ابطال‌ها از همان جایی که برگشته‌اند کم شده‌اند، نه اینکه ورودی
+                    شمرده شوند — دسته‌ای که فردایش حذف شده آرد تازه نیست، پختی است
+                    که انجام نشده.
+                </x-slot>
+
+                <x-bakery.report-table
+                    :columns="['مقصد', 'کیسه', 'کیلو', 'سهم']"
+                    :rows="count($journey['out'])"
+                    empty="در این بازه آردی از انبار خارج نشده است."
+                >
+                    @foreach ($journey['out'] as $row)
+                        <tr class="border-b border-gray-50 transition hover:bg-gray-50/70 dark:border-white/5 dark:hover:bg-white/5">
+                            <td class="whitespace-nowrap py-2.5 pe-3 font-medium">{{ $row['label'] }}</td>
+                            <td class="py-2.5 pe-3 tabular-nums">{{ $this->sacks($row['bags']) }}</td>
+                            <td class="py-2.5 pe-3 tabular-nums">{{ $this->kilos($row['kg']) }}</td>
+                            <td class="py-2.5 pe-3 font-semibold tabular-nums">{{ number_format($row['share'], 1) }}٪</td>
+                        </tr>
+                    @endforeach
+
+                    <x-slot name="footer">
+                        <td class="py-3 pe-3">جمع</td>
+                        <td class="py-3 pe-3 tabular-nums">{{ $this->sacks($journey['out_bags']) }}</td>
+                        <td class="py-3 pe-3 tabular-nums">{{ $this->kilos($journey['out_kg']) }}</td>
+                        <td class="py-3 pe-3 tabular-nums">۱۰۰٪</td>
+                    </x-slot>
+                </x-bakery.report-table>
+            </x-filament::section>
+
+            <x-filament::section>
+                <x-slot name="heading">آرد از کجا آمد</x-slot>
+
+                <x-bakery.report-table
+                    :columns="['منبع', 'کیسه', 'کیلو', 'سهم']"
+                    :rows="count($journey['in'])"
+                    empty="در این بازه آردی به انبار وارد نشده است."
+                >
+                    @foreach ($journey['in'] as $row)
+                        <tr class="border-b border-gray-50 transition hover:bg-gray-50/70 dark:border-white/5 dark:hover:bg-white/5">
+                            <td class="whitespace-nowrap py-2.5 pe-3 font-medium">{{ $row['label'] }}</td>
+                            <td class="py-2.5 pe-3 tabular-nums">{{ $this->sacks($row['bags']) }}</td>
+                            <td class="py-2.5 pe-3 tabular-nums">{{ $this->kilos($row['kg']) }}</td>
+                            <td class="py-2.5 pe-3 font-semibold tabular-nums">{{ number_format($row['share'], 1) }}٪</td>
+                        </tr>
+                    @endforeach
+
+                    <x-slot name="footer">
+                        <td class="py-3 pe-3">جمع</td>
+                        <td class="py-3 pe-3 tabular-nums">{{ $this->sacks($journey['in_bags']) }}</td>
+                        <td class="py-3 pe-3 tabular-nums">{{ $this->kilos($journey['in_kg']) }}</td>
+                        <td class="py-3 pe-3 tabular-nums">۱۰۰٪</td>
+                    </x-slot>
+                </x-bakery.report-table>
+
+                <div class="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3 text-sm dark:border-white/5">
+                    @if ($journey['balances'])
+                        <x-filament::icon icon="heroicon-m-check-circle" class="h-4 w-4 text-success-500" />
+                        <span class="text-gray-500 dark:text-gray-400">
+                            مانده اول + ورودی − خروجی = مانده آخر. حساب می‌خواند.
+                        </span>
+                    @else
+                        <x-filament::icon icon="heroicon-m-exclamation-triangle" class="h-4 w-4 text-danger-500" />
+                        <span class="text-danger-600 dark:text-danger-400">
+                            حساب نمی‌خواند — حرکتی در انبار هست که این گزارش جایش نمی‌شناسد.
+                        </span>
+                    @endif
+                </div>
             </x-filament::section>
         </div>
     </div>

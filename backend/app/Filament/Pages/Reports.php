@@ -158,6 +158,34 @@ class Reports extends Page implements HasForms
         return ReportSeries::consumption($from, $to, $this->granularity());
     }
 
+    /**
+     * Where the flour went over the chosen range — the owner's own
+     * question, and one no screen answered until now.
+     *
+     * @return array<string, mixed>
+     */
+    public function flourJourney(): array
+    {
+        [$from, $to] = $this->range();
+
+        return ReportSeries::flourJourney($from, $to);
+    }
+
+    /** "۶۳٫۸ کیسه" — trailing noughts trimmed, because nobody says ۶۳٫۸۰. */
+    public function sacks(?float $bags): string
+    {
+        if ($bags === null) {
+            return '—';
+        }
+
+        return rtrim(rtrim(number_format($bags, 2), '0'), '.').' کیسه';
+    }
+
+    public function kilos(float $kg): string
+    {
+        return number_format($kg, 1).' کیلو';
+    }
+
     public function currencyLabel(): string
     {
         return Money::label();
