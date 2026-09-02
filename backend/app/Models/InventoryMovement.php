@@ -15,6 +15,16 @@ class InventoryMovement extends Model
         'production' => 'مصرف در تولید',
         'spray' => 'آرد پاششی',
         'waste' => 'ضایعات',
+        // Both of these were written by the application and left out of
+        // this list, so twelve flour sales and five opening balances have
+        // been showing the owner the raw English key wherever a movement
+        // is named. It went unseen until «آرد کجا رفت» put the reasons in
+        // a column of their own and one line read «flour_sale».
+        'flour_sale' => 'فروش آرد',
+        // Stock that was found to be there, or not there, outside any
+        // record — an opening balance, or a figure repaired by hand.
+        // «شمارش انبار» below is the narrower case where somebody counted.
+        'correction' => 'اصلاح موجودی',
         'consignment_in' => 'دریافت امانی',
         'consignment_out' => 'تحویل امانی',
         // Written when a production entry or flour sale is deleted, so the
