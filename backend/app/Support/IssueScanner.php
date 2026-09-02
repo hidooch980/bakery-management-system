@@ -8,6 +8,7 @@ use App\Models\ConsignmentFlour;
 use App\Models\DieselAllocation;
 use App\Models\DoughEntry;
 use App\Models\Expense;
+use App\Models\FlourAllocation;
 use App\Models\InventoryItem;
 use App\Models\Loan;
 use App\Models\SalaryPayment;
@@ -38,6 +39,7 @@ class IssueScanner
             ...$this->lowStock(),
             ...$this->emptyStock(),
             ...$this->quotaOverrun(),
+            ...$this->readerDisagreesWithUs(),
             ...$this->negativeBankBalance(),
             ...$this->sellerAccounts(),
             ...$this->unsettledShortfalls(),
@@ -286,6 +288,58 @@ class IssueScanner
      *
      * No automatic fix: inventing a deposit would hide the missing one.
      */
+    /**
+     * The card reader saw fewer loaves than the shop recorded.
+     *
+     * Next month's flour is worked out from what the national system saw,
+     * not from what a seller wrote down, so this gap is not a bookkeeping
+     * detail — it is flour the shop will not get and has no other warning
+     * about until the allocation arrives short.
+     *
+     * Only reported in one direction. The reader seeing *more* than the
+     * shop recorded costs nothing and usually means a sale entered late.
+     *
+     * Silent until somebody types the reader's figure in: a period nobody
+     * has checked is not a period that agrees.
+     */
+    private function readerDisagreesWithUs(): array
+    {
+        $issues = [];
+
+        foreach (FlourAllocation::with('periods')->get() as $allocation) {
+            foreach ($allocation->periods as $period) {
+                $gap = $period->system_gap;
+
+                if ($gap === null || $gap >= 0) {
+                    continue;
+                }
+
+                $short = abs($gap);
+
+                $issues[] = new SystemIssue(
+                    key: "reader-gap-{$period->id}",
+                    severity: SystemIssue::WARNING,
+                    title: "سامانه در «{$period->label}» کمتر از ثبت ما دیده",
+                    detail: 'ثبت ما '.number_format($period->card_bread_count)
+                        .' نان کارتخوان است و سامانه '
+                        .number_format((int) $period->system_bread_count)
+                        .' نان — '.number_format($short).' نان اختلاف.',
+                    cause: 'فروشی که با کارت انجام شده در سامانه ثبت نشده،'
+                        .' یا فروشی که نقد بوده به اشتباه کارتی ثبت شده است.',
+                    suggestion: 'سهمیهٔ ماه بعد از روی رقم سامانه بسته می‌شود،'
+                        .' نه از روی ثبت ما؛ پیش از پایان ماه پیگیری کنید.',
+                    url: '/admin/flour-allocations',
+                    urlLabel: 'سهمیه‌ها',
+                    // Loaves short. A period ten loaves out is not the same
+                    // problem as one five hundred out.
+                    magnitude: (float) $short,
+                );
+            }
+        }
+
+        return $issues;
+    }
+
     private function negativeBankBalance(): array
     {
         $issues = [];

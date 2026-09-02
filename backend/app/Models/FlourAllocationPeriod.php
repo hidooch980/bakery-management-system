@@ -18,6 +18,7 @@ class FlourAllocationPeriod extends Model
         'starts_on',
         'ends_on',
         'allocated_kg',
+        'system_bread_count',
     ];
 
     protected function casts(): array
@@ -26,6 +27,7 @@ class FlourAllocationPeriod extends Model
             'starts_on' => 'date',
             'ends_on' => 'date',
             'allocated_kg' => 'decimal:3',
+            'system_bread_count' => 'integer',
         ];
     }
 
@@ -148,6 +150,31 @@ class FlourAllocationPeriod extends Model
     public function getBreadRemainderAttribute(): int
     {
         return $this->allocated_bread_count - $this->card_bread_count;
+    }
+
+    /**
+     * What the card reader itself reported, less what the shop recorded.
+     *
+     * Positive means the reader saw more than the shop wrote down — which
+     * is the harmless direction. Negative is the one that costs flour:
+     * loaves marked as card sales here that never registered, so next
+     * month's quota is worked out from a smaller number than the shop
+     * believes.
+     *
+     * Null until somebody enters the reader's figure. A period nobody has
+     * checked reads as unchecked, never as agreeing.
+     */
+    public function getSystemGapAttribute(): ?int
+    {
+        return $this->system_bread_count === null
+            ? null
+            : $this->system_bread_count - $this->card_bread_count;
+    }
+
+    /** Whether the reader's figure has been entered for this period. */
+    public function getIsCheckedAgainstReaderAttribute(): bool
+    {
+        return $this->system_bread_count !== null;
     }
 
     private function cardSales()
