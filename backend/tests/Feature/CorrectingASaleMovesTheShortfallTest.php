@@ -176,4 +176,55 @@ class CorrectingASaleMovesTheShortfallTest extends TestCase
         // Thirty loaves that were accounted for no longer are.
         $this->assertSame(40, $this->shortfallOn($batch));
     }
+
+    public function test_a_settled_shortfall_is_not_charged_twice(): void
+    {
+        // The shape of batch #115, which the first run of the recompute
+        // got wrong: 800 shaped, 742 sold, and 58 already settled on a
+        // line further down. Walking the rows in order, the remainder was
+        // written on the first line before the settled one was reached —
+        // so the same 58 loaves were charged twice, 116 in total.
+        $batch = $this->batch(800);
+
+        SaleRecorder::record($batch, [
+            ['payment_type' => 'card', 'bread_count' => 714, 'amount' => 7140000],
+            ['payment_type' => 'home', 'bread_count' => 9],
+            ['payment_type' => 'schools', 'bread_count' => 10],
+            ['payment_type' => 'credit', 'bread_count' => 5],
+            ['payment_type' => 'charity', 'bread_count' => 4],
+        ], $this->seller->id);
+
+        // The batch is 58 short; somebody answers for it.
+        $carrier = Sale::where('chane_entry_id', $batch->id)
+            ->whereNotNull('shortfall_count')->first();
+
+        $this->assertSame(58, (int) $carrier->shortfall_count);
+        $carrier->update(['shortfall_settled_on' => now()]);
+
+        // Recomputing must now find nothing left to charge: those loaves
+        // are missing and answered for at the same time.
+        SaleRecorder::refreshBatchShortfall($batch->fresh());
+
+        $this->assertSame(58, $this->shortfallOn($batch), 'not 116');
+    }
+
+    public function test_a_correction_after_a_settlement_only_moves_what_is_left(): void
+    {
+        $batch = $this->batch(100);
+
+        SaleRecorder::record($batch, [
+            ['payment_type' => 'cash', 'bread_count' => 80, 'amount' => 800000],
+        ], $this->seller->id);
+
+        $sale = Sale::where('chane_entry_id', $batch->id)->first();
+        $sale->update(['shortfall_settled_on' => now()]);
+        $this->assertSame(20, $this->shortfallOn($batch));
+
+        // Ten of those loaves turn out to have been sold after all. The
+        // settled twenty stands — that money changed hands — and nothing
+        // new is added on top.
+        $sale->update(['bread_count' => 90]);
+
+        $this->assertSame(20, $this->shortfallOn($batch));
+    }
 }

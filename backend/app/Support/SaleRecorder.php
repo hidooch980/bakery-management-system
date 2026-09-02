@@ -184,7 +184,23 @@ class SaleRecorder
 
         $breadPrice = (float) (CurrentBakery::get()?->bread_price ?? 0);
 
-        $remainder = max(0, (int) $chane->chane_count - (int) $sales->sum('bread_count'));
+        // A settled shortfall is loaves somebody has already answered for.
+        // They are missing from the batch and accounted for at the same
+        // time, so they come off the remainder — otherwise the same loaves
+        // are charged twice, once in the settled figure and once again in
+        // whatever this assigns next.
+        //
+        // Missing this doubled the shortfall on two batches when the
+        // recompute was first run: 800 shaped, 742 sold, 58 already
+        // settled, and a fresh 58 written on another line.
+        $settled = (int) $sales
+            ->filter(fn (Sale $sale) => $sale->shortfall_settled_on !== null)
+            ->sum('shortfall_count');
+
+        $remainder = max(
+            0,
+            (int) $chane->chane_count - (int) $sales->sum('bread_count') - $settled,
+        );
 
         $carried = false;
 
@@ -196,10 +212,9 @@ class SaleRecorder
             }
 
             // Settled means somebody paid for it. Rewriting it would move
-            // a debt that is already closed.
+            // a debt that is already closed. Its loaves are already off the
+            // remainder above, so it does not need to claim the carry too.
             if ($sale->shortfall_settled_on !== null) {
-                $carried = true;
-
                 continue;
             }
 
