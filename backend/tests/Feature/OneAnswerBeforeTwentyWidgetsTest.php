@@ -13,6 +13,7 @@ use App\Support\ShopHealth;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -61,7 +62,7 @@ class OneAnswerBeforeTwentyWidgetsTest extends TestCase
         parent::tearDown();
     }
 
-    private function page(): \Livewire\Features\SupportTesting\Testable
+    private function page(): Testable
     {
         return Livewire::test(ShopToday::class);
     }
