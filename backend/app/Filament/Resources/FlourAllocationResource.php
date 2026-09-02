@@ -242,6 +242,31 @@ class FlourAllocationResource extends Resource
                     ->description('سهمیه دوره منهای نان کارتخوان')
                     ->toggleable(),
 
+                // Reader against our own record. Blank where nobody has
+                // checked yet, because «not checked» and «agrees» must not
+                // look the same.
+                Tables\Columns\TextColumn::make('reader_gap')
+                    ->label('کارتخوان در برابر ثبت ما')
+                    ->state(fn (FlourAllocation $record) => $record->periods
+                        ->map(function ($p) {
+                            if (! $p->is_checked_against_reader) {
+                                return $p->period_number.') بررسی نشده';
+                            }
+
+                            $gap = $p->system_gap;
+
+                            return sprintf(
+                                '%d) %s',
+                                $p->period_number,
+                                $gap === 0
+                                    ? 'می‌خواند'
+                                    : ($gap > 0 ? '+' : '−').number_format(abs($gap)),
+                            );
+                        })
+                        ->implode('   •   '))
+                    ->description('منفی یعنی سامانه کمتر از ثبت ما دیده')
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('current')
                     ->label('دوره جاری')
                     ->state(function (FlourAllocation $record) {
@@ -263,6 +288,45 @@ class FlourAllocationResource extends Resource
                     }),
             ])
             ->actions([
+                // The one number the shop cannot work out for itself.
+                // «اختلاف با کارتخوان» above compares the quota against
+                // the shop's *own* record of card sales; this compares
+                // that record against what the reader actually
+                // registered, which is the figure next month's flour is
+                // worked out from.
+                Tables\Actions\Action::make('readerFigures')
+                    ->label('ثبت رقم کارتخوان')
+                    ->icon('heroicon-o-clipboard-document-check')
+                    ->modalHeading('رقمی که خود کارتخوان نشان می‌دهد')
+                    ->modalDescription(
+                        'تعداد نان هر دوره را از سامانه بخوانید و اینجا بنویسید.'
+                        .' خالی گذاشتن یعنی هنوز بررسی نشده — صفر معنای دیگری دارد.'
+                    )
+                    ->fillForm(fn (FlourAllocation $record) => $record->periods
+                        ->mapWithKeys(fn ($p) => [
+                            'p'.$p->period_number => $p->system_bread_count,
+                        ])->all())
+                    ->form(fn (FlourAllocation $record) => $record->periods
+                        ->map(fn ($p) => Forms\Components\TextInput::make('p'.$p->period_number)
+                            ->label($p->label)
+                            ->helperText('ثبت خود ما: '.number_format($p->card_bread_count).' نان')
+                            ->numeric()
+                            ->minValue(0)
+                            ->nullable())
+                        ->all())
+                    ->action(function (FlourAllocation $record, array $data) {
+                        foreach ($record->periods as $period) {
+                            $typed = $data['p'.$period->period_number] ?? null;
+
+                            $period->update([
+                                'system_bread_count' => $typed === '' || $typed === null
+                                    ? null
+                                    : (int) $typed,
+                            ]);
+                        }
+                    })
+                    ->successNotificationTitle('رقم کارتخوان ثبت شد'),
+
                 Tables\Actions\EditAction::make()->label('ویرایش'),
                 Tables\Actions\DeleteAction::make()->label('حذف'),
             ])
