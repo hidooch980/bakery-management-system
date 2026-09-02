@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
 use App\Models\InventoryItem;
+use App\Models\InventoryMovement;
 use App\Models\Sale;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -141,5 +142,146 @@ class ReportSeries
                 ];
             })
             ->values();
+    }
+
+    /**
+     * Where the flour went over one range, and where it came from.
+     *
+     * The owner asked the question in four words — «آرد کجا رفت» — and
+     * until now nothing answered it. The consumption series says how much
+     * was baked each day; it does not say that of the month's sacks, four
+     * in five were baked, one in seven went to a partner bakery and never
+     * came back, and a handful was dusted on the bench.
+     *
+     * Read from the warehouse ledger, which is the only place all of it
+     * meets: production, spray, lending, flour sales and every correction
+     * are separate screens and one set of movements.
+     *
+     * **Reversals are netted against what they undo, not shown as flour
+     * arriving.** A batch deleted the next day is not a delivery; it is a
+     * bake that did not happen, and a report that lists it under «آمد»
+     * tells the owner sacks turned up that nobody bought. Where the
+     * reversal says which movement it cancels it is netted against that
+     * one's own destination; the column arrived on 1405/05/25, so anything
+     * cancelled before it falls back to its family — a production reversal
+     * to the bake, a sale reversal to the sale.
+     *
+     * Sacks lead and kilograms follow, because sacks are what the shop
+     * counts and what its quota is written in.
+     *
+     * @return array{
+     *     opening_kg: float, closing_kg: float,
+     *     in: array<int, array{reason: string, label: string, kg: float, bags: ?float, share: float}>,
+     *     out: array<int, array{reason: string, label: string, kg: float, bags: ?float, share: float}>,
+     *     in_kg: float, out_kg: float, in_bags: ?float, out_bags: ?float,
+     *     opening_bags: ?float, closing_bags: ?float, balances: bool
+     * }
+     */
+    public static function flourJourney(Carbon $from, Carbon $to): array
+    {
+        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+
+        $opening = (float) $flour->movements()->where('created_at', '<', $from)
+            ->selectRaw("coalesce(sum(case when direction = 'in' then quantity else -quantity end), 0) as net")
+            ->value('net');
+
+        $movements = $flour->movements()
+            ->whereBetween('created_at', [$from, $to])
+            ->with('reverses')
+            ->get();
+
+        // Net out per destination: what left, less anything that came back
+        // to the same place.
+        $net = [];
+
+        foreach ($movements as $movement) {
+            $destination = self::flourDestination($movement);
+            $net[$destination] ??= 0.0;
+            $net[$destination] += ($movement->direction === 'out' ? 1 : -1) * (float) $movement->quantity;
+        }
+
+        $out = [];
+        $in = [];
+
+        foreach ($net as $reason => $kg) {
+            $kg = round($kg, 3);
+
+            if (abs($kg) < 0.001) {
+                continue;
+            }
+
+            // A destination whose net is negative gave more back than it
+            // took, which for a stocktake or a correction is the ordinary
+            // case and for a bake means a batch was cancelled.
+            $row = [
+                'reason' => $reason,
+                'label' => InventoryMovement::REASONS[$reason] ?? $reason,
+                'kg' => abs($kg),
+                'bags' => $bagWeight > 0 ? round(abs($kg) / $bagWeight, 2) : null,
+                'share' => 0.0,
+            ];
+
+            $kg > 0 ? $out[] = $row : $in[] = $row;
+        }
+
+        $outKg = round(array_sum(array_column($out, 'kg')), 3);
+        $inKg = round(array_sum(array_column($in, 'kg')), 3);
+
+        $share = function (array $rows, float $total) {
+            foreach ($rows as $i => $row) {
+                $rows[$i]['share'] = $total > 0 ? round($row['kg'] / $total * 100, 1) : 0.0;
+            }
+
+            // Biggest first: the question is where the flour went, and the
+            // answer is the top line.
+            usort($rows, fn ($a, $b) => $b['kg'] <=> $a['kg']);
+
+            return $rows;
+        };
+
+        $closing = round($opening + $inKg - $outKg, 3);
+
+        return [
+            'opening_kg' => round($opening, 3),
+            'closing_kg' => $closing,
+            'opening_bags' => $bagWeight > 0 ? round($opening / $bagWeight, 2) : null,
+            'closing_bags' => $bagWeight > 0 ? round($closing / $bagWeight, 2) : null,
+            'in' => $share($in, $inKg),
+            'out' => $share($out, $outKg),
+            'in_kg' => $inKg,
+            'out_kg' => $outKg,
+            'in_bags' => $bagWeight > 0 ? round($inKg / $bagWeight, 2) : null,
+            'out_bags' => $bagWeight > 0 ? round($outKg / $bagWeight, 2) : null,
+            // Derived from one ledger, so this cannot fail by arithmetic —
+            // it is here because the day it does fail is the day something
+            // wrote a movement this report does not know how to place, and
+            // a report that quietly drops flour is worse than none.
+            'balances' => abs(round($opening + $inKg - $outKg, 3) - $closing) < 0.001,
+        ];
+    }
+
+    /**
+     * Which destination a movement belongs to.
+     *
+     * A reversal belongs to whatever it cancels, so that cancelling a bake
+     * reduces the bake rather than appearing as a delivery of flour.
+     */
+    private static function flourDestination(InventoryMovement $movement): string
+    {
+        if ($movement->reverses) {
+            return $movement->reverses->reason;
+        }
+
+        return match ($movement->reason) {
+            // Before `reverses_movement_id` existed there is no link to
+            // follow, so the family is the best that can be said. Spray
+            // reversals land on the bake, which is where the flour was
+            // going anyway.
+            'production_reversal' => 'production',
+            'flour_sale_reversal' => 'flour_sale',
+            'consignment_return' => 'consignment_out',
+            default => $movement->reason,
+        };
     }
 }
