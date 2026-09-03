@@ -55,7 +55,7 @@ class PartnerLedger
         return $open
             ->groupBy(fn (ConsignmentFlour $c) => $c->customer_id ?? $c->partner_name)
             ->map(fn (Collection $records, $key) => self::position((string) $key, $records))
-            ->sortByDesc(fn (PartnerPosition $p) => $p->netBags)
+            ->sortByDesc(fn (PartnerPosition $p) => $p->netBags())
             ->values();
     }
 
