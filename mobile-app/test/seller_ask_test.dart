@@ -1,4 +1,3 @@
-import 'package:bakery_app/models/bakery.dart';
 import 'package:bakery_app/models/entries.dart';
 import 'package:bakery_app/widgets/seller_ask.dart';
 import 'package:flutter/material.dart';
