@@ -14,6 +14,7 @@ import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
 import '../../widgets/pay_card.dart';
 import '../../widgets/seller_account_card.dart';
+import '../../widgets/seller_ask.dart';
 import '../../widgets/seller_collections_card.dart';
 import '../../widgets/station_rail.dart';
 import '../../widgets/role_home_scaffold.dart';
@@ -105,6 +106,10 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     }
   }
 
+  /// Set while the one-button answer is in flight, so the button cannot be
+  /// pressed twice into two sales.
+  bool _confirming = false;
+
   void _reload() => setState(() => _data = _load());
 
   Future<void> _openSaleSheet(ChaneEntry chane) async {
@@ -119,6 +124,48 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     );
 
     if (saved == true) _reload();
+  }
+
+  /// The whole batch, cash — the answer nearly every day has, and the one
+  /// the old sheet pre-filled and then made the seller scroll past five
+  /// more fields to agree with.
+  ///
+  /// It posts through `recordSplitSale` like the sheet does, with one line
+  /// instead of six. Anything else — a shortfall, a school, bread taken
+  /// home — is a real division and goes through the sheet, unchanged.
+  Future<void> _recordAllCash(ChaneEntry chane) async {
+    setState(() => _confirming = true);
+
+    final price = _bakery?.breadPrice ?? 0;
+
+    try {
+      final queued = await widget.api.recordSplitSale(
+        chaneEntryId: chane.id,
+        payments: [
+          SalePaymentLine(
+            paymentType: PaymentType.cash,
+            breadCount: chane.chaneCount,
+            amount: chane.chaneCount * price,
+          ),
+        ],
+      );
+
+      if (!mounted) return;
+
+      showMessage(
+        context,
+        queued
+            ? 'اینترنت وصل نیست؛ فروش ذخیره شد و با اتصال بعدی ارسال می‌شود.'
+            : 'فروش ثبت شد.',
+      );
+
+      _reload();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showMessage(context, e.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _confirming = false);
+    }
   }
 
   Future<void> _openFlourSaleSheet() async {
@@ -302,6 +349,17 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         const _InlineEmpty(
           icon: Icons.done_all_rounded,
           text: 'همه چانه‌ها فروخته شده‌اند.',
+        )
+      // One batch is not a choice, so it is not offered as one: the screen
+      // asks the question instead. Several batches is a real choice and
+      // gets the list — the same rule the chane maker's screen follows.
+      else if (pending.length == 1)
+        SellerAsk(
+          chane: pending.single,
+          bakery: _bakery,
+          saving: _confirming,
+          onAllCash: () => _recordAllCash(pending.single),
+          onSplit: () => _openSaleSheet(pending.single),
         )
       else
         for (final entry in pending) ...[
