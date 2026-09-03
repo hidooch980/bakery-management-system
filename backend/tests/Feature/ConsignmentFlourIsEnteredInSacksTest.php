@@ -68,6 +68,7 @@ class ConsignmentFlourIsEnteredInSacksTest extends TestCase
             ->fillForm([
                 'customer_id' => $this->partner()->id,
                 'direction' => 'borrowed',
+                'partner_phone' => '09151234567',
                 'bags' => 12,
                 'occurred_on' => now()->toDateString(),
             ])
@@ -90,6 +91,7 @@ class ConsignmentFlourIsEnteredInSacksTest extends TestCase
             ->fillForm([
                 'customer_id' => $this->partner()->id,
                 'direction' => 'borrowed',
+                'partner_phone' => '09151234567',
                 'bags' => 12,
                 'occurred_on' => now()->toDateString(),
             ])
@@ -118,5 +120,115 @@ class ConsignmentFlourIsEnteredInSacksTest extends TestCase
         // the weight is for the books.
         $this->assertStringStartsWith('5 کیسه', $record->quantity_label);
         $this->assertStringContainsString('200 کیلوگرم', $record->quantity_label);
+    }
+
+    /**
+     * Four partner bakeries were holding 116 sacks of this shop's flour on
+     * 2026-09-03 with not one telephone number on file — the panel could
+     * name every debtor and offered no way to ask any of them for it back.
+     *
+     * A number that is a nuisance to type once is the whole of the
+     * follow-up later.
+     */
+    public function test_a_transfer_will_not_be_recorded_without_a_number_to_ring(): void
+    {
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
+
+        Livewire::test(CreateConsignmentFlour::class)
+            ->fillForm([
+                'customer_id' => $this->partner()->id,
+                'direction' => 'lent',
+                'bags' => 12,
+                'occurred_on' => now()->toDateString(),
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['partner_phone']);
+
+        $this->assertSame(0, ConsignmentFlour::count());
+    }
+
+    /**
+     * The number belongs to the partner, not to one transfer: the next
+     * amanat is a different row and the number has to still be there.
+     */
+    public function test_the_number_typed_on_a_transfer_lands_on_the_partner(): void
+    {
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
+
+        $partner = $this->partner();
+
+        Livewire::test(CreateConsignmentFlour::class)
+            ->fillForm([
+                'customer_id' => $partner->id,
+                'direction' => 'lent',
+                'partner_phone' => '09151234567',
+                'bags' => 12,
+                'occurred_on' => now()->toDateString(),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('09151234567', $partner->fresh()->phone);
+    }
+
+    public function test_a_number_already_on_the_partner_is_not_overwritten(): void
+    {
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
+
+        $partner = $this->partner();
+        $partner->update(['phone' => '09150000000']);
+
+        Livewire::test(CreateConsignmentFlour::class)
+            ->fillForm([
+                'customer_id' => $partner->id,
+                'direction' => 'lent',
+                'partner_phone' => '09159999999',
+                'bags' => 12,
+                'occurred_on' => now()->toDateString(),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        // The partner page is where a number gets corrected. A transfer
+        // form quietly rewriting it is how a good number is lost to a
+        // typo on an unrelated row.
+        $this->assertSame('09150000000', $partner->fresh()->phone);
+    }
+
+    public function test_a_handover_date_can_be_marked_a_guess(): void
+    {
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
+
+        Livewire::test(CreateConsignmentFlour::class)
+            ->fillForm([
+                'customer_id' => $this->partner()->id,
+                'direction' => 'lent',
+                'partner_phone' => '09151234567',
+                'bags' => 12,
+                'occurred_on' => now()->toDateString(),
+                'date_is_approximate' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertTrue(ConsignmentFlour::firstOrFail()->date_is_approximate);
+    }
+
+    public function test_an_ordinary_transfer_is_not_marked_a_guess(): void
+    {
+        InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 2000, 'purchase');
+
+        Livewire::test(CreateConsignmentFlour::class)
+            ->fillForm([
+                'customer_id' => $this->partner()->id,
+                'direction' => 'lent',
+                'partner_phone' => '09151234567',
+                'bags' => 12,
+                'occurred_on' => now()->toDateString(),
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertFalse(ConsignmentFlour::firstOrFail()->date_is_approximate);
     }
 }

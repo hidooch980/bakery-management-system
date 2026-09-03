@@ -58,12 +58,33 @@ class ConsignmentFlourResource extends Resource
                             Forms\Components\TextInput::make('phone')
                                 ->label('تلفن')
                                 ->tel()
+                                ->required()
                                 ->maxLength(20),
                         ])
                         ->createOptionUsing(fn (array $data) => Customer::create(
                             $data + ['type' => Customer::PARTNER_TYPE, 'is_active' => true]
                         )->id)
-                        ->helperText('از فهرست انتخاب کنید یا با + همکار جدید تعریف کنید.'),
+                        ->helperText('از فهرست انتخاب کنید یا با + همکار جدید تعریف کنید.')
+                        ->live()
+                        // Fills the phone box from the partner's record the
+                        // moment one is chosen, so the common case is a
+                        // required field the admin never has to type.
+                        ->afterStateUpdated(function ($state, Forms\Set $set) {
+                            $set('partner_phone', Customer::find($state)?->phone);
+                        }),
+
+                    // Required, and deliberately so. Four partners were
+                    // holding 116 sacks of this shop's flour with not one
+                    // telephone number on file anywhere — the system could
+                    // say who owed it and offered no way to ask for it
+                    // back. A number that is a nuisance to type once is
+                    // the whole of the follow-up later.
+                    Forms\Components\TextInput::make('partner_phone')
+                        ->label('تلفن همکار')
+                        ->tel()
+                        ->required()
+                        ->maxLength(20)
+                        ->helperText('برای پیگیری آردی که برنگردد. اگر همکار شماره نداشته باشد، همین شماره در پروندهٔ او ثبت می‌شود.'),
 
                     Forms\Components\Select::make('direction')
                         ->label('نوع')
@@ -87,8 +108,20 @@ class ConsignmentFlourResource extends Resource
                             .Qty::format(DoughFormula::fromBakery()->bagWeightKg, 0)
                             .' کیلوگرم'),
 
-                    JalaliDateInput::today('occurred_on', 'تاریخ')
-                        ->required(),
+                    JalaliDateInput::today('occurred_on', 'تاریخ تحویل')
+                        ->required()
+                        ->helperText('روزی که کیسه‌ها جابه‌جا شدند — نه روزی که این فرم پر می‌شود.'),
+
+                    // An amanat entered weeks late arrives with today's
+                    // date in the box, because that is what the box was
+                    // filled with and nobody remembers the real day. Left
+                    // alone, the oldest debt in the shop looks like the
+                    // newest and the chase stays quiet for a fortnight
+                    // more. Ticking this says so out loud.
+                    Forms\Components\Toggle::make('date_is_approximate')
+                        ->label('تاریخ تحویل دقیق نیست')
+                        ->helperText('اگر آرد قبلاً رفته و روزش را نمی‌دانید، این را بزنید تا پیگیری‌اش عقب نیفتد.')
+                        ->inline(false),
 
                     JalaliDateInput::make('settled_on', 'تاریخ تسویه')
                         ->helperText('خالی بگذارید تا در وضعیت «تسویه‌نشده» بماند.'),
@@ -106,8 +139,11 @@ class ConsignmentFlourResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('occurred_on')
-                    ->label('تاریخ')
+                    ->label('تاریخ تحویل')
                     ->formatStateUsing(fn ($state) => AppCalendar::date($state))
+                    ->description(fn (ConsignmentFlour $record) => $record->date_is_approximate
+                        ? 'تاریخ دقیق نیست'
+                        : null)
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('partner.name')
