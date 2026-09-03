@@ -7,6 +7,7 @@ use App\Models\Bakery;
 use App\Models\ConsignmentFlour;
 use App\Models\Customer;
 use App\Models\InventoryItem;
+use App\Models\InventoryMovement;
 use App\Models\IssueAcknowledgement;
 use App\Models\User;
 use App\Support\DecidedIssues;
@@ -165,17 +166,29 @@ class TheHealthSummaryCountsWhatThePageShowsTest extends TestCase
      */
     public function test_the_critical_count_is_of_open_issues_only(): void
     {
-        $issues = (new IssueScanner)->scan();
-        $critical = $issues->firstWhere('severity', SystemIssue::CRITICAL);
+        // A balance below zero: the shop's oldest critical, and one this
+        // test can arrange rather than hope for. Written straight to the
+        // ledger because the model would refuse to take out what is not
+        // there — which is the whole reason a negative balance is an
+        // issue when it does appear.
+        InventoryMovement::create([
+            'inventory_item_id' => InventoryItem::ofKey(InventoryItem::FLOUR)->id,
+            'direction' => 'out',
+            'quantity' => 20_000,
+            'reason' => 'production',
+        ]);
 
-        if ($critical === null) {
-            $this->markTestSkipped('این مغازهٔ آزمایشی مورد بحرانی ندارد.');
-        }
+        $critical = (new IssueScanner)->scan()
+            ->firstWhere('severity', SystemIssue::CRITICAL);
+
+        $this->assertNotNull($critical, 'موجودی منفی باید بحرانی گزارش شود.');
 
         $this->assertStringContainsString('(1 بحرانی)', $this->summary());
 
         $this->answer($critical);
 
+        // A decided critical reprinted as critical every morning is the
+        // reason nobody reads the line.
         $this->assertStringContainsString('(0 بحرانی)', $this->summary());
     }
 
