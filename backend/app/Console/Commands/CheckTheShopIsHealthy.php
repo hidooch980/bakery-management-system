@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Bakery;
+use App\Support\DecidedIssues;
 use App\Support\IssueScanner;
 use App\Support\ShopHealth;
 use App\Support\SystemIssue;
@@ -73,18 +74,43 @@ class CheckTheShopIsHealthy extends Command
         };
     }
 
+    /**
+     * The issue centre's own count, drawn the way that page draws it.
+     *
+     * This line used to print the raw scan. On 2026-09-03 it read «۷ مورد
+     * (۱ بحرانی)» while the page it names showed four: five of the seven
+     * had been answered, two of them weeks before. A summary that points
+     * at a screen and disagrees with it teaches the reader to trust
+     * neither — and it was read aloud twice that morning as though every
+     * one of the seven were waiting.
+     *
+     * Decided ones are still said, quietly, on their own line. They are
+     * not nothing: an answer covers a problem at the size it was, so a
+     * long decided list is a list that will come back one at a time.
+     */
     private function summarise(ShopHealth $health): int
     {
         $issues = (new IssueScanner(Bakery::first()))->scan();
-        $critical = $issues->where('severity', SystemIssue::CRITICAL)->count();
+        $decided = DecidedIssues::load();
+
+        $open = $decided->open($issues);
+        $answered = $decided->decided($issues);
+        $critical = $open->where('severity', SystemIssue::CRITICAL)->count();
 
         $this->newLine();
         $this->line('<options=bold>خلاصه</>');
         $this->line(sprintf(
-            '  صفحهٔ مشکلات: %d مورد (%d بحرانی) — اینها کار مغازه است، نه خرابی سیستم',
-            $issues->count(),
+            '  صفحهٔ مشکلات: %d مورد باز (%d بحرانی) — اینها کار مغازه است، نه خرابی سیستم',
+            $open->count(),
             $critical
         ));
+
+        if ($answered->isNotEmpty()) {
+            $this->line(sprintf(
+                '  و %d مورد که پاسخ داده‌اید — اگر بزرگ‌تر شوند برمی‌گردند',
+                $answered->count()
+            ));
+        }
 
         if ($health->isSpotless()) {
             $this->newLine();
