@@ -9,6 +9,8 @@ use App\Models\FlourSale;
 use App\Models\Income;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
+use App\Models\Purchase;
+use App\Models\PurchaseItem;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use Illuminate\Support\Carbon;
@@ -57,6 +59,23 @@ class Ledger
     public static function recordedExpenses(Carbon $from, Carbon $to): float
     {
         return round((float) Expense::whereBetween('spent_on', [
+            $from->toDateString(), $to->toDateString(),
+        ])->sum('amount'), 2);
+    }
+
+    /**
+     * What arrived on a lorry: every purchase invoice dated in the window,
+     * lines and all.
+     *
+     * Counted apart from [recordedExpenses] for the same reason salaries
+     * are — an invoice is not an expense row, and adding the two names
+     * together is how one delivery gets charged twice. The three retired
+     * expense categories are the rows this replaced; they are still
+     * counted, by [recordedExpenses], because they really happened.
+     */
+    public static function purchases(Carbon $from, Carbon $to): float
+    {
+        return round((float) Purchase::whereBetween('purchased_on', [
             $from->toDateString(), $to->toDateString(),
         ])->sum('amount'), 2);
     }
@@ -145,7 +164,12 @@ class Ledger
 
     public static function totalExpenses(Carbon $from, Carbon $to): float
     {
-        return round(self::recordedExpenses($from, $to) + self::paidSalaries($from, $to), 2);
+        return round(
+            self::recordedExpenses($from, $to)
+            + self::paidSalaries($from, $to)
+            + self::purchases($from, $to),
+            2
+        );
     }
 
     public static function profit(Carbon $from, Carbon $to): float
@@ -161,9 +185,24 @@ class Ledger
      */
     public static function flourPurchases(Carbon $from, Carbon $to): float
     {
-        return round((float) Expense::whereBetween('spent_on', [
+        // Rows filed before a delivery became a record of its own. The
+        // category is no longer offered and these are no longer written,
+        // but a month that contains them has to still balance.
+        $asExpenses = (float) Expense::whereBetween('spent_on', [
             $from->toDateString(), $to->toDateString(),
-        ])->where('category', 'flour')->sum('amount'), 2);
+        ])->where('category', 'flour')->sum('amount');
+
+        // Only the flour lines of an invoice. A lorry that brought flour
+        // and charged for its own unloading spent money on two different
+        // things, and only one of them is charged again as it is baked.
+        $asPurchaseLines = (float) PurchaseItem::query()
+            ->whereHas('purchase', fn ($q) => $q->whereBetween('purchased_on', [
+                $from->toDateString(), $to->toDateString(),
+            ]))
+            ->whereHas('item', fn ($q) => $q->where('key', InventoryItem::FLOUR))
+            ->sum('amount');
+
+        return round($asExpenses + $asPurchaseLines, 2);
     }
 
     /**
@@ -209,7 +248,8 @@ class Ledger
             + (float) Income::whereDate('received_on', $date)->sum('amount');
 
         $expense = (float) Expense::whereDate('spent_on', $date)->sum('amount')
-            + (float) SalaryPayment::paid()->whereDate('paid_on', $date)->sum('net_amount');
+            + (float) SalaryPayment::paid()->whereDate('paid_on', $date)->sum('net_amount')
+            + (float) Purchase::whereDate('purchased_on', $date)->sum('amount');
 
         return [round($income, 2), round($expense, 2)];
     }

@@ -295,7 +295,7 @@ class ReportController extends Controller
             ->groupBy('category')
             ->map(fn ($group, $category) => [
                 'category' => $category,
-                'label' => Expense::CATEGORIES[$category] ?? $category,
+                'label' => Expense::categoryLabels()[$category] ?? $category,
                 'amount' => round((float) $group->sum('amount'), 2),
                 'amount_formatted' => Money::format($group->sum('amount')),
                 'count' => $group->count(),

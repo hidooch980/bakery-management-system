@@ -10,6 +10,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import '../admin/admin_record_sheet.dart';
+import '../shared/purchase_sheet.dart';
 
 /// The rest of the shop, on the seller's screen.
 ///
@@ -1073,6 +1074,25 @@ class _FlourSectionState extends State<_FlourSection> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+        // «ورودی انبار» above is stock arriving with no invoice behind it
+        // — an opening balance, a count that came up short. This one is a
+        // delivery: it carries the mill's name and what the shop owes for
+        // it, and the docket is in somebody's pocket by the time it would
+        // otherwise reach a desk.
+        FilledButton.icon(
+          onPressed: () async {
+            if (await PurchaseSheet.open(context, widget.api)) {
+              widget.onChanged();
+              await _loadStock();
+            }
+          },
+          icon: const Icon(Icons.receipt_long_rounded, size: IconSize.row),
+          label: const Text('ثبت محموله با فاکتور'),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(50),
+          ),
         ),
       ],
     );

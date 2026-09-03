@@ -14,6 +14,7 @@ import 'follow_ups_section.dart';
 import 'income_expense_chart.dart';
 import 'seller_debts_section.dart';
 import 'seller_performance_section.dart';
+import 'supplier_debts_section.dart';
 
 /// Income against expenses, with the resulting profit, for a chosen range.
 class AdminFinanceTab extends StatefulWidget {
@@ -264,6 +265,12 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
               // Money the shop has earned but the buyer has not paid yet.
               const SizedBox(height: 22),
               CustomerDebtsSection(api: widget.api),
+
+              // The other side of the same question. What the schools owe
+              // the shop has always been on this page; what the shop owes
+              // the mill has never been anywhere.
+              const SizedBox(height: 22),
+              SupplierDebtsSection(api: widget.api),
 
               // Who has to be called today, and about what.
               const SizedBox(height: 22),

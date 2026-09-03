@@ -69,7 +69,10 @@ class ExpenseController extends Controller
     public function update(Request $request, Expense $expense): JsonResponse
     {
         $data = $request->validate([
-            'category' => ['sometimes', Rule::in(array_keys(Expense::CATEGORIES))],
+            // Retired keys are accepted on an edit and refused on a create:
+            // a delivery filed as an expense before purchases existed has
+            // to stay correctable, and nothing new belongs there.
+            'category' => ['sometimes', Rule::in(array_keys(Expense::categoryLabels()))],
             'title' => ['sometimes', 'string', 'max:255'],
             'amount' => ['sometimes', 'numeric', 'min:0'],
             'spent_on' => ['sometimes', 'string', 'max:20'],

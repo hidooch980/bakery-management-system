@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\IncomeController;
 use App\Http\Controllers\Api\InventoryController;
 use App\Http\Controllers\Api\PowerBiExportController;
+use App\Http\Controllers\Api\PurchaseController;
 use App\Http\Controllers\Api\QuotaController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SalaryController;
@@ -31,6 +32,8 @@ use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SellerCollectionController;
 use App\Http\Controllers\Api\SellerPerformanceController;
 use App\Http\Controllers\Api\SettlementRequestController;
+use App\Http\Controllers\Api\SupplierController;
+use App\Http\Controllers\Api\SupplierPaymentController;
 use App\Http\Controllers\Api\StaffAdjustmentController;
 use App\Http\Controllers\Api\StaffAdvanceController;
 use App\Http\Controllers\Api\StaffAdvanceRequestController;
@@ -219,6 +222,41 @@ Route::prefix('v1')->group(function () {
             Route::post('/consignment-flour', [ConsignmentFlourController::class, 'store']);
             Route::patch('/consignment-flour/{consignment}/settle', [ConsignmentFlourController::class, 'settle']);
             Route::delete('/consignment-flour/{consignment}', [ConsignmentFlourController::class, 'destroy']);
+        });
+
+        // --- Buying: the door, and the books ---
+        //
+        // Two permissions, because they are two acts. Writing down what
+        // came off the lorry is the seller's — they are the one standing
+        // there, the same reason they tick the bakers in. What the shop
+        // owes the mill, paying it, and correcting an invoice already
+        // filed belong to whoever holds the money.
+        //
+        // The literal paths are declared before `{purchase}` and
+        // `{supplier}` below, or the model binding matches «options» as
+        // an id and answers 404 to a form that has never worked.
+        Route::middleware('permission:record-purchase')->group(function () {
+            Route::get('/suppliers', [SupplierController::class, 'index']);
+            Route::get('/purchases/options', [PurchaseController::class, 'options']);
+            Route::get('/purchases/mine', [PurchaseController::class, 'mine']);
+            Route::post('/purchases', [PurchaseController::class, 'store']);
+        });
+
+        Route::middleware('permission:manage-purchases')->group(function () {
+            Route::get('/suppliers/balances', [SupplierController::class, 'balances']);
+            Route::post('/suppliers', [SupplierController::class, 'store']);
+            Route::get('/suppliers/{supplier}/account', [SupplierPaymentController::class, 'account']);
+            Route::put('/suppliers/{supplier}', [SupplierController::class, 'update']);
+            Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy']);
+
+            Route::get('/purchases', [PurchaseController::class, 'index']);
+            Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
+            Route::put('/purchases/{purchase}', [PurchaseController::class, 'update']);
+            Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy']);
+
+            Route::get('/supplier-payments', [SupplierPaymentController::class, 'index']);
+            Route::post('/supplier-payments', [SupplierPaymentController::class, 'store']);
+            Route::delete('/supplier-payments/{payment}', [SupplierPaymentController::class, 'destroy']);
         });
 
         // --- Holidays: everyone reads, admin manages ---

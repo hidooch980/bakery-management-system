@@ -5,6 +5,7 @@ import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
+import '../shared/purchase_sheet.dart';
 import 'admin_home_screen.dart';
 import 'diesel_section.dart';
 
@@ -96,6 +97,18 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
             children: [
+              // The delivery is written down where the stock is read, so
+              // the sacks that just arrived and the balance they change
+              // are one screen apart rather than one menu apart.
+              FilledButton.icon(
+                onPressed: () async {
+                  if (await PurchaseSheet.open(context, widget.api)) _reload();
+                },
+                icon: const Icon(Icons.local_shipping_rounded,
+                    size: IconSize.button),
+                label: const Text('ثبت محموله'),
+              ),
+              const SizedBox(height: 16),
               DieselSection(api: widget.api),
               const SizedBox(height: 12),
               AdminSection(

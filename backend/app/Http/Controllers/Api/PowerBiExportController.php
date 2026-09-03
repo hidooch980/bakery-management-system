@@ -105,7 +105,7 @@ class PowerBiExportController extends Controller
                 'date' => Carbon::parse($expense->spent_on)->toDateString(),
                 'date_jalali' => Jalali::date($expense->spent_on),
                 'category' => $expense->category,
-                'category_label' => Expense::CATEGORIES[$expense->category] ?? $expense->category,
+                'category_label' => Expense::categoryLabels()[$expense->category] ?? $expense->category,
                 'amount' => round((float) $expense->amount, 2),
                 'note' => $expense->note,
             ])

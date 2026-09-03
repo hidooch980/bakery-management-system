@@ -7,6 +7,7 @@ use App\Models\BankAccount;
 use App\Models\FixedAsset;
 use App\Models\Loan;
 use App\Models\SalaryPayment;
+use App\Models\Supplier;
 use App\Models\Sale;
 use App\Models\StaffAdvance;
 
@@ -112,7 +113,29 @@ class BalanceSheet
                 'amount' => self::partnerShares(),
                 'note' => null,
             ],
+            [
+                'key' => 'supplier_debt',
+                'label' => 'بدهی به تأمین‌کنندگان',
+                'amount' => self::supplierDebt(),
+                'note' => 'فاکتورهای پرداخت‌نشده',
+            ],
         ];
+    }
+
+    /**
+     * Invoiced and not yet paid for.
+     *
+     * The shop has bought flour on credit since it opened and this sheet
+     * has never said so: a lorry that arrived unpaid put its sacks on the
+     * asset side and nothing at all on the other, which made the shop look
+     * richer the more it owed. Only what is owed counts — a supplier the
+     * shop has overpaid is in credit, and adding that to a liability total
+     * would net a debt off against a different mill's money.
+     */
+    private static function supplierDebt(): float
+    {
+        return round((float) Supplier::query()->get()
+            ->sum(fn (Supplier $supplier) => max(0, $supplier->balance)), 2);
     }
 
     /** Cash the sellers are holding, plus bread they owe for. */

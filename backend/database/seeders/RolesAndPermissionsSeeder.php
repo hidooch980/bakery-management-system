@@ -34,6 +34,10 @@ class RolesAndPermissionsSeeder extends Seeder
         'view-chane-board',
         'record-work-start',
         'view-work-start-report',
+        // Suppliers, invoices and what the shop owes each mill.
+        'manage-purchases',
+        // Writing down a delivery that has just arrived, and nothing else.
+        'record-purchase',
     ];
 
     public function run(): void
@@ -102,6 +106,10 @@ class RolesAndPermissionsSeeder extends Seeder
             // The floor works with flour on their hands and phones in a
             // locker; the seller is holding one, so they tick people in.
             'record-attendance-for-others',
+            // The lorry arrives while the owner is out. The seller writes
+            // down what came off it; what the shop owes for it, and the
+            // paying, stay with whoever holds the money.
+            'record-purchase',
             'change-password',
         ]);
 

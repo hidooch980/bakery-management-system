@@ -130,8 +130,10 @@ class MoneyMovesThroughTheBankTest extends TestCase
 
     public function test_every_kind_of_cost_the_shop_has_comes_off_the_account(): void
     {
-        // Freight, unloading, fuel, flour, salt, wages, insurance — the
-        // shop pays all of it from the one account.
+        // Freight, unloading, fuel, rent, wages, insurance — the shop
+        // pays all of it from the one account. Flour is not among them
+        // any more: buying it is a purchase invoice now, and that has its
+        // own account posting.
         $categories = array_slice(array_keys(Expense::CATEGORIES), 0, 6);
 
         foreach ($categories as $index => $category) {

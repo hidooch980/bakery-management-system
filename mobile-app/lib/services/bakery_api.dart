@@ -6,6 +6,7 @@ import '../models/chane_board.dart';
 import '../models/customer.dart';
 import '../models/entries.dart';
 import '../models/payroll.dart';
+import '../models/purchase.dart';
 import '../models/staff_adjustment.dart';
 import '../models/today_answer.dart';
 import '../models/flour_sale.dart';
@@ -1327,6 +1328,93 @@ class BakeryApi {
       _client.patch('/advance-requests/$id/reject', {'note': note});
 
   /// Laravel paginators nest the rows under `data.data`; plain lists don't.
+  // ------------------------------------------------------------ buying
+
+  /// Everything the delivery form needs, in one call.
+  ///
+  /// Three calls would be three chances to fail on the forecourt, and a
+  /// form that draws itself half-way is worse than one that says it could
+  /// not load.
+  Future<PurchaseOptions> purchaseOptions() async {
+    final body = await _client.getCached('/purchases/options');
+
+    return PurchaseOptions.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// Writes down a delivery: who brought it, what came off the lorry, and
+  /// what was handed over at the door.
+  ///
+  /// [supplierName] opens an account under that name when the mill is not
+  /// in the list yet — standing at a lorry is not the moment to be sent to
+  /// another screen first.
+  Future<Purchase> recordPurchase({
+    required List<PurchaseLineDraft> lines,
+    int? supplierId,
+    String? supplierName,
+    String? invoiceNo,
+    String? purchasedOn,
+    double? paidAmount,
+    int? bankAccountId,
+    bool paidInCash = false,
+    String? note,
+  }) async {
+    final body = await _client.post('/purchases', {
+      if (supplierId != null) 'supplier_id': supplierId,
+      if (supplierId == null && supplierName != null)
+        'supplier_name': supplierName,
+      if (invoiceNo != null && invoiceNo.isNotEmpty) 'invoice_no': invoiceNo,
+      if (purchasedOn != null && purchasedOn.isNotEmpty)
+        'purchased_on': purchasedOn,
+      if (paidAmount != null) 'paid_amount': paidAmount,
+      if (bankAccountId != null) 'bank_account_id': bankAccountId,
+      if (paidInCash) 'paid_in_cash': true,
+      if (note != null && note.isNotEmpty) 'note': note,
+      'items': lines.map((line) => line.toJson()).toList(),
+    });
+
+    return Purchase.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// What this person has written down. Their own, not the shop's.
+  Future<List<Purchase>> myPurchases() async {
+    final body = await _client.get('/purchases/mine');
+
+    return _paginated(body).map(Purchase.fromJson).toList();
+  }
+
+  /// Every supplier the shop is not square with, and the total owed.
+  Future<({List<SupplierBalance> suppliers, String totalOwedFormatted})>
+      supplierBalances() async {
+    final body = await _client.getCached('/suppliers/balances');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return (
+      suppliers: ((data['suppliers'] as List?) ?? const [])
+          .cast<Map<String, dynamic>>()
+          .map(SupplierBalance.fromJson)
+          .toList(),
+      totalOwedFormatted: data['total_owed_formatted'] as String? ?? '',
+    );
+  }
+
+  /// Money paid to a mill on account, after the delivery.
+  Future<void> paySupplier({
+    required int supplierId,
+    required double amount,
+    int? purchaseId,
+    int? bankAccountId,
+    bool paidInCash = false,
+    String? note,
+  }) =>
+      _client.post('/supplier-payments', {
+        'supplier_id': supplierId,
+        'amount': amount,
+        if (purchaseId != null) 'purchase_id': purchaseId,
+        if (bankAccountId != null) 'bank_account_id': bankAccountId,
+        if (paidInCash) 'paid_in_cash': true,
+        if (note != null && note.isNotEmpty) 'note': note,
+      });
+
   List<Map<String, dynamic>> _paginated(Map<String, dynamic> body) {
     final data = body['data'];
 
