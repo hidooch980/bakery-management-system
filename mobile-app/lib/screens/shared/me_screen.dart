@@ -6,7 +6,6 @@ import '../../services/bakery_api.dart';
 import '../../widgets/attendance_card.dart';
 import '../../widgets/lateness_card.dart';
 import '../../widgets/pay_card.dart';
-import 'my_advances_screen.dart';
 
 /// Everything about the person rather than the work: attendance, what
 /// their pay stands at, and what they have asked for.
@@ -41,19 +40,6 @@ class MeScreen extends StatelessWidget {
           LatenessCard(api: api),
           const SizedBox(height: 14),
           PayCard(api: api),
-          const SizedBox(height: 14),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.receipt_long_rounded),
-              title: const Text('علی‌الحساب‌های من'),
-              subtitle: const Text('آنچه گرفته‌ام و آنچه خواسته‌ام'),
-              trailing: const Icon(Icons.chevron_left_rounded),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => MyAdvancesScreen(api: api)),
-              ),
-            ),
-          ),
         ],
       ),
     );

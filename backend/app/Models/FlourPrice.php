@@ -19,6 +19,7 @@ class FlourPrice extends Model
     use BelongsToBakery;
 
     protected $fillable = [
+        'purchase_id',
         'price_per_kg',
         'effective_from',
         'note',
@@ -30,6 +31,12 @@ class FlourPrice extends Model
             'price_per_kg' => 'decimal:2',
             'effective_from' => 'date',
         ];
+    }
+
+    /** The invoice that set this rate, when it was not typed by hand. */
+    public function purchase()
+    {
+        return $this->belongsTo(Purchase::class);
     }
 
     /**

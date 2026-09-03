@@ -17,6 +17,10 @@ class BankTransaction extends Model
         'flour_sale' => 'فروش آرد',
         'income' => 'درآمد متفرقه',
         'expense' => 'هزینه',
+        // A delivery paid for at the door, and money paid to a mill on
+        // account afterwards. Both leave the same account for the same
+        // reason, so they read as one line in a statement.
+        'purchase' => 'خرید از تأمین‌کننده',
         'salary' => 'حقوق',
         'advance' => 'علی‌الحساب کارکنان',
         'share' => 'سهم شریک',

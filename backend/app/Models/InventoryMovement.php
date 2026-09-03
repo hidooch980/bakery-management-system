@@ -31,6 +31,10 @@ class InventoryMovement extends Model
         // stock it moved comes back with the reason visible in the ledger.
         'production_reversal' => 'ابطال ثبت تولید',
         'flour_sale_reversal' => 'ابطال فروش آرد',
+        // A purchase line corrected downwards, or the whole invoice
+        // deleted: the sacks it brought in go back out again, and
+        // «خرید» on an outgoing line would read as a second delivery.
+        'purchase_reversal' => 'ابطال خرید',
         // Written when consignment flour is handed back, or the record of it
         // is deleted — either way the sack physically moves the other way.
         'consignment_return' => 'بازگشت آرد امانی',

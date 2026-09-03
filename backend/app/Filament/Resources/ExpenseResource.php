@@ -39,7 +39,14 @@ class ExpenseResource extends Resource
                 ->schema([
                     Forms\Components\Select::make('category')
                         ->label('دسته‌بندی')
-                        ->options(Expense::CATEGORIES)
+                        // A row already filed under a retired key keeps it
+                        // in the list, or opening it to fix the amount
+                        // would show an empty picker and save the row into
+                        // whatever the owner picked to get past it.
+                        ->options(fn (?Expense $record) => $record
+                            && array_key_exists($record->category, Expense::RETIRED_CATEGORIES)
+                                ? Expense::categoryLabels()
+                                : Expense::CATEGORIES)
                         ->required()
                         ->native(false),
 
@@ -93,7 +100,7 @@ class ExpenseResource extends Resource
                 Tables\Columns\TextColumn::make('category')
                     ->label('دسته‌بندی')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => Expense::CATEGORIES[$state] ?? $state)
+                    ->formatStateUsing(fn ($state) => Expense::categoryLabels()[$state] ?? $state)
                     ->color(fn ($state) => match ($state) {
                         'flour' => 'warning',
                         'salary' => 'danger',
@@ -131,7 +138,9 @@ class ExpenseResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('category')
                     ->label('دسته‌بندی')
-                    ->options(Expense::CATEGORIES),
+                    // Retired keys included so the rows already filed under them
+                    // can still be picked out of the list.
+                    ->options(Expense::categoryLabels()),
 
                 Tables\Filters\Filter::make('spent_on')
                     ->form([

@@ -30,7 +30,7 @@ class ExpenseByCategoryChart extends ChartWidget
         $labels = [];
         $values = [];
 
-        foreach (Expense::CATEGORIES as $key => $label) {
+        foreach (Expense::categoryLabels() as $key => $label) {
             $amount = (float) ($grouped->get($key)?->sum('amount') ?? 0);
 
             // Keep the doughnut readable by dropping empty categories.

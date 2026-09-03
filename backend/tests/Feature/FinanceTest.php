@@ -48,13 +48,15 @@ class FinanceTest extends TestCase
     {
         $this->actingAs($this->userWithRole('admin'), 'sanctum')
             ->postJson('/api/v1/expenses', [
-                'category' => 'flour',
-                'title' => 'خرید ۱۰ کیسه آرد',
+                // Buying flour is a purchase invoice now, not an expense
+                // category — see ADeliveryIsOneRecordWithANameOnItTest.
+                'category' => 'freight',
+                'title' => 'کرایه حمل ۱۰ کیسه آرد',
                 'amount' => 5_000_000,
                 'spent_on' => '1405/05/03',
             ])
             ->assertCreated()
-            ->assertJsonPath('data.category_label', 'خرید آرد')
+            ->assertJsonPath('data.category_label', 'حمل و نقل')
             ->assertJsonPath('data.spent_on_jalali', '1405/05/03');
 
         $this->assertDatabaseHas('expenses', ['amount' => 5000000.00]);
