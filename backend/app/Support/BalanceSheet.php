@@ -7,9 +7,9 @@ use App\Models\BankAccount;
 use App\Models\FixedAsset;
 use App\Models\Loan;
 use App\Models\SalaryPayment;
-use App\Models\Supplier;
 use App\Models\Sale;
 use App\Models\StaffAdvance;
+use App\Models\Supplier;
 
 /**
  * What the shop owns against what it owes, as of now.
