@@ -14,6 +14,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Validation\Rule;
 
 class InventoryItemResource extends Resource
 {
@@ -74,6 +75,20 @@ class InventoryItemResource extends Resource
     private static function bagWeightFor(InventoryItem $item): float
     {
         return $item->bagWeightKg();
+    }
+
+    /**
+     * The reasons a person may put on a movement they are entering by hand.
+     *
+     * Every reason in the ledger minus «شمارش انبار», which the stocktake
+     * action writes and nothing else may: that form takes a difference and
+     * a count is a total.
+     *
+     * @return array<string, string>
+     */
+    private static function handEnteredReasons(): array
+    {
+        return collect(InventoryMovement::REASONS)->except('stocktake')->all();
     }
 
     /**
@@ -199,14 +214,20 @@ class InventoryItemResource extends Resource
                             // a dropdown that accepts either. The action
                             // beside this one asks the right question and
                             // does the subtraction itself.
+                            //
+                            // Refused as well as hidden. Dropping an
+                            // option only stops the person who uses the
+                            // dropdown; the rule is what stops the value.
                             Forms\Components\Select::make('reason')
                                 ->label('علت')
-                                ->options(collect(InventoryMovement::REASONS)
-                                    ->except('stocktake')
-                                    ->all())
+                                ->options(self::handEnteredReasons())
                                 ->default('manual')
                                 ->required()
                                 ->native(false)
+                                ->rules([Rule::in(array_keys(self::handEnteredReasons()))])
+                                ->validationMessages([
+                                    'in' => 'برای شمارش فیزیکی، از دکمهٔ «ثبت شمارش انبار» استفاده کنید.',
+                                ])
                                 ->helperText('برای شمارش فیزیکی، از دکمهٔ «ثبت شمارش انبار» استفاده کنید.'),
 
                             Forms\Components\Textarea::make('note')

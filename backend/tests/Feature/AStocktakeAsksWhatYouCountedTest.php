@@ -244,8 +244,10 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
 
     public function test_the_action_is_on_the_page(): void
     {
-        $this->get(InventoryItemResource::getUrl('index'))
-            ->assertSuccessful()
-            ->assertSee('ثبت شمارش انبار');
+        $this->get(InventoryItemResource::getUrl('index'))->assertSuccessful();
+
+        Livewire::test(ListInventoryItems::class)
+            ->assertTableActionExists('stocktake')
+            ->assertTableActionExists('recordStock');
     }
 }
