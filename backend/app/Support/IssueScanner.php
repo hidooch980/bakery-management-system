@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Models\BankAccount;
 use App\Models\ChaneEntry;
-use App\Models\ConsignmentFlour;
 use App\Models\DieselAllocation;
 use App\Models\DoughEntry;
 use App\Models\Expense;
@@ -543,51 +542,56 @@ class IssueScanner
      * Counted per partner rather than per lending, because what the owner
      * needs is a name and a number, not four rows about the same person.
      *
-     * A fortnight is the line. Sacks go back and forth within a week here
-     * as a matter of course; past two weeks it has stopped being the
-     * ordinary rhythm and become flour nobody is asking for.
+     * Net of what the shop borrowed back, because flour goes both ways and
+     * both directions are the same conversation: نانوایی کنت held twenty
+     * sacks of the shop's while the shop held twelve of theirs, and the
+     * only figure either of them would recognise is eight. The counting
+     * lives in PartnerLedger so this warning and the partner report can
+     * never quote the owner two different numbers.
      */
     private function flourOutWithPartners(): array
     {
-        $limit = now()->subDays(14);
-
-        $open = ConsignmentFlour::query()
-            ->where('direction', 'lent')
-            ->whereNull('settled_on')
-            ->with('partner')
-            ->get();
-
-        if ($open->isEmpty()) {
-            return [];
-        }
-
         $issues = [];
 
-        foreach ($open->groupBy(fn (ConsignmentFlour $c) => $c->customer_id ?? $c->partner_name) as $key => $lendings) {
-            $oldest = $lendings->min(fn (ConsignmentFlour $c) => $c->occurred_on);
-
-            if ($oldest->gt($limit)) {
+        foreach (PartnerLedger::positions() as $partner) {
+            if (! $partner->isOverdue()) {
                 continue;
             }
 
-            $bags = round($lendings->sum(fn (ConsignmentFlour $c) => (float) $c->bags), 1);
-            $days = (int) $oldest->diffInDays(now());
-            $who = $lendings->first()->partner_label ?: 'همکار بی‌نام';
+            $net = round($partner->netBags(), 1);
+
+            // With nothing coming the other way the net *is* what went
+            // out, so the sentence says how it went out — «۵۶ کیسه در ۲
+            // نوبت» — rather than repeating a total twice.
+            $detail = ($partner->offsetLabel() === null
+                ? $partner->lentLabel()
+                : Qty::format($net, 1).' کیسه')
+                .'، '.$partner->ageLabel().'.';
+
+            // The working, shown only where the netting changed the
+            // answer, so the ordinary case stays one short sentence.
+            if ($offset = $partner->offsetLabel()) {
+                $detail .= ' ('.$offset.')';
+            }
 
             $issues[] = new SystemIssue(
-                key: "consignment-open-{$key}",
+                key: "consignment-open-{$partner->key}",
                 severity: SystemIssue::WARNING,
-                title: "آرد امانی نزد {$who} برنگشته",
-                detail: number_format($bags, 1).' کیسه در '.$lendings->count().' نوبت،'
-                    ." قدیمی‌ترین {$days} روز پیش (".AppCalendar::date($oldest).').',
-                cause: 'آرد به نانوایی همکار داده شده و هنوز پس نیامده است.',
+                title: "آرد امانی نزد {$partner->name} برنگشته",
+                detail: $detail,
+                cause: $partner->dateIsApproximate
+                    ? 'آرد به نانوایی همکار داده شده و هنوز پس نیامده است. روزِ'
+                        .' تحویلش ثبت نشده، پس این ردیف می‌تواند بسیار قدیمی‌تر از'
+                        .' تاریخش باشد.'
+                    : 'آرد به نانوایی همکار داده شده و هنوز پس نیامده است.',
                 suggestion: 'اگر برگشته، در بخش آرد امانی تسویه‌اش کنید تا انبار درست شود؛'
-                    .' وگرنه پیگیری کنید — این کیسه‌ها از موجودی شما کم شده‌اند.',
-                url: '/admin/consignment-flours',
-                urlLabel: 'آرد امانی',
+                    .' وگرنه پیگیری کنید — این کیسه‌ها از موجودی شما کم شده‌اند.'
+                    .($partner->phone ? ' تلفن: '.$partner->phone : ' شمارهٔ تماس این همکار در سیستم نیست.'),
+                url: '/admin/partner-report',
+                urlLabel: 'گزارش همکاران',
                 // Sacks, which is what the shop counts them in and what
                 // grows if more go out to the same partner.
-                magnitude: $bags,
+                magnitude: $net,
             );
         }
 

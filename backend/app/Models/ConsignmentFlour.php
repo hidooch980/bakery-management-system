@@ -37,6 +37,7 @@ class ConsignmentFlour extends Model
         'bags',
         'amount_kg',
         'occurred_on',
+        'date_is_approximate',
         'settled_on',
         'note',
     ];
@@ -47,6 +48,7 @@ class ConsignmentFlour extends Model
             'bags' => 'decimal:2',
             'amount_kg' => 'decimal:3',
             'occurred_on' => 'date',
+            'date_is_approximate' => 'boolean',
             'settled_on' => 'date',
         ];
     }
@@ -63,6 +65,19 @@ class ConsignmentFlour extends Model
                 $record->amount_kg = round((float) $record->bags * $bagWeight, 3);
             } elseif ($record->bags === null && $bagWeight > 0) {
                 $record->bags = round((float) $record->amount_kg / $bagWeight, 2);
+            }
+        });
+
+        // A phone typed on a transfer belongs to the partner, not to the
+        // transfer: the next amanat is a different row and the number has
+        // to still be there. Written up to the partner record when that
+        // record has none, and never over one already on file — the
+        // partner page is where a number gets corrected.
+        static::saved(function (self $record) {
+            $partner = $record->partner;
+
+            if ($partner && blank($partner->phone) && filled($record->partner_phone)) {
+                $partner->forceFill(['phone' => $record->partner_phone])->save();
             }
         });
 
