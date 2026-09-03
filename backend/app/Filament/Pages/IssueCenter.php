@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\IssueAcknowledgement;
 use App\Support\CurrentBakery;
+use App\Support\DecidedIssues;
 use App\Support\IssueScanner;
 use App\Support\SystemIssue;
 use Filament\Actions\Action;
@@ -56,8 +57,7 @@ class IssueCenter extends Page
      */
     private ?Collection $scanned = null;
 
-    /** @var Collection<string, IssueAcknowledgement>|null */
-    private ?Collection $answers = null;
+    private ?DecidedIssues $answers = null;
 
     /** @return Collection<int, SystemIssue> */
     public function getIssues(): Collection
@@ -65,12 +65,14 @@ class IssueCenter extends Page
         return $this->scanned ??= app(IssueScanner::class)->scan();
     }
 
-    /** @return Collection<string, IssueAcknowledgement> */
-    private function answers(): Collection
+    /**
+     * Where open and decided are told apart — shared with `shop:health`,
+     * whose summary line points at this page and used to quote a bigger
+     * number than the page showed.
+     */
+    private function answers(): DecidedIssues
     {
-        return $this->answers ??= IssueAcknowledgement::with('acknowledgedBy')
-            ->get()
-            ->keyBy('issue_key');
+        return $this->answers ??= DecidedIssues::load();
     }
 
     /**
@@ -81,22 +83,18 @@ class IssueCenter extends Page
      */
     public function getOpenIssues(): Collection
     {
-        return $this->getIssues()->reject(
-            fn (SystemIssue $i) => $this->answers()->get($i->key)?->stillCovers($i) ?? false
-        )->values();
+        return $this->answers()->open($this->getIssues());
     }
 
     /** @return Collection<int, SystemIssue> */
     public function getAnsweredIssues(): Collection
     {
-        return $this->getIssues()->filter(
-            fn (SystemIssue $i) => $this->answers()->get($i->key)?->stillCovers($i) ?? false
-        )->values();
+        return $this->answers()->decided($this->getIssues());
     }
 
     public function answerFor(SystemIssue $issue): ?IssueAcknowledgement
     {
-        return $this->answers()->get($issue->key);
+        return $this->answers()->answerFor($issue);
     }
 
     /**
@@ -105,7 +103,7 @@ class IssueCenter extends Page
      */
     public function growthFor(SystemIssue $issue): ?int
     {
-        $growth = $this->answers()->get($issue->key)?->growthSince($issue);
+        $growth = $this->answers()->growthFor($issue);
 
         return $growth !== null && $growth > 0 ? (int) round($growth * 100) : null;
     }
