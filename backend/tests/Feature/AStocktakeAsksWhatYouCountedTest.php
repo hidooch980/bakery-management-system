@@ -53,7 +53,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         return InventoryItem::ofKey(InventoryItem::FLOUR);
     }
 
-    private function count(InventoryItem $item, float $counted, ?string $note = null): void
+    private function countStock(InventoryItem $item, float $counted, ?string $note = null): void
     {
         Livewire::test(ListInventoryItems::class)
             ->callTableAction('stocktake', $item, ['counted' => $counted, 'note' => $note]);
@@ -68,7 +68,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         $flour = $this->flour();
         $flour->move('in', 2606, 'purchase');
 
-        $this->count($flour, 71);
+        $this->countStock($flour, 71);
 
         // 71 sacks at 40 kg. Not 2606 + 2840.
         $this->assertEqualsWithDelta(2840, $flour->fresh()->balance, 0.001);
@@ -83,7 +83,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         $flour = $this->flour();
         $flour->move('in', 2840, 'purchase');
 
-        $this->count($flour, 60);
+        $this->countStock($flour, 60);
 
         $this->assertEqualsWithDelta(2400, $flour->fresh()->balance, 0.001);
 
@@ -101,7 +101,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         $flour = $this->flour();
         $flour->move('in', 2606, 'purchase');
 
-        $this->count($flour, 71);
+        $this->countStock($flour, 71);
 
         // 2606 + 2840 = 5446 is the number this test exists to refuse.
         $this->assertEqualsWithDelta(2840, $flour->fresh()->balance, 0.001);
@@ -112,7 +112,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         $flour = $this->flour();
         $flour->move('in', 2840, 'purchase');
 
-        $this->count($flour, 71);
+        $this->countStock($flour, 71);
 
         // A line that moved nothing is a line to read past for ever.
         $this->assertSame(0, InventoryMovement::where('reason', 'stocktake')->count());
@@ -130,7 +130,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         $flour = $this->flour();
         $flour->move('in', 2606, 'purchase');
 
-        $this->count($flour, 71);
+        $this->countStock($flour, 71);
 
         $note = InventoryMovement::where('reason', 'stocktake')->firstOrFail()->note;
 
@@ -144,7 +144,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         $flour = $this->flour();
         $flour->move('in', 2606, 'purchase');
 
-        $this->count($flour, 71, 'دو کیسه پاره در گوشهٔ انبار پیدا شد');
+        $this->countStock($flour, 71, 'دو کیسه پاره در گوشهٔ انبار پیدا شد');
 
         $this->assertStringContainsString(
             'دو کیسه پاره در گوشهٔ انبار پیدا شد',
@@ -167,7 +167,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
 
         $salt->move('in', 100, 'purchase');
 
-        $this->count($salt, 88.64);
+        $this->countStock($salt, 88.64);
 
         $this->assertEqualsWithDelta(88.64, $salt->fresh()->balance, 0.001);
         $this->assertSame('out', InventoryMovement::where('reason', 'stocktake')->firstOrFail()->direction);
@@ -182,7 +182,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         $flour = $this->flour();
         $flour->move('in', 2840, 'purchase');
 
-        $this->count($flour, 0);
+        $this->countStock($flour, 0);
 
         $this->assertEqualsWithDelta(0, $flour->fresh()->balance, 0.001);
     }
@@ -192,7 +192,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         $flour = $this->flour();
         $flour->move('in', 2840, 'purchase');
 
-        $this->count($flour, 10);
+        $this->countStock($flour, 10);
 
         // The count is the floor: an out can only ever be the gap down to
         // what was counted, so 400 kg is where it lands and not below.
@@ -232,7 +232,7 @@ class AStocktakeAsksWhatYouCountedTest extends TestCase
         $flour = $this->flour();
         $flour->move('in', 2606, 'purchase');
 
-        $this->count($flour, 71);
+        $this->countStock($flour, 71);
 
         // The reason stays in REASONS so the ledger can name it, even
         // though nothing may choose it by hand any more.
