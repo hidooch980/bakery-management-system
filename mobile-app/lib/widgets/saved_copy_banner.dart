@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import '../services/response_cache.dart';
 import '../theme/app_theme.dart';
 import '../utils/formatters.dart';
 
@@ -27,20 +28,31 @@ class SavedCopyBanner extends StatelessWidget {
       builder: (context, at, _) {
         if (at == null) return const SizedBox.shrink();
 
+        // Past the keeping window the copy is not merely «not live», it is
+        // from another day's trading, and the two deserve different
+        // sentences. The old cache refused to show this one at all, which
+        // is how a shop that lost signal at closing opened to an error.
+        final old = DateTime.now().difference(at) > ResponseCache.maxAge;
+
         return Card(
           color: AppColors.attention.withValues(alpha: 0.08),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                Icon(Icons.history_rounded, color: AppColors.attention),
+                Icon(
+                  old ? Icons.warning_amber_rounded : Icons.history_rounded,
+                  color: AppColors.attention,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    // The time, not «قدیمی». Whether a figure from two
-                    // hours ago is usable depends on which figure it is,
-                    // and the person reading it is the one who knows.
-                    'این ارقام از نسخهٔ ذخیره‌شده است — ${JalaliFormat.dateTime(at)}',
+                    // The time either way. Whether a figure from two hours
+                    // ago is usable depends on which figure it is, and the
+                    // person reading it is the one who knows.
+                    old
+                        ? 'این ارقام کهنه‌اند و به‌روز نشده‌اند — ${JalaliFormat.dateTime(at)}'
+                        : 'این ارقام از نسخهٔ ذخیره‌شده است — ${JalaliFormat.dateTime(at)}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),

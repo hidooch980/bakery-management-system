@@ -280,7 +280,11 @@ class ApiClient {
     String marker,
     Object failure,
   ) async {
-    final cached = await _cache.read(path, query);
+    // Stale is allowed here and nowhere else. This is the arm that runs
+    // when the server cannot be reached, so the choice is not «yesterday
+    // or today» — it is «yesterday or nothing», and the banner says which
+    // one is on screen.
+    final cached = await _cache.read(path, query, allowStale: true);
 
     if (cached == null) throw failure;
 

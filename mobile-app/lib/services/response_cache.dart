@@ -26,8 +26,19 @@ class ResponseCache {
 
   static const _prefix = 'read_cache_v2:';
 
-  /// Anything older than this is not worth showing: a day-old board would
-  /// be read as today's and quietly mislead.
+  /// Past this, a copy stops being treated as current.
+  ///
+  /// It does not stop being shown. The reason written here when the cache
+  /// was built — «a day-old board would be read as today's and quietly
+  /// mislead» — was right about the danger and wrong about the remedy, and
+  /// the remedy it chose was to show nothing at all. A shop that lost its
+  /// signal at closing and opens the app the next morning got an error
+  /// where yesterday's figures were sitting in storage, readable.
+  ///
+  /// What makes the old copy safe is saying that it is old, which nothing
+  /// did until `SavedCopyBanner`. So the age is now reported rather than
+  /// enforced: fresh is preferred, stale is served with its hour on the
+  /// screen, and only «nothing at all» is still an error.
   static const maxAge = Duration(hours: 12);
 
   String _key(String path, Map<String, dynamic>? query) =>
@@ -63,11 +74,17 @@ class ResponseCache {
     );
   }
 
-  /// The stored answer, or null when there is none or it is too old.
-  Future<({Map<String, dynamic> body, DateTime at})?> read(
+  /// The stored answer, or null when there is none.
+  ///
+  /// [allowStale] decides what happens to a copy past [maxAge]. The
+  /// default is to refuse it, because a caller that has not thought about
+  /// age should not get yesterday by accident. `getCached` passes true
+  /// only on the offline path, where the alternative is a blank screen.
+  Future<({Map<String, dynamic> body, DateTime at, bool isStale})?> read(
     String path,
-    Map<String, dynamic>? query,
-  ) async {
+    Map<String, dynamic>? query, {
+    bool allowStale = false,
+  }) async {
     try {
       final raw = await _store.read(_key(path, query));
 
@@ -82,9 +99,15 @@ class ResponseCache {
 
       if (at == null || body is! Map) return null;
 
-      if (DateTime.now().difference(at) > maxAge) return null;
+      final isStale = DateTime.now().difference(at) > maxAge;
 
-      return (body: Map<String, dynamic>.from(body), at: at);
+      if (isStale && !allowStale) return null;
+
+      return (
+        body: Map<String, dynamic>.from(body),
+        at: at,
+        isStale: isStale,
+      );
     } on Object {
       return null;
     }

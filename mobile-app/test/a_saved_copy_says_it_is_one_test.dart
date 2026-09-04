@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 
 import 'package:bakery_app/services/api_client.dart';
+import 'package:bakery_app/services/response_cache.dart';
 import 'package:bakery_app/widgets/saved_copy_banner.dart';
 
 /// The read half of working without signal.
@@ -201,6 +202,63 @@ void main() {
       // the one who knows.
       expect(find.textContaining('نسخهٔ ذخیره‌شده'), findsOneWidget);
       expect(find.textContaining('21:40'), findsOneWidget);
+    });
+  });
+
+  group('a copy older than the keeping window', () {
+    test('is served when the server cannot be reached', () async {
+      final stored = DateTime.now().subtract(ResponseCache.maxAge * 2);
+
+      FlutterSecureStorage.setMockInitialValues({
+        'read_cache_v2:/chane-board':
+            '{"at":"${stored.toIso8601String()}","body":{"success":true,"data":{"bags":7}}}',
+      });
+
+      final wire = _Adapter('{}')
+        ..failWith = DioException.connectionError(
+          requestOptions: RequestOptions(path: '/chane-board'),
+          reason: 'no signal',
+        );
+
+      // The shop lost signal at closing and opened the app the next
+      // morning. The figures were sitting in storage the whole time and
+      // the screen showed an error, because the cache refused to hand over
+      // anything past twelve hours.
+      final body = await _client(wire).getCached('/chane-board');
+
+      expect((body['data'] as Map)['bags'], 7);
+    });
+
+    test('is still refused to a caller that has not asked for it', () async {
+      final stored = DateTime.now().subtract(ResponseCache.maxAge * 2);
+
+      FlutterSecureStorage.setMockInitialValues({
+        'read_cache_v2:/chane-board':
+            '{"at":"${stored.toIso8601String()}","body":{"x":1}}',
+      });
+
+      // The default stays «no». Only the offline arm asks for stale, where
+      // the alternative is a blank screen rather than a fresh answer.
+      expect(await ResponseCache().read('/chane-board', null), isNull);
+    });
+
+    testWidgets('is called old on the screen, not merely saved',
+        (tester) async {
+      final client = _client(_Adapter('{}'));
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: SavedCopyBanner(client: client)),
+      ));
+
+      client.savedCopyAt.value =
+          DateTime.now().subtract(ResponseCache.maxAge * 2);
+      await tester.pump();
+
+      // Figures from another day's trading and figures from an hour ago
+      // are both «not live», and reading them as the same thing is what
+      // the twelve-hour cut-off was trying to prevent. Saying which is
+      // the cheaper way to prevent it.
+      expect(find.textContaining('کهنه'), findsOneWidget);
     });
   });
 }
