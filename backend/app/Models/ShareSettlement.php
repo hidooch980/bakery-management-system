@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
+use App\Models\Concerns\RecordsAudit;
 use App\Support\AppCalendar;
 use App\Support\Jalali;
 use App\Support\Money;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ShareSettlement extends Model
 {
-    use BelongsToBakery, PostsToBankAccount;
+    use BelongsToBakery, PostsToBankAccount, RecordsAudit;
 
     protected $fillable = [
         'bakery_share_id',
@@ -110,5 +111,16 @@ class ShareSettlement extends Model
     public function bankPostingDate()
     {
         return $this->paid_on ?? now();
+    }
+
+    /**
+     * How this row names itself in the trail.
+     *
+     * The log outlives the record: once the row is gone its id points at
+     * nothing, and this sentence is all that is left to argue from.
+     */
+    public function auditSubject(): ?string
+    {
+        return trim('سهم شریک '.($this->share?->name ?? '').' — '.($this->period_label ?? ''), ' —');
     }
 }

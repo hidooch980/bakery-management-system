@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class StaffAdvanceRequest extends Model
 {
-    use BelongsToBakery;
+    use BelongsToBakery, RecordsAudit;
 
     public const PENDING = 'pending';
 
@@ -124,5 +125,16 @@ class StaffAdvanceRequest extends Model
             'decided_at' => now(),
             'decision_note' => $note,
         ]);
+    }
+
+    /**
+     * How this row names itself in the trail.
+     *
+     * The log outlives the record: once the row is gone its id points at
+     * nothing, and this sentence is all that is left to argue from.
+     */
+    public function auditSubject(): ?string
+    {
+        return trim('درخواست علی‌الحساب '.($this->user?->name ?? ''));
     }
 }

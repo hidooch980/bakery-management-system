@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,7 @@ use Illuminate\Support\Carbon;
  */
 class FlourAllocation extends Model
 {
-    use BelongsToBakery;
+    use BelongsToBakery, RecordsAudit;
 
     /**
      * Period boundaries as Jalali days of the month. The third period runs
@@ -208,5 +209,16 @@ class FlourAllocation extends Model
 
         return static::with('periods')->get()
             ->first(fn (self $allocation) => Jalali::format($allocation->month_start, 'Y/m') === $jalaliMonth);
+    }
+
+    /**
+     * How this row names itself in the trail.
+     *
+     * The log outlives the record: once the row is gone its id points at
+     * nothing, and this sentence is all that is left to argue from.
+     */
+    public function auditSubject(): ?string
+    {
+        return 'سهمیهٔ آرد '.($this->month_label ?? '');
     }
 }

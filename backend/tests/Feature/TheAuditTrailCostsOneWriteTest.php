@@ -14,14 +14,18 @@ use Tests\TestCase;
 /**
  * What the audit trail costs per financial write.
  *
- * `RecordsAudit` went onto nine models that move money, and each of them
- * now writes a second row on every save. This project's own rule is to
- * measure before and after any change on a path the shop uses all day —
- * the issue-centre badge once added 320 queries and 390ms to every panel
- * page — and that rule was not followed when the trail went in.
+ * `RecordsAudit` went onto the models that move money, and each of them
+ * now writes a second row on every save. It started at nine and is now
+ * twenty-one; the cost per save did not change, because the trail writes
+ * one row for the row being saved and never reads the others.
+ *
+ * This project's own rule is to measure before and after any change on a
+ * path the shop uses all day — the issue-centre badge once added 320
+ * queries and 390ms to every panel page — and that rule was not followed
+ * when the trail went in.
  *
  * So: an assertion rather than a benchmark. A benchmark tells you a
- * number on the day you run it; an assertion tells whoever adds the tenth
+ * number on the day you run it; an assertion tells whoever adds the next
  * model that they have doubled the cost.
  */
 class TheAuditTrailCostsOneWriteTest extends TestCase

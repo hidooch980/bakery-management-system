@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use App\Support\AppCalendar;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class DieselDelivery extends Model
 {
-    use BelongsToBakery;
+    use BelongsToBakery, RecordsAudit;
 
     protected $fillable = [
         'user_id',
@@ -57,5 +58,16 @@ class DieselDelivery extends Model
     public function getReceivedOnDisplayAttribute(): string
     {
         return AppCalendar::date($this->received_on);
+    }
+
+    /**
+     * How this row names itself in the trail.
+     *
+     * The log outlives the record: once the row is gone its id points at
+     * nothing, and this sentence is all that is left to argue from.
+     */
+    public function auditSubject(): ?string
+    {
+        return 'گازوئیل '.$this->litres.' لیتر';
     }
 }

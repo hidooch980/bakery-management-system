@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -16,7 +17,7 @@ use Illuminate\Support\Carbon;
  */
 class FlourPrice extends Model
 {
-    use BelongsToBakery;
+    use BelongsToBakery, RecordsAudit;
 
     protected $fillable = [
         'purchase_id',
@@ -62,5 +63,16 @@ class FlourPrice extends Model
     public static function current(): ?float
     {
         return static::onDate(now());
+    }
+
+    /**
+     * How this row names itself in the trail.
+     *
+     * The log outlives the record: once the row is gone its id points at
+     * nothing, and this sentence is all that is left to argue from.
+     */
+    public function auditSubject(): ?string
+    {
+        return 'نرخ آرد '.$this->price_per_kg;
     }
 }

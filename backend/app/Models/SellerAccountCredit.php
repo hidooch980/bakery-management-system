@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class SellerAccountCredit extends Model
 {
-    use BelongsToBakery;
+    use BelongsToBakery, RecordsAudit;
 
     protected $fillable = [
         'user_id',
@@ -45,5 +46,16 @@ class SellerAccountCredit extends Model
     public static function balanceFor(int $userId): float
     {
         return round((float) static::query()->where('user_id', $userId)->sum('amount'), 2);
+    }
+
+    /**
+     * How this row names itself in the trail.
+     *
+     * The log outlives the record: once the row is gone its id points at
+     * nothing, and this sentence is all that is left to argue from.
+     */
+    public function auditSubject(): ?string
+    {
+        return trim('اعتبار فروشنده '.($this->user?->name ?? ''));
     }
 }
