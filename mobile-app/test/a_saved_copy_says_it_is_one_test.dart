@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 
 import 'package:bakery_app/services/api_client.dart';
+import 'package:bakery_app/services/local_database.dart';
 import 'package:bakery_app/services/response_cache.dart';
 import 'package:bakery_app/widgets/saved_copy_banner.dart';
 
@@ -206,13 +207,30 @@ void main() {
   });
 
   group('a copy older than the keeping window', () {
-    test('is served when the server cannot be reached', () async {
-      final stored = DateTime.now().subtract(ResponseCache.maxAge * 2);
-
-      FlutterSecureStorage.setMockInitialValues({
-        'read_cache_v2:/chane-board':
-            '{"at":"${stored.toIso8601String()}","body":{"success":true,"data":{"bags":7}}}',
+    /// Saves an answer and then back-dates it, which is the only way to
+    /// have a copy from yesterday without waiting until tomorrow.
+    Future<void> saveAsOldAsYesterday(String path) async {
+      await ResponseCache().save(path, null, {
+        'success': true,
+        'data': {'bags': 7},
       });
+
+      final db = await LocalDatabase().database;
+
+      await db.update(
+        'cached_reads',
+        {
+          'saved_at': DateTime.now()
+              .subtract(ResponseCache.maxAge * 2)
+              .toIso8601String(),
+        },
+        where: 'cache_key = ?',
+        whereArgs: [ResponseCache.keyFor(path, null)],
+      );
+    }
+
+    test('is served when the server cannot be reached', () async {
+      await saveAsOldAsYesterday('/chane-board');
 
       final wire = _Adapter('{}')
         ..failWith = DioException.connectionError(
@@ -230,12 +248,7 @@ void main() {
     });
 
     test('is still refused to a caller that has not asked for it', () async {
-      final stored = DateTime.now().subtract(ResponseCache.maxAge * 2);
-
-      FlutterSecureStorage.setMockInitialValues({
-        'read_cache_v2:/chane-board':
-            '{"at":"${stored.toIso8601String()}","body":{"x":1}}',
-      });
+      await saveAsOldAsYesterday('/chane-board');
 
       // The default stays «no». Only the offline arm asks for stale, where
       // the alternative is a blank screen rather than a fresh answer.

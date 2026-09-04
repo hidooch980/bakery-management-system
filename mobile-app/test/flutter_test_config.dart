@@ -19,7 +19,14 @@ import 'package:bakery_app/services/local_database.dart';
 /// is nothing on this side of the plugin boundary to run one against.
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   sqfliteFfiInit();
-  LocalDatabase.factoryForTesting = databaseFactoryFfi;
+  // The no-isolate factory, and not the ordinary one. sqflite's ffi
+  // implementation normally answers from a background isolate, and
+  // messages across an isolate boundary need real time — which a widget
+  // test does not have: `pumpAndSettle` drives a fake clock, so any screen
+  // that reads through the cache hangs until the test times out. In the
+  // same isolate the futures are microtasks, which the fake clock does
+  // drive.
+  LocalDatabase.factoryForTesting = databaseFactoryFfiNoIsolate;
 
   // Every in-memory database shares one path, and sqflite keys its cache
   // of open handles on the path — which is what makes «a queue built
@@ -28,7 +35,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   // dropped between them. Registered here rather than in each test file:
   // a leak of this kind does not fail, it counts wrong.
   setUp(() async {
-    await databaseFactoryFfi.deleteDatabase(inMemoryDatabasePath);
+    await databaseFactoryFfiNoIsolate.deleteDatabase(inMemoryDatabasePath);
   });
 
   await testMain();

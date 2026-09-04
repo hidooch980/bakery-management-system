@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:bakery_app/services/api_client.dart';
+import 'package:bakery_app/services/local_database.dart';
 import 'package:bakery_app/services/response_cache.dart';
 
 /// Serves one answer, then refuses to connect — the shape of walking out of
@@ -158,15 +159,35 @@ void main() {
     });
 
     test('a stale entry is not served', () async {
-      // Stored as though it were written well beyond the keeping window.
-      final stored = DateTime.now().subtract(ResponseCache.maxAge * 2);
+      final cache = ResponseCache();
 
-      FlutterSecureStorage.setMockInitialValues({
-        'read_cache_v2:/chane-board':
-            '{"at":"${stored.toIso8601String()}","body":{"x":1}}',
-      });
+      await cache.save('/chane-board', null, {'x': 1});
 
-      expect(await ResponseCache().read('/chane-board', null), isNull);
+      // Back-dated well beyond the keeping window, which is the only way
+      // to have yesterday's copy without waiting until tomorrow. Seeding
+      // the old secure-storage key would pass without proving anything —
+      // the cache does not read from there any more, so an empty answer
+      // would look like a refused one.
+      final db = await LocalDatabase().database;
+
+      await db.update(
+        'cached_reads',
+        {
+          'saved_at': DateTime.now()
+              .subtract(ResponseCache.maxAge * 2)
+              .toIso8601String(),
+        },
+        where: 'cache_key = ?',
+        whereArgs: [ResponseCache.keyFor('/chane-board', null)],
+      );
+
+      expect(await cache.read('/chane-board', null), isNull);
+
+      // And it is there to be had, for a caller that asks.
+      expect(
+        (await cache.read('/chane-board', null, allowStale: true))?.body['x'],
+        1,
+      );
     });
 
     test('signing out forgets what was on screen', () async {
@@ -183,6 +204,50 @@ void main() {
         client.getCached('/sales/today'),
         throwsA(isA<ApiException>()),
       );
+    });
+  });
+
+  group('the cache has a ceiling', () {
+    test('it keeps the newest and drops what falls off the end', () async {
+      final cache = ResponseCache();
+
+      // Nothing ever removed an entry before this. Every distinct report
+      // anybody opened stayed on the handset for the life of the install,
+      // and only signing out cleared any of it — a leak with a friendly
+      // name, on a phone whose storage the shop does not manage.
+      for (var i = 0; i < ResponseCache.maxEntries + 20; i++) {
+        await cache.save('/reports', {'month': '$i'}, {'n': i});
+      }
+
+      // The oldest are gone.
+      expect(await cache.read('/reports', {'month': '0'}), isNull);
+
+      // The newest are not.
+      final newest = ResponseCache.maxEntries + 19;
+      expect(
+        (await cache.read('/reports', {'month': '$newest'}))?.body['n'],
+        newest,
+      );
+    });
+
+    test('re-reading a path does not add a second entry', () async {
+      final cache = ResponseCache();
+
+      await cache.save('/chane-board', null, {'x': 1});
+      await cache.save('/chane-board', null, {'x': 2});
+
+      // One answer per read, replaced. Otherwise the ceiling would be
+      // reached by one screen somebody left open.
+      expect((await cache.read('/chane-board', null))?.body['x'], 2);
+    });
+
+    test('signing out empties it', () async {
+      final cache = ResponseCache();
+
+      await cache.save('/sales/today', null, {'x': 1});
+      await cache.clear();
+
+      expect(await cache.read('/sales/today', null), isNull);
     });
   });
 }

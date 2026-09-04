@@ -43,7 +43,7 @@ class LocalDatabase {
 
   static const _fileName = 'bakery_local.db';
 
-  static const _version = 1;
+  static const _version = 2;
 
   Database? _open;
 
@@ -72,6 +72,7 @@ class LocalDatabase {
           version: _version,
           onConfigure: _configure,
           onCreate: _createSchema,
+          onUpgrade: _upgradeSchema,
         ),
       );
     }
@@ -87,6 +88,7 @@ class LocalDatabase {
       version: _version,
       onConfigure: _configure,
       onCreate: _createSchema,
+      onUpgrade: _upgradeSchema,
     );
   }
 
@@ -124,6 +126,8 @@ class LocalDatabase {
     // What the server refused. Kept rather than deleted: what the seller
     // typed is not the server's to throw away, and until somebody has seen
     // it the only trace used to be a counter nothing displayed.
+    await _createReadCache(db);
+
     await db.execute('''
       CREATE TABLE rejected_writes (
         seq         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,6 +140,32 @@ class LocalDatabase {
         rejected_at TEXT NOT NULL
       )
     ''');
+  }
+
+  /// The last good answer the server gave to each read.
+  ///
+  /// One row per path-and-query, replaced whenever a fresh answer arrives.
+  /// Kept here rather than in [SecureStore] for the same reason the queue
+  /// moved, and for one the queue did not have: nothing ever removed an
+  /// entry. Every distinct report a manager opened stayed on the handset
+  /// for the life of the install, and only sign-out cleared any of it.
+  Future<void> _createReadCache(Database db) async {
+    await db.execute("""
+      CREATE TABLE cached_reads (
+        cache_key TEXT PRIMARY KEY,
+        body      TEXT NOT NULL,
+        saved_at  TEXT NOT NULL
+      )
+    """);
+
+    // Eviction reads this, oldest first.
+    await db.execute(
+      'CREATE INDEX cached_reads_saved_at ON cached_reads (saved_at)',
+    );
+  }
+
+  Future<void> _upgradeSchema(Database db, int from, int to) async {
+    if (from < 2) await _createReadCache(db);
   }
 
   /// The key the database file is encrypted with.

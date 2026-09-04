@@ -3,9 +3,6 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-
-import 'package:bakery_app/services/local_database.dart';
 import 'package:bakery_app/services/offline_queue.dart';
 
 /// The offline queue, moved off a JSON string and onto rows.
@@ -23,16 +20,15 @@ import 'package:bakery_app/services/offline_queue.dart';
 /// never written down anywhere else.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  sqfliteFfiInit();
 
   late OfflineQueue queue;
 
-  /// A fresh in-memory database per test. Unencrypted, deliberately: what
-  /// these prove is the SQL, and the encryption is a property of the file
-  /// on the handset rather than of the statements run against it.
-  OfflineQueue queueOn() => OfflineQueue(
-        database: LocalDatabase(factory: databaseFactoryFfi),
-      );
+  /// The database comes from `test/flutter_test_config.dart`: one
+  /// in-memory database, shared by every instance within a test the way
+  /// the file is on a handset, and dropped between tests. Unencrypted,
+  /// deliberately — what these prove is the SQL, and the encryption is a
+  /// property of the file rather than of the statements run against it.
+  OfflineQueue queueOn() => OfflineQueue();
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
