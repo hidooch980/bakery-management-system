@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:sqflite_common/sqflite.dart';
+
+import 'local_database.dart';
 import 'secure_store.dart';
 
 /// One write the app could not send at the time, kept for a later retry.
@@ -55,96 +58,210 @@ class QueuedRequest {
 /// Deliberately narrow: only a handful of "record this" endpoints opt in
 /// (see BakeryApi), never reads, logins, or anything money-adjacent enough
 /// that a silent retry could be the wrong call.
+///
+/// Backed by the encrypted local database rather than one JSON string in
+/// [SecureStore]. The old shape rewrote the entire queue on every enqueue
+/// and re-parsed it to answer «how many are waiting», which the home
+/// screen asks constantly: recording the tenth sale of an offline morning
+/// rewrote the other nine. Rows and an index do that work instead.
+///
+/// The public shape is unchanged, so the screens and `ApiClient` did not
+/// move with it.
 class OfflineQueue {
-  OfflineQueue({SecureStore? store}) : _store = store ?? SecureStore();
+  OfflineQueue({SecureStore? store, LocalDatabase? database})
+      : _store = store ?? SecureStore(),
+        _database = database ?? LocalDatabase();
 
   final SecureStore _store;
+  final LocalDatabase _database;
 
-  // Held in [SecureStore], not a preference file. What waits here is
-  // sales the server has not seen yet — amounts, customers, notes — and
-  // on Android a preference file is plain XML that a rooted or seized
-  // handset simply reads. The version moved with the move; an entry
-  // written by an older build is left where it was rather than copied
-  // across, which would leave the plaintext original in place anyway.
-  static const _key = 'offline_queue_v2';
+  /// Where the queue lived before the database, and where an upgrading
+  /// handset still has its unsent sales on first launch.
+  static const _legacyKey = 'offline_queue_v2';
 
-  /// Entries the server refused outright.
+  static const _legacyRejectedKey = 'offline_rejected_v2';
+
+  bool _carriedOver = false;
+
+  Future<Database> get _db async {
+    final db = await _database.database;
+
+    await _carryOverLegacy(db);
+
+    return db;
+  }
+
+  /// Moves anything the old JSON queue was still holding into the tables.
   ///
-  /// They used to be deleted, and the only trace was a counter nobody
-  /// displayed: what the seller had typed was gone, unnamed. Retrying
-  /// them is not the answer — the server has said no and would say no
-  /// again — but neither is silence. They are kept here until a person
-  /// has seen them and dismissed them.
-  static const _rejectedKey = 'offline_rejected_v2';
+  /// This runs once per process and matters exactly once per handset: an
+  /// upgrade that happens while a phone has unsent sales on it. Dropping
+  /// them here would be the failure this whole feature exists to prevent,
+  /// and it would be invisible — the queue would simply be empty and the
+  /// sales would never have been recorded anywhere else.
+  ///
+  /// The legacy keys are deleted only after the rows are committed, so an
+  /// upgrade interrupted midway still has them to read next time. An id
+  /// already present is left alone rather than replaced: it is the same
+  /// write under the same Idempotency-Key.
+  Future<void> _carryOverLegacy(Database db) async {
+    if (_carriedOver) return;
 
-  Future<List<QueuedRequest>> all() async => _list(_key)
-      .then((rows) => rows.map(QueuedRequest.fromJson).toList());
+    _carriedOver = true;
 
-  /// Secure storage holds strings, not string lists, so each of these is
-  /// one JSON array. Anything unreadable is treated as empty rather than
-  /// thrown: a queue that will not parse must not stop the shop recording
-  /// the next sale.
-  Future<List<Map<String, dynamic>>> _list(String key) async {
-    final raw = await _store.read(key);
+    for (final (key, table) in [
+      (_legacyKey, 'queued_writes'),
+      (_legacyRejectedKey, 'rejected_writes'),
+    ]) {
+      final raw = await _store.read(key);
 
-    if (raw == null || raw.isEmpty) return [];
+      if (raw == null || raw.isEmpty) continue;
 
-    try {
-      final decoded = jsonDecode(raw);
+      try {
+        final decoded = jsonDecode(raw);
 
-      return decoded is List
-          ? decoded.map((e) => (e as Map).cast<String, dynamic>()).toList()
-          : [];
-    } on Object {
-      return [];
+        if (decoded is! List) continue;
+
+        await db.transaction((txn) async {
+          for (final row in decoded) {
+            if (row is! Map) continue;
+
+            final json = row.cast<String, dynamic>();
+
+            await txn.insert(
+              table,
+              table == 'queued_writes'
+                  ? _queuedRow(QueuedRequest.fromJson(json))
+                  : _rejectedRow(RejectedRequest.fromJson(json)),
+              conflictAlgorithm: ConflictAlgorithm.ignore,
+            );
+          }
+        });
+      } on Object {
+        // Unreadable, which the old queue also tolerated: a queue that
+        // will not parse must not stop the shop recording the next sale.
+        // Left in place rather than deleted, so it can be looked at.
+        continue;
+      }
+
+      await _store.delete(key);
     }
   }
 
-  Future<int> count() async => (await all()).length;
+  static Map<String, Object?> _queuedRow(QueuedRequest r) => {
+        'id': r.id,
+        'path': r.path,
+        'body': jsonEncode(r.body),
+        'label': r.label,
+        'created_at': r.createdAt.toIso8601String(),
+      };
 
-  Future<void> enqueue(QueuedRequest request) async {
-    final rows = await _list(_key);
+  static Map<String, Object?> _rejectedRow(RejectedRequest r) => {
+        ..._queuedRow(r.request),
+        'reason': r.reason,
+        'rejected_at': DateTime.now().toIso8601String(),
+      };
 
-    await _store.write(_key, jsonEncode([...rows, request.toJson()]));
+  static QueuedRequest _toRequest(Map<String, Object?> row) => QueuedRequest(
+        id: row['id'] as String,
+        path: row['path'] as String,
+        body: _decodeBody(row['body']),
+        label: row['label'] as String? ?? '',
+        createdAt:
+            DateTime.tryParse(row['created_at'] as String? ?? '') ??
+                DateTime.now(),
+      );
+
+  static Map<String, dynamic> _decodeBody(Object? raw) {
+    try {
+      final decoded = jsonDecode(raw as String? ?? '{}');
+
+      return decoded is Map ? decoded.cast<String, dynamic>() : {};
+    } on Object {
+      return {};
+    }
   }
 
-  Future<List<RejectedRequest>> rejected() async =>
-      _list(_rejectedKey).then((rows) => rows.map(RejectedRequest.fromJson).toList());
+  /// Everything waiting, oldest first — the order it will be sent in.
+  Future<List<QueuedRequest>> all() async {
+    final rows = await (await _db).query(
+      'queued_writes',
+      orderBy: 'created_at, seq',
+    );
 
-  Future<int> rejectedCount() async => (await rejected()).length;
+    return rows.map(_toRequest).toList();
+  }
+
+  /// Counted by the database rather than by reading the queue and taking
+  /// its length. The home screen asks this on every build.
+  Future<int> count() async {
+    final rows =
+        await (await _db).rawQuery('SELECT count(*) AS n FROM queued_writes');
+
+    return (rows.first['n'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> enqueue(QueuedRequest request) async {
+    await (await _db).insert(
+      'queued_writes',
+      _queuedRow(request),
+      // Same id means the same write. A retry that reaches here twice is
+      // one entry, not two — the id is the Idempotency-Key.
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  Future<List<RejectedRequest>> rejected() async {
+    final rows = await (await _db).query(
+      'rejected_writes',
+      orderBy: 'rejected_at, seq',
+    );
+
+    return rows
+        .map((row) => RejectedRequest(
+              request: _toRequest(row),
+              reason: row['reason'] as String? ?? 'دلیلی ثبت نشد.',
+            ))
+        .toList();
+  }
+
+  Future<int> rejectedCount() async {
+    final rows =
+        await (await _db).rawQuery('SELECT count(*) AS n FROM rejected_writes');
+
+    return (rows.first['n'] as num?)?.toInt() ?? 0;
+  }
 
   /// Moves an entry out of the queue and into the refused list, keeping
   /// what the server said so the person can see why.
+  ///
+  /// One transaction: an entry that left the queue without arriving in the
+  /// refused list is a sale that vanished with nothing said about it, and
+  /// the two writes used to be separate.
   Future<void> reject(QueuedRequest request, String reason) async {
-    final existing = await _list(_rejectedKey);
+    final db = await _db;
 
-    await _store.write(_rejectedKey, jsonEncode([
-      ...existing,
-      RejectedRequest(request: request, reason: reason).toJson(),
-    ]));
+    await db.transaction((txn) async {
+      await txn.insert(
+        'rejected_writes',
+        _rejectedRow(RejectedRequest(request: request, reason: reason)),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
-    await remove(request.id);
+      await txn.delete(
+        'queued_writes',
+        where: 'id = ?',
+        whereArgs: [request.id],
+      );
+    });
   }
 
   Future<void> dismissRejected(String id) async {
-    final items = await rejected();
-
-    await _store.write(
-      _rejectedKey,
-      jsonEncode(items
-          .where((r) => r.request.id != id)
-          .map((r) => r.toJson())
-          .toList()),
-    );
+    await (await _db)
+        .delete('rejected_writes', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> remove(String id) async {
-    final items = await all();
-
-    await _store.write(
-      _key,
-      jsonEncode(items.where((r) => r.id != id).map((r) => r.toJson()).toList()),
-    );
+    await (await _db).delete('queued_writes', where: 'id = ?', whereArgs: [id]);
   }
 }
 

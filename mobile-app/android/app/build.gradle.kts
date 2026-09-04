@@ -48,6 +48,22 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+    }
+
+    // The two architectures staff phones actually are.
+    //
+    // `--target-platform android-arm,android-arm64` on the build command
+    // filters Flutter's own libraries and not a plugin's prebuilt ones:
+    // SQLCipher ships an x86_64 build regardless, 5.7 MB of an APK that
+    // every phone in the shop downloads over mobile data, for an
+    // architecture none of them has. `abiFilters` in defaultConfig does
+    // not remove it either — the library is packaged rather than built —
+    // so it is excluded at packaging.
+    packaging {
+        jniLibs {
+            excludes += listOf("lib/x86/**", "lib/x86_64/**")
+        }
     }
 
     signingConfigs {
