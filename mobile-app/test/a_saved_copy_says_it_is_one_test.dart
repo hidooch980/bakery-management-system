@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:bakery_app/services/api_client.dart';
 import 'package:bakery_app/services/local_database.dart';
 import 'package:bakery_app/services/response_cache.dart';
+import 'package:bakery_app/utils/formatters.dart';
 import 'package:bakery_app/widgets/saved_copy_banner.dart';
 
 /// The read half of working without signal.
@@ -195,14 +196,22 @@ void main() {
       // Set rather than driven through a real fetch: what the tests above
       // prove is when the mark goes up, and this one is about what the
       // shop reads when it has.
-      client.savedCopyAt.value = DateTime(2026, 9, 3, 21, 40);
+      //
+      // Relative to now, not a fixed date. A written-out «۱۴۰۵/۰۶/۱۲ —
+      // ۲۱:۴۰» is inside the keeping window or past it depending on what
+      // time the suite runs, so the banner said «ذخیره‌شده» here and
+      // «کهنه» on CI four hours later. The test was reading the clock and
+      // calling it a result.
+      final takenAt = DateTime.now().subtract(const Duration(hours: 1));
+
+      client.savedCopyAt.value = takenAt;
       await tester.pump();
 
-      // The hour, not «قدیمی». Whether a figure from two hours ago is
-      // usable depends on which figure it is, and the person reading it is
-      // the one who knows.
+      // The hour, not «قدیمی». Whether a figure from an hour ago is usable
+      // depends on which figure it is, and the person reading it is the
+      // one who knows.
       expect(find.textContaining('نسخهٔ ذخیره‌شده'), findsOneWidget);
-      expect(find.textContaining('21:40'), findsOneWidget);
+      expect(find.textContaining(JalaliFormat.time(takenAt)), findsOneWidget);
     });
   });
 
