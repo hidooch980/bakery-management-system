@@ -128,7 +128,7 @@ class _PurchaseSheetState extends State<PurchaseSheet> {
     setState(() => _saving = true);
 
     try {
-      await widget.api.recordPurchase(
+      final outcome = await widget.api.recordPurchase(
         lines: drafts,
         supplierId: _supplier?.id,
         supplierName: _newSupplier.text.trim(),
@@ -138,7 +138,15 @@ class _PurchaseSheetState extends State<PurchaseSheet> {
 
       if (!mounted) return;
 
-      showMessage(context, 'فاکتور خرید ثبت شد.');
+      // Said plainly when it is waiting. «ثبت شد» over a queued write is
+      // how somebody goes looking for the invoice in the panel an hour
+      // later, does not find it, and types it a second time.
+      showMessage(
+        context,
+        outcome.queued
+            ? 'بدون اینترنت ذخیره شد — با وصل‌شدن ارسال می‌شود.'
+            : 'فاکتور خرید ثبت شد.',
+      );
       Navigator.pop(context, true);
     } on ApiException catch (e) {
       if (!mounted) return;
