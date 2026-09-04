@@ -86,6 +86,18 @@ class UserManagementController extends Controller
 
         $user->update(collect($data)->except('role')->toArray());
 
+        // The reason somebody's password gets reset from here is usually
+        // that the old one has stopped being a secret. Leaving the
+        // sessions it opened alive answers the wrong half of that, so they
+        // go — the same thing `changePassword` does when the person
+        // changes their own.
+        //
+        // Deactivation needs no equivalent: `EndsInactiveSessions` closes
+        // those on the next request, whichever way the column was changed.
+        if (isset($data['password'])) {
+            $user->tokens()->delete();
+        }
+
         if (isset($data['role'])) {
             $user->syncRoles([$data['role']]);
         }
