@@ -13,6 +13,7 @@ use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
 /**
@@ -236,6 +237,74 @@ class Ledger
             'total' => round($bread + $flour + $other, 2),
             'total_formatted' => Money::format($bread + $flour + $other),
         ];
+    }
+
+    /**
+     * One figure's daily totals across a whole range, in one query.
+     *
+     * The series pages ask the same question of the same table once per
+     * bucket: a month of days was ninety-four sums over `sales` alone, and
+     * six hundred queries for one page. The window is the only thing that
+     * changes between those, so the sums are done per day by the database
+     * and added up per bucket in PHP.
+     *
+     * Per day, not per bucket, because the buckets are Jalali weeks and
+     * months. Grouping those in SQL means teaching the database a calendar
+     * it does not have; grouping by the date it does have is exact, and
+     * every bucket is a run of whole days.
+     *
+     * Keyed 'Y-m-d'. A day with nothing in it is absent rather than zero,
+     * so callers must default.
+     *
+     * @param  Builder  $query
+     * @return array<string, float>
+     */
+    public static function dailySums($query, string $dateColumn, string $sumColumn, Carbon $from, Carbon $to): array
+    {
+        $rows = $query
+            ->whereBetween($dateColumn, [$from, $to])
+            ->selectRaw("date({$dateColumn}) as d, sum({$sumColumn}) as total")
+            ->groupBy('d')
+            ->pluck('total', 'd');
+
+        return $rows->map(fn ($total) => (float) $total)->all();
+    }
+
+    /**
+     * The same, counting rows rather than summing a column.
+     *
+     * Its own method rather than a `count(*)` passed to [dailySums]: that
+     * builds `sum(count(*))`, which the database rejects, and a helper
+     * that takes an expression invites exactly that.
+     *
+     * @param  Builder  $query
+     * @return array<string, float>
+     */
+    public static function dailyCounts($query, string $dateColumn, Carbon $from, Carbon $to): array
+    {
+        $rows = $query
+            ->whereBetween($dateColumn, [$from, $to])
+            ->selectRaw("date({$dateColumn}) as d, count(*) as total")
+            ->groupBy('d')
+            ->pluck('total', 'd');
+
+        return $rows->map(fn ($total) => (float) $total)->all();
+    }
+
+    /**
+     * What those daily totals come to between two dates, inclusive.
+     *
+     * @param  array<string, float>  $daily
+     */
+    public static function sumDays(array $daily, Carbon $from, Carbon $to): float
+    {
+        $total = 0.0;
+
+        for ($day = $from->copy()->startOfDay(); $day->lessThanOrEqualTo($to); $day->addDay()) {
+            $total += $daily[$day->toDateString()] ?? 0.0;
+        }
+
+        return round($total, 2);
     }
 
     /** A single day's income and cost, for the trend chart. */
