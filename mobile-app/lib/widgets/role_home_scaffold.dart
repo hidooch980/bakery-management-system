@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../screens/shared/settings_screen.dart';
 import '../services/bakery_api.dart';
 import 'common.dart';
+import 'saved_copy_banner.dart';
 import 'sync_status_card.dart';
 
 /// One page of a role's home screen.
@@ -151,6 +152,13 @@ class _RoleHomeScaffoldState extends State<RoleHomeScaffold> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: SyncStatusCard(api: widget.api),
+            ),
+            // Beside it, and separate: what is waiting to be sent and what
+            // is being read from a saved copy are two different problems,
+            // and only one of them clears itself.
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SavedCopyBanner(client: widget.api.client),
             ),
             Expanded(
               child: AnimatedSwitcher(

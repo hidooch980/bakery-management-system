@@ -30,15 +30,23 @@ class ResponseCache {
   /// be read as today's and quietly mislead.
   static const maxAge = Duration(hours: 12);
 
-  String _key(String path, Map<String, dynamic>? query) {
-    if (query == null || query.isEmpty) {
-      return '$_prefix$path';
-    }
+  String _key(String path, Map<String, dynamic>? query) =>
+      '$_prefix${keyFor(path, query)}';
+
+  /// How a read is named, path and query together.
+  ///
+  /// Public because the staleness marker has to agree with the cache about
+  /// what counts as the same read. When they disagreed, a live fetch of one
+  /// month's report cleared the «saved copy» mark from another month that
+  /// was still on the screen.
+  static String keyFor(String path, Map<String, dynamic>? query) {
+    if (query == null || query.isEmpty) return path;
 
     // Sorted, so the same query written in a different order is one entry.
-    final parts = query.entries.map((e) => '${e.key}=${e.value}').toList()..sort();
+    final parts = query.entries.map((e) => '${e.key}=${e.value}').toList()
+      ..sort();
 
-    return '$_prefix$path?${parts.join('&')}';
+    return '$path?${parts.join('&')}';
   }
 
   Future<void> save(

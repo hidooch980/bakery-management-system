@@ -206,9 +206,29 @@ class ApiClient {
   set transport(HttpClientAdapter adapter) => _dio.httpClientAdapter = adapter;
 
   /// When the shown copy of [path] was last fetched, or null if it is live.
-  DateTime? servedFrom(String path) => _servedAt[path];
+  ///
+  /// Keyed with the query, not the path alone. `/reports` for مرداد and
+  /// `/reports` for شهریور are two answers, and sharing one marker meant a
+  /// live fetch of either cleared the «this is a saved copy» mark from the
+  /// other — while the saved figures were still on the screen.
+  DateTime? servedFrom(String path, {Map<String, dynamic>? query}) =>
+      _servedAt[ResponseCache.keyFor(path, query)];
 
   final Map<String, DateTime> _servedAt = {};
+
+  /// When the app last had to answer a read from its saved copy, or null
+  /// while everything on screen came from the server.
+  ///
+  /// `servedFrom` has existed since the cache was written and no screen
+  /// ever read it, so the shop has been shown saved figures with nothing
+  /// saying so — a manager reading last night's bank balance at noon has
+  /// no way to tell. This is the same fact in a shape a widget can listen
+  /// to.
+  ///
+  /// One value for the whole client rather than one per screen: it errs
+  /// toward showing the warning, and a warning shown once too often costs
+  /// nothing next to a stale figure shown as today's.
+  final ValueNotifier<DateTime?> savedCopyAt = ValueNotifier(null);
 
   /// Same as [get], except the last good answer is kept and served when the
   /// server cannot be reached.
@@ -220,30 +240,61 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? query,
   }) async {
+    final marker = ResponseCache.keyFor(path, query);
+
     try {
       final body = await get(path, query: query);
 
-      _servedAt.remove(path);
+      _servedAt.remove(marker);
+      savedCopyAt.value = null;
       await _cache.save(path, query, body);
 
       return body;
     } on ApiException catch (e) {
       if (!e.isConnectivityError) rethrow;
 
-      final cached = await _cache.read(path, query);
-
-      if (cached == null) rethrow;
-
-      _servedAt[path] = cached.at;
-
-      return cached.body;
+      return await _servedFromCache(path, query, marker, e);
+    } catch (e) {
+      // Anything that is not an ApiException never came from the server,
+      // so it is the connection — and the saved copy is the right answer.
+      //
+      // Today `_send` turns every socket and DNS failure into an
+      // ApiException, so this arm is not on any known path. It is here
+      // because `postOrQueue` needed exactly this and reading did not have
+      // it: one throw escaping the write path lost what a seller had just
+      // typed. The cost of the same escape here is a screen that comes up
+      // empty with a good copy sitting unused in storage, and the cost of
+      // the arm is nothing.
+      return await _servedFromCache(path, query, marker, e);
     }
+  }
+
+  /// The saved copy, or the original failure when there is none.
+  ///
+  /// Rethrowing matters: a screen with nothing to show must say so. An
+  /// empty board presented as today's is the one answer worse than an
+  /// error.
+  Future<Map<String, dynamic>> _servedFromCache(
+    String path,
+    Map<String, dynamic>? query,
+    String marker,
+    Object failure,
+  ) async {
+    final cached = await _cache.read(path, query);
+
+    if (cached == null) throw failure;
+
+    _servedAt[marker] = cached.at;
+    savedCopyAt.value = cached.at;
+
+    return cached.body;
   }
 
   /// Forgets every cached read. Called on sign-out, so the next person to
   /// use this phone is not shown the last one's figures.
   Future<void> clearCache() async {
     _servedAt.clear();
+    savedCopyAt.value = null;
     await _cache.clear();
   }
 
