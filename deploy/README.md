@@ -24,8 +24,13 @@ sudo apt-get install -y nginx php8.3-fpm
 فایل [nginx-bakery.conf](nginx-bakery.conf) را در جای خودش بگذارید و فعالش کنید:
 
 ```bash
+sudo mkdir -p /etc/nginx/snippets && sudo cp deploy/snippets/bakery-app.conf /etc/nginx/snippets/
 sudo cp deploy/nginx-bakery.conf /etc/nginx/sites-available/bakery && sudo ln -sf /etc/nginx/sites-available/bakery /etc/nginx/sites-enabled/bakery
 ```
+
+> کانفیگ سه بلوک `server` دارد که همه‌شان یک چیز را سرو می‌کنند، پس آنچه
+> مشترک است در `snippets/bakery-app.conf` نشسته. بدون کپی‌کردن آن، nginx
+> با `include` ناموجود بالا نمی‌آید.
 
 nginx به‌عنوان `www-data` اجرا می‌شود و باید بتواند از مسیر پروژه رد شود.
 بدون این، هر درخواست ۵۰۰ می‌دهد و در `/var/log/nginx/error.log` می‌نویسد
@@ -52,6 +57,147 @@ sudo usermod -a -G ubuntu www-data && bash deploy/fix-storage-permissions.sh
 ```bash
 sudo nginx -t && sudo systemctl restart nginx php8.3-fpm && sudo systemctl enable nginx php8.3-fpm
 ```
+
+## HTTPS
+
+تا امروز پنل و API روی HTTP بودند و **رمز عبور هر بار رمزنگاری‌نشده از سیم
+رد می‌شد**. این تنها یافتهٔ CRITICAL ممیزی بود که با کد بسته نمی‌شد، چون یک
+نام دامنه لازم داشت. نام: `baker.molido.ir`.
+
+### پیش‌نیاز: DNS
+
+**بدون این هیچ‌کدام از مراحل بعد کار نمی‌کند.** یک رکورد `A` لازم است:
+
+```
+baker.molido.ir.   A   37.32.21.125
+```
+
+آزمودنش، از هر جایی:
+
+```bash
+dig +short baker.molido.ir
+```
+
+باید `37.32.21.125` برگردد. Let's Encrypt نام را با گرفتن یک فایل از
+**همین سرور** اثبات می‌کند، پس اگر رکورد جای دیگری اشاره کند — یا هنوز
+ساخته نشده باشد — صدور گواهی رد می‌شود.
+
+> اگر نام پشت CDN باشد (مثل آروان)، آدرسِ رکورد سرورِ ما نیست و اثبات
+> از راه فایل جواب نمی‌دهد. یا موقتاً proxy را خاموش کنید، یا از روش
+> `--dns-...` استفاده کنید. `baker.molido.shop` امروز پشت CDN است.
+
+### مرحلهٔ ۱ — نامِ بی‌گواهی
+
+```bash
+sudo mkdir -p /etc/nginx/snippets && sudo cp deploy/snippets/bakery-app.conf /etc/nginx/snippets/
+sudo cp deploy/nginx-bakery.conf /etc/nginx/sites-available/bakery
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+در این مرحله نام روی HTTP جواب می‌دهد و مسیر `/.well-known/acme-challenge/`
+باز است. **گوشی‌های مغازه دست نخورده‌اند** — همچنان با IP روی ۸۰ و ۸۰۰۰
+حرف می‌زنند.
+
+`nginx-bakery.conf` هیچ TLSی ندارد و این عمدی است: nginx وقتی بلوکِ
+`listen ... ssl` به گواهی‌ای اشاره کند که وجود ندارد **اصلاً بالا نمی‌آید**،
+و nginx که بالا نیاید یعنی مغازه تعطیل.
+
+### مرحلهٔ ۲ — گواهی
+
+```bash
+sudo apt-get install -y certbot
+sudo certbot certonly --webroot -w /var/www/html -d baker.molido.ir \
+    --agree-tos -m hidooch980@gmail.com --no-eff-email
+```
+
+`--webroot` و نه `--nginx`: خودمان کانفیگ را می‌نویسیم، و certbot با
+`--nginx` فایل را بازنویسی می‌کند تا با چیزی که در مخزن است فرق کند.
+
+### مرحلهٔ ۳ — روشن‌کردن TLS
+
+```bash
+sudo cp deploy/nginx-bakery-tls.conf /etc/nginx/sites-available/bakery-tls
+sudo ln -sf /etc/nginx/sites-available/bakery-tls /etc/nginx/sites-enabled/bakery-tls
+```
+
+`nginx-bakery-tls.conf` بلوکِ نام روی پورت ۸۰ را هم دارد. پس آن یکی را از
+`nginx-bakery.conf` **بردارید**، وگرنه دو بلوک برای `baker.molido.ir:80`
+هست و nginx دومی را نادیده می‌گیرد و بی‌صدا ریدایرکت نمی‌کند:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+آزمودن — هر سه، نه فقط اولی:
+
+```bash
+curl -s https://baker.molido.ir/api/v1/health
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' http://baker.molido.ir/api/v1/health
+curl -s -o /dev/null -w '%{http_code}\n' http://37.32.21.125:8000/api/v1/health
+```
+
+به‌ترتیب: پاسخ سلامت، یک `301` به https، و **همچنان `200`** روی IP. سومی
+مهم‌ترین است — اگر ۲۰۰ نداد، گوشی‌های مغازه از کار افتاده‌اند.
+
+### مرحلهٔ ۴ — لاراول بداند پشت TLS است
+
+```bash
+# در backend/.env
+APP_URL=https://baker.molido.ir
+```
+
+```bash
+sudo -u www-data php artisan config:cache
+```
+
+بدون این، هر لینکی که سرور می‌سازد — لینک بازیابی رمز، ریدایرکت خروج از
+پنل — با `http://` بیرون می‌رود.
+
+### مرحلهٔ ۵ — گوشی‌ها، آخر از همه
+
+`server.json` را **تازه بعد از سبز شدن مرحلهٔ ۳** عوض کنید. اپ این فایل را
+از GitHub می‌خواند، پس این تغییر هم‌زمان به همهٔ گوشی‌ها می‌رسد و اشتباهش
+هم‌زمان همه را می‌خواباند:
+
+```json
+"api_base_url": "https://baker.molido.ir/api/v1",
+"fallback_urls": [
+  "http://37.32.21.125/api/v1",
+  "http://37.32.21.125:8000/api/v1"
+]
+```
+
+fallbackها می‌مانند تا وقتی مطمئن شوید همهٔ گوشی‌ها روی نام کار می‌کنند.
+
+### تمدید
+
+Let's Encrypt هر ۹۰ روز منقضی می‌شود و بستهٔ certbot خودش تایمر تمدید دارد.
+آزمودنش **قبل** از اینکه لازم شود:
+
+```bash
+sudo certbot renew --dry-run
+```
+
+> تمدید هم همان فایل `/.well-known/acme-challenge/` را می‌گیرد. اگر روزی
+> ریدایرکت را روی کل پورت ۸۰ گذاشتید، تمدید شصت روز بعد بی‌صدا می‌ایستد —
+> نه خطایی، نه ایمیلی، فقط یک گواهی که یک روز صبح منقضی است.
+
+### HSTS: هنوز نه
+
+در کانفیگ نیست و عمدی است. HSTS به هر گوشی‌ای که یک بار موفق شده می‌گوید
+تا ماه‌ها HTTP ساده را برای این نام قبول نکند، و **با ویرایش فایل روی سرور
+پس گرفته نمی‌شود** — دستور از قبل داخل گوشی است. بعد از اینکه گواهی
+دست‌کم یک بار خودش تمدید شد و مغازه یک هفته روی نام کار کرد اضافه‌اش کنید.
+تا آن وقت، گواهی خراب مسئلهٔ یک بعدازظهر است نه دو هفته.
+
+### بازگشت
+
+```bash
+sudo rm /etc/nginx/sites-enabled/bakery-tls && sudo systemctl reload nginx
+```
+
+نام برمی‌گردد به HTTP ساده و IP اصلاً تکان نخورده. تا وقتی HSTS اضافه نشده،
+این بازگشت کامل است.
 
 ## آزمایش
 
