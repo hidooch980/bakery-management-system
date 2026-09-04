@@ -9,6 +9,24 @@ class InventoryMovement extends Model
 {
     use BelongsToBakery;
 
+    /**
+     * Any row written here makes every remembered balance out of date.
+     *
+     * The balance is a SUM over this table held on the item object, and
+     * the same item exists as several objects in a request. Putting the
+     * invalidation on the model that does the writing means it cannot be
+     * forgotten: `InventoryItem::move` is the ordinary way in, but a
+     * seeder, a fix-up command or a test writing a movement straight is
+     * covered by the same hook rather than by a comment asking it to
+     * remember. One of those tests is how this was found.
+     */
+    protected static function booted(): void
+    {
+        static::created(fn () => InventoryItem::forgetBalances());
+        static::updated(fn () => InventoryItem::forgetBalances());
+        static::deleted(fn () => InventoryItem::forgetBalances());
+    }
+
     public const REASONS = [
         'manual' => 'ثبت دستی',
         'purchase' => 'خرید',

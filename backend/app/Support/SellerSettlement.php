@@ -7,6 +7,7 @@ use App\Models\Sale;
 use App\Models\SellerAccountCredit;
 use App\Models\SettlementRequest;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -30,8 +31,56 @@ class SellerSettlement
      */
     public static function outstandingFor(User $seller, ?array $saleIds = null): array
     {
-        $sales = self::outstandingSales($seller, $saleIds)->get();
+        return self::totals(self::outstandingSales($seller, $saleIds)->get());
+    }
 
+    /**
+     * The same answer for a list of sellers, in one query rather than one
+     * each.
+     *
+     * The seller-accounts page asks for every seller at once, and asking
+     * per seller put a query on the page for every person who has ever
+     * sold bread — it grew with the staff list, which is exactly the shape
+     * this project has been bitten by before.
+     *
+     * Sellers with nothing open still get an entry, so a caller can read
+     * the result by id without checking whether it is there.
+     *
+     * @param  Collection<int, User>  $sellers
+     * @return array<int, array<string, mixed>>
+     */
+    public static function outstandingForMany($sellers): array
+    {
+        $ids = $sellers->pluck('id')->all();
+
+        $bySeller = $ids === []
+            ? collect()
+            : Sale::query()
+                ->whereIn('user_id', $ids)
+                ->sellerAccountOutstanding()
+                ->get()
+                ->groupBy('user_id');
+
+        $totals = [];
+
+        foreach ($ids as $id) {
+            $totals[$id] = self::totals($bySeller->get($id) ?? collect());
+        }
+
+        return $totals;
+    }
+
+    /**
+     * What a set of open sales comes to.
+     *
+     * Shared by the one-seller and the many-seller paths on purpose. Two
+     * copies of this arithmetic would be two answers to «what does he owe»
+     * the day somebody changed one of them.
+     *
+     * @param  Collection<int, Sale>  $sales
+     */
+    private static function totals($sales): array
+    {
         $cash = round($sales->sum(fn (Sale $s) => $s->cash_held), 2);
         $difference = round($sales->sum(fn (Sale $s) => $s->open_difference), 2);
         $shortfall = round($sales->sum(fn (Sale $s) => $s->open_shortfall), 2);

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Exceptions\InsufficientStockException;
 use App\Models\Concerns\BelongsToBakery;
+use App\Support\CurrentBakery;
 use App\Support\DoughFormula;
 use Illuminate\Database\Eloquent\Model;
 
@@ -90,13 +91,77 @@ class InventoryItem extends Model
         return $this->hasMany(InventoryMovement::class);
     }
 
-    /** Current stock, derived from the movement ledger. */
+    /**
+     * Current stock, derived from the movement ledger.
+     *
+     * Held for the life of this instance once worked out. It is two SUM
+     * queries, and it is read wherever the shop asks «how much is there»
+     * — the answer page alone read it twenty-three times and paid
+     * forty-six queries for the same number.
+     *
+     * Any movement anywhere in the process drops every memo, so a balance
+     * read after one is the new figure — including when the write went
+     * through a different object for the same item, which is what
+     * `StockReversal` does.
+     */
     public function getBalanceAttribute(): float
+    {
+        if ($this->balanceMemo === null || $this->memoTakenAt !== self::$ledgerGeneration) {
+            $this->balanceMemo = $this->countTheLedger();
+            $this->memoTakenAt = self::$ledgerGeneration;
+        }
+
+        return $this->balanceMemo;
+    }
+
+    /**
+     * Bumped by every movement, anywhere.
+     *
+     * The same item exists as more than one object in a request — `ofKey`
+     * hands out one, and an eager-loaded `$movement->item` is another — so
+     * a memo dropped on the object doing the writing left the other one
+     * holding the figure from before. `StockReversal` moves stock through
+     * exactly that second object, and six tests said so: flour put back by
+     * a deleted consignment was still missing when the balance was read
+     * through the first.
+     *
+     * A counter rather than a registry of live objects: any write makes
+     * every memo in the process older than the ledger, and the next read
+     * counts it again.
+     */
+    private static int $ledgerGeneration = 0;
+
+    private ?int $memoTakenAt = null;
+
+    /**
+     * Deliberately not called `$balance`.
+     *
+     * A declared property of that name is read directly by every
+     * `$this->balance` inside this class rather than going through
+     * `__get`, so the accessor above is skipped and the guard in [move]
+     * compares against null instead of the stock on hand. Two hundred and
+     * seventy-eight tests said so.
+     */
+    private ?float $balanceMemo = null;
+
+    private function countTheLedger(): float
     {
         $in = (float) $this->movements()->where('direction', 'in')->sum('quantity');
         $out = (float) $this->movements()->where('direction', 'out')->sum('quantity');
 
         return round($in - $out, 3);
+    }
+
+    /**
+     * Forces the next read of any instance to count the ledger again.
+     *
+     * Called by [move]. Anything that writes `inventory_movements` without
+     * going through it must call this, or it will read a figure from
+     * before its own write.
+     */
+    public static function forgetBalances(): void
+    {
+        self::$ledgerGeneration++;
     }
 
     /**
@@ -209,6 +274,8 @@ class InventoryItem extends Model
             throw new InsufficientStockException($this->name, $this->balance, $quantity, $this->unit);
         }
 
+        self::forgetBalances();
+
         return $this->movements()->create([
             'user_id' => $userId,
             'direction' => $direction,
@@ -220,9 +287,21 @@ class InventoryItem extends Model
         ]);
     }
 
+    /**
+     * Resolved items, by bakery and key — one lookup each, however often
+     * asked. Same shape as [CurrentBakery], and reset the same way.
+     *
+     * Keyed by bakery as well as key, because one request can act as
+     * users of different shops and returning the first answer would hand
+     * one shop another's flour.
+     */
+    private static array $resolved = [];
+
     public static function ofKey(string $key): self
     {
-        return static::firstOrCreate(
+        $cacheKey = CurrentBakery::id().':'.$key;
+
+        return self::$resolved[$cacheKey] ??= static::firstOrCreate(
             ['key' => $key],
             [
                 'name' => self::DEFAULTS[$key] ?? $key,
@@ -230,5 +309,17 @@ class InventoryItem extends Model
                 'bag_weight_kg' => self::DEFAULT_BAG_WEIGHTS[$key] ?? null,
             ]
         );
+    }
+
+    /**
+     * Drops the resolved items.
+     *
+     * Called between tests, where one process runs many shops in turn and
+     * a remembered item would be the previous test's row against the next
+     * test's database.
+     */
+    public static function forgetResolved(): void
+    {
+        self::$resolved = [];
     }
 }

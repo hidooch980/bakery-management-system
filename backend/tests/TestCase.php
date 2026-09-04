@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Models\InventoryItem;
 use App\Support\CurrentBakery;
 use App\Support\Money;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -30,6 +31,11 @@ abstract class TestCase extends BaseTestCase
         // saying Toman — so amounts came back ten times over in a test that
         // had never mentioned Rial.
         Money::forgetCache();
+
+        // Same reason again. The resolved item also carries a remembered
+        // balance, so a stale one would be the previous test's stock read
+        // against this test's ledger.
+        InventoryItem::forgetResolved();
 
         $connection = config('database.default');
         $database = config("database.connections.{$connection}.database");
