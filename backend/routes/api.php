@@ -84,6 +84,15 @@ Route::prefix('v1')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/change-password', [AuthController::class, 'changePassword'])
             ->middleware('permission:change-password');
+
+        // Your own devices, and signing them out. No permission gate: these
+        // read and close nothing but the caller's own sessions, and the
+        // person who needs them most is whoever has just lost a phone —
+        // not necessarily somebody with a role that can do anything else.
+        Route::get('/devices', [AuthController::class, 'devices']);
+        Route::delete('/devices/others', [AuthController::class, 'revokeOtherDevices']);
+        Route::delete('/devices/{token}', [AuthController::class, 'revokeDevice'])
+            ->whereNumber('token');
         Route::get('/bakery', [BakeryController::class, 'show']);
 
         // --- Attendance (all staff) ---

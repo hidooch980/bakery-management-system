@@ -16,8 +16,10 @@ import '../models/settlement_request.dart';
 import '../models/user.dart';
 import '../models/work_start.dart';
 import 'api_client.dart';
+import 'device_name.dart';
 import 'offline_queue.dart';
 import '../models/quota_and_advance.dart';
+import '../models/signed_in_device.dart';
 
 /// Typed wrapper over every endpoint the mobile app uses.
 class BakeryApi {
@@ -34,6 +36,9 @@ class BakeryApi {
     final body = await _client.post('/login', {
       'login': login,
       'password': password,
+      // So the device list has something to call this handset. Read
+      // defensively — a name is a nicety, signing in is not.
+      'device_name': await DeviceName.read(),
     });
 
     final data = body['data'] as Map<String, dynamic>;
@@ -1471,5 +1476,38 @@ class BakeryApi {
     if (data is List) return data.cast<Map<String, dynamic>>();
 
     return const [];
+  }
+
+  // ------------------------------------------------------------- devices
+
+  /// The handsets holding a session for whoever is signed in here.
+  ///
+  /// Not cached. The point of opening this screen is usually that
+  /// something has just changed, and a list read from this morning is the
+  /// one answer worse than no list.
+  Future<List<SignedInDevice>> devices() async {
+    final body = await _client.get('/devices');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return ((data['devices'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(SignedInDevice.fromJson)
+        .toList();
+  }
+
+  /// Signs one handset out. True when it was this one.
+  Future<bool> signOutDevice(int id) async {
+    final body = await _client.delete('/devices/$id');
+
+    return (body['data'] as Map<String, dynamic>?)?['signed_self_out'] == true;
+  }
+
+  /// Signs out everything except the phone in your hand, and says how many.
+  Future<int> signOutOtherDevices() async {
+    final body = await _client.delete('/devices/others');
+
+    return ((body['data'] as Map<String, dynamic>?)?['closed'] as num?)
+            ?.toInt() ??
+        0;
   }
 }
