@@ -37,17 +37,52 @@ jobs:
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           HOST: ${{ secrets.DEPLOY_HOST }}
           HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+          # The same three names read as *variables* rather than secrets.
+          #
+          # «Settings → Secrets and variables → Actions» is one page with
+          # two tabs, and a value put in the wrong one is simply not
+          # there as far as `secrets.` is concerned — with nothing to say
+          # so. The first deploy failed exactly this way, reported as
+          # «not set» to somebody who had just set them.
+          VAR_KEY: ${{ vars.DEPLOY_SSH_KEY }}
+          VAR_HOST: ${{ vars.DEPLOY_HOST }}
+          VAR_HOST_KEY: ${{ vars.DEPLOY_HOST_KEY }}
         run: |
           missing=
           [ -n "$KEY" ] || missing="$missing DEPLOY_SSH_KEY"
           [ -n "$HOST" ] || missing="$missing DEPLOY_HOST"
           [ -n "$HOST_KEY" ] || missing="$missing DEPLOY_HOST_KEY"
 
-          if [ -n "$missing" ]; then
-            echo "::error::این secretها تنظیم نشده‌اند:$missing"
-            echo "راهنمای تنظیم: docs/DEPLOY-FROM-GITHUB.md"
+          [ -z "$missing" ] && exit 0
+
+          echo "::error::این secretها خالی رسیدند:$missing"
+          echo
+
+          if [ -n "$VAR_KEY$VAR_HOST$VAR_HOST_KEY" ]; then
+            echo "پیدا شد — ولی در تب «Variables» ثبت شده، نه «Secrets»."
+            echo "همان صفحه است با دو تب. مقادیر را از Variables پاک کنید"
+            echo "و در «Secrets» دوباره بسازید (New repository secret)."
+            echo
+            echo "و کلید خصوصی حتماً باید Secret باشد: مقدار یک Variable"
+            echo "در لاگ اجرا دیده می‌شود."
             exit 1
           fi
+
+          cat <<'WHY'
+          سه جای معمولِ اشتباه، به ترتیب احتمال:
+
+          ۱. تب اشتباه — «Variables» به‌جای «Secrets».
+          ۲. «Environment secret» به‌جای «Repository secret». این workflow
+             هیچ environmentی اعلام نمی‌کند، پس آن‌ها را نمی‌بیند.
+             در «New repository secret» بسازید، نه زیر یک Environment.
+          ۳. مخزن دیگر — مطمئن شوید در همین مخزن ثبت شده‌اند.
+
+          نام‌ها باید دقیقاً این‌ها باشند، با حروف بزرگ:
+            DEPLOY_SSH_KEY   DEPLOY_HOST   DEPLOY_HOST_KEY
+          WHY
+
+          echo "راهنمای کامل: docs/DEPLOY-FROM-GITHUB.md"
+          exit 1
 
       - name: Set up SSH
         env:

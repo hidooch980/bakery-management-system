@@ -67,6 +67,18 @@ echo '--- DEPLOY_HOST_KEY ---'; ssh-keyscan -t ed25519 localhost 2>/dev/null | s
 اگر یکی از سه‌تای اول یا `DEPLOY_HOST_KEY` جا بیفتد، workflow در همان قدم
 اول با پیام روشن متوقف می‌شود و چیزی روی سرور دست نمی‌خورد.
 
+> **حواستان به این دو باشد** — اولین استقرار دقیقاً به همین دلیل شکست خورد:
+>
+> - آن صفحه **دو تب** دارد: «Secrets» و «Variables». مقدار باید در
+>   **Secrets** باشد. چیزی که در Variables گذاشته شود اصلاً به workflow
+>   نمی‌رسد — و بدتر، مقدارش در لاگ اجرا دیده می‌شود، که برای یک کلید
+>   خصوصی یعنی لو رفتن.
+> - دکمهٔ درست **New repository secret** است، نه ساختن secret زیر یک
+>   Environment. این workflow هیچ environmentی اعلام نمی‌کند، پس
+>   secretهای environment را نمی‌بیند.
+>
+> اگر در Variables گذاشته باشید، workflow خودش تشخیص می‌دهد و می‌گوید.
+
 ---
 
 ## استقرار
@@ -99,7 +111,7 @@ echo '--- DEPLOY_HOST_KEY ---'; ssh-keyscan -t ed25519 localhost 2>/dev/null | s
 
 | پیام | معنی |
 |---|---|
-| `این secretها تنظیم نشده‌اند` | یکی از مقادیر بالا ثبت نشده |
+| `این secretها خالی رسیدند` | تب اشتباه (Variables به‌جای Secrets)، یا Environment secret به‌جای Repository secret، یا نام غلط — خودِ پیام می‌گوید کدام |
 | `Host key verification failed` | کلید سرور عوض شده — **بررسی کنید چرا** پیش از آنکه `DEPLOY_HOST_KEY` را عوض کنید |
 | `Permission denied (publickey)` | کلید در `authorized_keys` سرور نیست |
 | `Connection timed out` | آی‌پی یا پورت اشتباه، یا فایروال |
