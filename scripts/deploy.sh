@@ -21,6 +21,12 @@ APP=${APP:-/home/ubuntu/bakery-management-system}
 BACK=$APP/backend
 LOCK=${LOCK:-/tmp/deploy.lock}
 
+# What to deploy. `main` unless told otherwise — the argument is for
+# putting a known-good tag back when a release turns out to be bad:
+#
+#   bash scripts/deploy.sh v4.88.0
+REF=${1:-main}
+
 exec 9>"$LOCK"
 if ! flock -n 9; then
   echo "یک استقرار در جریان است." >&2
@@ -64,7 +70,34 @@ cd "$APP" || fail "پوشهٔ برنامه پیدا نشد: $APP"
 # put the shop back to.
 WAS=$(git rev-parse HEAD)
 
-git pull -q origin main || fail "git pull ناموفق بود؛ چیزی تغییر نکرد."
+# Nothing is pulled over uncommitted work. A `git pull` onto a dirty
+# tree either fails half way or quietly merges around the change, and
+# this directory is edited by hand when something is being chased down
+# at the oven. Say so and stop, rather than deciding for them.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo
+  git status --short
+  fail "پوشهٔ کار روی سرور تغییرات ثبت‌نشده دارد. اول تکلیف آن‌ها را روشن کنید."
+fi
+
+git fetch -q origin "$REF" || fail "«$REF» از origin گرفته نشد؛ چیزی تغییر نکرد."
+
+if [ "$REF" = main ]; then
+  # Fast-forward only. A plain `pull` would build a merge commit out of
+  # whatever had diverged on the server, and the shop would then be
+  # running code that exists nowhere else.
+  git merge -q --ff-only FETCH_HEAD \
+    || fail "main روی سرور از origin جدا شده. با دست بررسی کنید."
+else
+  # A tag, for putting a known-good version back. Detached on purpose:
+  # this is a checkout of one exact release, not a branch to carry on
+  # from.
+  git checkout -q --detach FETCH_HEAD \
+    || fail "checkout «$REF» ناموفق بود."
+  echo "    ⚠ سرور روی «$REF» است، نه main."
+  echo "      برای برگشتن: git checkout main"
+fi
+
 git log --oneline -1
 
 say "۲/۶  وابستگی‌ها"
@@ -116,7 +149,7 @@ else
     # against it is far closer to correct than serving the new.
     echo
     echo "    !!! مهاجرت شکست خورد — کد به $WAS برمی‌گردد" >&2
-    cd "$APP" && git reset -q --hard "$WAS"
+    cd "$APP" && git checkout -q --detach "$WAS" && git reset -q --hard "$WAS"
     cd "$BACK" || true
     artisan config:cache -q || true
     artisan route:cache -q || true

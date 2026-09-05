@@ -117,14 +117,25 @@ STUB
   # `git pull origin main` has no remote here. A wrapper makes it a
   # commit instead, so the script really does move forward and really can
   # be reset back.
+  # `fetch` has no remote here, so it becomes «make a commit and point
+  # FETCH_HEAD at it» — after which the script's own merge and checkout
+  # are the real thing, against a real repository.
   cat > "$BIN/git" <<STUB
 #!/usr/bin/env bash
-if [ "\$1" = pull ]; then
+GIT=$(command -v git)
+if [ "\$1" = fetch ]; then
+  cur=\$("\$GIT" -C "$WORLD/app" rev-parse --abbrev-ref HEAD)
+  "\$GIT" -C "$WORLD/app" checkout -q -B __incoming
   echo two > "$WORLD/app/file"
-  $(command -v git) -C "$WORLD/app" commit -qam two
+  "\$GIT" -C "$WORLD/app" commit -qam two
+  # Real git writes «<sha>\t\tbranch 'x' of <url>» here, and `git merge
+  # FETCH_HEAD` will not read a bare sha.
+  printf '%s\t\tbranch '"'"'main'"'"' of origin\n' \
+    "\$("\$GIT" -C "$WORLD/app" rev-parse HEAD)" > "$WORLD/app/.git/FETCH_HEAD"
+  "\$GIT" -C "$WORLD/app" checkout -q "\$cur"
   exit 0
 fi
-exec $(command -v git) "\$@"
+exec "\$GIT" "\$@"
 STUB
   chmod +x "$BIN/git"
 }
@@ -183,6 +194,34 @@ echo "=== پنل خطا می‌دهد ==="
 build_world
 PENDING=0 PANEL_CODE=500 && OUT=$(run_deploy); CODE=$?
 check "استقرار شکست خورد" "$CODE" 1
+rm -rf "$WORLD"
+
+echo
+echo "=== پوشهٔ کار کثیف است: چیزی روی کار دست‌نویس کشیده نمی‌شود ==="
+build_world
+echo "دست‌نویس" >> "$WORLD/app/file"
+PENDING=0 && OUT=$(run_deploy); CODE=$?
+check "استقرار شکست خورد" "$CODE" 1
+contains "علتش را می‌گوید" "$OUT" "تغییرات ثبت‌نشده"
+# The point: it stopped before touching anything, so the hand-edit and
+# the running code are both still there.
+check "چیزی نصب نشد" "$(grep -c composer "$LOG")" 0
+check "کشی ساخته نشد" "$(grep -c 'config:cache' "$LOG")" 0
+rm -rf "$WORLD"
+
+echo
+echo "=== برگرداندن به یک تگ: سرور روی همان تگ می‌ایستد ==="
+build_world
+# A release that turned out bad, put back to the last good one. The
+# workflow's «ref» input is only worth having if the script honours it —
+# it deployed main whatever it was told, and the rollback documented in
+# docs/DEPLOY-FROM-GITHUB.md would silently have redeployed the bad code.
+PENDING=0 && OUT=$( export PATH="$BIN:$PATH" APP="$WORLD/app" LOG="$LOG" \
+      LOCK="$WORLD/lock" PENDING=0 MIGRATE=0 HEALTH="" PANEL_CODE=200
+    bash "$ROOT/scripts/deploy.sh" v4.88.0 2>&1 ); CODE=$?
+check "استقرار موفق" "$CODE" 0
+contains "می‌گوید روی main نیست" "$OUT" "نه main"
+check "از main جدا شد" "$(git -C "$WORLD/app" rev-parse --abbrev-ref HEAD)" "HEAD"
 rm -rf "$WORLD"
 
 echo

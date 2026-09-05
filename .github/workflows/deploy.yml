@@ -1,0 +1,133 @@
+name: Deploy
+
+# Updating the live shop, from here instead of from somebody's laptop.
+#
+# The deploy has always been a person opening a terminal, and every time
+# that person was unavailable the shop simply ran old code — a phone
+# release would land with the server still on the previous version, and
+# the new screens came up empty because the fields they read were not
+# being sent yet.
+#
+# Manual on purpose. This is a working bakery: nobody wants a merge at
+# four in the afternoon restarting php-fpm in the middle of the day's
+# sales. Somebody decides when, and this does the typing.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'شاخه یا تگی که مستقر شود (پیش‌فرض: main)'
+        required: false
+        default: 'main'
+
+# Two deploys at once would fight over composer and the caches.
+# `scripts/deploy.sh` also takes a lock on the server itself, which
+# covers the case of somebody deploying by hand at the same time.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: استقرار روی سرور
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check the secrets are set
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          missing=
+          [ -n "$KEY" ] || missing="$missing DEPLOY_SSH_KEY"
+          [ -n "$HOST" ] || missing="$missing DEPLOY_HOST"
+          [ -n "$HOST_KEY" ] || missing="$missing DEPLOY_HOST_KEY"
+
+          if [ -n "$missing" ]; then
+            echo "::error::این secretها تنظیم نشده‌اند:$missing"
+            echo "راهنمای تنظیم: docs/DEPLOY-FROM-GITHUB.md"
+            exit 1
+          fi
+
+      - name: Set up SSH
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          # The server's own public key, pinned. Without it the first
+          # connection would trust whatever answered — and this session
+          # carries a key that can restart the shop, so «whatever
+          # answered» is not good enough. A changed host key fails the
+          # deploy rather than being accepted quietly.
+          HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          printf '%s\n' "$HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          # Proves the key and the host both work before anything is
+          # changed, so a bad secret fails here rather than half way
+          # through a deploy.
+          ssh -i ~/.ssh/deploy_key \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=20 \
+              -p "${{ secrets.DEPLOY_PORT || 22 }}" \
+              "${{ secrets.DEPLOY_USER || 'ubuntu' }}@$HOST" \
+              'echo "اتصال برقرار شد: $(hostname)"'
+
+      - name: Run the deploy
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          REF: ${{ inputs.ref || 'main' }}
+        run: |
+          # The script lives on the server and updates itself in its own
+          # first step. It refuses to pull over uncommitted work, applies
+          # pending migrations behind `artisan down`, rebuilds the
+          # caches, reloads php-fpm and nginx, and exits non-zero if the
+          # shop does not come back. That exit code is what fails this
+          # job.
+          #
+          # The ref is passed to it rather than acted on here: deciding
+          # what to check out in two places is how they come to disagree.
+          #
+          # First run after this lands is the exception — the server
+          # still has the previous script, which takes no argument and
+          # deploys main whatever it is given.
+          case "$REF" in
+            ''|*[!A-Za-z0-9._/-]*)
+              echo "::error::ref نامعتبر: '$REF'"; exit 1 ;;
+          esac
+
+          ssh -i ~/.ssh/deploy_key \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=20 \
+              -o ServerAliveInterval=30 \
+              -p "${{ secrets.DEPLOY_PORT || 22 }}" \
+              "${{ secrets.DEPLOY_USER || 'ubuntu' }}@$HOST" \
+              "cd /home/ubuntu/bakery-management-system && bash scripts/deploy.sh '$REF'"
+
+      - name: Say what is live
+        if: always()
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          # Runs even when the deploy failed, because «what is the shop
+          # actually running now» is the first thing anybody asks after a
+          # failure, and the rollback in deploy.sh means the answer is
+          # not always obvious.
+          ssh -i ~/.ssh/deploy_key \
+              -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+              -p "${{ secrets.DEPLOY_PORT || 22 }}" \
+              "${{ secrets.DEPLOY_USER || 'ubuntu' }}@$HOST" \
+              'cd /home/ubuntu/bakery-management-system && git log --oneline -1' \
+            || echo "نتوانستم نسخهٔ فعلی را بخوانم."
+
+      - name: Forget the key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
