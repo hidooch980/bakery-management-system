@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
@@ -19,7 +20,7 @@ use Illuminate\Support\Carbon;
  */
 class DieselAllocation extends Model
 {
-    use BelongsToBakery;
+    use BelongsToBakery, RecordsAudit;
 
     protected $fillable = [
         'month_start',
@@ -295,5 +296,16 @@ class DieselAllocation extends Model
     public static function current(): ?self
     {
         return static::forDate(now());
+    }
+
+    /**
+     * How this row names itself in the trail.
+     *
+     * The log outlives the record: once the row is gone its id points at
+     * nothing, and this sentence is all that is left to argue from.
+     */
+    public function auditSubject(): ?string
+    {
+        return 'سهمیهٔ گازوئیل '.($this->month_label ?? '');
     }
 }

@@ -2,6 +2,7 @@
 
 use App\Exceptions\AlreadyClaimedException;
 use App\Exceptions\InsufficientStockException;
+use App\Http\Middleware\EndsInactiveSessions;
 use App\Http\Middleware\IdempotentWrites;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\AuthenticationException;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
+            'active' => EndsInactiveSessions::class,
             'idempotent' => IdempotentWrites::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,

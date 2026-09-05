@@ -4,8 +4,12 @@ namespace App\Support;
 
 use App\Models\ChaneEntry;
 use App\Models\DoughEntry;
+use App\Models\Expense;
+use App\Models\FlourSale;
+use App\Models\Income;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
+use App\Models\SalaryPayment;
 use App\Models\Sale;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -22,11 +26,37 @@ class ReportSeries
     /** Money in and money out, bucket by bucket. */
     public static function financial(Carbon $from, Carbon $to, string $granularity): Collection
     {
+        // Five questions asked once each over the whole range, rather than
+        // once per bucket. The window was the only thing that changed
+        // between them, and a month of days paid a hundred and fifty
+        // queries for that.
+        $bread = Ledger::dailySums(Sale::query(), 'created_at', 'amount', $from, $to);
+        $flourSold = Ledger::dailySums(FlourSale::query(), 'sold_on', 'amount', $from, $to);
+        $other = Ledger::dailySums(Income::query(), 'received_on', 'amount', $from, $to);
+        $spent = Ledger::dailySums(Expense::query(), 'spent_on', 'amount', $from, $to);
+        $wages = Ledger::dailySums(SalaryPayment::paid(), 'paid_on', 'net_amount', $from, $to);
+
         return collect(PeriodBuckets::build($from, $to, $granularity))
-            ->map(function (array $bucket) {
-                $income = Ledger::incomeBreakdown($bucket['from'], $bucket['to']);
-                $recorded = Ledger::recordedExpenses($bucket['from'], $bucket['to']);
-                $salaries = Ledger::paidSalaries($bucket['from'], $bucket['to']);
+            ->map(function (array $bucket) use ($bread, $flourSold, $other, $spent, $wages) {
+                $from = $bucket['from'];
+                $to = $bucket['to'];
+
+                // Rounded per figure and then combined, in the same order
+                // `incomeBreakdown` did it. Adding first and rounding once
+                // would be a different number in the last rial, and the
+                // point of this change is that it is not.
+                $income = [
+                    'bread' => Ledger::sumDays($bread, $from, $to),
+                    'flour' => Ledger::sumDays($flourSold, $from, $to),
+                    'other' => Ledger::sumDays($other, $from, $to),
+                ];
+                $income['total'] = round(
+                    $income['bread'] + $income['flour'] + $income['other'],
+                    2,
+                );
+
+                $recorded = Ledger::sumDays($spent, $from, $to);
+                $salaries = Ledger::sumDays($wages, $from, $to);
                 $expense = round($recorded + $salaries, 2);
                 $profit = round($income['total'] - $expense, 2);
 
@@ -115,30 +145,42 @@ class ReportSeries
     {
         $formula = DoughFormula::fromBakery();
 
-        return collect(PeriodBuckets::build($from, $to, $granularity))
-            ->map(function (array $bucket) use ($formula) {
-                $window = [$bucket['from'], $bucket['to']];
+        // Seven questions asked once each over the whole range. Per bucket
+        // this was the heaviest part of the page: a month of days ran
+        // sixty-two sums over `dough_entries` alone.
+        $batches = Ledger::dailyCounts(DoughEntry::query(), 'created_at', $from, $to);
+        $sacks = Ledger::dailySums(DoughEntry::query(), 'created_at', 'bag_count', $from, $to);
+        $chaneCount = Ledger::dailySums(ChaneEntry::query(), 'created_at', 'chane_count', $from, $to);
+        $chaneWeight = Ledger::dailySums(ChaneEntry::query(), 'created_at', 'normal_weight_kg', $from, $to);
+        $naninoWeightDaily = Ledger::dailySums(ChaneEntry::query(), 'created_at', 'nanino_weight_kg', $from, $to);
+        $loaves = Ledger::dailySums(Sale::query(), 'created_at', 'bread_count', $from, $to);
+        $takings = Ledger::dailySums(Sale::query(), 'created_at', 'amount', $from, $to);
 
-                $chane = ChaneEntry::whereBetween('created_at', $window);
-                $normalCount = (int) $chane->clone()->sum('chane_count');
-                $naninoWeight = (float) $chane->clone()->sum('nanino_weight_kg');
-                $naninoCount = $formula->naninoCountForWeight($naninoWeight);
-                $sales = Sale::whereBetween('created_at', $window);
+        return collect(PeriodBuckets::build($from, $to, $granularity))
+            ->map(function (array $bucket) use (
+                $formula, $batches, $sacks, $chaneCount, $chaneWeight,
+                $naninoWeightDaily, $loaves, $takings,
+            ) {
+                $from = $bucket['from'];
+                $to = $bucket['to'];
+
+                $naninoWeight = Ledger::sumDays($naninoWeightDaily, $from, $to);
+                $amount = Ledger::sumDays($takings, $from, $to);
 
                 return [
                     'key' => $bucket['key'],
                     'label' => $bucket['label'],
                     'from' => $bucket['from']->toDateString(),
                     'to' => $bucket['to']->toDateString(),
-                    'dough_entries' => DoughEntry::whereBetween('created_at', $window)->count(),
-                    'bags_kneaded' => (float) DoughEntry::whereBetween('created_at', $window)->sum('bag_count'),
-                    'normal_chane_count' => $normalCount,
-                    'nanino_chane_count' => $naninoCount,
-                    'normal_weight_kg' => round((float) $chane->clone()->sum('normal_weight_kg'), 2),
+                    'dough_entries' => (int) Ledger::sumDays($batches, $from, $to),
+                    'bags_kneaded' => Ledger::sumDays($sacks, $from, $to),
+                    'normal_chane_count' => (int) Ledger::sumDays($chaneCount, $from, $to),
+                    'nanino_chane_count' => $formula->naninoCountForWeight($naninoWeight),
+                    'normal_weight_kg' => Ledger::sumDays($chaneWeight, $from, $to),
                     'nanino_weight_kg' => round($naninoWeight, 2),
-                    'bread_sold' => (int) $sales->clone()->sum('bread_count'),
-                    'sales_amount' => round((float) $sales->clone()->sum('amount'), 2),
-                    'sales_amount_formatted' => Money::format($sales->clone()->sum('amount')),
+                    'bread_sold' => (int) Ledger::sumDays($loaves, $from, $to),
+                    'sales_amount' => $amount,
+                    'sales_amount_formatted' => Money::format($amount),
                 ];
             })
             ->values();

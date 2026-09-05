@@ -78,12 +78,24 @@ Route::prefix('v1')->group(function () {
     // needs to know who is asking, and group middleware runs before
     // sanctum has resolved the user. It is a no-op unless the client
     // sends an Idempotency-Key, so older app versions are unaffected.
-    Route::middleware(['auth:sanctum', 'idempotent'])->group(function () {
+    // `active` runs after sanctum has resolved the user and before
+    // anything reads or writes: an account switched off must stop working
+    // on the next request, not at the next sign-in it never makes.
+    Route::middleware(['auth:sanctum', 'active', 'idempotent'])->group(function () {
         // --- Available to every authenticated user ---
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::post('/change-password', [AuthController::class, 'changePassword'])
             ->middleware('permission:change-password');
+
+        // Your own devices, and signing them out. No permission gate: these
+        // read and close nothing but the caller's own sessions, and the
+        // person who needs them most is whoever has just lost a phone —
+        // not necessarily somebody with a role that can do anything else.
+        Route::get('/devices', [AuthController::class, 'devices']);
+        Route::delete('/devices/others', [AuthController::class, 'revokeOtherDevices']);
+        Route::delete('/devices/{token}', [AuthController::class, 'revokeDevice'])
+            ->whereNumber('token');
         Route::get('/bakery', [BakeryController::class, 'show']);
 
         // --- Attendance (all staff) ---

@@ -16,8 +16,10 @@ import '../models/settlement_request.dart';
 import '../models/user.dart';
 import '../models/work_start.dart';
 import 'api_client.dart';
+import 'device_name.dart';
 import 'offline_queue.dart';
 import '../models/quota_and_advance.dart';
+import '../models/signed_in_device.dart';
 
 /// Typed wrapper over every endpoint the mobile app uses.
 class BakeryApi {
@@ -34,6 +36,9 @@ class BakeryApi {
     final body = await _client.post('/login', {
       'login': login,
       'password': password,
+      // So the device list has something to call this handset. Read
+      // defensively — a name is a nicety, signing in is not.
+      'device_name': await DeviceName.read(),
     });
 
     final data = body['data'] as Map<String, dynamic>;
@@ -1159,19 +1164,35 @@ class BakeryApi {
 
   /// Records a tanker. The warning comes back set when it took the month
   /// past its quota, so it can be said while the driver is still there.
-  Future<({DieselQuota? quota, String? warning})> recordDieselDelivery({
+  ///
+  /// Queued when there is no signal, like the warehouse intake it is: the
+  /// tanker is at the gate, the docket is in hand, and the yard is the one
+  /// corner of this shop where the phone reliably has nothing. What the
+  /// queue cannot carry is the warning — whether this load took the month
+  /// past its quota is the server's arithmetic over every other delivery,
+  /// so offline it comes back null and is only known once it syncs.
+  Future<({DieselQuota? quota, String? warning, bool queued})>
+      recordDieselDelivery({
     required double litres,
     double? amount,
     String? docketNumber,
     String? note,
   }) async {
-    final body = await _client.post('/diesel/deliveries', {
-      'litres': litres,
-      if (amount != null) 'amount': amount,
-      if (docketNumber != null && docketNumber.isNotEmpty)
-        'docket_number': docketNumber,
-      if (note != null && note.isNotEmpty) 'note': note,
-    });
+    final body = await _client.postOrQueue(
+      '/diesel/deliveries',
+      {
+        'litres': litres,
+        if (amount != null) 'amount': amount,
+        if (docketNumber != null && docketNumber.isNotEmpty)
+          'docket_number': docketNumber,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+      label: 'تحویل گازوئیل — $litres لیتر',
+    );
+
+    if (body['queued'] == true) {
+      return (quota: null, warning: null, queued: true);
+    }
 
     final data = body['data'] as Map<String, dynamic>;
     final allocation = data['allocation'] as Map<String, dynamic>?;
@@ -1179,6 +1200,7 @@ class BakeryApi {
     return (
       quota: allocation == null ? null : DieselQuota.fromJson(allocation),
       warning: data['warning'] as String?,
+      queued: false,
     );
   }
 
@@ -1347,7 +1369,13 @@ class BakeryApi {
   /// [supplierName] opens an account under that name when the mill is not
   /// in the list yet — standing at a lorry is not the moment to be sent to
   /// another screen first.
-  Future<Purchase> recordPurchase({
+  ///
+  /// Queued when there is no signal. This is the screen somebody stands at
+  /// a lorry to fill in, and «ثبت نشد، دوباره امتحان کنید» there means a
+  /// paper docket and a promise to type it in later — which is how a
+  /// delivery ends up in nobody's records. The sacks are counted at the
+  /// door either way, so the write waits rather than being refused.
+  Future<({Purchase? purchase, bool queued})> recordPurchase({
     required List<PurchaseLineDraft> lines,
     int? supplierId,
     String? supplierName,
@@ -1358,21 +1386,44 @@ class BakeryApi {
     bool paidInCash = false,
     String? note,
   }) async {
-    final body = await _client.post('/purchases', {
-      if (supplierId != null) 'supplier_id': supplierId,
-      if (supplierId == null && supplierName != null)
-        'supplier_name': supplierName,
-      if (invoiceNo != null && invoiceNo.isNotEmpty) 'invoice_no': invoiceNo,
-      if (purchasedOn != null && purchasedOn.isNotEmpty)
-        'purchased_on': purchasedOn,
-      if (paidAmount != null) 'paid_amount': paidAmount,
-      if (bankAccountId != null) 'bank_account_id': bankAccountId,
-      if (paidInCash) 'paid_in_cash': true,
-      if (note != null && note.isNotEmpty) 'note': note,
-      'items': lines.map((line) => line.toJson()).toList(),
-    });
+    final body = await _client.postOrQueue(
+      '/purchases',
+      {
+        if (supplierId != null) 'supplier_id': supplierId,
+        if (supplierId == null && supplierName != null)
+          'supplier_name': supplierName,
+        if (invoiceNo != null && invoiceNo.isNotEmpty) 'invoice_no': invoiceNo,
+        if (purchasedOn != null && purchasedOn.isNotEmpty)
+          'purchased_on': purchasedOn,
+        if (paidAmount != null) 'paid_amount': paidAmount,
+        if (bankAccountId != null) 'bank_account_id': bankAccountId,
+        if (paidInCash) 'paid_in_cash': true,
+        if (note != null && note.isNotEmpty) 'note': note,
+        'items': lines.map((line) => line.toJson()).toList(),
+      },
+      label: 'فاکتور خرید — ${_purchaseLabel(supplierName, invoiceNo)}',
+    );
 
-    return Purchase.fromJson(body['data'] as Map<String, dynamic>);
+    if (body['queued'] == true) {
+      return (purchase: null, queued: true);
+    }
+
+    return (
+      purchase: Purchase.fromJson(body['data'] as Map<String, dynamic>),
+      queued: false,
+    );
+  }
+
+  /// Names a queued invoice by the mill, or by its number when the mill is
+  /// one already on file and only its id was sent.
+  static String _purchaseLabel(String? supplierName, String? invoiceNo) {
+    final name = supplierName?.trim() ?? '';
+
+    if (name.isNotEmpty) return name;
+
+    final number = invoiceNo?.trim() ?? '';
+
+    return number.isEmpty ? 'بدون نام' : 'فاکتور $number';
   }
 
   /// What this person has written down. Their own, not the shop's.
@@ -1425,5 +1476,38 @@ class BakeryApi {
     if (data is List) return data.cast<Map<String, dynamic>>();
 
     return const [];
+  }
+
+  // ------------------------------------------------------------- devices
+
+  /// The handsets holding a session for whoever is signed in here.
+  ///
+  /// Not cached. The point of opening this screen is usually that
+  /// something has just changed, and a list read from this morning is the
+  /// one answer worse than no list.
+  Future<List<SignedInDevice>> devices() async {
+    final body = await _client.get('/devices');
+    final data = body['data'] as Map<String, dynamic>;
+
+    return ((data['devices'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(SignedInDevice.fromJson)
+        .toList();
+  }
+
+  /// Signs one handset out. True when it was this one.
+  Future<bool> signOutDevice(int id) async {
+    final body = await _client.delete('/devices/$id');
+
+    return (body['data'] as Map<String, dynamic>?)?['signed_self_out'] == true;
+  }
+
+  /// Signs out everything except the phone in your hand, and says how many.
+  Future<int> signOutOtherDevices() async {
+    final body = await _client.delete('/devices/others');
+
+    return ((body['data'] as Map<String, dynamic>?)?['closed'] as num?)
+            ?.toInt() ??
+        0;
   }
 }

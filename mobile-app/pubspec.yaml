@@ -42,6 +42,17 @@ dependencies:
   local_auth: ^3.0.2
   connectivity_plus: ^7.3.0
   uuid: ^4.6.0
+  # The phone's own database. SQLCipher rather than plain sqflite: what
+  # lives in it is unsent sales and, in time, the read cache — amounts,
+  # customers, wages — and a plain sqlite file in the app's data directory
+  # is readable on a rooted or seized handset. That is the same reason the
+  # queue was moved off SharedPreferences in the first place, and a move
+  # into an unencrypted database would have quietly undone it.
+  #
+  # The key is minted once per install and kept in flutter_secure_storage.
+  sqflite_sqlcipher: ^3.4.1
+  path: ^1.9.1
+  sqflite_common: ^2.5.11
 
 dev_dependencies:
   flutter_test:
@@ -49,6 +60,9 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.4
   local_auth_platform_interface: ^1.1.0
+  # Backs the local database in tests: SQLCipher has no plugin on the Dart
+  # VM. See test/flutter_test_config.dart.
+  sqflite_common_ffi: ^2.4.2+1
 
 # Generates every Android density from the bakery loaf artwork, replacing
 # the default Flutter logo.

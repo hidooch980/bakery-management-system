@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use App\Support\DoughFormula;
 use App\Support\StockLedger;
 use App\Support\StockReversal;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ConsignmentFlour extends Model
 {
-    use BelongsToBakery;
+    use BelongsToBakery, RecordsAudit;
 
     // "Flour" is uncountable, so Laravel would guess `consignment_flour`.
     protected $table = 'consignment_flours';
@@ -206,5 +207,16 @@ class ConsignmentFlour extends Model
     public function getDirectionLabelAttribute(): string
     {
         return self::DIRECTIONS[$this->direction] ?? $this->direction;
+    }
+
+    /**
+     * How this row names itself in the trail.
+     *
+     * The log outlives the record: once the row is gone its id points at
+     * nothing, and this sentence is all that is left to argue from.
+     */
+    public function auditSubject(): ?string
+    {
+        return 'آرد امانی '.$this->partner_label.' — '.$this->bags.' کیسه';
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PasswordResetCode;
 use App\Models\User;
 use App\Rules\NotAGuessablePassword;
+use App\Support\Jalali;
 use App\Support\Sms;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +33,10 @@ class AuthController extends Controller
         $data = $request->validate([
             'login' => ['required', 'string'],
             'password' => ['required', 'string'],
+            // Optional, so an older build that does not send it still logs
+            // in. What it costs when it is missing is the device list being
+            // three rows all called «دستگاه ناشناس».
+            'device_name' => ['sometimes', 'nullable', 'string', 'max:60'],
         ]);
 
         $user = User::where('email', $data['login'])
@@ -50,7 +55,9 @@ class AuthController extends Controller
 
         $user->forceFill(['last_login_at' => now()])->save();
         $this->closeOldestSessions($user);
-        $token = $user->createToken('mobile-app')->plainTextToken;
+        $token = $user->createToken(
+            self::deviceName($data['device_name'] ?? null),
+        )->plainTextToken;
 
         return $this->success([
             'token' => $token,
@@ -246,6 +253,108 @@ class AuthController extends Controller
      * A password change or reset still closes every session; those are
      * deliberate and are left alone.
      */
+    /**
+     * The devices holding a session for whoever is asking.
+     *
+     * Written because there was no way to answer «گوشی‌ام گم شده» except by
+     * deactivating the person who lost it, which stops them working. The
+     * three ways a session ended before this — changing a password,
+     * resetting one, an admin switching the account off — are all the side
+     * effect of doing something else, and two of the three cost more than
+     * the problem.
+     */
+    public function devices(Request $request): JsonResponse
+    {
+        $current = $request->user()->currentAccessToken();
+
+        $devices = $request->user()->tokens()
+            ->orderByDesc('last_used_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($token) => [
+                'id' => $token->id,
+                'name' => $token->name,
+                // The phone in your hand, so the list can say so rather
+                // than inviting somebody to sign themselves out by accident
+                // while standing at the till.
+                'is_current' => $current !== null && $token->id === $current->id,
+                'last_used_at' => Jalali::dateTime($token->last_used_at),
+                // Null, not «هرگز»: a token minted a minute ago has not been
+                // used yet, and the screen decides how to say that.
+                'created_at' => Jalali::dateTime($token->created_at),
+            ]);
+
+        return $this->success([
+            'devices' => $devices,
+            'max' => self::MAX_SESSIONS,
+        ]);
+    }
+
+    /**
+     * Signs one device out, named by the row in that list.
+     *
+     * Scoped to the caller's own tokens on purpose: `$user->tokens()` and
+     * not `PersonalAccessToken::find()`, so an id belonging to somebody
+     * else is a 404 and not somebody else's session ending.
+     */
+    public function revokeDevice(Request $request, int $token): JsonResponse
+    {
+        $row = $request->user()->tokens()->whereKey($token)->first();
+
+        if ($row === null) {
+            return $this->error('این دستگاه پیدا نشد.', 404);
+        }
+
+        $wasCurrent = $request->user()->currentAccessToken()?->id === $row->id;
+
+        $row->delete();
+
+        return $this->success(
+            ['signed_self_out' => $wasCurrent],
+            $wasCurrent
+                ? 'از این دستگاه خارج شدید.'
+                : 'آن دستگاه خارج شد.',
+        );
+    }
+
+    /**
+     * Everything except the phone asking.
+     *
+     * The answer to a lost handset when its owner cannot say which row in
+     * the list it is — which, standing in a shop having just realised, is
+     * most of the time.
+     */
+    public function revokeOtherDevices(Request $request): JsonResponse
+    {
+        $current = $request->user()->currentAccessToken();
+
+        $closed = $request->user()->tokens()
+            ->when($current !== null, fn ($q) => $q->whereKeyNot($current->id))
+            ->delete();
+
+        return $this->success(
+            ['closed' => $closed],
+            $closed === 0
+                ? 'دستگاه دیگری وارد نبود.'
+                : 'بقیهٔ دستگاه‌ها خارج شدند.',
+        );
+    }
+
+    /**
+     * What to write on the token.
+     *
+     * Trimmed and collapsed rather than rejected: this arrives from
+     * `device_info_plus`, and a manufacturer that pads its model name with
+     * whitespace should not cost somebody a login. An empty or missing one
+     * keeps the name every token carried before this existed.
+     */
+    private static function deviceName(?string $sent): string
+    {
+        $name = trim(preg_replace('/\s+/u', ' ', $sent ?? ''));
+
+        return $name === '' ? 'mobile-app' : mb_substr($name, 0, 60);
+    }
+
     private function closeOldestSessions(User $user): void
     {
         $keep = $user->tokens()

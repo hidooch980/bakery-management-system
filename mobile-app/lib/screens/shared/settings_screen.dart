@@ -8,6 +8,7 @@ import '../../widgets/biometric_tile.dart';
 import '../admin/backup_screen.dart';
 import 'change_password_screen.dart';
 import 'my_advances_screen.dart';
+import 'my_devices_screen.dart';
 import 'update_screen.dart';
 import '../../theme/app_theme.dart';
 
@@ -150,6 +151,24 @@ class SettingsScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const ChangePasswordScreen(),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Every role, and above the rest of the list on purpose:
+                  // whoever has just lost a phone is not necessarily
+                  // somebody with a role that can do anything else here.
+                  ListTile(
+                    leading: const Icon(Icons.devices_rounded),
+                    title: const Text('دستگاه‌های من'),
+                    subtitle: const Text('خروج از گوشی گم‌شده'),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MyDevicesScreen(
+                          api: context.read<BakeryApi>(),
+                        ),
                       ),
                     ),
                   ),

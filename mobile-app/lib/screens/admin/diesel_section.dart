@@ -53,10 +53,16 @@ class _DieselSectionState extends State<DieselSection> {
 
       if (!mounted) return;
 
+      // Offline there is no warning to give: whether this tanker took the
+      // month past its quota is counted on the server against every other
+      // delivery. Saying «از سهمیه نگذشت» here would be a guess, so the
+      // message says only what is true — it is saved, not yet sent.
       showMessage(
         context,
-        outcome.warning ?? 'تحویل ثبت شد.',
-        isError: outcome.warning != null,
+        outcome.queued
+            ? 'بدون اینترنت ذخیره شد — با وصل‌شدن ارسال می‌شود.'
+            : outcome.warning ?? 'تحویل ثبت شد.',
+        isError: outcome.warning != null && !outcome.queued,
       );
       _reload();
     } on ApiException catch (e) {

@@ -87,15 +87,35 @@ jobs:
           # Strip the leading "v" so it can be written into pubspec.yaml.
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Sync pubspec version with the release tag
-        if: steps.config.outputs.version != ''
+      - name: Stamp the version this build carries
         working-directory: mobile-app
         run: |
-          # The in-app updater compares this against the GitHub release tag.
-          # Offset past the abi*1000 codes the withdrawn per-ABI builds used
-          # (up to 3000+), so phones holding one can still be updated.
+          # Two halves, and only one of them depends on there being a tag.
+          #
+          # The build number is the versionCode Android installs by, and it
+          # must rise with every build this workflow publishes. It used to
+          # be set only when a release tag was given, so an untagged run
+          # left `pubspec.yaml` at its checked-in `+1` and produced an APK
+          # with versionCode 1 — which no phone holding a real release can
+          # install, because Android reads a lower code as a downgrade and
+          # refuses it. Nothing said so: the build was green, the artifact
+          # was there, and the failure appeared as «برنامه نصب نشد» on a
+          # handset with no reason given.
+          #
+          # Offset past the abi*1000 codes the withdrawn per-ABI builds
+          # used (up to 3000+), so phones still holding one can be updated.
           BUILD_NUMBER=$(( 10000 + ${{ github.run_number }} ))
-          sed -i "s/^version: .*/version: ${{ steps.config.outputs.version }}+$BUILD_NUMBER/" pubspec.yaml
+
+          # The version name is what the in-app updater compares against
+          # the GitHub release tag, so it is the tag when there is one, and
+          # otherwise whatever the repository already says. A build with no
+          # tag is not a release and must not claim a release's name.
+          NAME="${{ steps.config.outputs.version }}"
+          if [ -z "$NAME" ]; then
+            NAME=$(grep '^version:' pubspec.yaml | sed 's/^version: *//' | cut -d+ -f1)
+          fi
+
+          sed -i "s/^version: .*/version: $NAME+$BUILD_NUMBER/" pubspec.yaml
           grep '^version:' pubspec.yaml
 
       - name: Restore release keystore
@@ -175,6 +195,26 @@ jobs:
             --dart-define=UPDATE_REPO=${{ github.repository }}
 
           echo "APK size: $(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)"
+
+      - name: Verify the APK can actually be installed over a release
+        working-directory: mobile-app
+        run: |
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -1)
+          CODE=$("$AAPT2" dump badging build/app/outputs/flutter-apk/app-release.apk \
+            | grep -oE "versionCode='[0-9]+'" | grep -oE '[0-9]+')
+
+          echo "versionCode=$CODE"
+
+          # The floor the stamping step guarantees. Below it, Android reads
+          # the APK as a downgrade of anything already on a staff phone and
+          # refuses to install it — with no reason shown on the handset.
+          # This is checked here rather than trusted, because the symptom
+          # appears at the far end of the chain: a green build, an artifact
+          # that looks fine, and «برنامه نصب نشد» on a phone in the shop.
+          if [ -z "$CODE" ] || [ "$CODE" -le 10000 ]; then
+            echo "::error::versionCode $CODE is at or below the 10000 floor — this APK cannot be installed over an existing release."
+            exit 1
+          fi
 
       - name: Verify the APK is signed with the release key
         working-directory: mobile-app

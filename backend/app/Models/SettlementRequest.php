@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\RecordsAudit;
 use App\Support\AppCalendar;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class SettlementRequest extends Model
 {
-    use BelongsToBakery;
+    use BelongsToBakery, RecordsAudit;
 
     protected $fillable = [
         'user_id',
@@ -109,5 +110,16 @@ class SettlementRequest extends Model
     public function getRequestedOnDisplayAttribute(): ?string
     {
         return $this->created_at ? AppCalendar::dateTime($this->created_at) : null;
+    }
+
+    /**
+     * How this row names itself in the trail.
+     *
+     * The log outlives the record: once the row is gone its id points at
+     * nothing, and this sentence is all that is left to argue from.
+     */
+    public function auditSubject(): ?string
+    {
+        return trim('تسویهٔ فروشنده '.($this->user?->name ?? ''));
     }
 }

@@ -31,9 +31,15 @@ class SellerAccountController extends Controller
     {
         $pending = SettlementRequest::pending()->get()->keyBy('user_id');
 
-        $sellers = User::ofCurrentBakery()->role('seller')->orderBy('name')->get()
-            ->map(function (User $seller) use ($pending) {
-                $owed = SellerSettlement::outstandingFor($seller);
+        $people = User::ofCurrentBakery()->role('seller')->orderBy('name')->get();
+
+        // Every seller's open sales in one query. Asked per seller, this
+        // page put a query on it for each person who has ever sold bread.
+        $owedBySeller = SellerSettlement::outstandingForMany($people);
+
+        $sellers = $people
+            ->map(function (User $seller) use ($pending, $owedBySeller) {
+                $owed = $owedBySeller[$seller->id];
                 $request = $pending->get($seller->id);
 
                 return [
