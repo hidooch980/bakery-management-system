@@ -1096,9 +1096,39 @@ class BakeryApi {
   }
 
   Future<Map<String, dynamic>> productionReport({String? from, String? to}) async {
-    final body = await _client.get('/reports/production', query: {
+    final body = await _client.getCached('/reports/production', query: {
       if (from != null) 'from': from,
       if (to != null) 'to': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  /// What was sold in a range, split by how it was paid for and by whom.
+  ///
+  /// The endpoint has been there since the reports were written and the
+  /// phone never asked: the owner could see what the shop took, and not
+  /// how much of it is cash he is holding against credit he is owed.
+  Future<Map<String, dynamic>> salesReport({String? from, String? to}) async {
+    final body = await _client.getCached('/reports/sales', query: {
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  /// What the shop consumed over a range, bucketed: flour kneaded against
+  /// flour sold on, and the salt and yeast behind it.
+  Future<Map<String, dynamic>> consumptionSeries({
+    required String from,
+    required String to,
+    String granularity = 'day',
+  }) async {
+    final body = await _client.getCached('/reports/consumption-series', query: {
+      'from': from,
+      'to': to,
+      'granularity': granularity,
     });
 
     return body['data'] as Map<String, dynamic>;

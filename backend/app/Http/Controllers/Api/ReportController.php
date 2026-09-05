@@ -25,6 +25,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Admin-facing reporting. All endpoints accept optional `from` / `to`
@@ -110,27 +111,35 @@ class ReportController extends Controller
     {
         $formula = DoughFormula::fromBakery();
 
+        // Six questions over the whole range rather than two per day.
+        // This loop ran `->get()` twice for every date and was capped at
+        // 120 — a three-month range cost 240 queries and loaded every
+        // batch and every chane row to add up four columns. The same
+        // shape the reports page was fixed into: group by date in SQL,
+        // bucket in PHP.
+        $doughEntries = Ledger::dailyCounts(DoughEntry::query(), 'created_at', $from, $to);
+        $doughBags = Ledger::dailySums(DoughEntry::query(), 'created_at', 'bag_count', $from, $to);
+        $chaneCount = Ledger::dailySums(ChaneEntry::query(), 'created_at', 'chane_count', $from, $to);
+        $naninoWeight = Ledger::dailySums(ChaneEntry::query(), 'created_at', 'nanino_weight_kg', $from, $to);
+
         $days = collect();
         $cursor = $from->copy()->startOfDay();
 
         while ($cursor->lte($to) && $days->count() < 120) {
             $date = $cursor->toDateString();
 
-            $entries = DoughEntry::whereDate('created_at', $date)->get();
-            $chane = ChaneEntry::whereDate('created_at', $date)->get();
-
             // Nanino is stored as a weight, so the loaf count is derived
             // the same way every other screen derives it.
-            $normalCount = (int) $chane->sum('chane_count');
+            $normalCount = (int) ($chaneCount[$date] ?? 0);
             $naninoCount = $formula->naninoCountForWeight(
-                (float) $chane->sum('nanino_weight_kg')
+                (float) ($naninoWeight[$date] ?? 0)
             );
 
             $days->push([
                 'date' => $date,
                 'date_display' => Jalali::date($cursor),
-                'dough_entries' => $entries->count(),
-                'dough_bags' => (int) $entries->sum('bag_count'),
+                'dough_entries' => (int) ($doughEntries[$date] ?? 0),
+                'dough_bags' => (int) ($doughBags[$date] ?? 0),
                 'normal_chane_count' => $normalCount,
                 'nanino_chane_count' => $naninoCount,
                 'total_bread_count' => $normalCount + $naninoCount,
@@ -157,19 +166,46 @@ class ReportController extends Controller
             'bread_count' => (int) $sales->sum('bread_count'),
             'total_amount' => round((float) $sales->sum('amount'), 2),
             'total_amount_formatted' => Money::format($sales->sum('amount')),
-            'by_payment_type' => $sales->groupBy('payment_type')->map(fn ($group) => [
+            'by_payment_type' => $sales->groupBy('payment_type')->map(fn ($group, $type) => [
+                // The shop's own word for it. The key alone («schools»)
+                // is not what anybody calls it, and a phone that
+                // translated it here would be a second place the labels
+                // live and a second place they can drift.
+                'label' => Sale::PAYMENT_LABELS[$type] ?? $type,
                 'count' => $group->count(),
                 'bread_count' => (int) $group->sum('bread_count'),
                 'amount' => round((float) $group->sum('amount'), 2),
                 'amount_formatted' => Money::format($group->sum('amount')),
             ]),
-            'by_seller' => $sales->groupBy('user_id')->map(fn ($group) => [
-                'seller' => User::find($group->first()->user_id)?->name,
-                'count' => $group->count(),
-                'amount' => round((float) $group->sum('amount'), 2),
-                'amount_formatted' => Money::format($group->sum('amount')),
-            ])->values(),
+            // Names fetched once for the whole group rather than one
+            // `find` per seller inside the loop.
+            'by_seller' => $this->namedBySeller($sales),
         ]);
+    }
+
+    /**
+     * What each seller sold, with their name.
+     *
+     * The names come in one query. It was a `User::find` inside the
+     * grouping, so a shop with ten sellers asked the users table ten
+     * times for a report that had already loaded every sale.
+     *
+     * @param  Collection<int, Sale>  $sales
+     */
+    private function namedBySeller($sales): array
+    {
+        $grouped = $sales->groupBy('user_id');
+
+        $names = User::whereIn('id', $grouped->keys()->filter()->all())
+            ->pluck('name', 'id');
+
+        return $grouped->map(fn ($group, $id) => [
+            'seller' => $names[$id] ?? null,
+            'count' => $group->count(),
+            'bread_count' => (int) $group->sum('bread_count'),
+            'amount' => round((float) $group->sum('amount'), 2),
+            'amount_formatted' => Money::format($group->sum('amount')),
+        ])->values()->all();
     }
 
     public function flourConsumption(Request $request): JsonResponse

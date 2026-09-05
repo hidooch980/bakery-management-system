@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\IssueDestination;
 use App\Support\SystemIssue;
 use App\Support\TodayAnswer;
 use Illuminate\Http\JsonResponse;
@@ -49,10 +50,17 @@ class TodayController extends Controller
                     'severity' => $issue->severity,
                     'title' => $issue->title,
                     'detail' => $issue->detail,
-                    // What to do about it, for the phone's detail sheet.
-                    // The panel puts this behind a click; a phone has
-                    // nowhere else to put it.
+                    // Why it probably happened and what to do about it,
+                    // for the phone's detail sheet. The panel puts both
+                    // behind a click; a phone has nowhere else to put
+                    // them, and the row alone says what is wrong without
+                    // saying what to do — which is the half he needs.
+                    'cause' => $issue->cause,
                     'suggestion' => $issue->suggestion,
+                    // Which tab on the phone deals with this. Null where
+                    // the phone has nowhere to send him, and the row then
+                    // offers no button rather than a dead one.
+                    'destination' => IssueDestination::forKey($issue->key),
                 ])->values(),
 
                 'figures' => $answer->figures(),

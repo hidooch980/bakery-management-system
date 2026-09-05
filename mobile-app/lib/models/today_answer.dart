@@ -33,6 +33,8 @@ class TodayNeed {
     required this.title,
     required this.detail,
     required this.suggestion,
+    this.cause = '',
+    this.destination,
   });
 
   final String key;
@@ -44,6 +46,20 @@ class TodayNeed {
   final String detail;
   final String suggestion;
 
+  /// Why it most likely happened. The row says what is wrong; this says
+  /// what to look for, which is usually a missing entry rather than a
+  /// wrong number.
+  final String cause;
+
+  /// Which tab on the phone deals with it — `warehouse`, `finance`,
+  /// `staff`, `overview` — or null when there is nowhere to send him.
+  ///
+  /// Named by the server, like every other sentence on this screen, so a
+  /// new check can point somewhere without waiting for an app release.
+  /// A name this build does not know reads as null and shows no button,
+  /// rather than a button that goes nowhere.
+  final String? destination;
+
   bool get isCritical => severity == 'critical';
   bool get isWarning => severity == 'warning';
 
@@ -53,6 +69,8 @@ class TodayNeed {
         title: json['title'] as String? ?? '',
         detail: json['detail'] as String? ?? '',
         suggestion: json['suggestion'] as String? ?? '',
+        cause: json['cause'] as String? ?? '',
+        destination: json['destination'] as String?,
       );
 }
 
