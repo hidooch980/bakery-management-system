@@ -91,45 +91,50 @@ class ReportSeries
     public static function consumption(Carbon $from, Carbon $to, string $granularity): Collection
     {
         $items = InventoryItem::all()->keyBy('key');
+        $flour = $items->get(InventoryItem::FLOUR);
+
+        // Six questions asked once each over the whole range rather than
+        // once per bucket. A month of days ran five sums over the movement
+        // ledger for every day on the chart.
+        $kneaded = Ledger::dailyStockOut($flour, ['production'], $from, $to);
+        $bench = Ledger::dailyStockOut($flour, ['spray'], $from, $to);
+        $soldOn = Ledger::dailyStockOut($flour, ['flour_sale', 'consignment_out'], $from, $to);
+        $salt = Ledger::dailyStockOut($items->get(InventoryItem::SALT), ['production'], $from, $to);
+        $yeast = Ledger::dailyStockOut($items->get('yeast_dry'), ['production'], $from, $to);
+        $sacks = Ledger::dailySums(DoughEntry::query(), 'created_at', 'bag_count', $from, $to);
 
         return collect(PeriodBuckets::build($from, $to, $granularity))
-            ->map(function (array $bucket) use ($items) {
-                $window = [$bucket['from'], $bucket['to']];
+            ->map(function (array $bucket) use (
+                $kneaded, $bench, $soldOn, $salt, $yeast, $sacks,
+            ) {
+                $from = $bucket['from'];
+                $to = $bucket['to'];
 
-                $used = function (?InventoryItem $item, array $reasons) use ($window) {
-                    if (! $item) {
-                        return 0.0;
-                    }
+                // Three decimals, as before: flour is weighed to the gram
+                // and rounding it to two would lose a kilo over a month.
+                $used = fn (array $daily) => round(Ledger::sumDays($daily, $from, $to), 3);
 
-                    return round((float) $item->movements()
-                        ->where('direction', 'out')
-                        ->whereIn('reason', $reasons)
-                        ->whereBetween('created_at', $window)
-                        ->sum('quantity'), 3);
-                };
-
-                $flour = $items->get(InventoryItem::FLOUR);
-                $production = $used($flour, ['production']);
-                $spray = $used($flour, ['spray']);
+                $production = $used($kneaded);
+                $spray = $used($bench);
 
                 return [
                     'key' => $bucket['key'],
                     'label' => $bucket['label'],
                     'from' => $bucket['from']->toDateString(),
                     'to' => $bucket['to']->toDateString(),
-                    'bags_kneaded' => (float) DoughEntry::whereBetween('created_at', $window)->sum('bag_count'),
+                    'bags_kneaded' => Ledger::sumDays($sacks, $from, $to),
                     'flour_production_kg' => $production,
                     'flour_spray_kg' => $spray,
                     'flour_used_kg' => round($production + $spray, 3),
                     // Sold on rather than baked — reported beside the usage
                     // so the store's outflow still adds up, without being
                     // counted as consumption.
-                    'flour_sold_kg' => $used($flour, ['flour_sale', 'consignment_out']),
-                    'salt_kg' => $used($items->get(InventoryItem::SALT), ['production']),
+                    'flour_sold_kg' => $used($soldOn),
+                    'salt_kg' => $used($salt),
                     // yeast_wet_kg was here until 1405/06/08. The tub was
                     // removed, and a series that is zero for ever is a line
                     // on a chart saying nothing.
-                    'yeast_dry_kg' => $used($items->get('yeast_dry'), ['production']),
+                    'yeast_dry_kg' => $used($yeast),
                 ];
             })
             ->values();

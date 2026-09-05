@@ -36,6 +36,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Tags, not just the commit. An untagged build names itself after
+          # the last release (see the stamping step), and the default
+          # shallow checkout brings none.
+          fetch-tags: true
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -107,10 +113,30 @@ jobs:
           BUILD_NUMBER=$(( 10000 + ${{ github.run_number }} ))
 
           # The version name is what the in-app updater compares against
-          # the GitHub release tag, so it is the tag when there is one, and
-          # otherwise whatever the repository already says. A build with no
-          # tag is not a release and must not claim a release's name.
+          # the GitHub release tag — three numeric parts, build metadata
+          # dropped. It is the tag when there is one.
+          #
+          # Without a tag it is the *last released* name, not the value
+          # sitting in `pubspec.yaml`. That value is `1.0.0` and has been
+          # for the life of the repository, and naming a build after it
+          # wedges any phone it is installed on: the handset then reports
+          # 1.0.0, the updater reads the real 4.87.0 release as newer and
+          # offers it for ever, and Android refuses that install because
+          # its versionCode is lower than the build already there. The way
+          # out is uninstalling the app — which takes the offline queue,
+          # and the unsent sales in it, with it.
+          #
+          # So a test build carries the released name and a higher build
+          # number. The two are told apart by that number rather than by
+          # the name, which is the price of the phone staying usable.
           NAME="${{ steps.config.outputs.version }}"
+
+          if [ -z "$NAME" ]; then
+            LAST=$(git tag --list 'v*' --sort=-v:refname | head -1)
+            NAME="${LAST#v}"
+          fi
+
+          # No tags at all — a fresh fork, or the very first build.
           if [ -z "$NAME" ]; then
             NAME=$(grep '^version:' pubspec.yaml | sed 's/^version: *//' | cut -d+ -f1)
           fi
