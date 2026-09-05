@@ -343,7 +343,7 @@ class IssueScanner
     {
         $issues = [];
 
-        foreach (BankAccount::all() as $account) {
+        foreach (BankAccount::query()->withBalance()->get() as $account) {
             if ($account->balance >= 0) {
                 continue;
             }
@@ -366,20 +366,42 @@ class IssueScanner
         return $issues;
     }
 
+    /**
+     * Every open sale, by the seller holding it. Read once and shared by
+     * the two seller checks below, which between them were asking the
+     * `sales` table three times for every seller on the staff list.
+     *
+     * @var Collection<int, Collection<int, Sale>>|null
+     */
+    private ?Collection $openSalesBySeller = null;
+
+    /** @return Collection<int, Collection<int, Sale>> */
+    private function openSalesBySeller(): Collection
+    {
+        return $this->openSalesBySeller ??= Sale::query()
+            ->sellerAccountOutstanding()
+            ->oldest('created_at')
+            ->get()
+            ->groupBy('user_id');
+    }
+
+    /** The people those sales belong to, in one question. */
+    private function sellersHoldingMoney(): Collection
+    {
+        $ids = $this->openSalesBySeller()->keys()->all();
+
+        return $ids === []
+            ? collect()
+            : User::query()->ofCurrentBakery()->whereIn('id', $ids)->get();
+    }
+
     /** Money a seller is still holding, or a gap they have not answered for. */
     private function sellerAccounts(): array
     {
-        $sellers = User::query()->ofCurrentBakery()
-            ->whereHas('sales', fn ($q) => $q->sellerAccountOutstanding())
-            ->get();
-
         $issues = [];
 
-        foreach ($sellers as $seller) {
-            $sales = Sale::query()
-                ->where('user_id', $seller->id)
-                ->sellerAccountOutstanding()
-                ->get();
+        foreach ($this->sellersHoldingMoney() as $seller) {
+            $sales = $this->openSalesBySeller()->get($seller->id);
 
             $total = round($sales->sum(fn (Sale $s) => $s->seller_account_amount), 2);
             $difference = round($sales->sum(fn (Sale $s) => (float) $s->amount_difference), 2);
@@ -424,18 +446,14 @@ class IssueScanner
         [$monthStart] = Jalali::currentMonthRange();
         $limit = now()->subDays(7);
 
-        $sellers = User::query()->ofCurrentBakery()
-            ->whereHas('sales', fn ($q) => $q->sellerAccountOutstanding())
-            ->get();
+        $sellers = $this->sellersHoldingMoney();
+        $owedBySeller = SellerSettlement::outstandingForMany($sellers);
 
         $issues = [];
 
         foreach ($sellers as $seller) {
-            $sales = Sale::query()
-                ->where('user_id', $seller->id)
-                ->sellerAccountOutstanding()
-                ->oldest('created_at')
-                ->get();
+            // Loaded oldest first, so the head of the list is the oldest debt.
+            $sales = $this->openSalesBySeller()->get($seller->id);
 
             $oldest = $sales->first();
 
@@ -452,7 +470,7 @@ class IssueScanner
 
             $days = (int) $oldest->created_at->diffInDays(now());
             $total = round($sales->sum(fn (Sale $s) => $s->seller_account_amount), 2);
-            $owed = SellerSettlement::outstandingFor($seller);
+            $owed = $owedBySeller[$seller->id];
 
             // Carried past a month end the shop said it would settle by.
             $fromLastMonth = $oldest->created_at->lt($monthStart);
@@ -615,7 +633,7 @@ class IssueScanner
         $issues = [];
         $soon = now()->addDays(7);
 
-        foreach (Loan::outstanding()->get() as $loan) {
+        foreach (Loan::outstanding()->withPaid()->get() as $loan) {
             $due = $loan->next_due_on;
 
             if ($due === null || $due->gt($soon)) {

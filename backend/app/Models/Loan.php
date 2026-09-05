@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\RecordsAudit;
+use App\Models\Concerns\RemembersLedgerTotal;
 use App\Support\AppCalendar;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Loan extends Model
 {
-    use BelongsToBakery, RecordsAudit;
+    use BelongsToBakery, RecordsAudit, RemembersLedgerTotal;
 
     protected $fillable = [
         'title',
@@ -53,9 +54,21 @@ class Loan extends Model
         return $query->whereNull('settled_on');
     }
 
+    /**
+     * Loads the paid total with the rows, so a list of loans costs one
+     * question rather than one per loan.
+     */
+    public function scopeWithPaid(Builder $query): Builder
+    {
+        return $query->withSum('payments as paid_total', 'amount');
+    }
+
     public function getPaidAttribute(): float
     {
-        return round((float) $this->payments()->sum('amount'), 2);
+        return $this->rememberLedgerTotal(
+            fn () => round((float) $this->payments()->sum('amount'), 2),
+            preloadedAs: 'paid_total',
+        );
     }
 
     /**

@@ -30,6 +30,18 @@ class LoanPayment extends Model
         'note',
     ];
 
+    /**
+     * Every write forgets every remembered loan total, so no copy
+     * of a loan anywhere in the request keeps reading the figure
+     * from before this row.
+     */
+    protected static function booted(): void
+    {
+        static::created(fn () => Loan::forgetLedgerTotals());
+        static::updated(fn () => Loan::forgetLedgerTotals());
+        static::deleted(fn () => Loan::forgetLedgerTotals());
+    }
+
     protected function casts(): array
     {
         return [

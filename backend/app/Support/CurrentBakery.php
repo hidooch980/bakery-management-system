@@ -22,6 +22,15 @@ class CurrentBakery
     /** Resolved shops, by id — one lookup each, however often asked. */
     private static array $cached = [];
 
+    /**
+     * The shop nobody is signed in to — the console, the scheduler, a
+     * queued job, every test that never logs in. Looked up once too: left
+     * unremembered it was the single most-run query in the system, asked
+     * two hundred times by one scan of the issue list, because every
+     * global scope on every model goes through here.
+     */
+    private static ?Bakery $fallback = null;
+
     private static ?int $forcedId = null;
 
     /**
@@ -39,7 +48,10 @@ class CurrentBakery
         $bakeryId = self::$forcedId ?? auth()->user()?->bakery_id;
 
         if ($bakeryId === null) {
-            return Bakery::query()->oldest('id')->first();
+            // A missing shop is not remembered: a seeder or an install
+            // command creates it a moment later and must then be able to
+            // find it.
+            return self::$fallback ??= Bakery::query()->oldest('id')->first();
         }
 
         return self::$cached[$bakeryId] ??= Bakery::find($bakeryId);
@@ -73,6 +85,7 @@ class CurrentBakery
     public static function forget(): void
     {
         self::$cached = [];
+        self::$fallback = null;
         self::$forcedId = null;
     }
 }
