@@ -880,11 +880,21 @@ class BakeryApi {
   ///
   /// Not cached: the whole point of the screen is that the figure on it is
   /// current, and a stale «سالم» is exactly the failure it exists to stop.
+  /// The owner's first screen.
+  ///
+  /// Served from the saved copy without signal, like every other read —
+  /// it was the one that was not, and with the radio off the owner's home
+  /// tab was a red error box while the screens behind it all worked. The
+  /// page exists to say *when* it looked, so [todayCheckedAt] carries the
+  /// copy's time for the tab to print instead of «همین حالا».
   Future<TodayAnswer> today() async {
-    final body = await _client.get('/today');
+    final body = await _client.getCached('/today');
 
     return TodayAnswer.fromJson(body['data'] as Map<String, dynamic>);
   }
+
+  /// When the answer on screen was actually fetched, or null when it is live.
+  DateTime? todayCheckedAt() => _client.servedFrom('/today');
 
   /// Admin dashboard counters for today.
   Future<Map<String, dynamic>> dashboard() async {
@@ -897,8 +907,11 @@ class BakeryApi {
   // ----------------------------------------------- admin: money and stock
 
   /// Categories an expense can be filed under, as the shop defines them.
+  /// Cached: the expense form refuses to save without a category rather
+  /// than guess one, so without the list there was no recording a cost
+  /// offline at all.
   Future<List<LedgerCategory>> expenseCategories() async {
-    final body = await _client.get('/expenses/categories');
+    final body = await _client.getCached('/expenses/categories');
 
     return (body['data'] as List)
         .cast<Map<String, dynamic>>()
@@ -907,7 +920,7 @@ class BakeryApi {
   }
 
   Future<List<LedgerCategory>> incomeCategories() async {
-    final body = await _client.get('/incomes/categories');
+    final body = await _client.getCached('/incomes/categories');
 
     return (body['data'] as List)
         .cast<Map<String, dynamic>>()
