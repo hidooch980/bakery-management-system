@@ -64,6 +64,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
         HomeTab(
           label: 'خلاصه',
+          destination: 'overview',
           title: 'خلاصه امروز',
           icon: Icons.dashboard_outlined,
           selectedIcon: Icons.dashboard_rounded,
@@ -71,6 +72,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
         HomeTab(
           label: 'مالی',
+          destination: 'finance',
           title: 'مالی',
           icon: Icons.account_balance_wallet_outlined,
           selectedIcon: Icons.account_balance_wallet_rounded,
@@ -78,6 +80,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
         HomeTab(
           label: 'انبار',
+          destination: 'warehouse',
           title: 'انبار',
           icon: Icons.warehouse_outlined,
           selectedIcon: Icons.warehouse_rounded,
@@ -85,6 +88,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
         HomeTab(
           label: 'کارکنان',
+          destination: 'staff',
           title: 'کارکنان',
           icon: Icons.people_outline_rounded,
           selectedIcon: Icons.people_rounded,

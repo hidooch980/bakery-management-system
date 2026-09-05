@@ -9,9 +9,12 @@ import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import 'balance_sheet_section.dart';
 import 'bank_balances_section.dart';
+import 'consumption_report_section.dart';
 import 'customer_debts_section.dart';
 import 'follow_ups_section.dart';
 import 'income_expense_chart.dart';
+import 'production_report_section.dart';
+import 'sales_breakdown_section.dart';
 import 'seller_debts_section.dart';
 import 'seller_performance_section.dart';
 import 'supplier_debts_section.dart';
@@ -74,6 +77,28 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
     return widget.api.financialReport(
       from: _toApiDate(from),
       to: _toApiDate(to),
+    );
+  }
+
+  /// Exactly the range the report above is showing.
+  ///
+  /// Not [_apiRange], which widens «امروز» to the week around it so the
+  /// chart has more than one bar to draw. The sections below are figures
+  /// rather than a trend, and a «تولید» total covering a different week
+  /// from the «درآمد» above it would be read as disagreeing with it.
+  ({String from, String to}) _reportRange() {
+    final now = DateTime.now();
+
+    final from = switch (_range) {
+      _Range.today => now,
+      _Range.week => now.subtract(const Duration(days: 6)),
+      _Range.month => now.subtract(const Duration(days: 29)),
+      _Range.custom => _customFrom ?? now,
+    };
+
+    return (
+      from: _toApiDate(from),
+      to: _toApiDate(_range == _Range.custom ? (_customTo ?? now) : now),
     );
   }
 
@@ -237,6 +262,51 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                 final range = _apiRange();
 
                 return IncomeExpenseChart(
+                  api: widget.api,
+                  from: range.from,
+                  to: range.to,
+                  granularity: range.granularity,
+                );
+              }(),
+
+              // How the takings were paid for. «فروش ۱۲٬۰۰۰٬۰۰۰» is one
+              // figure covering two facts: cash in the drawer and credit
+              // owed. Read as one, it says the shop has money it has not
+              // been given.
+              const SizedBox(height: 22),
+              () {
+                final range = _reportRange();
+
+                return SalesBreakdownSection(
+                  api: widget.api,
+                  from: range.from,
+                  to: range.to,
+                  currency: widget.bakery?.currency ?? Currency.toman,
+                );
+              }(),
+
+              // What the shop actually made. Every figure on this page was
+              // money and none of it said how many sacks were kneaded or
+              // how much bread came off the oven — in a bakery.
+              const SizedBox(height: 22),
+              () {
+                final range = _reportRange();
+
+                return ProductionReportSection(
+                  api: widget.api,
+                  from: range.from,
+                  to: range.to,
+                );
+              }(),
+
+              // Where the flour went. Baked and sold-on are the two halves
+              // the quota is judged on, and a single «مصرف» figure hides
+              // which is which.
+              const SizedBox(height: 22),
+              () {
+                final range = _apiRange();
+
+                return ConsumptionReportSection(
                   api: widget.api,
                   from: range.from,
                   to: range.to,

@@ -127,11 +127,36 @@ class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
                   : _sumFormatted(series, (p) => p.incomeFormatted, series.income),
               color: _incomeColour,
             ),
+            // What the takings were made of. One bar for «درآمد» could not
+            // tell a month of baking from a month of selling the flour on,
+            // and those are different shops.
+            if (series.incomeBread > 0)
+              AdminRow(
+                label: '— از فروش نان',
+                value: _sumFormatted(series, (p) => p.incomeFormatted, series.incomeBread),
+              ),
+            if (series.incomeFlour > 0)
+              AdminRow(
+                label: '— از فروش آرد',
+                value: _sumFormatted(series, (p) => p.incomeFormatted, series.incomeFlour),
+              ),
+            if (series.incomeOther > 0)
+              AdminRow(
+                label: '— درآمد متفرقه',
+                value: _sumFormatted(series, (p) => p.incomeFormatted, series.incomeOther),
+              ),
+
             AdminRow(
               label: 'جمع هزینه',
               value: _sumFormatted(series, (p) => p.expenseFormatted, series.expense),
               color: _expenseColour,
             ),
+            if (series.expenseSalaries > 0)
+              AdminRow(
+                label: '— از آن، حقوق',
+                value: _sumFormatted(series, (p) => p.expenseFormatted, series.expenseSalaries),
+              ),
+
             AdminRow(
               label: series.profit >= 0 ? 'سود' : 'زیان',
               value: _sumFormatted(series, (p) => p.profitFormatted, series.profit),

@@ -17,6 +17,7 @@ class HomeTab {
     required this.icon,
     required this.selectedIcon,
     required this.builder,
+    this.destination,
   });
 
   /// What the menu calls it — a word, not a sentence.
@@ -30,6 +31,33 @@ class HomeTab {
   final IconData selectedIcon;
 
   final WidgetBuilder builder;
+
+  /// The name the server uses for this tab when it sends a screen
+  /// somewhere — `warehouse`, `finance`, and so on.
+  ///
+  /// Deliberately not the Persian label: that is what the shop reads and
+  /// is free to change, and a destination that broke because somebody
+  /// renamed a tab would break silently.
+  final String? destination;
+}
+
+/// Lets a page inside the scaffold move to another one of its tabs.
+///
+/// «امروز» needs it: an issue there says what is wrong, and the answer is
+/// on a different tab. Without this the row could only name the place and
+/// leave the owner to find it — which is what it did.
+class HomeTabs extends InheritedWidget {
+  const HomeTabs({super.key, required this.goTo, required super.child});
+
+  /// Moves to the tab with this destination name. Does nothing when no
+  /// tab claims the name, so an unknown one is inert rather than an error.
+  final void Function(String destination) goTo;
+
+  static HomeTabs? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<HomeTabs>();
+
+  @override
+  bool updateShouldNotify(HomeTabs oldWidget) => false;
 }
 
 /// The shape every role's home screen shares.
@@ -105,6 +133,32 @@ class _RoleHomeScaffoldState extends State<RoleHomeScaffold> {
     final tabs = widget.tabs;
     final current = tabs[_tab.clamp(0, tabs.length - 1)];
 
+    return HomeTabs(
+      goTo: _goTo,
+      child: _scaffold(context, theme, user, tabs, current),
+    );
+  }
+
+  /// Moves to the named tab, if this role has one.
+  ///
+  /// Quiet about a name it does not have: the destinations are chosen on
+  /// the server and a seller's home screen has no «مالی» to go to. Doing
+  /// nothing is right — the row that offered it should not have, and an
+  /// error over a bakery's home screen is worse than a button that stays
+  /// put.
+  void _goTo(String destination) {
+    final index = widget.tabs.indexWhere((t) => t.destination == destination);
+
+    if (index >= 0 && index != _tab) setState(() => _tab = index);
+  }
+
+  Widget _scaffold(
+    BuildContext context,
+    ThemeData theme,
+    dynamic user,
+    List<HomeTab> tabs,
+    HomeTab current,
+  ) {
     return Scaffold(
       floatingActionButton: widget.floatingActionButton,
       appBar: AppBar(
