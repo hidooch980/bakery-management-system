@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/today_answer.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 
 /// One answer: whether the shop is sound, and what is the owner's to do.
@@ -59,7 +60,10 @@ class _AdminTodayTabState extends State<AdminTodayTab> {
             );
           }
 
-          return _Answer(answer: snapshot.data!);
+          return _Answer(
+            answer: snapshot.data!,
+            checkedAt: widget.api.todayCheckedAt(),
+          );
         },
       ),
     );
@@ -67,9 +71,15 @@ class _AdminTodayTabState extends State<AdminTodayTab> {
 }
 
 class _Answer extends StatelessWidget {
-  const _Answer({required this.answer});
+  const _Answer({required this.answer, required this.checkedAt});
 
   final TodayAnswer answer;
+
+  /// When this answer was fetched, or null when it came from the server
+  /// just now. A saved copy must not say «همین حالا»: a green screen
+  /// with the wrong time on it is the four days this page was built
+  /// against.
+  final DateTime? checkedAt;
 
   @override
   Widget build(BuildContext context) {
@@ -110,11 +120,19 @@ class _Answer extends StatelessWidget {
         // those four days looked like.
         Row(
           children: [
-            Icon(Icons.check_circle_outline_rounded, size: 15, color: muted),
+            Icon(
+              checkedAt == null
+                  ? Icons.check_circle_outline_rounded
+                  : Icons.history_rounded,
+              size: 15,
+              color: muted,
+            ),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                'هر ${answer.cycles} چرخه همین حالا بررسی شد',
+                checkedAt == null
+                    ? 'هر ${answer.cycles} چرخه همین حالا بررسی شد'
+                    : 'هر ${answer.cycles} چرخه در ${JalaliFormat.dateTime(checkedAt!)} بررسی شد — بدون اتصال، به‌روز نیست',
                 style: theme.textTheme.bodySmall?.copyWith(color: muted),
               ),
             ),
