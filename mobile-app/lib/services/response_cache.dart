@@ -110,24 +110,37 @@ class ResponseCache {
     return '$path?${parts.join('&')}';
   }
 
+  /// Keeps a copy. Best-effort, always: a read that already succeeded must
+  /// not fail because the copy of it could not be filed.
+  ///
+  /// `read` has been guarded since it was written and this was not, and
+  /// the difference showed the day «امروز» started going through the
+  /// cache: the fetch was fine, the save threw, and the owner's home
+  /// screen showed `DatabaseException(open_failed …)` over an answer the
+  /// server had already given. Not keeping a copy costs one screen that
+  /// has to be online next time. Throwing costs the screen now.
   Future<void> save(
     String path,
     Map<String, dynamic>? query,
     Map<String, dynamic> body,
   ) async {
-    final db = await _db;
+    try {
+      final db = await _db;
 
-    await db.insert(
-      'cached_reads',
-      {
-        'cache_key': keyFor(path, query),
-        'body': jsonEncode(body),
-        'saved_at': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+      await db.insert(
+        'cached_reads',
+        {
+          'cache_key': keyFor(path, query),
+          'body': jsonEncode(body),
+          'saved_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
-    await _evict(db);
+      await _evict(db);
+    } on Object {
+      // Nothing here is worth failing a read for.
+    }
   }
 
   /// Drops the oldest answers once there are more than [maxEntries].
@@ -188,7 +201,16 @@ class ResponseCache {
 
   /// Dropped on sign-out: the next person to use this phone must not be
   /// shown the last one's figures.
+  ///
+  /// Best-effort for the same reason as [save], and with one difference
+  /// worth naming: a clear that fails leaves another person's figures on
+  /// the handset. They are still behind the app's own login, and a sign-out
+  /// that throws instead of completing is the worse of the two.
   Future<void> clear() async {
-    await (await _db).delete('cached_reads');
+    try {
+      await (await _db).delete('cached_reads');
+    } on Object {
+      // A cache that will not open holds nothing readable anyway.
+    }
   }
 }
