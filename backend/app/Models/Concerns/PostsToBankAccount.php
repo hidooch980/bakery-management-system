@@ -74,6 +74,10 @@ trait PostsToBankAccount
         BankTransaction::where('source_type', Relation::getMorphAlias(static::class))
             ->where('source_id', $this->getKey())
             ->delete();
+
+        // Deleted through the query builder, so no model event fired and
+        // nothing told the accounts their remembered balance is old.
+        BankAccount::forgetLedgerTotals();
     }
 
     public function bankTransactions()

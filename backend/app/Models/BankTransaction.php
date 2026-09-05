@@ -44,6 +44,18 @@ class BankTransaction extends Model
         'note',
     ];
 
+    /**
+     * Every write forgets every remembered bankaccount total, so no copy
+     * of a bankaccount anywhere in the request keeps reading the figure
+     * from before this row.
+     */
+    protected static function booted(): void
+    {
+        static::created(fn () => BankAccount::forgetLedgerTotals());
+        static::updated(fn () => BankAccount::forgetLedgerTotals());
+        static::deleted(fn () => BankAccount::forgetLedgerTotals());
+    }
+
     protected function casts(): array
     {
         return [
