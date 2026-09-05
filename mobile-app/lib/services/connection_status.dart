@@ -56,6 +56,11 @@ class ConnectionStatus extends ChangeNotifier {
   /// server coming back is noticed without the user doing anything.
   static const _pollInterval = Duration(seconds: 45);
 
+  /// Called each time the phone comes back online, after the queue has
+  /// been sent. Set by whoever knows which role is signed in — this class
+  /// deliberately does not.
+  void Function()? onOnline;
+
   Future<void> start() async {
     await refresh();
 
@@ -129,7 +134,14 @@ class ConnectionStatus extends ChangeNotifier {
     // seconds and flushing on each one would retry a genuinely rejected
     // entry for ever.
     if (changed && value) {
-      unawaited(_flushQueue());
+      unawaited(_flushQueue().then((_) {
+        // After the flush, not before: the answers worth keeping are the
+        // ones that include what was just sent. Warmed here because this
+        // is the moment a phone has signal and nobody is asking it for
+        // anything — which is exactly when the copies for the next
+        // outage should be taken.
+        onOnline?.call();
+      }));
     }
 
     if (changed || !_checking) {
