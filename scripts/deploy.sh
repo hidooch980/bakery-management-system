@@ -6,11 +6,20 @@
 # app boots with, the autoloader loses Filament\PanelProvider, and the
 # bakery goes down until a plain `composer install` puts it back. It is
 # not available here at all.
+#
+# The migration step used to *report* pending migrations and carry on.
+# That is the worst of the three things it could do: the new code was
+# already live against the old schema, and the site went on answering
+# 200 while doing it, so nothing said anything was wrong. Today it
+# applies them — behind `artisan down`, so no one is served by a
+# half-migrated shop — and puts the code back where it was if they fail.
 set -u
 
-APP=/home/ubuntu/bakery-management-system
+# Overridable so the test can run this script against a fixture rather
+# than the live shop. Unset everywhere else, which is the real server.
+APP=${APP:-/home/ubuntu/bakery-management-system}
 BACK=$APP/backend
-LOCK=/tmp/deploy.lock
+LOCK=${LOCK:-/tmp/deploy.lock}
 
 exec 9>"$LOCK"
 if ! flock -n 9; then
@@ -20,6 +29,8 @@ fi
 
 say() { echo; echo "=== $* ==="; }
 
+fail() { echo; echo "!!! $*" >&2; exit 1; }
+
 # Artisan runs as www-data, because that is who owns bootstrap/cache and
 # storage/logs and who has to read what these commands write. Run as
 # ubuntu they failed on every deploy — «Operation not permitted» buried
@@ -28,13 +39,36 @@ say() { echo; echo "=== $* ==="; }
 # still answered 200.
 artisan() { sudo -u www-data HOME=/tmp XDG_CONFIG_HOME=/tmp php artisan "$@"; }
 
+# Set once the shop has been taken down, so the trap below knows it has
+# something to undo.
+DOWN=no
+
+# Whatever happens after this point — a failed migration, a syntax error
+# in this script, someone's Ctrl-C — the shop comes back up. Left to the
+# happy path alone, a script that died between `down` and `up` would
+# leave the bakery closed until a person noticed and knew the command.
+restore() {
+  if [ "$DOWN" = yes ]; then
+    echo
+    echo "=== باز کردن مغازه ==="
+    artisan up || echo "    !!! «php artisan up» را دستی اجرا کنید" >&2
+    DOWN=no
+  fi
+}
+trap restore EXIT INT TERM
+
 say "۱/۶  کد"
-cd "$APP" || exit 1
-git pull -q origin main
+cd "$APP" || fail "پوشهٔ برنامه پیدا نشد: $APP"
+
+# Remembered before the pull, so a migration that fails has somewhere to
+# put the shop back to.
+WAS=$(git rev-parse HEAD)
+
+git pull -q origin main || fail "git pull ناموفق بود؛ چیزی تغییر نکرد."
 git log --oneline -1
 
 say "۲/۶  وابستگی‌ها"
-cd "$BACK" || exit 1
+cd "$BACK" || fail "پوشهٔ بک‌اند پیدا نشد: $BACK"
 # Never --no-dev. See the note at the top; it has taken the shop down
 # twice.
 #
@@ -53,8 +87,42 @@ echo "    نصب شد"
 say "۳/۶  قالب‌بندی"
 ./vendor/bin/pint --test 2>&1 | tail -2
 
-say "۴/۶  مهاجرت‌های معلق"
-artisan migrate:status 2>/dev/null | grep -i pending | head -10 || echo "    هیچ مهاجرت معلقی نیست"
+say "۴/۶  مهاجرت‌ها"
+PENDING=$(artisan migrate:status 2>/dev/null | grep -ci pending || true)
+
+if [ "$PENDING" -eq 0 ]; then
+  # The common case, and the one worth keeping quick: no schema change
+  # means no reason to close the shop at all.
+  echo "    هیچ مهاجرت معلقی نیست — مغازه بسته نمی‌شود"
+else
+  echo "    $PENDING مهاجرت معلق"
+  artisan migrate:status 2>/dev/null | grep -i pending
+
+  # Closed for the duration. Between the migration and the reload the
+  # old code is still the code being served, and a migration that drops
+  # or renames a column breaks it for exactly that window — which is
+  # short, and is the middle of somebody's sale.
+  echo
+  echo "    بستن موقت مغازه"
+  artisan down --render=errors::503 2>/dev/null || artisan down || fail "بستن مغازه ممکن نشد."
+  DOWN=yes
+
+  if artisan migrate --force; then
+    echo "    مهاجرت‌ها اجرا شدند"
+  else
+    # Back to the code that matches the schema on disk. A failed
+    # migration can leave the database half-changed, which is not
+    # something this script can put right — but serving the *old* code
+    # against it is far closer to correct than serving the new.
+    echo
+    echo "    !!! مهاجرت شکست خورد — کد به $WAS برمی‌گردد" >&2
+    cd "$APP" && git reset -q --hard "$WAS"
+    cd "$BACK" || true
+    artisan config:cache -q || true
+    artisan route:cache -q || true
+    fail "استقرار متوقف شد. وضعیت دیتابیس را بررسی کنید؛ ممکن است نیمه‌کاره مانده باشد."
+  fi
+fi
 
 say "۵/۶  کش"
 artisan config:cache -q
@@ -64,9 +132,27 @@ artisan filament:cache-components -q 2>/dev/null
 sudo systemctl reload php8.3-fpm nginx 2>/dev/null
 echo "    ساخته و بارگذاری شد"
 
+# Before the health check, or every check below answers 503 by design.
+restore
+
 say "۶/۶  آیا کار می‌کند"
-printf "    API   : "; curl -s -m 10 http://127.0.0.1/api/v1/health; echo
-printf "    پنل   : "; curl -s -o /dev/null -w "%{http_code}\n" -m 10 http://127.0.0.1/admin/login
-printf "    ۸۰۰۰  : "; curl -s -o /dev/null -w "%{http_code}\n" -m 10 http://127.0.0.1:8000/api/v1/health
+HEALTH=$(curl -s -m 10 http://127.0.0.1/api/v1/health || true)
+PANEL=$(curl -s -o /dev/null -w "%{http_code}" -m 10 http://127.0.0.1/admin/login || true)
+
+printf "    API   : %s\n" "$HEALTH"
+printf "    پنل   : %s\n" "$PANEL"
+printf "    ۸۰۰۰  : "; curl -s -o /dev/null -w "%{http_code}\n" -m 10 http://127.0.0.1:8000/api/v1/health || true
 echo
+
+# The exit code means something now. It printed the answer and returned
+# success either way before, so a deploy that had left the shop broken
+# looked exactly like one that had not — including to anything running
+# this from a script.
+case "$HEALTH" in
+  *'"service":"bakery"'*) ;;
+  *) fail "API سالم جواب نداد. مغازه بالا نیامده است." ;;
+esac
+
+[ "$PANEL" = 200 ] || fail "پنل $PANEL برگرداند."
+
 artisan stock:audit 2>&1 | tail -20
