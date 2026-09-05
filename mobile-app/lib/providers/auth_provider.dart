@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -5,21 +6,44 @@ import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
 import '../services/bakery_api.dart';
+import '../services/cache_warmer.dart';
 import '../services/biometric_service.dart';
 import '../services/secure_store.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
 
 class AuthProvider extends ChangeNotifier {
-  AuthProvider(this._api, {BiometricService? biometrics, SecureStore? store})
-      : _biometrics = biometrics ?? BiometricService(),
-        _store = store ?? SecureStore() {
+  AuthProvider(
+    this._api, {
+    BiometricService? biometrics,
+    SecureStore? store,
+    CacheWarmer? warmer,
+  })  : _biometrics = biometrics ?? BiometricService(),
+        _store = store ?? SecureStore(),
+        _warmer = warmer ?? CacheWarmer(_api) {
     _api.client.onSessionExpired = sessionExpired;
   }
 
   final BakeryApi _api;
   final BiometricService _biometrics;
   final SecureStore _store;
+
+  /// Fills the cache for whatever this person opens first, while there is
+  /// still a connection to fill it from.
+  final CacheWarmer _warmer;
+
+  /// Warms the cache for the signed-in role, if anybody is signed in.
+  ///
+  /// Public because `ConnectionStatus` calls it when the phone comes back
+  /// online, and it is the only thing here that knows which role that is.
+  /// Fire-and-forget: nothing on screen waits for it.
+  void warmCache() {
+    final user = _user;
+
+    if (user == null || _status != AuthStatus.authenticated) return;
+
+    unawaited(_warmer.warm(user.role));
+  }
 
   /// Where the last signed-in user is kept, so a cold start with no signal
   /// still knows whose shift it is.
@@ -82,6 +106,10 @@ class AuthProvider extends ChangeNotifier {
       await _rememberUser(_user!);
       _offline = false;
       _status = AuthStatus.authenticated;
+
+      // A cold start that reached the server is the first chance to take
+      // the copies this person will need the next time it cannot.
+      warmCache();
     } on ApiException catch (e) {
       final cached = await _storedUser();
 
@@ -142,6 +170,8 @@ class AuthProvider extends ChangeNotifier {
       await _rememberUser(result.user);
       _offline = false;
       _status = AuthStatus.authenticated;
+
+      warmCache();
 
       if (rememberForBiometrics) {
         await _biometrics.enable(login: login, password: password);

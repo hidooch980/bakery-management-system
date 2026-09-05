@@ -48,7 +48,15 @@ class BakeryApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()..load()),
         // Whether the backend answers — asked once at startup and then on
         // every change in the radio, so every screen reads one truth.
-        ChangeNotifierProvider(create: (_) => ConnectionStatus(client)..start()),
+        //
+        // Coming back online is also when the cache is refilled, so the
+        // next outage has something to show. The two are wired together
+        // here rather than inside either: connectivity does not know who
+        // is signed in, and the session does not watch the radio.
+        ChangeNotifierProxyProvider<AuthProvider, ConnectionStatus>(
+          create: (_) => ConnectionStatus(client)..start(),
+          update: (_, auth, connection) => connection!..onOnline = auth.warmCache,
+        ),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, theme, _) => MaterialApp(
