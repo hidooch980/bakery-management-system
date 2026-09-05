@@ -1,0 +1,48 @@
+name: Deploy Script Tests
+
+# The script that updates the live shop, exercised where it is safe to
+# find out what it does.
+#
+# It runs once a release against a real bakery, and its failure paths had
+# never been run anywhere: a pending migration was reported and skipped
+# past, so the new code went live against the old schema behind a site
+# that still answered 200. Now it applies migrations behind
+# `artisan down` and rolls the code back if they fail — and none of that
+# is worth having unless something proves it still works.
+#
+# Seconds to run: everything outside the script is a stub.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/deploy-script-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Deploy script
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Catches a typo without running anything, which matters for a file
+      # whose first real execution is against the shop.
+      - name: Check syntax
+        run: |
+          bash -n scripts/deploy.sh
+          bash -n scripts/tests/deploy_test.sh
+
+      - name: Lint
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          # Informational: the script is written for bash on the server
+          # and some of what shellcheck asks for would obscure it.
+          shellcheck -S error scripts/deploy.sh scripts/tests/deploy_test.sh
+
+      - name: Run tests
+        run: bash scripts/tests/deploy_test.sh
