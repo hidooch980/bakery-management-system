@@ -292,6 +292,40 @@ class Ledger
     }
 
     /**
+     * A stock item's daily outflow for the given reasons, in one query.
+     *
+     * Same shape as [dailySums] and separate from it because the filtering
+     * is the interesting part: an item, a direction and a set of reasons.
+     * Asked per bucket, the consumption series ran five of these for every
+     * day on the chart.
+     *
+     * A missing item is an empty map rather than an error — a shop that
+     * has never stocked yeast still has a chart.
+     *
+     * @return array<string, float>
+     */
+    public static function dailyStockOut(
+        ?InventoryItem $item,
+        array $reasons,
+        Carbon $from,
+        Carbon $to,
+    ): array {
+        if ($item === null) {
+            return [];
+        }
+
+        return self::dailySums(
+            $item->movements()
+                ->where('direction', 'out')
+                ->whereIn('reason', $reasons),
+            'created_at',
+            'quantity',
+            $from,
+            $to,
+        );
+    }
+
+    /**
      * What those daily totals come to between two dates, inclusive.
      *
      * @param  array<string, float>  $daily

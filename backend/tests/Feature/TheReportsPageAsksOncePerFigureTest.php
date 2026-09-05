@@ -294,4 +294,112 @@ class TheReportsPageAsksOncePerFigureTest extends TestCase
             "a month of production buckets took {$queries} queries",
         );
     }
+
+    /** What a bucket's consumption figure is, counted the slow way. */
+    private function usedTheSlowWay(string $key, array $reasons, Carbon $from, Carbon $to): float
+    {
+        $item = InventoryItem::query()->where('key', $key)->first();
+
+        if ($item === null) {
+            return 0.0;
+        }
+
+        return round((float) $item->movements()
+            ->where('direction', 'out')
+            ->whereIn('reason', $reasons)
+            ->whereBetween('created_at', [$from, $to])
+            ->sum('quantity'), 3);
+    }
+
+    public function test_consumption_buckets_report_what_the_slow_count_says(): void
+    {
+        $start = Carbon::create(2026, 8, 20)->startOfDay();
+        $this->tradeAcross($start);
+
+        $from = $start->copy();
+        $to = $start->copy()->addDays(9)->endOfDay();
+
+        foreach (['day', 'week', 'month'] as $granularity) {
+            $series = ReportSeries::consumption($from, $to, $granularity);
+
+            $this->assertNotEmpty($series, "no buckets for {$granularity}");
+
+            foreach ($series as $bucket) {
+                $bucketFrom = Carbon::parse($bucket['from'])->startOfDay();
+                $bucketTo = Carbon::parse($bucket['to'])->endOfDay();
+                $where = "{$granularity} bucket {$bucket['key']}";
+
+                $production = $this->usedTheSlowWay(
+                    InventoryItem::FLOUR, ['production'], $bucketFrom, $bucketTo,
+                );
+                $spray = $this->usedTheSlowWay(
+                    InventoryItem::FLOUR, ['spray'], $bucketFrom, $bucketTo,
+                );
+
+                $this->assertSame($production, $bucket['flour_production_kg'], "kneaded flour wrong in {$where}");
+                $this->assertSame($spray, $bucket['flour_spray_kg'], "bench flour wrong in {$where}");
+
+                // The two ways a bakery eats flour, added. Flour sold on is
+                // deliberately not in this total.
+                $this->assertSame(
+                    round($production + $spray, 3),
+                    $bucket['flour_used_kg'],
+                    "flour used wrong in {$where}",
+                );
+
+                $this->assertSame(
+                    $this->usedTheSlowWay(
+                        InventoryItem::FLOUR,
+                        ['flour_sale', 'consignment_out'],
+                        $bucketFrom,
+                        $bucketTo,
+                    ),
+                    $bucket['flour_sold_kg'],
+                    "flour sold wrong in {$where}",
+                );
+
+                $this->assertSame(
+                    $this->usedTheSlowWay(InventoryItem::SALT, ['production'], $bucketFrom, $bucketTo),
+                    $bucket['salt_kg'],
+                    "salt wrong in {$where}",
+                );
+
+                $this->assertSame(
+                    $this->usedTheSlowWay('yeast_dry', ['production'], $bucketFrom, $bucketTo),
+                    $bucket['yeast_dry_kg'],
+                    "yeast wrong in {$where}",
+                );
+
+                $this->assertSame(
+                    (float) DoughEntry::whereBetween('created_at', [$bucketFrom, $bucketTo])->sum('bag_count'),
+                    $bucket['bags_kneaded'],
+                    "sacks wrong in {$where}",
+                );
+            }
+        }
+    }
+
+    public function test_consumption_is_not_a_query_per_day(): void
+    {
+        $start = Carbon::create(2026, 8, 1)->startOfDay();
+        $this->tradeAcross($start);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        ReportSeries::consumption(
+            $start->copy(),
+            $start->copy()->addDays(30)->endOfDay(),
+            'day',
+        );
+
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertLessThan(
+            20,
+            $queries,
+            "a month of consumption buckets took {$queries} queries",
+        );
+    }
 }
