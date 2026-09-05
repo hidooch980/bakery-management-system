@@ -32,6 +32,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Names only, never values — `jq keys` cannot print one, and the
+      # runner masks them regardless. It exists because three rounds of
+      # «they are set» / «they arrive empty» is two rounds too many: this
+      # is the list of what the workflow can actually see, from the
+      # workflow's own side, and it settles the question in one run.
+      - name: List the secrets this workflow can see
+        env:
+          ALL: ${{ toJSON(secrets) }}
+        run: |
+          echo "secretهایی که این workflow می‌بیند:"
+          printf '%s' "$ALL" | jq -r 'keys[]' | sed 's/^/  - /'
+          echo
+          echo "variableها:"
+          printf '%s' '${{ toJSON(vars) }}' | jq -r 'keys[] // empty' | sed 's/^/  - /'
+          echo "  (اگر چیزی زیر این خط نیست، یعنی هیچ variableای ندارید)"
+
       - name: Check the secrets are set
         env:
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
