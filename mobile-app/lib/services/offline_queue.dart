@@ -91,6 +91,48 @@ class OfflineQueue {
     return db;
   }
 
+  /// The database, or null when it will not open.
+  ///
+  /// Every method below goes through this rather than [_db], because the
+  /// one thing this class must never do is fail. A seller standing at a
+  /// customer's door with no signal is the case it exists for, and on a
+  /// handset where the database could not be opened at all every one of
+  /// these threw — so the sale was not queued, it was lost, and the app
+  /// said `DatabaseException(open_failed …)`.
+  ///
+  /// The fallback is where the queue lived until this release: one JSON
+  /// array in [SecureStore], still encrypted, slower and perfectly
+  /// correct. [_carryOverLegacy] already knows how to read it, so a
+  /// handset that writes there today has its sales moved into the tables
+  /// by itself the first time the database does open.
+  Future<Database?> get _dbOrNull async {
+    try {
+      return await _db;
+    } on Object {
+      return null;
+    }
+  }
+
+  /// The legacy JSON list under [key], or empty when there is none.
+  Future<List<Map<String, dynamic>>> _fallbackRows(String key) async {
+    try {
+      final raw = await _store.read(key);
+
+      if (raw == null || raw.isEmpty) return [];
+
+      final decoded = jsonDecode(raw);
+
+      return decoded is List
+          ? decoded.map((e) => (e as Map).cast<String, dynamic>()).toList()
+          : [];
+    } on Object {
+      return [];
+    }
+  }
+
+  Future<void> _writeFallback(String key, List<Map<String, dynamic>> rows) =>
+      _store.write(key, jsonEncode(rows));
+
   /// Moves anything the old JSON queue was still holding into the tables.
   ///
   /// This runs once per process and matters exactly once per handset: an
@@ -183,10 +225,15 @@ class OfflineQueue {
 
   /// Everything waiting, oldest first — the order it will be sent in.
   Future<List<QueuedRequest>> all() async {
-    final rows = await (await _db).query(
-      'queued_writes',
-      orderBy: 'created_at, seq',
-    );
+    final db = await _dbOrNull;
+
+    if (db == null) {
+      return (await _fallbackRows(_legacyKey))
+          .map(QueuedRequest.fromJson)
+          .toList();
+    }
+
+    final rows = await db.query('queued_writes', orderBy: 'created_at, seq');
 
     return rows.map(_toRequest).toList();
   }
@@ -194,14 +241,31 @@ class OfflineQueue {
   /// Counted by the database rather than by reading the queue and taking
   /// its length. The home screen asks this on every build.
   Future<int> count() async {
-    final rows =
-        await (await _db).rawQuery('SELECT count(*) AS n FROM queued_writes');
+    final db = await _dbOrNull;
+
+    if (db == null) return (await _fallbackRows(_legacyKey)).length;
+
+    final rows = await db.rawQuery('SELECT count(*) AS n FROM queued_writes');
 
     return (rows.first['n'] as num?)?.toInt() ?? 0;
   }
 
   Future<void> enqueue(QueuedRequest request) async {
-    await (await _db).insert(
+    final db = await _dbOrNull;
+
+    if (db == null) {
+      final rows = await _fallbackRows(_legacyKey);
+
+      // The id is the Idempotency-Key, so the same write reaching here
+      // twice is one entry either way.
+      if (rows.any((r) => r['id'] == request.id)) return;
+
+      await _writeFallback(_legacyKey, [...rows, request.toJson()]);
+
+      return;
+    }
+
+    await db.insert(
       'queued_writes',
       _queuedRow(request),
       // Same id means the same write. A retry that reaches here twice is
@@ -211,10 +275,15 @@ class OfflineQueue {
   }
 
   Future<List<RejectedRequest>> rejected() async {
-    final rows = await (await _db).query(
-      'rejected_writes',
-      orderBy: 'rejected_at, seq',
-    );
+    final db = await _dbOrNull;
+
+    if (db == null) {
+      return (await _fallbackRows(_legacyRejectedKey))
+          .map(RejectedRequest.fromJson)
+          .toList();
+    }
+
+    final rows = await db.query('rejected_writes', orderBy: 'rejected_at, seq');
 
     return rows
         .map((row) => RejectedRequest(
@@ -225,8 +294,11 @@ class OfflineQueue {
   }
 
   Future<int> rejectedCount() async {
-    final rows =
-        await (await _db).rawQuery('SELECT count(*) AS n FROM rejected_writes');
+    final db = await _dbOrNull;
+
+    if (db == null) return (await _fallbackRows(_legacyRejectedKey)).length;
+
+    final rows = await db.rawQuery('SELECT count(*) AS n FROM rejected_writes');
 
     return (rows.first['n'] as num?)?.toInt() ?? 0;
   }
@@ -238,7 +310,23 @@ class OfflineQueue {
   /// refused list is a sale that vanished with nothing said about it, and
   /// the two writes used to be separate.
   Future<void> reject(QueuedRequest request, String reason) async {
-    final db = await _db;
+    final db = await _dbOrNull;
+
+    if (db == null) {
+      final refused = await _fallbackRows(_legacyRejectedKey);
+
+      // Added to the refused list before it leaves the queue, so an
+      // interruption between the two leaves the entry in both rather
+      // than in neither.
+      await _writeFallback(_legacyRejectedKey, [
+        ...refused.where((r) => (r['request'] as Map?)?['id'] != request.id),
+        RejectedRequest(request: request, reason: reason).toJson(),
+      ]);
+
+      await remove(request.id);
+
+      return;
+    }
 
     await db.transaction((txn) async {
       await txn.insert(
@@ -256,12 +344,37 @@ class OfflineQueue {
   }
 
   Future<void> dismissRejected(String id) async {
-    await (await _db)
-        .delete('rejected_writes', where: 'id = ?', whereArgs: [id]);
+    final db = await _dbOrNull;
+
+    if (db == null) {
+      final rows = await _fallbackRows(_legacyRejectedKey);
+
+      await _writeFallback(
+        _legacyRejectedKey,
+        rows.where((r) => (r['request'] as Map?)?['id'] != id).toList(),
+      );
+
+      return;
+    }
+
+    await db.delete('rejected_writes', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> remove(String id) async {
-    await (await _db).delete('queued_writes', where: 'id = ?', whereArgs: [id]);
+    final db = await _dbOrNull;
+
+    if (db == null) {
+      final rows = await _fallbackRows(_legacyKey);
+
+      await _writeFallback(
+        _legacyKey,
+        rows.where((r) => r['id'] != id).toList(),
+      );
+
+      return;
+    }
+
+    await db.delete('queued_writes', where: 'id = ?', whereArgs: [id]);
   }
 }
 

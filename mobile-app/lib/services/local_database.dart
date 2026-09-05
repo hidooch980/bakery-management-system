@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -61,13 +62,20 @@ class LocalDatabase {
   Future<Database> _openDatabase() async {
     final factory = _factory ?? factoryForTesting;
 
+    final path = _path ??
+        (factory != null
+            ? inMemoryDatabasePath
+            : p.join(await cipher.getDatabasesPath(), _fileName));
+
+    await _ensureDirectoryExists(path);
+
     // Tests run on the Dart VM, where the SQLCipher plugin does not exist.
     // They pass their own factory and get an unencrypted database, which
     // is the right trade: what a test proves is the SQL, and encryption is
     // a property of the file rather than of the statements run against it.
     if (factory != null) {
       return factory.openDatabase(
-        _path ?? inMemoryDatabasePath,
+        path,
         options: OpenDatabaseOptions(
           version: _version,
           onConfigure: _configure,
@@ -76,9 +84,6 @@ class LocalDatabase {
         ),
       );
     }
-
-    final path = _path ??
-        p.join(await cipher.getDatabasesPath(), _fileName);
 
     // The password goes through SQLCipher's own `openDatabase`, which is
     // the only entry point that takes one.
@@ -90,6 +95,31 @@ class LocalDatabase {
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
     );
+  }
+
+  /// Makes the folder the file goes in, because sqlite will not.
+  ///
+  /// Android does not create the app's `databases/` directory for us, and
+  /// opening a database inside one that is not there fails with
+  /// `open_failed` and nothing else. On a fresh install that was every
+  /// open: the queue could not hold a sale, the cache could not keep an
+  /// answer, and the owner's home screen showed
+  ///
+  ///   DatabaseException(open_failed .../databases/bakery_local.db)
+  ///
+  /// No test caught it, because tests ran against an in-memory database
+  /// where there is no directory to be missing. sqflite's own README
+  /// opens with this step; it was read as advice rather than as the
+  /// requirement it is.
+  Future<void> _ensureDirectoryExists(String path) async {
+    if (path == inMemoryDatabasePath) return;
+
+    try {
+      await Directory(p.dirname(path)).create(recursive: true);
+    } on Object {
+      // Already there, or unwritable. The open below answers either way,
+      // and it answers better than a guess here would.
+    }
   }
 
   /// Foreign keys are off by default in sqlite.
