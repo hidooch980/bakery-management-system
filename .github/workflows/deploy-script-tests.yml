@@ -35,8 +35,10 @@ jobs:
         run: |
           bash -n scripts/deploy.sh
           bash -n scripts/auto-deploy.sh
+          bash -n scripts/enable-https.sh
           bash -n scripts/tests/deploy_test.sh
           bash -n scripts/tests/auto_deploy_test.sh
+          bash -n scripts/tests/enable_https_test.sh
 
       - name: Lint
         run: |
@@ -45,9 +47,12 @@ jobs:
           # Informational: the script is written for bash on the server
           # and some of what shellcheck asks for would obscure it.
           shellcheck -S error scripts/deploy.sh scripts/auto-deploy.sh \
-            scripts/tests/deploy_test.sh scripts/tests/auto_deploy_test.sh
+            scripts/enable-https.sh \
+            scripts/tests/deploy_test.sh scripts/tests/auto_deploy_test.sh \
+            scripts/tests/enable_https_test.sh
 
       - name: Run tests
         run: |
           bash scripts/tests/deploy_test.sh
           bash scripts/tests/auto_deploy_test.sh
+          bash scripts/tests/enable_https_test.sh
