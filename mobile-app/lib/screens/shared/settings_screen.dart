@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'error_log_screen.dart';
+import '../../services/error_log.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
@@ -210,6 +212,39 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                   ],
+                  // Only once there is something to read. An empty
+                  // «گزارش خطاها» sitting in the settings of a working app
+                  // invites somebody to go looking for a problem that is
+                  // not there; when it appears, it is because one is.
+                  ValueListenableBuilder<List<LoggedError>>(
+                    valueListenable: ErrorLog.entries,
+                    builder: (context, entries, _) => entries.isEmpty
+                        ? const SizedBox.shrink()
+                        : Column(
+                            children: [
+                              const Divider(height: 1),
+                              ListTile(
+                                leading: const Icon(
+                                  Icons.report_problem_outlined,
+                                ),
+                                title: const Text('گزارش خطاها'),
+                                subtitle: Text(
+                                  '${entries.length} مورد از وقتی برنامه '
+                                  'باز شده',
+                                ),
+                                trailing:
+                                    const Icon(Icons.chevron_left_rounded),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ErrorLogScreen(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.system_update_rounded),
