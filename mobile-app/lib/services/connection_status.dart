@@ -90,11 +90,17 @@ class ConnectionStatus extends ChangeNotifier {
     final results = await _connectivity.checkConnectivity();
     _hasRadio = results.any((r) => r != ConnectivityResult.none);
 
+    // Tell the client before asking the server, not after: with the radio
+    // off, every read the app makes between here and the answer would
+    // otherwise sit out the connect timeout with a good copy in storage.
+    _client.knownOffline = !_hasRadio;
+
     // No radio at all means no point troubling the server with a request
     // that cannot leave the phone.
     final reachable = _hasRadio && await _client.isServerReachable();
 
     _checking = false;
+    _client.knownOffline = !reachable;
     _set(reachable);
   }
 
