@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
@@ -76,7 +77,7 @@ class _ConsumptionReportSectionState extends State<ConsumptionReportSection> {
         if (snapshot.hasError) return const SizedBox.shrink();
 
         final totals =
-            ((snapshot.data!['totals'] as Map?) ?? const {}).cast<String, dynamic>();
+            keyedGroup(snapshot.data!['totals']);
 
         final used = _double(totals['flour_used_kg']);
         final sold = _double(totals['flour_sold_kg']);

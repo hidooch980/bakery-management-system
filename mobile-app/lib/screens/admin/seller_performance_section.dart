@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
@@ -68,7 +69,7 @@ class _SellerPerformanceSectionState extends State<SellerPerformanceSection> {
           );
         }
 
-        final totals = (data['totals'] as Map?)?.cast<String, dynamic>() ?? {};
+        final totals = keyedGroup(data['totals']);
 
         return AdminSection(
           title: 'کارکرد فروشندگان',
