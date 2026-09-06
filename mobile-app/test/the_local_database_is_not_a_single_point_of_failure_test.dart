@@ -186,4 +186,61 @@ void main() {
       await cache.clear();
     });
   });
+
+  /// A file the app can no longer open, which is where the offline story
+  /// really ended.
+  ///
+  /// `_password` mints a fresh key whenever secure storage comes back
+  /// empty, and on Android that entry can go — a keystore invalidated by
+  /// an OS update, a backup restored onto another handset. After that
+  /// SQLCipher cannot decrypt a file the app itself wrote. Every open
+  /// fails, every caller reads the failure as «nothing saved», and the
+  /// phone has no cache and no queue for the rest of the install, in
+  /// silence.
+  ///
+  /// The contents of a file that will not open are already unreachable,
+  /// so a fresh one loses nothing that was not already lost, and it gets
+  /// working offline back the same day rather than at the next reinstall.
+  group('a local database that will not open heals instead of giving up', () {
+    late Directory dir;
+    late String path;
+
+    setUp(() {
+      FlutterSecureStorage.setMockInitialValues({});
+      LocalDatabase.lastError = null;
+      dir = Directory.systemTemp.createTempSync('bakery-db');
+      path = p.join(dir.path, 'nested', 'bakery_local.db');
+    });
+
+    tearDown(() => dir.deleteSync(recursive: true));
+
+    test('a file it cannot read is replaced rather than kept forever', () async {
+      // Exactly what an unreadable encrypted file looks like from here:
+      // bytes where a database header should be.
+      Directory(p.dirname(path)).createSync(recursive: true);
+      File(path).writeAsBytesSync(List<int>.filled(4096, 7));
+
+      final db = LocalDatabase(
+        factory: databaseFactoryFfiNoIsolate,
+        path: path,
+      );
+
+      final cache = ResponseCache(database: db);
+      await cache.save('/sales/my-account', null, {'data': 'ok'});
+
+      final held = await cache.read('/sales/my-account', null, allowStale: true);
+
+      expect(held?.body, {'data': 'ok'});
+      expect(LocalDatabase.healthy, isTrue);
+    });
+
+    test('an unopenable database is reported and not hidden', () async {
+      final db = LocalDatabase(factory: _NoDatabase(), path: path);
+
+      await expectLater(db.database, throwsA(anything));
+
+      expect(LocalDatabase.healthy, isFalse);
+      expect(LocalDatabase.lastError, contains('open_failed'));
+    });
+  });
 }
