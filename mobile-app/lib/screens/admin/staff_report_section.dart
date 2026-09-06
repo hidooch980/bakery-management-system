@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 import '../../utils/formatters.dart';
 
 import '../../services/bakery_api.dart';
@@ -75,7 +76,7 @@ class _StaffReportSectionState extends State<StaffReportSection> {
         final coverage = _num(attendance['coverage_percent']);
         final staff = _int(attendance['active_staff']);
 
-        final byEmployee = ((payroll['by_employee'] as List?) ?? const [])
+        final byEmployee = rowList(payroll['by_employee'])
             .whereType<Map>()
             .map((e) => e.map((k, v) => MapEntry('$k', v)))
             .toList();

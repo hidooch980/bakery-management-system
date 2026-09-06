@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../models/flour_sale.dart';
 import '../../services/api_client.dart';
@@ -179,7 +180,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
   }
 
   List<Widget> _buildQuota(BuildContext context, Map<String, dynamic> quota) {
-    final periods = (quota['periods'] as List?) ?? const [];
+    final periods = rowList(quota['periods']);
 
     return [
       AdminSection(

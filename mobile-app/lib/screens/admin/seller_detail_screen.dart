@@ -58,7 +58,7 @@ class _SellerDetailScreenState extends State<SellerDetailScreen> {
           final summary =
               keyedGroup(data['summary']);
           final days =
-              (data['days'] as List? ?? const []).cast<Map<String, dynamic>>();
+              rowList(data['days']);
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -93,7 +93,7 @@ class _Summary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final types = (summary['by_payment_type'] as List? ?? const [])
+    final types = rowList(summary['by_payment_type'])
         .cast<Map<String, dynamic>>();
     final shortfallCount = summary['shortfall_count'] as int? ?? 0;
 
@@ -173,7 +173,7 @@ class _DayState extends State<_Day> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final lines =
-        (widget.day['lines'] as List? ?? const []).cast<Map<String, dynamic>>();
+        rowList(widget.day['lines']);
 
     final shortfall = lines.fold<int>(
       0,

@@ -74,7 +74,7 @@ class _SalesBreakdownSectionState extends State<SalesBreakdownSection> {
 
         final data = snapshot.data!;
         final byType = keyedGroup(data['by_payment_type']);
-        final bySeller = ((data['by_seller'] as List?) ?? const [])
+        final bySeller = rowList(data['by_seller'])
             .whereType<Map<String, dynamic>>()
             .toList();
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
@@ -67,7 +68,7 @@ class _StaffYieldSectionState extends State<StaffYieldSection> {
         if (snapshot.hasError) return const SizedBox.shrink();
 
         final data = snapshot.data!;
-        final rows = ((data['rows'] as List?) ?? const [])
+        final rows = rowList(data['rows'])
             .whereType<Map<String, dynamic>>()
             .toList();
         final note = '${data['note'] ?? ''}';

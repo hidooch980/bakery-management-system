@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../models/bakery.dart';
 import '../../models/entries.dart';
@@ -844,7 +845,7 @@ class _QuotaSectionState extends State<_QuotaSection> {
   Future<void> _load() async {
     try {
       final allocation = await widget.api.currentFlourAllocation();
-      final periods = (allocation?['periods'] as List?) ?? const [];
+      final periods = rowList(allocation?['periods']);
       final current = periods
           .cast<Map<String, dynamic>>()
           .where((p) => p['is_current'] == true)

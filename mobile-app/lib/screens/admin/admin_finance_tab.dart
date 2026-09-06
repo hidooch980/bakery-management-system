@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../models/bakery.dart';
 import '../../services/bakery_api.dart';
@@ -363,9 +364,9 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
     final expenses = data['expenses'] as Map<String, dynamic>? ?? const {};
     final profit = data['profit'] as Map<String, dynamic>? ?? const {};
     final outstanding = data['outstanding_salaries'] as Map<String, dynamic>? ?? const {};
-    final byCategory = (expenses['by_category'] as List?) ?? const [];
+    final byCategory = rowList(expenses['by_category']);
     final split = data['profit_split'] as Map<String, dynamic>? ?? const {};
-    final holders = (split['holders'] as List?) ?? const [];
+    final holders = rowList(split['holders']);
 
     final isPositive = profit['is_positive'] == true;
     final profitColor = isPositive ? AppColors.moneyIn : AppColors.moneyOut;
@@ -479,8 +480,8 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
             for (var i = 0; i < byCategory.length; i++) ...[
               if (i > 0) const Divider(height: 1),
               AdminRow(
-                label: '${(byCategory[i] as Map)['label']}',
-                value: '${(byCategory[i] as Map)['amount_formatted']}',
+                label: '${byCategory[i]['label']}',
+                value: '${byCategory[i]['amount_formatted']}',
               ),
             ],
           ],
@@ -498,16 +499,16 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
             for (var i = 0; i < holders.length; i++) ...[
               if (i > 0) const Divider(height: 1),
               AdminRow(
-                label: '${(holders[i] as Map)['name']}'
-                    '  •  ${(holders[i] as Map)['dang_label']}',
-                value: '${(holders[i] as Map)['amount_formatted']}',
+                label: '${holders[i]['name']}'
+                    '  •  ${holders[i]['dang_label']}',
+                value: '${holders[i]['amount_formatted']}',
                 icon: Icons.person_rounded,
               ),
-              if ('${(holders[i] as Map)['paid']}' != '0')
+              if ('${holders[i]['paid']}' != '0')
                 AdminRow(
                   label: 'پرداخت‌شده / مانده',
-                  value: '${(holders[i] as Map)['paid_formatted']}'
-                      '  •  ${(holders[i] as Map)['remaining_formatted']}',
+                  value: '${holders[i]['paid_formatted']}'
+                      '  •  ${holders[i]['remaining_formatted']}',
                 ),
             ],
           ],

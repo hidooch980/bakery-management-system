@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/json.dart';
 
 import '../services/bakery_api.dart';
 import '../theme/app_theme.dart';
@@ -135,7 +136,7 @@ class _LatenessCardState extends State<LatenessCard> {
                 // The times, not a verdict. «You were late» is an
                 // accusation; «06:25, deadline 06:00» is something a
                 // person can check against their own morning.
-                for (final row in (data['recent'] as List? ?? const [])
+                for (final row in rowList(data['recent'])
                     .cast<Map<String, dynamic>>()
                     .where((r) => r['is_late'] == true)
                     .take(5))

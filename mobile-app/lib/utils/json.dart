@@ -21,3 +21,27 @@ Map<String, dynamic> keyedGroup(dynamic value) {
   // shape change and is still «nothing I can read as a group».
   return const {};
 }
+
+/// The rows of a report, in the shapes those arrive in too.
+///
+/// The mirror of [keyedGroup], and the same trap the other way round: a
+/// grouped collection is a list when the server calls `->values()` on it
+/// and an object when it does not, and `as List?` throws on the object
+/// exactly as `as Map?` threw on the array. Fifteen places read rows that
+/// way, each correct against the endpoint it was written for and none of
+/// them able to survive that endpoint being written differently later.
+///
+/// A keyed group read as rows keeps its values, because «one row per
+/// payment type» is what the caller wanted either way and the key is
+/// already inside each row where it matters.
+List<Map<String, dynamic>> rowList(dynamic value) {
+  final raw = switch (value) {
+    List list => list,
+    Map map => map.values,
+    _ => const [],
+  };
+
+  // Anything in there that is not itself a row is dropped rather than
+  // cast: one malformed entry must not take the section off the screen.
+  return raw.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+}
