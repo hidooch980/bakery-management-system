@@ -69,32 +69,43 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
   }
 
   Future<_SellerData> _load() async {
-    final pending = await widget.api.pendingChane();
-    final today = await widget.api.todaySales();
+    // Together, not one after another. These four reads do not depend on
+    // each other, and awaiting them in turn meant four timeouts in a row
+    // whenever the phone was off the network: fifteen seconds each, so
+    // the screen drew nothing for something close to a minute and then
+    // drew it correctly. Everything worked. Nobody stands in a shop for a
+    // minute to find out.
+    //
+    // Started before any is awaited, so the waiting overlaps. With signal
+    // this is also simply faster.
+    final pendingCall = widget.api.pendingChane();
+    final todayCall = widget.api.todaySales();
 
-    ChaneBoard? board;
-    try {
-      board = await widget.api.chaneBoard();
-    } on ApiException {
-      // The comparison is informational; the rest of the page still works.
-      board = null;
-    }
+    // The comparison is informational; the rest of the page still works
+    // without it. Same for flour, which is a permission the seller may
+    // not hold — a failure there hides the section rather than the page.
+    final boardCall = widget.api.chaneBoard().then<ChaneBoard?>(
+          (b) => b,
+          onError: (_) => null,
+        );
 
-    // Flour selling is a permission the seller may not hold, so a failure
-    // here hides the section rather than breaking the page.
-    ({
-      List<FlourSale> sales,
-      int count,
-      double totalWeightKg,
-      String totalFormatted,
-    })? flour;
-    try {
-      flour = await widget.api.todayFlourSales();
-    } on ApiException {
-      flour = null;
-    }
+    final flourCall = widget.api.todayFlourSales().then<
+        ({
+          List<FlourSale> sales,
+          int count,
+          double totalWeightKg,
+          String totalFormatted,
+        })?>(
+      (f) => f,
+      onError: (_) => null,
+    );
 
-    return (pending: pending, today: today, board: board, flour: flour);
+    return (
+      pending: await pendingCall,
+      today: await todayCall,
+      board: await boardCall,
+      flour: await flourCall,
+    );
   }
 
   Future<void> _loadBakery() async {
