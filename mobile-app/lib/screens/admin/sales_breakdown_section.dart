@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
@@ -72,7 +73,7 @@ class _SalesBreakdownSectionState extends State<SalesBreakdownSection> {
         if (snapshot.hasError) return const SizedBox.shrink();
 
         final data = snapshot.data!;
-        final byType = (data['by_payment_type'] as Map?) ?? const {};
+        final byType = keyedGroup(data['by_payment_type']);
         final bySeller = ((data['by_seller'] as List?) ?? const [])
             .whereType<Map<String, dynamic>>()
             .toList();

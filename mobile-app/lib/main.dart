@@ -21,6 +21,30 @@ import 'widgets/update_prompt.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // A widget that throws while building is drawn, in a release build, as a
+  // plain grey rectangle: no message, no hint, and nothing in any log the
+  // shop can reach. The owner sent a photograph of one half a screen tall
+  // and it took a round of questions to find out which section it even
+  // was — and it was one bad cast in one section, on a page whose other
+  // figures were all correct.
+  //
+  // A failure that says nothing costs more than the failure. This one
+  // names the section and stays small, so the page around it still reads
+  // and whoever sees it can say what it said.
+  ErrorWidget.builder = (details) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'این بخش نمایش داده نشد.\n${details.exception}',
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.rtl,
+          // A colour, because this draws outside any theme: the widget
+          // it replaces is the one that failed, so there is no inherited
+          // style to fall back on and an uncoloured one can come out
+          // invisible on the dark screen the shop actually uses.
+          style: const TextStyle(fontSize: 12, color: Color(0xFFB00020)),
+        ),
+      );
+
   final client = ApiClient();
 
   // Where the backend lives is published in the repository rather than

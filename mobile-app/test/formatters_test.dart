@@ -193,4 +193,36 @@ void main() {
       expect(Bakery.fromJson({'name': 'x'}).currency, Currency.toman);
     });
   });
+
+  group('the unit is what is left when the number is taken away', () {
+    String unitOf(String formatted) =>
+        formatted.replaceAll(RegExp(digitsAndSeparators), '');
+
+    test('an Arabic comma does not come along with the currency', () {
+      // What the owner's finance screen showed: «42,194,500 ،ریال», with a
+      // comma leaning against the word, because «،» was not in the set of
+      // separators the number was stripped by.
+      expect(unitOf('42،194،500 ریال'), 'ریال');
+    });
+
+    test('the separators already handled still are', () {
+      expect(unitOf('42,194,500 ریال'), 'ریال');
+      expect(unitOf('42٬194٬500 ریال'), 'ریال');
+    });
+
+    test('Persian and Arabic-Indic digits are part of the number', () {
+      expect(unitOf('۴۲٬۱۹۴٬۵۰۰ ریال'), 'ریال');
+      expect(unitOf('٤٢٬١٩٤٬٥٠٠ ریال'), 'ریال');
+    });
+
+    test('a negative figure keeps its unit and loses its sign', () {
+      expect(unitOf('−5,245,500 تومان'), 'تومان');
+      expect(unitOf('-5,245,500 تومان'), 'تومان');
+    });
+
+    test('a decimal figure loses both marks', () {
+      expect(unitOf('12.5 کیلوگرم'), 'کیلوگرم');
+      expect(unitOf('12٫5 کیلوگرم'), 'کیلوگرم');
+    });
+  });
 }

@@ -1,4 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
+import '../../utils/formatters.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/financial_series.dart';
@@ -178,7 +179,7 @@ class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
     double total,
   ) {
     final example = series.points.isEmpty ? '' : sample(series.points.first);
-    final unit = example.replaceAll(RegExp(r'[\d,٬.\-−\s]'), '');
+    final unit = example.replaceAll(RegExp(digitsAndSeparators), '');
 
     final rounded = total.abs().round().toString().replaceAllMapped(
           RegExp(r'(\d)(?=(\d{3})+$)'),

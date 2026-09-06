@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
@@ -55,7 +56,7 @@ class _SellerDetailScreenState extends State<SellerDetailScreen> {
 
           final data = snapshot.data!;
           final summary =
-              (data['summary'] as Map?)?.cast<String, dynamic>() ?? {};
+              keyedGroup(data['summary']);
           final days =
               (data['days'] as List? ?? const []).cast<Map<String, dynamic>>();
 

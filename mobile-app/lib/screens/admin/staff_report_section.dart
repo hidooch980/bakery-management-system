@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/formatters.dart';
 
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
@@ -143,7 +144,7 @@ class _StaffReportSectionState extends State<StaffReportSection> {
   /// borrowed from the total rather than guessed at.
   String _money(Map<String, dynamic> payroll, double amount) {
     final formatted = (payroll['total_net_formatted'] as String?) ?? '';
-    final unit = formatted.replaceAll(RegExp(r'[\d,٬.\-−\s]'), '');
+    final unit = formatted.replaceAll(RegExp(digitsAndSeparators), '');
 
     final rounded = amount.round().toString().replaceAllMapped(
           RegExp(r'(\d)(?=(\d{3})+$)'),
