@@ -50,6 +50,18 @@ class LocalDatabase {
 
   Future<Database> get database async => _open ??= await _openDatabase();
 
+  /// Why the local database is not available, or null when it is.
+  ///
+  /// Read by the settings screen. Everything that uses this database
+  /// treats a failure as «no saved copy», which is the right behaviour on
+  /// the shop floor and the wrong one for anybody trying to find out why
+  /// a phone has no saved copies at all: three releases were spent fixing
+  /// layers above this one while the file underneath had never opened.
+  static String? lastError;
+
+  /// Whether the phone could open its own storage the last time it tried.
+  static bool get healthy => lastError == null;
+
   /// Set once by `test/flutter_test_config.dart`, for the code that builds
   /// a queue without being handed a database — `ApiClient` does, as a
   /// field initialiser, and threading a factory down to it from every
@@ -60,12 +72,70 @@ class LocalDatabase {
   static DatabaseFactory? factoryForTesting;
 
   Future<Database> _openDatabase() async {
+    try {
+      final db = await _tryOpen();
+      lastError = null;
+
+      return db;
+    } on Object {
+      // A file that will not open is a file whose contents are already
+      // unreachable, so starting a new one loses nothing that was not
+      // lost — and keeping the old one loses everything from here on.
+      //
+      // The way this happens is the key. `_password` mints a new one
+      // whenever secure storage comes back empty, and on Android that
+      // entry can go: a keystore invalidated by an OS update, a backup
+      // restored onto a different handset. From that moment SQLCipher
+      // cannot decrypt a file the app itself wrote, every open fails,
+      // and because each caller treats a failure as «nothing saved», the
+      // phone quietly has no cache and no queue for the rest of the
+      // install. No error, no empty state, nothing to report — just a
+      // seller in a shop with no signal being told there is nothing to
+      // show, release after release.
+      await _discard();
+
+      try {
+        final db = await _tryOpen();
+        lastError = null;
+
+        return db;
+      } on Object catch (again) {
+        lastError = '$again';
+        rethrow;
+      }
+    }
+  }
+
+  /// Where the file lives, by the same rule the open uses — so what gets
+  /// discarded is always the file that would not open.
+  Future<String> _resolvePath() async {
     final factory = _factory ?? factoryForTesting;
 
-    final path = _path ??
+    return _path ??
         (factory != null
             ? inMemoryDatabasePath
             : p.join(await cipher.getDatabasesPath(), _fileName));
+  }
+
+  /// Removes the local file so the next open can make a fresh one.
+  Future<void> _discard() async {
+    final path = await _resolvePath();
+
+    if (path == inMemoryDatabasePath) return;
+
+    try {
+      final file = File(path);
+
+      if (file.existsSync()) await file.delete();
+    } on Object {
+      // Nothing else to try. The open below reports what is left.
+    }
+  }
+
+  Future<Database> _tryOpen() async {
+    final factory = _factory ?? factoryForTesting;
+
+    final path = await _resolvePath();
 
     await _ensureDirectoryExists(path);
 

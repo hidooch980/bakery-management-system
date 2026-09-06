@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/bakery_api.dart';
 import '../services/offline_queue.dart';
 import '../services/connection_status.dart';
+import '../services/local_database.dart';
 import '../theme/app_theme.dart';
 import 'common.dart';
 
@@ -100,7 +101,13 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
     // Nothing to say: the server is answering, nothing is waiting, and
     // nothing was refused. A refusal keeps the card on screen even when
     // the queue is empty — vanishing is what used to lose it.
-    if (online && _pending == 0 && _rejected.isEmpty) {
+    // A phone that cannot open its own storage keeps nothing: no saved
+    // copies to read without signal, no queue to hold a sale. It used to
+    // be indistinguishable from an ordinary quiet day, which is how three
+    // releases were spent fixing layers above a file that never opened.
+    final storageBroken = !LocalDatabase.healthy;
+
+    if (online && _pending == 0 && _rejected.isEmpty && !storageBroken) {
       return const SizedBox.shrink();
     }
 
@@ -108,7 +115,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
 
     // A refusal is not the same problem as a queue waiting for signal:
     // the queue clears itself, this one needs a person.
-    final color = _rejected.isNotEmpty
+    final color = _rejected.isNotEmpty || storageBroken
         ? AppColors.moneyOut
         : (online ? AppColors.attention : AppColors.moneyOut);
 
@@ -119,7 +126,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
         child: Row(
           children: [
             Icon(
-              _rejected.isNotEmpty
+              _rejected.isNotEmpty || storageBroken
                   ? Icons.report_problem_rounded
                   : (online
                       ? Icons.cloud_sync_rounded
@@ -138,6 +145,16 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
                           color: color,
                         ),
                   ),
+                  if (storageBroken)
+                    Text(
+                      'این گوشی نمی‌تواند چیزی را برای حالت بدون اینترنت '
+                      'ذخیره کند. یک بار برنامه را ببندید و باز کنید؛ اگر '
+                      'باز هم این پیام بود، برنامه را حذف و دوباره نصب کنید.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+
                   if (_pending > 0)
                     Text(
                       '$_pending مورد ثبت‌شده در انتظار ارسال است'
@@ -210,6 +227,10 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
   /// No signal and "signal but no server" are different problems with
   /// different fixes, so they are not given the same sentence.
   String _headline(ConnectionStatus connection) {
+    if (!LocalDatabase.healthy) {
+      return 'حافظهٔ داخلی گوشی کار نمی‌کند';
+    }
+
     if (_rejected.isNotEmpty) {
       return '${_rejected.length} مورد ارسال نشد';
     }
