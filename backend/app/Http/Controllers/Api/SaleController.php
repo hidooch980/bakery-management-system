@@ -36,7 +36,7 @@ class SaleController extends Controller
      * older installation, and the queries that exclude them must keep
      * excluding them.
      */
-    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'charity'];
+    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'charity', 'waste'];
 
     /**
      * Seller records the sale of a pending chane batch.

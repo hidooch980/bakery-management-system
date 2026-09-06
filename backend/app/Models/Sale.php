@@ -30,6 +30,7 @@ class Sale extends Model
         'schools' => 'مدارس',
         'charity' => 'خیرات و کمک',
         'shortfall' => 'کسری نان',
+        'waste' => 'ضایعات',
         'other' => 'سایر',
     ];
 
@@ -65,7 +66,30 @@ class Sale extends Model
      * them would put the price of every loaf given away onto the person
      * who handed it over, as though they had pocketed it.
      */
-    public const GIVEAWAY_TYPES = ['charity', 'home'];
+    public const GIVEAWAY_TYPES = ['charity', 'home', 'waste'];
+
+    /**
+     * Bread that was destroyed: burnt, dropped, or left until it stopped
+     * being bread.
+     *
+     * A giveaway as far as money is concerned — nobody owes for it, and
+     * it stays off the seller's account — but deliberately not filed
+     * under charity, because those are opposite facts to the person
+     * reading the books. Charity is a decision he made; waste is a
+     * problem he has, and a month where one grew is not a month where
+     * the other did.
+     *
+     * Before this existed the seller closing a burnt batch could either
+     * take it as کسری, paying for the oven out of their wages, or call
+     * it خیرات, which was untrue and spoiled the giving figure too.
+     *
+     * **It costs nobody, which is what makes it worth watching.** That is
+     * the obvious way to cover a theft, so it is never silent: reported
+     * beside every other payment type, and raised by the issue scanner
+     * once it passes what an ordinary week loses. The answer to the risk
+     * is daylight, not making somebody pay for burnt bread.
+     */
+    public const WASTE_TYPE = 'waste';
 
     /**
      * Bread a worker took home.
