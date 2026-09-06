@@ -3,7 +3,10 @@ import 'dart:typed_data';
 
 import 'package:bakery_app/providers/auth_provider.dart';
 import 'package:bakery_app/providers/theme_provider.dart';
+import 'package:bakery_app/screens/chane/chane_home_screen.dart';
+import 'package:bakery_app/screens/dough/dough_home_screen.dart';
 import 'package:bakery_app/screens/seller/seller_home_screen.dart';
+import 'package:bakery_app/screens/shater/shater_home_screen.dart';
 import 'package:bakery_app/services/api_client.dart';
 import 'package:bakery_app/services/bakery_api.dart';
 import 'package:bakery_app/services/connection_status.dart';
@@ -14,7 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The seller's own screen, with the radio off, as a screen.
+/// Every role's first screen, with the radio off, as a screen.
 ///
 /// Four releases have fixed real bugs underneath this and the owner has
 /// said «کار نکرد» after every one. Every test that passed was a test of a
@@ -125,4 +128,58 @@ void main() {
       reason: 'the screen asked for: ${wire.asked}',
     );
   });
+
+  /// The other three benches.
+  ///
+  /// The seller's screen was mounted first because his was the failure
+  /// being chased. The dough maker, the chane gir and the shater open the
+  /// app in the same shop, on the same connection, and had no such test
+  /// at all — so a screen of theirs that threw offline would have been
+  /// found the way the seller's was: by somebody at the oven saying «کار
+  /// نکرد» and a week of guessing.
+  ///
+  /// The wire answers whatever it is asked, then stops answering. The
+  /// only question is whether the screen is still there.
+  for (final bench in <({String name, Widget Function(BakeryApi) build})>[
+    (name: 'خمیرگیر', build: (api) => DoughHomeScreen(api: api)),
+    (name: 'چانه‌گیر', build: (api) => ChaneHomeScreen(api: api)),
+    (name: 'شاطر', build: (api) => ShaterHomeScreen(api: api)),
+  ]) {
+    testWidgets('${bench.name} keeps a screen when the signal goes',
+        (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 3.0;
+      addTearDown(tester.view.reset);
+
+      Widget under() => MultiProvider(
+            providers: [
+              ChangeNotifierProvider(create: (_) => AuthProvider(api)),
+              ChangeNotifierProvider(create: (_) => ConnectionStatus(client)),
+              ChangeNotifierProvider(create: (_) => ThemeProvider()),
+            ],
+            child: MaterialApp(home: bench.build(api)),
+          );
+
+      await tester.pumpWidget(under());
+      await tester.pumpAndSettle();
+
+      wire.asked.clear();
+      wire.down = true;
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(under());
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'the screen asked for: ${wire.asked}',
+      );
+      expect(
+        find.textContaining('خطا'),
+        findsNothing,
+        reason: 'the screen asked for: ${wire.asked}',
+      );
+    });
+  }
 }
