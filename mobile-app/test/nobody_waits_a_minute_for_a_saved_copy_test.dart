@@ -110,4 +110,5 @@ void main() {
     // the request: the server may be on the same wifi.
     expect((await BakeryApi(client).todaySales()).total, 3);
   });
+
 }
