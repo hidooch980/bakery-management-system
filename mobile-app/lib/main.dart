@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'services/error_log.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
@@ -31,7 +33,30 @@ void main() async {
   // A failure that says nothing costs more than the failure. This one
   // names the section and stays small, so the page around it still reads
   // and whoever sees it can say what it said.
-  ErrorWidget.builder = (details) => Padding(
+  // Everything that goes wrong, kept where a person can read it. Framework
+  // errors still print to the console, which on a handset in a shop is
+  // nobody; this is the copy the owner can actually reach.
+  final previous = FlutterError.onError;
+
+  FlutterError.onError = (details) {
+    ErrorLog.record(details.exception, stack: details.stack,
+        where: details.library);
+    previous?.call(details);
+  };
+
+  // The other half. An error thrown outside a build — a future nobody
+  // awaited, a callback — reached nothing at all before this.
+  PlatformDispatcher.instance.onError = (error, stack) {
+    ErrorLog.record(error, stack: stack, where: 'خارج از رسم صفحه');
+
+    return true;
+  };
+
+  ErrorWidget.builder = (details) {
+    ErrorLog.record(details.exception, stack: details.stack,
+        where: 'هنگام رسم صفحه');
+
+    return Padding(
         padding: const EdgeInsets.all(16),
         child: Text(
           'این بخش نمایش داده نشد.\n${details.exception}',
@@ -44,6 +69,7 @@ void main() async {
           style: const TextStyle(fontSize: 12, color: Color(0xFFB00020)),
         ),
       );
+  };
 
   final client = ApiClient();
 
