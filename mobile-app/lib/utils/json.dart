@@ -45,3 +45,25 @@ List<Map<String, dynamic>> rowList(dynamic value) {
   // cast: one malformed entry must not take the section off the screen.
   return raw.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
 }
+
+/// The name to put on a row about a person, whatever arrived.
+///
+/// A row whose person did not come through used to read «—», which is
+/// indistinguishable from a person whose name is genuinely blank — and
+/// «نام کارکنان نمایش نمی‌دهد» could mean either. One of those is the
+/// server not sending the relation and the other is the record itself, and
+/// they are fixed in different places.
+///
+/// So an absent name falls back to the id the row already carries. «کارمند
+/// #7» is not pretty, but it is a fact somebody can act on: the shop knows
+/// who number seven is, and it says plainly that the name is what is
+/// missing rather than the person.
+String personName(Map<String, dynamic> person, {Object? fallbackId}) {
+  final name = '${person['name'] ?? ''}'.trim();
+
+  if (name.isNotEmpty) return name;
+
+  final id = person['id'] ?? fallbackId;
+
+  return id == null ? 'بدون نام' : 'کارمند #$id';
+}
