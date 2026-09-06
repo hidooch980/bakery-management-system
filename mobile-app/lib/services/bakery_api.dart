@@ -1118,6 +1118,21 @@ class BakeryApi {
     return body['data'] as Map<String, dynamic>;
   }
 
+  /// What each bench got out of a sack, against the formula.
+  ///
+  /// Cached like the other reports, so it opens without signal.
+  Future<Map<String, dynamic>> staffYield({
+    required String from,
+    required String to,
+  }) async {
+    final body = await _client.getCached('/reports/staff-yield', query: {
+      'from': from,
+      'to': to,
+    });
+
+    return body['data'] as Map<String, dynamic>;
+  }
+
   /// What the shop consumed over a range, bucketed: flour kneaded against
   /// flour sold on, and the salt and yeast behind it.
   Future<Map<String, dynamic>> consumptionSeries({

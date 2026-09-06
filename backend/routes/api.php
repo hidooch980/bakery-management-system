@@ -319,6 +319,12 @@ Route::prefix('v1')->group(function () {
             // it is the same class of question, asked per person.
             Route::get('/reports/sellers', [SellerPerformanceController::class, 'index']);
             Route::get('/reports/sellers/{seller}', [SellerPerformanceController::class, 'show']);
+
+            // What each bench got out of a sack, against the formula. Here
+            // rather than beside the attendance reports, which a seller can
+            // read: this is what somebody's work came to, and it belongs
+            // with «what each seller sold» behind the owner's permission.
+            Route::get('/reports/staff-yield', [ReportController::class, 'staffYield']);
             Route::get('/reports/flour', [ReportController::class, 'flourConsumption']);
             Route::get('/reports/efficiency', [ReportController::class, 'efficiency']);
             // What the shop got through, a day, a week or a month at a time.

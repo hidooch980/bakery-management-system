@@ -1,0 +1,189 @@
+DELETE api/v1/advance-requests/{advanceRequest}             (any signed-in)
+DELETE api/v1/bank-accounts/{account}                       admin
+DELETE api/v1/consignment-flour/{consignment}               admin, seller
+DELETE api/v1/customers/{customer}                          admin
+DELETE api/v1/devices/others                                (any signed-in)
+DELETE api/v1/devices/{token}                               (any signed-in)
+DELETE api/v1/diesel/deliveries/{delivery}                  admin, seller
+DELETE api/v1/expenses/{expense}                            admin
+DELETE api/v1/flour-allocations/{allocation}                admin, seller
+DELETE api/v1/holidays/{holiday}                            admin
+DELETE api/v1/incomes/{income}                              admin
+DELETE api/v1/purchases/{purchase}                          admin
+DELETE api/v1/salaries/{salary}                             admin
+DELETE api/v1/salary-requests/{salaryRequest}               (any signed-in)
+DELETE api/v1/shares/{share}                                admin
+DELETE api/v1/staff-adjustments/{adjustment}                admin
+DELETE api/v1/staff-advances/{advance}                      admin
+DELETE api/v1/supplier-payments/{payment}                   admin
+DELETE api/v1/suppliers/{supplier}                          admin
+DELETE api/v1/users/{user}                                  admin
+GET api/v1/advance-requests                                 admin
+GET api/v1/advance-requests/mine                            (any signed-in)
+GET api/v1/attendance/my-history                            admin, chane_gir, dough_maker, seller, shater
+GET api/v1/attendance/roster                                admin, chane_gir, dough_maker, seller, shater
+GET api/v1/attendance/today                                 admin, chane_gir, dough_maker, seller, shater
+GET api/v1/backups                                          admin
+GET api/v1/bakery                                           (any signed-in)
+GET api/v1/bank-accounts                                    admin
+GET api/v1/bank-accounts/{account}/transactions             admin
+GET api/v1/chane-board                                      admin, chane_gir, seller, shater
+GET api/v1/chane-entries/my-history                         admin, chane_gir, seller
+GET api/v1/chane-entries/pending                            admin, seller
+GET api/v1/consignment-flour                                admin, seller
+GET api/v1/consignment-flour/balance                        admin, seller
+GET api/v1/consignment-flour/partners                       admin, seller
+GET api/v1/customer-debts                                   admin
+GET api/v1/customers                                        (any signed-in)
+GET api/v1/customers/types                                  (any signed-in)
+GET api/v1/customers/{customer}/interactions                admin
+GET api/v1/devices                                          (any signed-in)
+GET api/v1/diesel/quota                                     admin, seller
+GET api/v1/dough-entries/my-history                         admin, dough_maker, seller
+GET api/v1/dough-entries/pending                            admin, chane_gir, seller
+GET api/v1/expenses                                         admin
+GET api/v1/expenses/categories                              admin
+GET api/v1/flour-allocations                                admin, seller
+GET api/v1/flour-allocations/current                        admin, seller
+GET api/v1/flour-sales/options                              admin, seller
+GET api/v1/flour-sales/today                                admin, seller
+GET api/v1/flour/balance                                    admin
+GET api/v1/flour/movements                                  admin
+GET api/v1/follow-ups                                       admin
+GET api/v1/health                                           (public)
+GET api/v1/holidays                                         (any signed-in)
+GET api/v1/holidays/today                                   (any signed-in)
+GET api/v1/holidays/types                                   (any signed-in)
+GET api/v1/incomes                                          admin
+GET api/v1/incomes/categories                               admin
+GET api/v1/inventory                                        admin, seller
+GET api/v1/inventory/movements                              admin, seller
+GET api/v1/me                                               (any signed-in)
+GET api/v1/my-collections                                   admin, seller
+GET api/v1/purchases                                        admin
+GET api/v1/purchases/mine                                   admin, seller
+GET api/v1/purchases/options                                admin, seller
+GET api/v1/purchases/{purchase}                             admin
+GET api/v1/reports/attendance                               admin, seller
+GET api/v1/reports/attendance-summary                       admin, seller
+GET api/v1/reports/balance-sheet                            admin
+GET api/v1/reports/consumption-series                       admin
+GET api/v1/reports/dashboard                                admin
+GET api/v1/reports/debts                                    admin
+GET api/v1/reports/efficiency                               admin
+GET api/v1/reports/export/{dataset}                         admin
+GET api/v1/reports/financial                                admin
+GET api/v1/reports/financial-series                         admin
+GET api/v1/reports/financial-trend                          admin
+GET api/v1/reports/flour                                    admin
+GET api/v1/reports/payroll                                  admin
+GET api/v1/reports/production                               admin
+GET api/v1/reports/sales                                    admin
+GET api/v1/reports/sellers                                  admin
+GET api/v1/reports/sellers/{seller}                         admin
+GET api/v1/reports/staff-yield                              admin
+GET api/v1/salaries                                         admin
+GET api/v1/salaries/employees                               admin
+GET api/v1/salaries/mine                                    (any signed-in)
+GET api/v1/salaries/my-summary                              (any signed-in)
+GET api/v1/salary-requests                                  admin
+GET api/v1/salary-requests/mine                             (any signed-in)
+GET api/v1/sales/my-account                                 admin, seller
+GET api/v1/sales/payment-types                              (any signed-in)
+GET api/v1/sales/staff                                      admin, seller
+GET api/v1/sales/today                                      admin, seller
+GET api/v1/seller-accounts                                  admin
+GET api/v1/settlement-requests                              admin, seller
+GET api/v1/settlement-requests/account                      admin, seller
+GET api/v1/settlement-requests/settleable                   admin, seller
+GET api/v1/shares                                           admin
+GET api/v1/shares/settlements                               admin
+GET api/v1/shares/split                                     admin
+GET api/v1/staff-adjustments                                admin
+GET api/v1/staff-adjustments/period                         admin
+GET api/v1/staff-advances                                   admin
+GET api/v1/staff-advances/mine                              (any signed-in)
+GET api/v1/staff-advances/outstanding                       admin
+GET api/v1/supplier-payments                                admin
+GET api/v1/suppliers                                        admin, seller
+GET api/v1/suppliers/balances                               admin
+GET api/v1/suppliers/{supplier}/account                     admin
+GET api/v1/today                                            admin
+GET api/v1/users                                            admin
+GET api/v1/users/roles                                      admin
+GET api/v1/users/{user}                                     admin
+GET api/v1/work-starts/late-report                          admin
+GET api/v1/work-starts/mine                                 (any signed-in)
+GET api/v1/work-starts/rules                                (any signed-in)
+GET api/v1/work-starts/today                                (any signed-in)
+PATCH api/v1/advance-requests/{advanceRequest}/approve      admin
+PATCH api/v1/advance-requests/{advanceRequest}/reject       admin
+PATCH api/v1/bank-accounts/{account}                        admin
+PATCH api/v1/consignment-flour/{consignment}/settle         admin, seller
+PATCH api/v1/diesel/quota                                   admin, seller
+PATCH api/v1/expenses/{expense}                             admin
+PATCH api/v1/incomes/{income}                               admin
+PATCH api/v1/inventory/{key}/threshold                      admin, seller
+PATCH api/v1/salaries/{salary}                              admin
+PATCH api/v1/salaries/{salary}/mark-paid                    admin
+PATCH api/v1/salary-requests/{salaryRequest}/reject         admin
+PATCH api/v1/shares/{share}                                 admin
+PATCH api/v1/users/{user}                                   admin
+PATCH api/v1/users/{user}/toggle-active                     admin
+POST api/v1/advance-requests                                (any signed-in)
+POST api/v1/attendance/check-in                             admin, chane_gir, dough_maker, seller, shater
+POST api/v1/attendance/check-in/{user}                      admin, chane_gir, dough_maker, seller, shater
+POST api/v1/backups                                         admin
+POST api/v1/bank-accounts                                   admin
+POST api/v1/bank-accounts/transfer                          admin
+POST api/v1/bank-accounts/{account}/transactions            admin
+POST api/v1/chane-entries                                   admin, chane_gir, seller
+POST api/v1/change-password                                 admin, chane_gir, dough_maker, seller, shater
+POST api/v1/consignment-flour                               admin, seller
+POST api/v1/customer-debts/{customer}/settle                admin
+POST api/v1/customers                                       admin
+POST api/v1/customers/{customer}/interactions               admin
+POST api/v1/diesel/deliveries                               admin, seller
+POST api/v1/dough-entries                                   admin, dough_maker, seller
+POST api/v1/expenses                                        admin
+POST api/v1/flour-allocations                               admin, seller
+POST api/v1/flour-sales                                     admin, seller
+POST api/v1/flour/movements                                 admin
+POST api/v1/forgot-password                                 (public)
+POST api/v1/holidays                                        admin
+POST api/v1/incomes                                         admin
+POST api/v1/interactions/{interaction}/complete             admin
+POST api/v1/inventory/movements                             admin, seller
+POST api/v1/login                                           (public)
+POST api/v1/logout                                          (any signed-in)
+POST api/v1/my-collections/{customer}/collect               admin, seller
+POST api/v1/purchases                                       admin, seller
+POST api/v1/reset-password                                  (public)
+POST api/v1/salaries                                        admin
+POST api/v1/salary-requests                                 (any signed-in)
+POST api/v1/sales                                           admin, seller
+POST api/v1/seller-accounts/{seller}/settle                 admin
+POST api/v1/seller-accounts/{seller}/settle-loaves          admin
+POST api/v1/settlement-requests                             admin, seller
+POST api/v1/settlement-requests/{settlement}/confirm        admin
+POST api/v1/settlement-requests/{settlement}/reject         admin
+POST api/v1/shares                                          admin
+POST api/v1/shares/{share}/settle                           admin
+POST api/v1/staff-adjustments                               admin
+POST api/v1/staff-advances                                  admin
+POST api/v1/supplier-payments                               admin
+POST api/v1/suppliers                                       admin
+POST api/v1/users                                           admin
+POST api/v1/work-starts                                     admin, chane_gir, seller
+PUT api/v1/bakery                                           admin
+PUT api/v1/bank-accounts/{account}                          admin
+PUT api/v1/customers/{customer}                             admin
+PUT api/v1/expenses/{expense}                               admin
+PUT api/v1/flour-allocations/{allocation}                   admin, seller
+PUT api/v1/holidays/{holiday}                               admin
+PUT api/v1/incomes/{income}                                 admin
+PUT api/v1/purchases/{purchase}                             admin
+PUT api/v1/salaries/{salary}                                admin
+PUT api/v1/shares/{share}                                   admin
+PUT api/v1/suppliers/{supplier}                             admin
+PUT api/v1/users/{user}                                     admin
