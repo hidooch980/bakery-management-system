@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\FlourAllocation;
+use App\Models\FlourAllocationPeriod;
 use App\Models\InventoryItem;
 use Illuminate\Support\Collection;
 
@@ -44,13 +45,24 @@ class Outlook
     /**
      * @return Collection<int, array{key: string, tone: string, title: string, basis: string}>
      */
-    public static function now(): Collection
+    /**
+     * @param  FlourAllocationPeriod|null  $period  the period in progress when the
+     *                                              caller has already loaded it — `TodayAnswer` has, for the figures
+     *                                              line — so it is not loaded twice for one page. Called bare, it is
+     *                                              looked up here.
+     */
+    public static function now(?FlourAllocationPeriod $period = null, bool $periodGiven = false): Collection
     {
         $burn = self::flourBurnPerDay();
 
+        if (! $periodGiven && $period === null) {
+            $allocation = FlourAllocation::with('periods')->orderByDesc('month_start')->first();
+            $period = $allocation?->periodFor(now());
+        }
+
         return collect([
             ...self::flour($burn),
-            ...self::quota($burn),
+            ...self::quota($burn, $period),
             ...self::periodProfit(),
         ]);
     }
@@ -128,14 +140,11 @@ class Outlook
      * line says how much is used; this says whether the rest is enough
      * for the days that are left, which is the half that decides anything.
      */
-    private static function quota(?array $burn): array
+    private static function quota(?array $burn, ?FlourAllocationPeriod $period): array
     {
         if ($burn === null || $burn['perDay'] <= 0) {
             return [];
         }
-
-        $allocation = FlourAllocation::with('periods')->orderByDesc('month_start')->first();
-        $period = $allocation?->periodFor(now());
 
         if ($period === null) {
             return [];
