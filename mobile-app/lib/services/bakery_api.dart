@@ -126,7 +126,7 @@ class BakeryApi {
 
   /// The rest of the floor and whether each of them is in yet.
   Future<List<StaffAttendance>> attendanceRoster() async {
-    final body = await _client.get('/attendance/roster');
+    final body = await _client.getCached('/attendance/roster');
     final data = body['data'] as Map<String, dynamic>;
 
     return ((data['staff'] as List?) ?? const [])
@@ -278,7 +278,7 @@ class BakeryApi {
 
   /// One person's month: the two totals and the entries behind them.
   Future<AdjustmentPeriod> adjustmentsFor(int userId) async {
-    final body = await _client.get('/staff-adjustments/period', query: {
+    final body = await _client.getCached('/staff-adjustments/period', query: {
       'user_id': '$userId',
     });
 
@@ -291,7 +291,7 @@ class BakeryApi {
 
   /// Everyone on the payroll, with what the shop has agreed to pay them.
   Future<List<Employee>> payrollEmployees() async {
-    final body = await _client.get('/salaries/employees');
+    final body = await _client.getCached('/salaries/employees');
 
     return ((body['data'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
@@ -301,7 +301,7 @@ class BakeryApi {
 
   /// The payslips already written, newest period first.
   Future<List<Payslip>> payslips({String? status}) async {
-    final body = await _client.get(
+    final body = await _client.getCached(
       '/salaries${status == null ? '' : '?status=$status'}',
     );
 
@@ -395,7 +395,7 @@ class BakeryApi {
     bool partnersOnly = false,
     bool buyersOnly = false,
   }) async {
-    final body = await _client.get('/customers', query: {
+    final body = await _client.getCached('/customers', query: {
       if (partnersOnly) 'partners_only': true,
       if (buyersOnly) 'buyers_only': true,
     });
@@ -433,7 +433,7 @@ class BakeryApi {
   }
 
   Future<SellerAccount> myAccount() async {
-    final body = await _client.get('/sales/my-account');
+    final body = await _client.getCached('/sales/my-account');
 
     return SellerAccount.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -443,7 +443,7 @@ class BakeryApi {
   /// What the buyers who run an account owe this seller.
   Future<({List<Map<String, dynamic>> customers, String totalFormatted})>
       myCollections() async {
-    final body = await _client.get('/my-collections');
+    final body = await _client.getCached('/my-collections');
     final data = body['data'] as Map<String, dynamic>;
 
     return (
@@ -514,7 +514,7 @@ class BakeryApi {
   /// any, and what happened to the ones before it.
   Future<({SettlementRequest? pending, List<SettlementRequest> history})>
       settlementRequests() async {
-    final body = await _client.get('/settlement-requests');
+    final body = await _client.getCached('/settlement-requests');
     final data = body['data'] as Map<String, dynamic>;
 
     return (
@@ -530,7 +530,7 @@ class BakeryApi {
 
   /// The seller's running account: one figure to pay against.
   Future<SellerRunningAccount> sellerAccount() async {
-    final body = await _client.get('/settlement-requests/account');
+    final body = await _client.getCached('/settlement-requests/account');
 
     return SellerRunningAccount.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -539,7 +539,7 @@ class BakeryApi {
   /// settle part of the account instead of all of it.
   Future<({List<SettleableLine> lines, String totalFormatted})>
       settleableLines() async {
-    final body = await _client.get('/settlement-requests/settleable');
+    final body = await _client.getCached('/settlement-requests/settleable');
     final data = body['data'] as Map<String, dynamic>;
 
     return (
@@ -632,7 +632,7 @@ class BakeryApi {
     required String to,
     String granularity = 'day',
   }) async {
-    final body = await _client.get('/reports/financial-series', query: {
+    final body = await _client.getCached('/reports/financial-series', query: {
       'from': from,
       'to': to,
       'granularity': granularity,
@@ -646,7 +646,7 @@ class BakeryApi {
   /// Not cached: a statement is read to answer a question about a
   /// particular moment, and a stale one would answer it wrongly.
   Future<BankStatement> bankStatement(int accountId, {String? from, String? until}) async {
-    final body = await _client.get('/bank-accounts/$accountId/transactions', query: {
+    final body = await _client.getCached('/bank-accounts/$accountId/transactions', query: {
       if (from != null) 'from': from,
       if (until != null) 'until': until,
     });
@@ -655,7 +655,7 @@ class BakeryApi {
   }
 
   Future<List<Map<String, dynamic>>> sellerAccounts() async {
-    final body = await _client.get('/seller-accounts');
+    final body = await _client.getCached('/seller-accounts');
     final data = body['data'] as Map<String, dynamic>;
 
     return ((data['sellers'] as List?) ?? const [])
@@ -684,7 +684,7 @@ class BakeryApi {
   /// What each school or office still owes, longest-waiting first.
   Future<({List<Map<String, dynamic>> customers, String totalFormatted, int overdueCount})>
       customerDebts() async {
-    final body = await _client.get('/customer-debts');
+    final body = await _client.getCached('/customer-debts');
     final data = body['data'] as Map<String, dynamic>;
 
     return (
@@ -699,7 +699,7 @@ class BakeryApi {
 
   /// Today's call list: follow-ups that have come due, oldest first.
   Future<List<Map<String, dynamic>>> dueFollowUps() async {
-    final body = await _client.get('/follow-ups');
+    final body = await _client.getCached('/follow-ups');
     final data = body['data'] as Map<String, dynamic>;
 
     return ((data['follow_ups'] as List?) ?? const [])
@@ -760,7 +760,7 @@ class BakeryApi {
 
   /// The going rates and what is left in the warehouse.
   Future<FlourSaleOptions> flourSaleOptions() async {
-    final body = await _client.get('/flour-sales/options');
+    final body = await _client.getCached('/flour-sales/options');
 
     return FlourSaleOptions.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -806,7 +806,7 @@ class BakeryApi {
         double totalWeightKg,
         String totalFormatted,
       })> todayFlourSales() async {
-    final body = await _client.get('/flour-sales/today');
+    final body = await _client.getCached('/flour-sales/today');
     final data = body['data'] as Map<String, dynamic>;
     final summary = data['summary'] as Map<String, dynamic>;
 
@@ -858,7 +858,7 @@ class BakeryApi {
 
   /// Late starts over a period, for payroll.
   Future<Map<String, dynamic>> workStartLateReport({String? from, String? to}) async {
-    final body = await _client.get('/work-starts/late-report', query: {
+    final body = await _client.getCached('/work-starts/late-report', query: {
       if (from != null) 'from': from,
       if (to != null) 'until': to,
     });
@@ -1087,7 +1087,7 @@ class BakeryApi {
 
   /// Income against expenses, with profit, for a date range.
   Future<Map<String, dynamic>> financialReport({String? from, String? to}) async {
-    final body = await _client.get('/reports/financial', query: {
+    final body = await _client.getCached('/reports/financial', query: {
       if (from != null) 'from': from,
       if (to != null) 'to': to,
     });
@@ -1158,14 +1158,14 @@ class BakeryApi {
 
   /// The flour quota for today's delivery period, or null if none is set.
   Future<Map<String, dynamic>?> currentFlourAllocation() async {
-    final body = await _client.get('/flour-allocations/current');
+    final body = await _client.getCached('/flour-allocations/current');
 
     return body['data'] as Map<String, dynamic>?;
   }
 
   /// Who checked in today, with their times.
   Future<List<Map<String, dynamic>>> adminAttendanceToday() async {
-    final body = await _client.get('/reports/attendance');
+    final body = await _client.getCached('/reports/attendance');
 
     return _paginated(body);
   }
@@ -1207,7 +1207,7 @@ class BakeryApi {
   /// is told so rather than shown a guessed figure.
   Future<({DieselQuota? quota, List<DieselDelivery> deliveries})>
       dieselQuota() async {
-    final body = await _client.get('/diesel/quota');
+    final body = await _client.getCached('/diesel/quota');
     final data = body['data'] as Map<String, dynamic>;
     final allocation = data['allocation'] as Map<String, dynamic>?;
 
@@ -1301,7 +1301,7 @@ class BakeryApi {
   /// will be short by.
   Future<({List<StaffAdvance> advances, String summary, double outstanding})>
       myAdvances() async {
-    final body = await _client.get('/staff-advances/mine');
+    final body = await _client.getCached('/staff-advances/mine');
     final data = body['data'] as Map<String, dynamic>;
 
     return (
@@ -1320,14 +1320,14 @@ class BakeryApi {
   /// What this person is owed, in one call, for the card on their home
   /// screen — their pay was visible to everyone but them.
   Future<PaySummary> myPaySummary() async {
-    final body = await _client.get('/salaries/my-summary');
+    final body = await _client.getCached('/salaries/my-summary');
 
     return PaySummary.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   Future<({List<AdvanceRequest> requests, bool hasPending})>
       myAdvanceRequests() async {
-    final body = await _client.get('/advance-requests/mine');
+    final body = await _client.getCached('/advance-requests/mine');
     final data = body['data'] as Map<String, dynamic>;
 
     return (
@@ -1352,7 +1352,7 @@ class BakeryApi {
   }
 
   Future<List<SalaryRequest>> mySalaryRequests() async {
-    final body = await _client.get('/salary-requests/mine');
+    final body = await _client.getCached('/salary-requests/mine');
 
     return ((body['data'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
@@ -1367,7 +1367,7 @@ class BakeryApi {
   /// call to go with the reject: paying the person through the pay sheet
   /// is what approval means, and that is where the figures are on screen.
   Future<List<SalaryRequest>> pendingSalaryRequests() async {
-    final body = await _client.get('/salary-requests?status=pending');
+    final body = await _client.getCached('/salary-requests?status=pending');
 
     return _paginated(body).map(SalaryRequest.fromJson).toList();
   }
@@ -1392,7 +1392,7 @@ class BakeryApi {
 
   /// The requests waiting on an answer, for whoever gives it.
   Future<List<AdvanceRequest>> pendingAdvanceRequests() async {
-    final body = await _client.get('/advance-requests');
+    final body = await _client.getCached('/advance-requests');
 
     return _paginated(body).map(AdvanceRequest.fromJson).toList();
   }
@@ -1486,7 +1486,7 @@ class BakeryApi {
 
   /// What this person has written down. Their own, not the shop's.
   Future<List<Purchase>> myPurchases() async {
-    final body = await _client.get('/purchases/mine');
+    final body = await _client.getCached('/purchases/mine');
 
     return _paginated(body).map(Purchase.fromJson).toList();
   }

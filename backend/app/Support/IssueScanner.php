@@ -42,6 +42,7 @@ class IssueScanner
             ...$this->negativeBankBalance(),
             ...$this->sellerAccounts(),
             ...$this->unsettledShortfalls(),
+            ...$this->tooMuchWaste(),
             ...$this->stalePending(),
             ...$this->longUnsettledSellers(),
             ...$this->tradingAtALoss(),
@@ -936,6 +937,67 @@ class IssueScanner
             magnitude: (float) $share,
         )];
     }
+
+    /**
+     * Waste past what an ordinary week loses.
+     *
+     * «ضایعات» costs nobody, which is exactly why it is watched. It was
+     * added so a seller closing a burnt batch would not have to pay for
+     * the oven out of their wages — and the same property that makes it
+     * fair makes it the obvious place to bury a theft.
+     *
+     * So it is not policed by making it expensive, which would undo the
+     * point. It is policed by being visible: a fortnight where more than
+     * [WASTE_ATTENTION_RATIO] of the bread was written off is said out
+     * loud, with the figure, and a person decides what it means. An oven
+     * with a bad thermostat and a seller helping themselves look the same
+     * from here, and this issue does not pretend to tell them apart — it
+     * says how much, and that somebody should look.
+     */
+    private function tooMuchWaste(): array
+    {
+        $from = now()->subDays(13)->startOfDay();
+
+        $sales = Sale::whereBetween('created_at', [$from, now()])->get();
+        $baked = (int) $sales->sum('bread_count');
+
+        // A fortnight with almost no baking makes a percentage that swings
+        // on a single loaf. Nothing is said until there is a fortnight
+        // worth judging.
+        if ($baked < self::WASTE_MIN_LOAVES) {
+            return [];
+        }
+
+        $wasted = (int) $sales->where('payment_type', Sale::WASTE_TYPE)->sum('bread_count');
+        $ratio = $wasted / $baked;
+
+        if ($ratio < self::WASTE_ATTENTION_RATIO) {
+            return [];
+        }
+
+        return [new SystemIssue(
+            key: 'waste-high',
+            severity: SystemIssue::WARNING,
+            title: 'ضایعات دو هفتهٔ اخیر بالاست',
+            detail: number_format($wasted).' نان از '.number_format($baked)
+                .' نان ثبت‌شده ضایعات خورده — '
+                .TodayAnswer::digits(round($ratio * 100, 1)).'٪.',
+            // Two very different things look identical from here, and
+            // saying which would be a guess dressed as a finding.
+            cause: 'یا مشکلی در پخت هست، یا نانی که ضایعات ثبت شده ضایعات نبوده.',
+            suggestion: 'چند فقره را با فروشنده و شاطر مرور کنید.'
+                .' ضایعات به حساب کسی نمی‌رود، پس تنها جایی که دیده می‌شود همین‌جاست.',
+            url: '/admin/sales',
+            urlLabel: 'مرور فروش‌ها',
+            magnitude: (float) $wasted,
+        )];
+    }
+
+    /** Above this share of a fortnight's bread, waste is worth saying. */
+    private const WASTE_ATTENTION_RATIO = 0.05;
+
+    /** Below this, a fortnight is too small to take a percentage of. */
+    private const WASTE_MIN_LOAVES = 500;
 
     private function unsettledShortfalls(): array
     {

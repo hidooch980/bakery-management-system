@@ -45,6 +45,10 @@ class CacheWarmer {
     final shared = <Future<void> Function()>[
       () => _api.bakery(),
       () => _api.attendanceToday(),
+      // Everybody is paid, and «چقدر طلب دارم» is the screen people open
+      // standing in a shop with no bars on the phone.
+      () => _api.myPaySummary(),
+      () => _api.myAdvances(),
     ];
 
     return switch (role) {
@@ -63,6 +67,11 @@ class CacheWarmer {
           () => _api.pendingChane(),
           () => _api.saleStaff(),
           () => _api.myLateness(),
+          // A seller's own account and the doors they collect at: the two
+          // things they need on a round, which is exactly where the signal
+          // goes.
+          () => _api.myAccount(),
+          () => _api.myCollections(),
         ],
       UserRole.doughMaker => [
           ...shared,
