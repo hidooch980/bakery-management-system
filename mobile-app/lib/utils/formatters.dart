@@ -242,3 +242,19 @@ class GroupedAmountInputFormatter extends TextInputFormatter {
     );
   }
 }
+
+/// Every character that is part of a number rather than part of its unit.
+///
+/// Two screens pull the shop's currency out of a formatted figure by
+/// deleting the number from it, and both listed the separators they had
+/// happened to see: ASCII digits, ASCII comma, the Persian thousands mark.
+/// The Arabic comma «،» was not among them, so when the server grouped
+/// with that one it survived the deletion and was shown as part of the
+/// unit — «۴۲٬۱۹۴٬۵۰۰ ،ریال», with a comma leaning against the word, on
+/// the owner's finance screen.
+///
+/// So the set is named once and covers the digits and separators actually
+/// in use in Persian text, rather than the ones one sample happened to
+/// contain: Latin, Persian and Arabic-Indic digits, all three thousands
+/// marks, both decimal marks, and both minus signs.
+const digitsAndSeparators = r'[\d۰-۹٠-٩,٬،.٫\-−\s]';
