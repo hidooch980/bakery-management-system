@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\BankAccount;
 use App\Models\ChaneEntry;
 use App\Models\FlourAllocation;
+use App\Models\FlourAllocationPeriod;
 use App\Models\InventoryItem;
 use Illuminate\Support\Collection;
 
@@ -110,8 +111,7 @@ class TodayAnswer
             ];
         }
 
-        $allocation = FlourAllocation::with('periods')->orderByDesc('month_start')->first();
-        $period = $allocation?->periodFor(now());
+        $period = $this->currentPeriod();
 
         if ($period) {
             $rows[] = ['label' => 'سهمیه', 'value' => self::digits($period->usage_percent).'٪'];
@@ -123,6 +123,45 @@ class TodayAnswer
         ];
 
         return $rows;
+    }
+
+    /**
+     * What the next few days look like, from what the last few did.
+     *
+     * Between the list and the figures: after what needs him, before the
+     * quiet line — because «آرد برای چند روز کافی است» is the question he
+     * asks with a delivery to order, and an empty list here is the
+     * ordinary case for a shop with a thin history, not a fault.
+     *
+     * @return list<array{key: string, tone: string, title: string, basis: string}>
+     */
+    public function outlook(): array
+    {
+        return Outlook::now($this->currentPeriod(), periodGiven: true)->values()->all();
+    }
+
+    /** Loaded once for the figures and the outlook both; null is memoised too. */
+    private bool $periodLoaded = false;
+
+    private ?FlourAllocationPeriod $period = null;
+
+    /**
+     * The quota period in progress, or null.
+     *
+     * Asked for twice on this page — once for «سهمیه ۴۲٪» on the figures
+     * line and once to say whether it will last — and the two used to
+     * load the allocation and its periods separately. Two queries for the
+     * same answer on the page the owner opens first.
+     */
+    private function currentPeriod(): ?FlourAllocationPeriod
+    {
+        if (! $this->periodLoaded) {
+            $allocation = FlourAllocation::with('periods')->orderByDesc('month_start')->first();
+            $this->period = $allocation?->periodFor(now());
+            $this->periodLoaded = true;
+        }
+
+        return $this->period;
     }
 
     /** «۶۵٫۲ کیسه» — one decimal, because nobody counts a tenth of a sack. */

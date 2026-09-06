@@ -135,8 +135,14 @@ class TheStockBalanceIsCountedOnceTest extends TestCase
         // the page the owner opens first. Generous on purpose: the point
         // is to catch a return to counting the ledger per read, not to pin
         // a number that a harmless change would break.
+        // 65 after the balance was memoised; 70 with the outlook — one
+        // grouped sum over the ledger for the burn rate, the period's
+        // used-kg, and the period's profit. Fixed cost, not per row: the
+        // burn rate is grouped by date in SQL, so a busier shop adds rows,
+        // not queries. The bound moves with it and still catches the
+        // thing it exists to catch, which is forty sums for one sack.
         $this->assertLessThan(
-            70,
+            80,
             $queries,
             "the answer page took {$queries} queries",
         );

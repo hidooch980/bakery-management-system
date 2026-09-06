@@ -174,6 +174,16 @@ class _Answer extends StatelessWidget {
             ),
           ),
 
+        // What the next few days look like, from what the last few did.
+        // After what needs him and before the quiet figures: it is the
+        // question he asks with a delivery to order.
+        if (answer.outlook.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+          for (final line in answer.outlook) _OutlookLine(line: line),
+        ],
+
         if (answer.figures.isNotEmpty) ...[
           const SizedBox(height: 22),
           const Divider(height: 1),
@@ -202,6 +212,46 @@ class _Answer extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// One forecast and the arithmetic under it.
+///
+/// The basis is never dropped for space. A forecast without it is a
+/// number the owner has to take on trust, and this screen exists because
+/// he stopped taking screens on trust.
+class _OutlookLine extends StatelessWidget {
+  const _OutlookLine({required this.line});
+
+  final TodayOutlook line;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.color;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            line.title,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: line.needsAttention ? FontWeight.w700 : FontWeight.w500,
+              color: line.needsAttention ? AppColors.emberWarm : null,
+            ),
+          ),
+          if (line.basis.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              line.basis,
+              style: theme.textTheme.bodySmall?.copyWith(color: muted),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

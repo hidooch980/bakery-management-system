@@ -82,6 +82,23 @@
         .today-need-title { font-weight: 600; font-size: 0.95rem; }
         .today-need-detail { font-size: 0.82rem; color: rgb(var(--gray-500)); margin-top: 0.15rem; }
 
+        .today-outlook {
+            margin-top: 1.25rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgb(var(--gray-200));
+            display: flex;
+            flex-direction: column;
+            gap: .6rem;
+        }
+        .dark .today-outlook { border-top-color: rgb(var(--gray-800)); }
+        .today-outlook-line small {
+            display: block;
+            color: rgb(var(--gray-500));
+            margin-top: .1rem;
+        }
+        .today-outlook-line.attention > div { color: rgb(var(--warning-600)); font-weight: 600; }
+        .dark .today-outlook-line.attention > div { color: rgb(var(--warning-400)); }
+
         .today-figures {
             margin-top: 1.75rem;
             padding-top: 1rem;
@@ -176,6 +193,20 @@
                         <span class="today-need-body">
                             <span class="today-need-title">{{ $warning }}</span>
                         </span>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
+        {{-- Forward-looking, and only where there is enough history to
+             look from. Each line carries its own basis so the owner can
+             disagree with the arithmetic, not just the number. --}}
+        @if ($this->outlook())
+            <div class="today-outlook">
+                @foreach ($this->outlook() as $line)
+                    <div class="today-outlook-line {{ $line['tone'] === 'attention' ? 'attention' : '' }}">
+                        <div>{{ $line['title'] }}</div>
+                        <small>{{ $line['basis'] }}</small>
                     </div>
                 @endforeach
             </div>
