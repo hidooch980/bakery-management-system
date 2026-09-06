@@ -21,6 +21,8 @@ use App\Support\Ledger;
 use App\Support\Money;
 use App\Support\PeriodBuckets;
 use App\Support\ReportSeries;
+use App\Support\StaffYield;
+use App\Support\TodayAnswer;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -274,6 +276,33 @@ class ReportController extends Controller
      * Attendance coverage for a period, counting only the days the bakery
      * was actually open — a closed day is not an absence.
      */
+    /**
+     * What each bench got out of a sack, against the formula.
+     *
+     * The envelope carries the rules as well as the rows, because a
+     * figure about a person read without them is read as a verdict: the
+     * minimum sample, and that shared batches count for nobody.
+     */
+    public function staffYield(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        $rows = StaffYield::between($from, $to);
+
+        return $this->success([
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'from_jalali' => Jalali::date($from),
+            'to_jalali' => Jalali::date($to),
+            'min_bags' => StaffYield::MIN_BAGS,
+            // Said on the screen, not just honoured here — «چرا اسم فلانی
+            // نیست» has one answer and it should be on the same page.
+            'note' => 'فقط خمیرهایی که یک نفر تنها چانه گرفته، و دست‌کم '
+                .TodayAnswer::digits((int) StaffYield::MIN_BAGS).' کیسه.',
+            'rows' => $rows->values(),
+        ]);
+    }
+
     public function attendanceSummary(Request $request): JsonResponse
     {
         [$from, $to] = $this->range($request);

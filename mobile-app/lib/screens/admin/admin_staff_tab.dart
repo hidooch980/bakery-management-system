@@ -6,6 +6,7 @@ import '../../widgets/common.dart';
 import 'advance_requests_section.dart';
 import 'payroll_section.dart';
 import 'staff_report_section.dart';
+import 'staff_yield_section.dart';
 import '../../theme/app_theme.dart';
 
 /// Who checked in today, and at what time.
@@ -17,6 +18,19 @@ class AdminStaffTab extends StatefulWidget {
   @override
   State<AdminStaffTab> createState() => _AdminStaffTabState();
 }
+
+/// The last thirty days, as the API takes them.
+///
+/// Computed once rather than in `build`: a section that takes its range
+/// as a parameter reloads when the parameter changes, and a fresh
+/// `DateTime.now()` on every frame would change it on every frame.
+final String _today = _apiDate(DateTime.now());
+final String _thirtyDaysAgo =
+    _apiDate(DateTime.now().subtract(const Duration(days: 29)));
+
+String _apiDate(DateTime value) =>
+    '${value.year}-${value.month.toString().padLeft(2, '0')}'
+    '-${value.day.toString().padLeft(2, '0')}';
 
 class _AdminStaffTabState extends State<AdminStaffTab> {
   late Future<List<Map<String, dynamic>>> _attendance;
@@ -61,6 +75,14 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                 AdvanceRequestsSection(api: widget.api),
                 const SizedBox(height: 12),
                 StaffReportSection(api: widget.api),
+                const SizedBox(height: 22),
+                // What each bench got out of a sack. The same thirty days
+                // the report above covers, so the two are read together.
+                StaffYieldSection(
+                  api: widget.api,
+                  from: _thirtyDaysAgo,
+                  to: _today,
+                ),
                 const SizedBox(height: 40),
                 const EmptyState(
                   icon: Icons.how_to_reg_rounded,
@@ -88,6 +110,14 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                       AdvanceRequestsSection(api: widget.api),
                       const SizedBox(height: 12),
                       StaffReportSection(api: widget.api),
+                const SizedBox(height: 22),
+                // What each bench got out of a sack. The same thirty days
+                // the report above covers, so the two are read together.
+                StaffYieldSection(
+                  api: widget.api,
+                  from: _thirtyDaysAgo,
+                  to: _today,
+                ),
                     ],
                   ),
                 );
