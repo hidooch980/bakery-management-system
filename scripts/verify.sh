@@ -18,7 +18,7 @@ set -u
 
 SRC=/home/ubuntu/bakery-management-system/backend
 T=/tmp/t
-LOCK=/tmp/verify.lock
+LOCK=${LOCK:-/var/lock/bakery-verify.lock}
 PINT_RED=0
 
 # Opening the lock and taking it are two different failures, and

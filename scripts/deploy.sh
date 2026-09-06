@@ -19,7 +19,12 @@ set -u
 # than the live shop. Unset everywhere else, which is the real server.
 APP=${APP:-/home/ubuntu/bakery-management-system}
 BACK=$APP/backend
-LOCK=${LOCK:-/tmp/deploy.lock}
+# Not /tmp. The lock lived there until a single run without `sudo` left
+# an ubuntu-owned file behind, after which every `sudo` run was refused:
+# `fs.protected_regular` stops even root opening another user's file in a
+# sticky world-writable directory. /var/lock is not world-writable, and
+# this script is always run as root, so the owner never varies.
+LOCK=${LOCK:-/var/lock/bakery-deploy.lock}
 
 # What to deploy. `main` unless told otherwise — the argument is for
 # putting a known-good tag back when a release turns out to be bad:

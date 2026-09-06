@@ -18,7 +18,7 @@ set -u
 
 APP=${APP:-/home/ubuntu/bakery-management-system}
 LOG=${AUTO_DEPLOY_LOG:-/var/log/bakery-auto-deploy.log}
-LOCK=${AUTO_DEPLOY_LOCK:-/tmp/auto-deploy.lock}
+LOCK=${AUTO_DEPLOY_LOCK:-/var/lock/bakery-auto-deploy.lock}
 REF=${AUTO_DEPLOY_REF:-main}
 
 # Its own lock, separate from the one `deploy.sh` takes. Two nightly runs
