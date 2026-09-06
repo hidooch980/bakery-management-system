@@ -1,5 +1,6 @@
 import 'package:bakery_app/screens/shared/error_log_screen.dart';
 import 'package:bakery_app/services/error_log.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -60,5 +61,28 @@ void main() {
 
     expect(find.textContaining("is not a subtype"), findsOneWidget);
     expect(find.textContaining('هنگام رسم صفحه'), findsOneWidget);
+  });
+
+  test('a failed request does not put the login token on the screen', () {
+    // This log is read out loud and photographed — that is the whole
+    // point of it — so anything it holds is as public as the shop's
+    // counter. Dio prints only its type and message today; if that ever
+    // widens to the request, the token travels with it.
+    ErrorLog.record(
+      DioException(
+        requestOptions: RequestOptions(
+          path: '/sales',
+          baseUrl: 'http://server.test/api/v1',
+          headers: {'Authorization': 'Bearer SECRET-TOKEN-12345'},
+        ),
+        message: 'boom',
+      ),
+    );
+
+    expect(
+      ErrorLog.entries.value.single.message,
+      isNot(contains('SECRET-TOKEN-12345')),
+      reason: 'the token reached a screen meant to be photographed',
+    );
   });
 }
