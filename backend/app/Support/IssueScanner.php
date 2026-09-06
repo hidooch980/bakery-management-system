@@ -29,6 +29,16 @@ use Illuminate\Support\Collection;
  */
 class IssueScanner
 {
+    /** How much of the log to read. A day of errors is far inside this. */
+    private const LOG_TAIL_BYTES = 262144;
+
+    /**
+     * One error is a fact of life on any server — a crawler asking for a
+     * path that does not exist, a request abandoned mid-flight. A handful
+     * in one day is something breaking.
+     */
+    private const ERROR_ATTENTION_COUNT = 3;
+
     /** @return Collection<int, SystemIssue> */
     public function scan(): Collection
     {
@@ -51,6 +61,7 @@ class IssueScanner
             ...$this->dieselRunningOut(),
             ...$this->monthlyObligations(),
             ...$this->expensesMostlyUncategorised(),
+            ...$this->serverErrorsToday(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -1067,5 +1078,91 @@ class IssueScanner
         }
 
         return $issues;
+    }
+
+    /**
+     * How many times the server itself failed today.
+     *
+     * Every kind of failure this application expects has a message: a
+     * validation error, a stock shortfall, a permission refused. What has
+     * no message anywhere is the kind nobody expected — those go to
+     * `storage/logs/laravel.log`, which on a shop floor is nowhere. The
+     * phone was blind the same way until today, and it cost five releases
+     * of guessing.
+     *
+     * So it is counted here, on the page the owner already reads. Not the
+     * stack trace and not the file: those belong to whoever fixes it, and
+     * putting them in front of a baker is noise. The number and the hour
+     * are the part that turns «کار نکرد» into a question with an answer.
+     *
+     * Read, never written. Recording this in the database would mean a
+     * write on exactly the path that is already failing, and a database
+     * that is itself the problem would then swallow its own report.
+     */
+    private function serverErrorsToday(): array
+    {
+        $path = storage_path('logs/laravel.log');
+
+        if (! is_readable($path)) {
+            return [];
+        }
+
+        $size = filesize($path);
+
+        if ($size === false || $size === 0) {
+            return [];
+        }
+
+        // The tail only. A log left to grow for months must not be read
+        // into memory to answer «did anything break today».
+        $read = min($size, self::LOG_TAIL_BYTES);
+        $handle = fopen($path, 'rb');
+
+        if ($handle === false) {
+            return [];
+        }
+
+        fseek($handle, -$read, SEEK_END);
+        $tail = fread($handle, $read) ?: '';
+        fclose($handle);
+
+        $today = now()->format('Y-m-d');
+        $count = 0;
+        $last = null;
+
+        foreach (explode("\n", $tail) as $line) {
+            if (! str_starts_with($line, '['.$today)) {
+                continue;
+            }
+
+            if (! str_contains($line, '.ERROR:') && ! str_contains($line, '.CRITICAL:')) {
+                continue;
+            }
+
+            $count++;
+            $last = $line;
+        }
+
+        if ($count < self::ERROR_ATTENTION_COUNT) {
+            return [];
+        }
+
+        // The hour, not the trace. «چه ساعتی» is answerable from the shop
+        // floor and narrows it more than a class name would.
+        $hour = $last !== null && preg_match('/\d{2}:\d{2}/', $last, $m) ? $m[0] : null;
+
+        return [new SystemIssue(
+            key: 'server-errors-today',
+            severity: SystemIssue::WARNING,
+            title: 'سیستم امروز چند بار خطا داده',
+            detail: $count.' خطا از ابتدای امروز'
+                .($hour !== null ? '، آخری ساعت '.$hour : '').'.',
+            cause: 'این‌ها خطاهای پیش‌بینی‌نشده‌اند، نه پیغام‌های معمول برنامه.',
+            suggestion: 'اگر جایی از برنامه درست کار نمی‌کند، احتمالاً همین‌جاست.'
+                .' متن کامل در storage/logs/laravel.log روی سرور است.',
+            url: null,
+            urlLabel: null,
+            magnitude: (float) $count,
+        )];
     }
 }
