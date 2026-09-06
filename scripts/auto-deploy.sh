@@ -18,13 +18,26 @@ set -u
 
 APP=${APP:-/home/ubuntu/bakery-management-system}
 LOG=${AUTO_DEPLOY_LOG:-/var/log/bakery-auto-deploy.log}
-LOCK=${AUTO_DEPLOY_LOCK:-/tmp/auto-deploy.lock}
+LOCK=${AUTO_DEPLOY_LOCK:-/var/lock/bakery-auto-deploy.lock}
 REF=${AUTO_DEPLOY_REF:-main}
 
 # Its own lock, separate from the one `deploy.sh` takes. Two nightly runs
 # cannot overlap, and a run that finds a person already deploying by hand
 # steps aside rather than queueing behind them.
-exec 9>"$LOCK"
+# Opening the lock and taking it are two different failures, and
+# they used to read as one. On the live server this line printed
+# «Permission denied», `flock` then failed on a file descriptor
+# that had never opened, and the script announced «a deploy is
+# already running» — sending somebody to hunt for a deploy that
+# did not exist. Every test passed a writable path, so the arm
+# was never once run.
+if ! : >>"$LOCK" 2>/dev/null; then
+  echo "قفل «$LOCK» باز نشد. مسیر دیگری بدهید:" >&2
+  echo "  sudo AUTO_DEPLOY_LOCK=/var/lock/bakery-auto.lock $0" >&2
+  exit 4
+fi
+
+exec 9>>"$LOCK"
 if ! flock -n 9; then
   exit 0
 fi
