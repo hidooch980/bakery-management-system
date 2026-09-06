@@ -61,14 +61,21 @@ class _DoughHomeScreenState extends State<DoughHomeScreen> {
     if (!mounted) return;
     setState(() => _bags = bags);
 
+    // Both started before either is awaited. They do not depend on each
+    // other, and taken in turn they are two connect timeouts in a row
+    // whenever the phone is off the network — the same sequential wait
+    // that made the seller's screen draw nothing for a minute.
+    final bakeryCall = widget.api.bakery();
+    final todayCall = _loadToday();
+
     try {
-      final bakery = await widget.api.bakery();
+      final bakery = await bakeryCall;
       if (mounted) setState(() => _bakery = bakery);
     } on ApiException {
       // The question reads fine without the shop's name on it.
     }
 
-    await _loadToday();
+    await todayCall;
   }
 
   Future<void> _loadToday() async {
