@@ -114,6 +114,22 @@ class ApiClient {
   final _storage = const FlutterSecureStorage();
   final _queue = OfflineQueue();
   final _cache = ResponseCache();
+
+  /// Whether the phone is known to be off the network right now.
+  ///
+  /// Set by `ConnectionStatus`, which is already asking. Without it every
+  /// read on a phone in airplane mode waits out the fifteen-second connect
+  /// timeout before falling back to the copy sitting in storage — and a
+  /// screen that fires four reads one after another waits a minute before
+  /// it draws anything. The cache was right, the queue was right, and the
+  /// owner still said «کار نکرد» five releases running, because nobody
+  /// stands in a shop watching a spinner for a minute to find out that it
+  /// would have worked.
+  ///
+  /// Only ever an optimisation: false means «go and try», never «you are
+  /// online». A stale true costs one doomed request, which is what used to
+  /// happen every time anyway.
+  bool knownOffline = false;
   static const _uuid = Uuid();
 
   Future<void> saveToken(String token) =>
@@ -241,6 +257,22 @@ class ApiClient {
     Map<String, dynamic>? query,
   }) async {
     final marker = ResponseCache.keyFor(path, query);
+
+    // Known to be off the network: answer from storage now rather than
+    // after the connect timeout. Only when there is actually a copy —
+    // with none, the request still goes out, because «no signal» from the
+    // radio and «unreachable» are not the same fact and the server may
+    // well answer.
+    if (knownOffline) {
+      final cached = await _cache.read(path, query, allowStale: true);
+
+      if (cached != null) {
+        _servedAt[marker] = cached.at;
+        savedCopyAt.value = cached.at;
+
+        return cached.body;
+      }
+    }
 
     try {
       final body = await get(path, query: query);
