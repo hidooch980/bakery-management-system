@@ -1280,7 +1280,7 @@ class _AttendanceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final user = record['user'] as Map<String, dynamic>?;
+    final user = keyedGroup(record['user']);
     final checkedInAt = DateTime.tryParse('${record['checked_in_at']}');
 
     return Padding(
@@ -1291,7 +1291,7 @@ class _AttendanceRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '${user?['name'] ?? '—'}',
+              '${user['name'] ?? '—'}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: Theme.of(context).colorScheme.onSurface,

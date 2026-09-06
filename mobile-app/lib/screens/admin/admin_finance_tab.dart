@@ -360,12 +360,12 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
   }
 
   List<Widget> _buildReport(BuildContext context, Map<String, dynamic> data) {
-    final income = data['income'] as Map<String, dynamic>? ?? const {};
-    final expenses = data['expenses'] as Map<String, dynamic>? ?? const {};
-    final profit = data['profit'] as Map<String, dynamic>? ?? const {};
-    final outstanding = data['outstanding_salaries'] as Map<String, dynamic>? ?? const {};
+    final income = keyedGroup(data['income']);
+    final expenses = keyedGroup(data['expenses']);
+    final profit = keyedGroup(data['profit']);
+    final outstanding = keyedGroup(data['outstanding_salaries']);
     final byCategory = rowList(expenses['by_category']);
-    final split = data['profit_split'] as Map<String, dynamic>? ?? const {};
+    final split = keyedGroup(data['profit_split']);
     final holders = rowList(split['holders']);
 
     final isPositive = profit['is_positive'] == true;

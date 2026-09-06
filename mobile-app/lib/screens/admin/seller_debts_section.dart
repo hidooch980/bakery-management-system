@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
@@ -44,7 +45,7 @@ class _SellerDebtsSectionState extends State<SellerDebtsSection> {
   }
 
   Future<void> _confirm(Map<String, dynamic> seller) async {
-    final request = seller['request'] as Map<String, dynamic>;
+    final request = keyedGroup(seller['request']);
 
     final ok = await showDialog<bool>(
       context: context,
@@ -88,7 +89,7 @@ class _SellerDebtsSectionState extends State<SellerDebtsSection> {
   }
 
   Future<void> _reject(Map<String, dynamic> seller) async {
-    final request = seller['request'] as Map<String, dynamic>;
+    final request = keyedGroup(seller['request']);
     final reason = TextEditingController();
 
     final ok = await showDialog<bool>(
@@ -224,7 +225,7 @@ class _SellerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final request = seller['request'] as Map<String, dynamic>?;
+    final request = keyedGroup(seller['request']);
     final settleable = (seller['settleable'] as num?)?.toDouble() ?? 0;
     final credit = (seller['credit'] as num?)?.toDouble() ?? 0;
 
@@ -269,7 +270,9 @@ class _SellerTile extends StatelessWidget {
             ),
 
           const SizedBox(height: 8),
-          if (request != null) ...[
+          // Was `!= null` when this came from a cast; an absent request
+          // now arrives as an empty map, which means the same thing here.
+          if (request.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(

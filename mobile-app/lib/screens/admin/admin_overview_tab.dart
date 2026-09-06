@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../models/bakery.dart';
 import '../../models/chane_board.dart';
@@ -66,9 +67,9 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
           final dashboard = snapshot.data!.dashboard;
           final board = snapshot.data!.board;
 
-          final today = dashboard['today'] as Map<String, dynamic>? ?? const {};
-          final queues = dashboard['queues'] as Map<String, dynamic>? ?? const {};
-          final staff = dashboard['staff'] as Map<String, dynamic>? ?? const {};
+          final today = keyedGroup(dashboard['today']);
+          final queues = keyedGroup(dashboard['queues']);
+          final staff = keyedGroup(dashboard['staff']);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
