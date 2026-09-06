@@ -225,5 +225,28 @@ check "از main جدا شد" "$(git -C "$WORLD/app" rev-parse --abbrev-ref HEAD
 rm -rf "$WORLD"
 
 echo
+echo "=== قفلی که باز نمی‌شود: می‌گوید قفل، نه «استقرار در جریان» ==="
+build_world
+# What the live server actually did. The lock could not be opened, and
+# the script reported that another deploy was running — so the person at
+# the terminal went looking for a deploy that did not exist instead of
+# reading the one line that would have told them the truth.
+# A directory that is not there: the open fails for every user, root
+# included, so the test means the same thing in CI as on a workstation.
+OUT=$( export PATH="$BIN:$PATH" APP="$WORLD/app" LOG="$LOG" \
+      LOCK="$WORLD/nowhere/lock" PENDING=0 MIGRATE=0 HEALTH="" PANEL_CODE=200
+    bash "$ROOT/scripts/deploy.sh" 2>&1 ); CODE=$?
+check "کد خروج قفل، نه کد رقابت" "$CODE" 4
+contains "می‌گوید قفل باز نشد" "$OUT" "باز نشد"
+if echo "$OUT" | grep -q "در جریان است"; then
+  echo "  رد: خطای قفل را «استقرار در جریان» گزارش کرد"
+  FAIL=$((FAIL + 1))
+else
+  PASS=$((PASS + 1))
+fi
+check "مغازه بسته نشد" "$(grep -c 'artisan down' "$LOG")" 0
+rm -rf "$WORLD"
+
+echo
 echo "$PASS قبول، $FAIL رد"
 [ "$FAIL" -eq 0 ]

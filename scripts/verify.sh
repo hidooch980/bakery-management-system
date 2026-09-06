@@ -21,7 +21,20 @@ T=/tmp/t
 LOCK=/tmp/verify.lock
 PINT_RED=0
 
-exec 9>"$LOCK"
+# Opening the lock and taking it are two different failures, and
+# they used to read as one. On the live server this line printed
+# «Permission denied», `flock` then failed on a file descriptor
+# that had never opened, and the script announced «a deploy is
+# already running» — sending somebody to hunt for a deploy that
+# did not exist. Every test passed a writable path, so the arm
+# was never once run.
+if ! : >>"$LOCK" 2>/dev/null; then
+  echo "قفل «$LOCK» باز نشد. مسیر دیگری بدهید:" >&2
+  echo "  sudo LOCK=/var/lock/bakery-verify.lock $0" >&2
+  exit 4
+fi
+
+exec 9>>"$LOCK"
 if ! flock -n 9; then
   echo "یک اجرا همین حالا در جریان است. این یکی شروع نشد." >&2
   exit 3
