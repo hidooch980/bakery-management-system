@@ -1,4 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
+import '../../utils/json.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/bakery_api.dart';
@@ -77,7 +78,7 @@ class _ProductionReportSectionState extends State<ProductionReportSection> {
         final data = snapshot.data!;
         final normal = _int(data['total_chane_count']);
         final nanino = _int(data['total_nanino_count']);
-        final daily = ((data['daily'] as List?) ?? const [])
+        final daily = rowList(data['daily'])
             .whereType<Map<String, dynamic>>()
             .toList();
 

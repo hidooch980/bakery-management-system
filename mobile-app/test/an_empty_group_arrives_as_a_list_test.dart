@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:bakery_app/screens/admin/sales_breakdown_section.dart';
@@ -86,6 +87,80 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('تفکیک فروش'), findsOneWidget);
     expect(find.textContaining('فروشی ثبت نشده'), findsOneWidget);
+  });
+
+  group('rows arrive in more than one shape too', () {
+    test('a list of rows is read as it is', () {
+      expect(
+        rowList(const [
+          {'label': 'نقدی'},
+          {'label': 'نسیه'},
+        ]).map((r) => r['label']),
+        ['نقدی', 'نسیه'],
+      );
+    });
+
+    test('a keyed group read as rows keeps its values', () {
+      // The same collection, from an endpoint that did not call
+      // `->values()` on it. `as List?` threw here; the key is already
+      // inside each row where it matters.
+      expect(
+        rowList(const {
+          'cash': {'label': 'نقدی'},
+          'credit': {'label': 'نسیه'},
+        }).map((r) => r['label']),
+        ['نقدی', 'نسیه'],
+      );
+    });
+
+    test('nothing, in any of the ways nothing arrives', () {
+      expect(rowList(const []), isEmpty);
+      expect(rowList(const <String, dynamic>{}), isEmpty);
+      expect(rowList(null), isEmpty);
+    });
+
+    test('one malformed entry does not take the section down', () {
+      // Dropped rather than cast: a section is worth more with a row
+      // missing than replaced entirely by a grey rectangle.
+      expect(
+        rowList(const [
+          {'label': 'نقدی'},
+          'پیام',
+          null,
+        ]),
+        hasLength(1),
+      );
+    });
+  });
+
+  test('no screen casts a server list or group by hand any more', () {
+    // The sweep, pinned. Both spellings threw on the shape they did not
+    // expect, and in a release build the throw is a plain grey rectangle
+    // with no message — which took a photograph and a round of questions
+    // to place. A new one should be caught here instead.
+    final offenders = <String>[];
+
+    for (final dir in ['lib/screens', 'lib/widgets']) {
+      for (final file in Directory(dir)
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart'))) {
+        final source = file.readAsStringSync();
+
+        for (final line in source.split('\n')) {
+          if (RegExp(r"\[[^\]]+\]\s+as\s+(List|Map)\??[\s)]").hasMatch(line)) {
+            offenders.add('${file.path}: ${line.trim()}');
+          }
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'Read it through rowList or keyedGroup, which survive the '
+          'shape the server actually sends.',
+    );
   });
 }
 

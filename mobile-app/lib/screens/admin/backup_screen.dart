@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
@@ -239,7 +240,7 @@ class _RecentList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final recent = (status['recent'] as List?) ?? const [];
+    final recent = rowList(status['recent']);
 
     if (recent.isEmpty) return const SizedBox.shrink();
 
@@ -274,7 +275,7 @@ class _RecentList extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          '${(recent[i] as Map)['at_display'] ?? '—'}',
+                          '${recent[i]['at_display'] ?? '—'}',
                           style:
                               Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     color: scheme.onSurface,
@@ -282,7 +283,7 @@ class _RecentList extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        _size(((recent[i] as Map)['size'] as num?)?.toInt() ?? 0),
+                        _size((recent[i]['size'] as num?)?.toInt() ?? 0),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: scheme.onSurfaceVariant,
                             ),

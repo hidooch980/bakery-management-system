@@ -58,7 +58,7 @@ class _SellerPerformanceSectionState extends State<SellerPerformanceSection> {
         }
 
         final data = snapshot.data!;
-        final sellers = (data['sellers'] as List? ?? const [])
+        final sellers = rowList(data['sellers'])
             .cast<Map<String, dynamic>>();
 
         if (sellers.isEmpty) {
