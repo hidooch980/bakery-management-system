@@ -66,14 +66,20 @@ class _ChaneHomeScreenState extends State<ChaneHomeScreen> {
     // chane maker enters what actually went on — a remembered figure is
     // submitted without the extras screen ever being opened again.
 
+    // Both started before either is awaited: they do not depend on each
+    // other, and in turn they are two connect timeouts in a row when the
+    // phone is off the network.
+    final bakeryCall = widget.api.bakery();
+    final waitingCall = _loadWaiting();
+
     try {
-      final bakery = await widget.api.bakery();
+      final bakery = await bakeryCall;
       if (mounted) setState(() => _bakery = bakery);
     } on ApiException {
       // The expected yield is a hint, not the question.
     }
 
-    await _loadWaiting();
+    await waitingCall;
   }
 
   Future<void> _loadWaiting() async {
