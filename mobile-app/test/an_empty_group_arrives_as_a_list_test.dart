@@ -169,6 +169,29 @@ void main() {
           'shape the server actually sends.',
     );
   });
+
+  group('the name on a row about a person', () {
+    test('is the name, when there is one', () {
+      expect(personName(const {'id': 7, 'name': 'علی رضایی'}), 'علی رضایی');
+    });
+
+    test('an absent name names the record instead of a dash', () {
+      // «—» is indistinguishable from a person whose name is genuinely
+      // blank, and those two are fixed in different places. The shop knows
+      // who number seven is.
+      expect(personName(const {'id': 7}), 'کارمند #7');
+      expect(personName(const {}, fallbackId: 7), 'کارمند #7');
+    });
+
+    test('a blank or whitespace name counts as absent', () {
+      expect(personName(const {'id': 7, 'name': ''}), 'کارمند #7');
+      expect(personName(const {'id': 7, 'name': '   '}), 'کارمند #7');
+    });
+
+    test('with nothing at all it still says something', () {
+      expect(personName(const {}), 'بدون نام');
+    });
+  });
 }
 
 class _Wire implements HttpClientAdapter {

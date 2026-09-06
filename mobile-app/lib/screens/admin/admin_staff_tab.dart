@@ -137,7 +137,7 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                     child: Icon(Icons.person_rounded, color: scheme.primary),
                   ),
                   title: Text(
-                    '${user['name'] ?? '—'}',
+                    personName(user, fallbackId: record['user_id']),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: Theme.of(context).colorScheme.onSurface,

@@ -1291,7 +1291,7 @@ class _AttendanceRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '${user['name'] ?? '—'}',
+              personName(user, fallbackId: record['user_id']),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: Theme.of(context).colorScheme.onSurface,
