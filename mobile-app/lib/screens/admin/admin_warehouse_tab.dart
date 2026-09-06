@@ -200,7 +200,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
             AdminRow(
               label: 'ماندهٔ سهمیه — منتقل می‌شود',
               value: _carriedBalance(
-                quota['carried_balance'] as Map<String, dynamic>,
+                keyedGroup(quota['carried_balance']),
               ),
               icon: Icons.savings_rounded,
               emphasise: true,
@@ -221,7 +221,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
       // periods so it can never disagree with them.
       if (quota['whole_period'] is Map<String, dynamic>)
         _PeriodCard(
-          period: quota['whole_period'] as Map<String, dynamic>,
+          period: keyedGroup(quota['whole_period']),
           isTotal: true,
         ),
     ];

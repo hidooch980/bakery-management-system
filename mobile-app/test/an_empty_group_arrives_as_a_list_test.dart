@@ -148,7 +148,14 @@ void main() {
         final source = file.readAsStringSync();
 
         for (final line in source.split('\n')) {
-          if (RegExp(r"\[[^\]]+\]\s+as\s+(List|Map)\??[\s)]").hasMatch(line)) {
+          // Both spellings, and this is the second version of this
+          // pattern: the first read `as Map?` and `as List?` and missed
+          // `as Map<String, dynamic>?` entirely — eighteen more sites,
+          // several of them without even a `?`, so they threw on an
+          // absent field and not only on a surprising one. A rule that
+          // catches most of a class is how the class survives.
+          if (RegExp(r"\[[^\]]+\]\s+as\s+(List|Map)\s*(<[^>]*>)?\??[\s)]")
+              .hasMatch(line)) {
             offenders.add('${file.path}: ${line.trim()}');
           }
         }

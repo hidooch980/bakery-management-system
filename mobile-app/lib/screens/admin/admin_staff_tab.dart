@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/json.dart';
 
 import '../../services/bakery_api.dart';
 import '../../utils/formatters.dart';
@@ -124,7 +125,7 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
               }
 
               final record = records[index - 1];
-              final user = record['user'] as Map<String, dynamic>?;
+              final user = keyedGroup(record['user']);
               final checkedInAt = DateTime.tryParse('${record['checked_in_at']}');
 
               return Card(
@@ -136,7 +137,7 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                     child: Icon(Icons.person_rounded, color: scheme.primary),
                   ),
                   title: Text(
-                    '${user?['name'] ?? '—'}',
+                    '${user['name'] ?? '—'}',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: Theme.of(context).colorScheme.onSurface,
