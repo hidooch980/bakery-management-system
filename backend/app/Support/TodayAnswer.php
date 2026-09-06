@@ -125,6 +125,21 @@ class TodayAnswer
         return $rows;
     }
 
+    /**
+     * What the next few days look like, from what the last few did.
+     *
+     * Between the list and the figures: after what needs him, before the
+     * quiet line — because «آرد برای چند روز کافی است» is the question he
+     * asks with a delivery to order, and an empty list here is the
+     * ordinary case for a shop with a thin history, not a fault.
+     *
+     * @return list<array{key: string, tone: string, title: string, basis: string}>
+     */
+    public function outlook(): array
+    {
+        return Outlook::now()->values()->all();
+    }
+
     /** «۶۵٫۲ کیسه» — one decimal, because nobody counts a tenth of a sack. */
     private static function sacks(float $bags): string
     {

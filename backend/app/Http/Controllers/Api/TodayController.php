@@ -63,6 +63,11 @@ class TodayController extends Controller
                     'destination' => IssueDestination::forKey($issue->key),
                 ])->values(),
 
+                // Forward-looking, with its basis in every line. Empty for
+                // a shop whose history is too thin to average — which the
+                // phone draws as nothing, not as a gap.
+                'outlook' => $answer->outlook(),
+
                 'figures' => $answer->figures(),
             ],
         ]);

@@ -74,6 +74,38 @@ class TodayNeed {
       );
 }
 
+/// One forward-looking line, with the arithmetic it rests on.
+///
+/// «حدود ۶ روز» on its own is an oracle; with its basis it is a sum the
+/// owner can check against the store and disagree with. The server
+/// composes both, like every other sentence on this screen.
+class TodayOutlook {
+  const TodayOutlook({
+    required this.key,
+    required this.tone,
+    required this.title,
+    required this.basis,
+  });
+
+  final String key;
+
+  /// `calm` or `attention`. Anything else reads as calm: a tone this build
+  /// has not been taught must not paint a fine forecast as a warning.
+  final String tone;
+
+  final String title;
+  final String basis;
+
+  bool get needsAttention => tone == 'attention';
+
+  factory TodayOutlook.fromJson(Map<String, dynamic> json) => TodayOutlook(
+        key: json['key'] as String? ?? '',
+        tone: json['tone'] as String? ?? 'calm',
+        title: json['title'] as String? ?? '',
+        basis: json['basis'] as String? ?? '',
+      );
+}
+
 /// A figure for the quiet line at the bottom.
 class TodayFigure {
   const TodayFigure({required this.label, required this.value});
@@ -98,6 +130,7 @@ class TodayAnswer {
     required this.warnings,
     required this.needs,
     required this.figures,
+    this.outlook = const [],
   });
 
   final TodayTone tone;
@@ -120,6 +153,10 @@ class TodayAnswer {
   final List<TodayNeed> needs;
   final List<TodayFigure> figures;
 
+  /// Empty on a server that predates it, and empty for a shop with too
+  /// little history to forecast from. Both draw as nothing.
+  final List<TodayOutlook> outlook;
+
   factory TodayAnswer.fromJson(Map<String, dynamic> json) => TodayAnswer(
         tone: TodayTone.parse(json['tone'] as String?),
         system: json['system'] as String? ?? '',
@@ -137,6 +174,9 @@ class TodayAnswer {
             .toList(),
         figures: ((json['figures'] as List<dynamic>?) ?? const [])
             .map((e) => TodayFigure.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        outlook: ((json['outlook'] as List<dynamic>?) ?? const [])
+            .map((e) => TodayOutlook.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 }

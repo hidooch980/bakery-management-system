@@ -89,6 +89,12 @@ class ShopToday extends Page
         return TodayAnswer::digits($this->answerer()->cycleCount());
     }
 
+    /** @return list<array{key: string, tone: string, title: string, basis: string}> */
+    public function outlook(): array
+    {
+        return $this->answerer()->outlook();
+    }
+
     /** @return list<array{label: string, value: string}> */
     public function figures(): array
     {
