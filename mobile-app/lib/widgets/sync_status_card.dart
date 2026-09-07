@@ -5,6 +5,7 @@ import '../services/bakery_api.dart';
 import '../services/offline_queue.dart';
 import '../services/connection_status.dart';
 import '../services/local_database.dart';
+import '../utils/formatters.dart';
 import '../theme/app_theme.dart';
 import 'common.dart';
 
@@ -33,6 +34,7 @@ class SyncStatusCard extends StatefulWidget {
 
 class _SyncStatusCardState extends State<SyncStatusCard> {
   int _pending = 0;
+  List<QueuedRequest> _waiting = const [];
   List<RejectedRequest> _rejected = const [];
   bool _syncing = false;
 
@@ -43,12 +45,15 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
   }
 
   Future<void> _refreshCount() async {
-    final count = await widget.api.pendingSyncCount();
+    // The three together, because they are one answer: how much is
+    // waiting, what it is, and what was turned down.
+    final waiting = await widget.api.pendingSync();
     final refused = await widget.api.rejectedWrites();
 
     if (!mounted) return;
     setState(() {
-      _pending = count;
+      _pending = waiting.length;
+      _waiting = waiting;
       _rejected = refused;
     });
   }
@@ -155,7 +160,7 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
                           ),
                     ),
 
-                  if (_pending > 0)
+                  if (_pending > 0) ...[
                     Text(
                       '$_pending مورد ثبت‌شده در انتظار ارسال است'
                       '${online ? '' : ' — با برقراری اتصال خودکار ارسال می‌شود'}',
@@ -163,6 +168,45 @@ class _SyncStatusCardState extends State<SyncStatusCard> {
                             color: scheme.onSurfaceVariant,
                           ),
                     ),
+
+                    // Named, not counted. A refusal has said what it was
+                    // since the day refusals stopped being deleted; what
+                    // is still waiting said only «۳ مورد», so a seller on
+                    // a bad signal could not tell whether the sale he had
+                    // just entered was one of them — and entered it again.
+                    // `QueuedRequest.label` was written for this list and
+                    // the list was never built.
+                    for (final item in _waiting)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.schedule_rounded,
+                              size: IconSize.inline,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                item.label,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: scheme.onSurface),
+                              ),
+                            ),
+                            Text(
+                              JalaliFormat.time(item.createdAt),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
 
                   // Named, with the server's reason, and dismissed only by
                   // hand. These used to be deleted the moment they were
