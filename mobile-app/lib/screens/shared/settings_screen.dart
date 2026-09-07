@@ -10,6 +10,9 @@ import '../../widgets/biometric_tile.dart';
 import '../admin/backup_screen.dart';
 import 'change_password_screen.dart';
 import 'my_advances_screen.dart';
+import 'my_attendance_screen.dart';
+import 'my_purchases_screen.dart';
+import 'my_salary_screen.dart';
 import 'my_devices_screen.dart';
 import 'update_screen.dart';
 import '../../theme/app_theme.dart';
@@ -174,6 +177,62 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const Divider(height: 1),
+                  // Every role again. «این ماه چند روز آمده‌ام» used to be
+                  // a question for the owner, who had to open the panel to
+                  // answer it; the record is the person's own.
+                  ListTile(
+                    leading: const Icon(Icons.event_available_rounded),
+                    title: const Text('حضور من'),
+                    subtitle: const Text('روزهایی که تیک زده‌اید'),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MyAttendanceScreen(
+                          api: context.read<BakeryApi>(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Beside «حضور من» and «علی‌الحساب من», because the three
+                  // are the same thing from the staff member's side: what
+                  // the shop has written down about their own pay.
+                  ListTile(
+                    leading: const Icon(Icons.receipt_long_rounded),
+                    title: const Text('حقوق من'),
+                    subtitle: const Text('درخواست حقوق ماه'),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MySalaryScreen(
+                          api: context.read<BakeryApi>(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Only whoever writes invoices down. For anybody else
+                  // the list would always be empty, and an empty screen
+                  // reads as a broken one.
+                  if (user?.can('record-purchase') ?? false) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.receipt_rounded),
+                      title: const Text('خریدهای من'),
+                      subtitle: const Text('فاکتورهایی که ثبت کرده‌اید'),
+                      trailing: const Icon(Icons.chevron_left_rounded),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MyPurchasesScreen(
+                            api: context.read<BakeryApi>(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const Divider(height: 1),
                   // Reachable by every role: the person whose pay an
                   // advance comes out of is whoever took it, not only the

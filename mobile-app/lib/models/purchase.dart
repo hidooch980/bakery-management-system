@@ -208,8 +208,13 @@ class Purchase {
     this.invoiceNo,
   });
 
+  /// The id is not required to be there.
+  ///
+  /// `as int` throws on an absent field, and a throw during a build is a
+  /// grey rectangle in release with nothing written on it — one short row
+  /// would take the whole list off the screen.
   factory Purchase.fromJson(Map<String, dynamic> json) => Purchase(
-        id: json['id'] as int,
+        id: (json['id'] as num?)?.toInt() ?? 0,
         supplierName: json['supplier_name'] as String? ?? '',
         purchasedOnDisplay: json['purchased_on_display'] as String? ?? '',
         amountFormatted: json['amount_formatted'] as String? ?? '',
