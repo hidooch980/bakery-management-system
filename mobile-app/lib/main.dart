@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'services/error_log.dart';
@@ -14,6 +15,7 @@ import 'screens/seller/seller_home_screen.dart';
 import 'screens/admin/admin_home_screen.dart';
 import 'screens/shater/shater_home_screen.dart';
 import 'services/api_client.dart';
+import 'services/app_version.dart';
 import 'services/bakery_api.dart';
 import 'services/connection_status.dart';
 import 'services/server_directory.dart';
@@ -70,6 +72,11 @@ void main() async {
         ),
       );
   };
+
+  // Off the request path, once, so the version header costs nothing per
+  // call and a platform channel that does not answer cannot hold up a
+  // request. Not awaited: sign-in must not wait on a diagnostic.
+  unawaited(AppVersion.warmUp());
 
   final client = ApiClient();
 

@@ -169,9 +169,10 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
                           title: Text(device.name),
                           subtitle: Text(
                             device.isCurrent
-                                ? 'همین گوشی · ${device.when}'
-                                : device.when,
+                                ? 'همین گوشی · ${device.versionLabel}\n${device.when}'
+                                : '${device.versionLabel}\n${device.when}',
                           ),
+                          isThreeLine: true,
                           trailing: TextButton(
                             onPressed: () => _signOut(device),
                             child: Text(

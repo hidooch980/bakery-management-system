@@ -4,6 +4,7 @@ use App\Exceptions\AlreadyClaimedException;
 use App\Exceptions\InsufficientStockException;
 use App\Http\Middleware\EndsInactiveSessions;
 use App\Http\Middleware\IdempotentWrites;
+use App\Http\Middleware\RecordsAppVersion;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'active' => EndsInactiveSessions::class,
+            'app-version' => RecordsAppVersion::class,
             'idempotent' => IdempotentWrites::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,

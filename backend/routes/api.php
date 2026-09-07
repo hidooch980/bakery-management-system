@@ -81,7 +81,7 @@ Route::prefix('v1')->group(function () {
     // `active` runs after sanctum has resolved the user and before
     // anything reads or writes: an account switched off must stop working
     // on the next request, not at the next sign-in it never makes.
-    Route::middleware(['auth:sanctum', 'active', 'idempotent'])->group(function () {
+    Route::middleware(['auth:sanctum', 'active', 'app-version', 'idempotent'])->group(function () {
         // --- Available to every authenticated user ---
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
