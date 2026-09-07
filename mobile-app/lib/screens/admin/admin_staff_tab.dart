@@ -5,6 +5,7 @@ import '../../services/bakery_api.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import 'advance_requests_section.dart';
+import 'lateness_report_section.dart';
 import 'salary_requests_section.dart';
 import 'payroll_section.dart';
 import 'staff_report_section.dart';
@@ -112,6 +113,8 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                       AdvanceRequestsSection(api: widget.api),
                       const SizedBox(height: 12),
                       SalaryRequestsSection(api: widget.api),
+                      const SizedBox(height: 12),
+                      LatenessReportSection(api: widget.api),
                       const SizedBox(height: 12),
                       StaffReportSection(api: widget.api),
                 const SizedBox(height: 22),
