@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
+import 'app_version.dart';
 import 'offline_queue.dart';
 import 'response_cache.dart';
 
@@ -64,6 +65,19 @@ class ApiClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+
+          // On every request rather than only at sign-in: nobody signs in
+          // again after updating, so a version recorded once would say
+          // 5.1.0 for as long as the token lived, whatever was installed.
+          //
+          // Synchronous. Whatever `warmUp` has found by now, and nothing
+          // if it has not finished — a diagnostic header must never make
+          // a request wait on a platform channel.
+          final version = AppVersion.cached;
+          if (version != null) {
+            options.headers['X-App-Version'] = version;
+          }
+
           handler.next(options);
         },
       ),

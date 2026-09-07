@@ -55,9 +55,19 @@ class AuthController extends Controller
 
         $user->forceFill(['last_login_at' => now()])->save();
         $this->closeOldestSessions($user);
-        $token = $user->createToken(
+        $new = $user->createToken(
             self::deviceName($data['device_name'] ?? null),
-        )->plainTextToken;
+        );
+
+        // Set here as well as in the middleware, so the device list is
+        // right from the first request rather than from the second.
+        $version = trim((string) $request->header('X-App-Version'));
+
+        if ($version !== '' && preg_match('/^[0-9A-Za-z.+-]{1,20}$/', $version)) {
+            $new->accessToken->forceFill(['app_version' => $version])->save();
+        }
+
+        $token = $new->plainTextToken;
 
         return $this->success([
             'token' => $token,
@@ -274,6 +284,11 @@ class AuthController extends Controller
             ->map(fn ($token) => [
                 'id' => $token->id,
                 'name' => $token->name,
+                // Which build is on that handset. Null until it has made
+                // one request carrying the header — a token minted by an
+                // older app never sends one, and «نامشخص» on the screen
+                // is itself the answer: that phone has not been updated.
+                'app_version' => $token->app_version,
                 // The phone in your hand, so the list can say so rather
                 // than inviting somebody to sign themselves out by accident
                 // while standing at the till.

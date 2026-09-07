@@ -6,6 +6,7 @@ class SignedInDevice {
     required this.isCurrent,
     this.lastUsedAt,
     this.createdAt,
+    this.appVersion,
   });
 
   final int id;
@@ -23,6 +24,11 @@ class SignedInDevice {
   final String? lastUsedAt;
   final String? createdAt;
 
+  /// Which build is on that handset, once it has made a request carrying
+  /// the header. Null for a session opened by an app old enough not to
+  /// send one — and that is itself the answer: it has not been updated.
+  final String? appVersion;
+
   factory SignedInDevice.fromJson(Map<String, dynamic> json) {
     return SignedInDevice(
       id: (json['id'] as num).toInt(),
@@ -32,6 +38,9 @@ class SignedInDevice {
       isCurrent: json['is_current'] == true,
       lastUsedAt: json['last_used_at'] as String?,
       createdAt: json['created_at'] as String?,
+      appVersion: (json['app_version'] as String?)?.trim().isEmpty == true
+          ? null
+          : json['app_version'] as String?,
     );
   }
 
@@ -45,4 +54,13 @@ class SignedInDevice {
 
     return 'بدون سابقهٔ استفاده';
   }
+
+  /// The build, said plainly, or that nobody knows.
+  ///
+  /// «نامشخص» rather than nothing: a blank where a version belongs reads
+  /// as a bug in the list, where the actual fact — this phone has not
+  /// spoken to the server since it was updated to a build that reports —
+  /// is worth seeing.
+  String get versionLabel =>
+      appVersion == null ? 'نسخه نامشخص' : 'نسخهٔ $appVersion';
 }
