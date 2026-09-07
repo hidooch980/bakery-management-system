@@ -37,8 +37,14 @@ class LatePenalty
         $bakery = CurrentBakery::get();
 
         return [
-            'free_days' => (int) ($bakery?->late_free_days ?: self::DEFAULT_FREE_DAYS),
-            'tier1_last_day' => (int) ($bakery?->late_tier1_last_day ?: self::DEFAULT_TIER1_LAST_DAY),
+            // `??`, not `?:`. Zero is a setting somebody chose — «charge
+            // from the first late day» — and `?:` read it as «not set»
+            // and handed back three. A shop that set no tolerance got
+            // three free days a month and nothing said so; the two
+            // amounts below were already written this way, so the
+            // difference was known and applied to half of them.
+            'free_days' => (int) ($bakery?->late_free_days ?? self::DEFAULT_FREE_DAYS),
+            'tier1_last_day' => (int) ($bakery?->late_tier1_last_day ?? self::DEFAULT_TIER1_LAST_DAY),
             'tier1_amount' => $bakery?->late_tier1_amount === null
                 ? (float) self::DEFAULT_TIER1_AMOUNT
                 : (float) $bakery->late_tier1_amount,

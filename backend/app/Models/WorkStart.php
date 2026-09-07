@@ -176,7 +176,21 @@ class WorkStart extends Model
 
         $cutoff = $now->copy()->setTime($hour, $minute, 0);
 
-        $late = $now->greaterThan($cutoff);
+        // «On a day the shop is closed there is nothing to be late for»
+        // is the rule `todayBoard` states and honours: on a holiday it
+        // reports no deadline, no countdown and nothing overdue. This
+        // method never read it. A tick on a closed day was measured
+        // against a deadline the same screen had just said did not apply,
+        // marked late, and charged — so the board said «no deadline
+        // today» while the record said «late» about the same morning.
+        //
+        // Since the tariff writes its own deduction, that disagreement is
+        // money off somebody's wages for being late to a shop that was
+        // shut. The work is still recorded: not charging somebody is not
+        // the same as pretending they were not there.
+        $closed = Holiday::whereDate('date', $date)->exists();
+
+        $late = ! $closed && $now->greaterThan($cutoff);
 
         // The tariff is charged per late day, not per late tick. If this day
         // has already been counted — because the other activity was late too
