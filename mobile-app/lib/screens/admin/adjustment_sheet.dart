@@ -153,7 +153,7 @@ class _AdjustmentSheetState extends State<AdjustmentSheet> {
                 decoration: const InputDecoration(labelText: 'کارمند'),
                 items: [
                   for (final p in widget.staff)
-                    DropdownMenuItem(value: p.id, child: Text(p.name)),
+                    DropdownMenuItem(value: p.id, child: Text(p.displayName)),
                 ],
                 onChanged: (id) => setState(
                   () => _person = widget.staff.firstWhere((p) => p.id == id),

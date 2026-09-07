@@ -1,3 +1,5 @@
+import '../utils/json.dart';
+
 /// One person on the payroll, and what a period owes them.
 class Employee {
   const Employee({
@@ -21,6 +23,10 @@ class Employee {
 
   final int id;
   final String name;
+
+  /// What to put in front of the shop owner. A payroll row or a picker
+  /// entry with no name is a figure about nobody.
+  String get displayName => personName({'id': id, 'name': name});
 
   /// In the shop's display unit, which is what gets typed back.
   final double monthlySalary;

@@ -1076,7 +1076,7 @@ class _PaymentRow extends StatelessWidget {
                   for (final person in staff)
                     DropdownMenuItem(
                       value: person.id,
-                      child: Text(person.name),
+                      child: Text(person.displayName),
                     ),
                 ],
                 onChanged: onConsumerChanged,

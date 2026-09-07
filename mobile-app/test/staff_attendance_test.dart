@@ -50,4 +50,37 @@ void main() {
       expect(person.checkedIn, isFalse);
     });
   });
+
+  group('what the roster row says', () {
+    // The raw name is allowed to be blank — the test above pins that. What
+    // is not allowed is a row on the seller's screen with a tick button and
+    // no name beside it: nobody can tick in somebody they cannot identify,
+    // and a blank line reads as a bug in the list rather than a missing
+    // field on one person.
+    test('is the name when the server sent one', () {
+      final person =
+          StaffAttendance.fromJson({'id': 7, 'name': 'حسن شاطر'});
+
+      expect(person.displayName, 'حسن شاطر');
+    });
+
+    test('names the record when the name is missing or blank', () {
+      expect(StaffAttendance.fromJson({'id': 7}).displayName, 'کارمند #7');
+      expect(
+        StaffAttendance.fromJson({'id': 7, 'name': '   '}).displayName,
+        'کارمند #7',
+      );
+    });
+
+    test('is never empty, whatever the row held', () {
+      for (final row in <Map<String, dynamic>>[
+        {},
+        {'id': 0},
+        {'id': 4, 'name': ''},
+        {'name': null},
+      ]) {
+        expect(StaffAttendance.fromJson(row).displayName, isNotEmpty);
+      }
+    });
+  });
 }

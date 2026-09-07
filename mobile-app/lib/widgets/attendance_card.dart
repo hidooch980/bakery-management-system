@@ -294,7 +294,7 @@ class _RosterSheetState extends State<_RosterSheet> {
       if (queued) {
         showMessage(
           context,
-          'اینترنت وصل نیست؛ حضور ${person.name} ذخیره شد و با اتصال بعدی ثبت می‌شود.',
+          'اینترنت وصل نیست؛ حضور ${person.displayName} ذخیره شد و با اتصال بعدی ثبت می‌شود.',
         );
       }
     } on ApiException catch (e) {
@@ -374,7 +374,7 @@ class _RosterSheetState extends State<_RosterSheet> {
 
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(person.name),
+                      title: Text(person.displayName),
                       subtitle: person.checkedIn
                           ? Text(
                               person.checkedInAt != null
