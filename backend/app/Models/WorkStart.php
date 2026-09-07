@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToBakery;
 use App\Support\AppCalendar;
 use App\Support\CurrentBakery;
 use App\Support\Jalali;
+use App\Support\LateDeduction;
 use App\Support\LatePenalty;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
@@ -71,6 +72,39 @@ class WorkStart extends Model
             'late_sequence' => 'integer',
             'penalty_amount' => 'decimal:2',
         ];
+    }
+
+    /**
+     * Keeps the wage deduction in step with the records.
+     *
+     * On save and on delete, both, and after the write rather than
+     * before: the figure is summed from the rows, so it has to be summed
+     * from the rows as they now are. Deleting an early late day re-prices
+     * every later one, which is why the total is recomputed from scratch
+     * instead of being adjusted by a difference.
+     *
+     * `LateDeduction::sync` leaves a settled month alone.
+     */
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        static::saved(function (self $record) {
+            $record->syncDeduction();
+        });
+
+        static::deleted(function (self $record) {
+            $record->syncDeduction();
+        });
+    }
+
+    private function syncDeduction(): void
+    {
+        if ($this->user_id === null || $this->date === null) {
+            return;
+        }
+
+        LateDeduction::sync((int) $this->user_id, $this->date->copy());
     }
 
     public function user()

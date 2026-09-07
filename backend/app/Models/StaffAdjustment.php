@@ -29,6 +29,18 @@ class StaffAdjustment extends Model
     /** A sum, straight out. */
     public const BY_AMOUNT = 'amount';
 
+    /**
+     * Whether a person wrote this down or a rule did.
+     *
+     * Null for every row anybody has ever entered. The late tariff sets
+     * its own marker so it can find and rewrite exactly its own row, and
+     * so that nothing it writes can be mistaken for somebody's decision.
+     */
+    public function isAutomatic(): bool
+    {
+        return $this->source !== null;
+    }
+
     /** Days of pay, priced from this person's own monthly wage. */
     public const BY_DAYS = 'days';
 
@@ -50,6 +62,7 @@ class StaffAdjustment extends Model
         'recorded_by',
         'kind',
         'basis',
+        'source',
         'amount',
         'days',
         'occurred_on',
