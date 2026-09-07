@@ -3,8 +3,8 @@
 use App\Exceptions\AlreadyClaimedException;
 use App\Exceptions\InsufficientStockException;
 use App\Http\Middleware\EndsInactiveSessions;
-use App\Http\Middleware\RecordsAppVersion;
 use App\Http\Middleware\IdempotentWrites;
+use App\Http\Middleware\RecordsAppVersion;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
