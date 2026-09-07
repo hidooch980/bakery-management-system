@@ -114,7 +114,7 @@ class _PayrollSectionState extends State<PayrollSection> {
       );
 
       if (!mounted) return;
-      showMessage(context, 'حقوق ${person.name} ثبت شد.');
+      showMessage(context, 'حقوق ${person.displayName} ثبت شد.');
       _reload();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -172,7 +172,7 @@ class _PayrollSectionState extends State<PayrollSection> {
             else
               for (final person in staff) ...[
                 AdminRow(
-                  label: person.name,
+                  label: person.displayName,
                   value: paidThisPeriod.contains(person.id)
                       ? 'پرداخت شد'
                       : person.monthlySalaryFormatted,
@@ -392,7 +392,7 @@ class _PaySheetState extends State<_PaySheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'حقوق ${widget.person.name}',
+                'حقوق ${widget.person.displayName}',
                 style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 20),

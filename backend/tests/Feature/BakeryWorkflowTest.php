@@ -185,6 +185,29 @@ class BakeryWorkflowTest extends TestCase
             ->assertJsonPath('data.total', 1);
     }
 
+    /**
+     * A row on the attendance sheet with a time but no name says somebody
+     * was here without saying who, which is the one thing the sheet is for.
+     * The name is asserted at the exact path the phone reads it from, so a
+     * later change to the eager load or to the envelope shape is caught
+     * here rather than in a photograph of a screen in the shop.
+     */
+    public function test_attendance_rows_carry_the_name_not_only_the_time(): void
+    {
+        $staff = $this->userWithRole('dough_maker');
+        $staff->update(['name' => 'حسین رحیمی']);
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($staff, 'sanctum')->postJson('/api/v1/attendance/check-in');
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/reports/attendance')
+            ->assertOk()
+            ->assertJsonPath('data.data.0.user.name', 'حسین رحیمی')
+            ->assertJsonPath('data.data.0.user.id', $staff->id)
+            ->assertJsonPath('data.data.0.user_id', $staff->id);
+    }
+
     public function test_only_admin_can_create_accounts(): void
     {
         foreach (['dough_maker', 'chane_gir', 'seller'] as $role) {

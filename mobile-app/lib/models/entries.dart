@@ -1,3 +1,5 @@
+import '../utils/json.dart';
+
 class DoughEntry {
   const DoughEntry({
     required this.id,
@@ -162,6 +164,10 @@ class StaffName {
         id: json['id'] as int,
         name: (json['name'] ?? '') as String,
       );
+
+  /// What to show in a picker. A blank line in a dropdown cannot be chosen
+  /// on purpose — it reads as an empty list with a gap in it.
+  String get displayName => personName({'id': id, 'name': name});
 }
 
 class SalePaymentLine {
@@ -261,6 +267,12 @@ class StaffAttendance {
 
   /// Wall-clock time, already formatted by the server.
   final String? checkedInAt;
+
+  /// What to put on the row. A roster row with a blank name is a line with
+  /// a tick button and nothing saying whose tick it is, and the seller
+  /// cannot tick somebody in they cannot identify — so it names the record
+  /// rather than leaving the space empty.
+  String get displayName => personName({'id': id, 'name': name});
 
   /// Someone entered this for them rather than them entering it. Shown so
   /// the seller can see the tick is theirs, not evidence the person came
