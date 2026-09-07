@@ -1099,11 +1099,39 @@ class IssueScanner
      * write on exactly the path that is already failing, and a database
      * that is itself the problem would then swallow its own report.
      */
+    /**
+     * Where the log for a given day actually is.
+     *
+     * `laravel.log` is only the name the `single` driver uses. This shop
+     * runs the `daily` driver, which writes `laravel-YYYY-MM-DD.log` — so
+     * the fixed name found nothing, `is_readable` returned false, and the
+     * detector reported «no errors» every single day whatever had
+     * happened. A detector that cannot fire is worse than no detector,
+     * because its silence is read as good news.
+     *
+     * Both names are tried rather than the configuration being consulted:
+     * the channel can be a stack of several, and the question here is only
+     * which file exists.
+     */
+    private function logPathFor(string $date): ?string
+    {
+        foreach (["logs/laravel-{$date}.log", 'logs/laravel.log'] as $name) {
+            $path = storage_path($name);
+
+            if (is_readable($path)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
     private function serverErrorsToday(): array
     {
-        $path = storage_path('logs/laravel.log');
+        $today = now()->format('Y-m-d');
+        $path = $this->logPathFor($today);
 
-        if (! is_readable($path)) {
+        if ($path === null) {
             return [];
         }
 
@@ -1126,7 +1154,6 @@ class IssueScanner
         $tail = fread($handle, $read) ?: '';
         fclose($handle);
 
-        $today = now()->format('Y-m-d');
         $count = 0;
         $last = null;
 
@@ -1159,7 +1186,7 @@ class IssueScanner
                 .($hour !== null ? '، آخری ساعت '.$hour : '').'.',
             cause: 'این‌ها خطاهای پیش‌بینی‌نشده‌اند، نه پیغام‌های معمول برنامه.',
             suggestion: 'اگر جایی از برنامه درست کار نمی‌کند، احتمالاً همین‌جاست.'
-                .' متن کامل در storage/logs/laravel.log روی سرور است.',
+                .' متن کامل در '.$path.' روی سرور است.',
             url: null,
             urlLabel: null,
             magnitude: (float) $count,
