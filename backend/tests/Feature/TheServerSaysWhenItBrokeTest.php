@@ -10,8 +10,8 @@ use Tests\TestCase;
 
 /**
  * Every kind of failure this application expects has a message. What has
- * none is the kind nobody expected: those go to `storage/logs/laravel.log`,
- * which on a shop floor is nowhere.
+ * none is the kind nobody expected: those go to the log file, which on a
+ * shop floor is nowhere.
  *
  * The phone was blind the same way until today, and it cost five releases
  * of guessing at «کار نکرد» while the message that named the type and the
@@ -24,13 +24,26 @@ class TheServerSaysWhenItBrokeTest extends TestCase
 
     private string $log;
 
+    /**
+     * The name the shop's own server writes, not the one the `single`
+     * driver would. Every test in this file used to write `laravel.log`,
+     * so every test passed while the detector — which looked for exactly
+     * that name — found nothing on the real machine and reported «no
+     * errors» every day. A fixture that agrees with the code instead of
+     * with the server proves nothing about the server.
+     */
+    private function dailyLog(): string
+    {
+        return storage_path('logs/laravel-'.now()->format('Y-m-d').'.log');
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->seed(BakerySeeder::class);
 
-        $this->log = storage_path('logs/laravel.log');
+        $this->log = $this->dailyLog();
 
         if (! is_dir(dirname($this->log))) {
             mkdir(dirname($this->log), 0o775, true);
@@ -42,6 +55,7 @@ class TheServerSaysWhenItBrokeTest extends TestCase
     protected function tearDown(): void
     {
         @unlink($this->log);
+        @unlink(storage_path('logs/laravel.log'));
 
         parent::tearDown();
     }
@@ -119,6 +133,47 @@ class TheServerSaysWhenItBrokeTest extends TestCase
         @unlink($this->log);
 
         $this->assertNull($this->issue());
+    }
+
+    /**
+     * The other driver's name still works. A server configured the other
+     * way round should not go quiet either, and which of the two a shop
+     * runs is a line in its `.env` that nobody looks at again.
+     */
+    public function test_the_single_drivers_name_is_read_too(): void
+    {
+        @unlink($this->log);
+
+        file_put_contents(
+            storage_path('logs/laravel.log'),
+            $this->line('08:00').$this->line('09:00').$this->line('10:00'),
+        );
+
+        $this->assertNotNull($this->issue());
+    }
+
+    /**
+     * Today's file is the one asked for. Yesterday's sits in the same
+     * directory under its own name and its errors are not today's news.
+     */
+    public function test_yesterdays_file_is_not_read(): void
+    {
+        @unlink($this->log);
+
+        $yesterday = storage_path(
+            'logs/laravel-'.now()->subDay()->format('Y-m-d').'.log',
+        );
+
+        file_put_contents(
+            $yesterday,
+            $this->line('08:00').$this->line('09:00').$this->line('10:00'),
+        );
+
+        try {
+            $this->assertNull($this->issue());
+        } finally {
+            @unlink($yesterday);
+        }
     }
 
     /**
