@@ -34,7 +34,18 @@ class TheServerSaysWhenItBrokeTest extends TestCase
      */
     private function dailyLog(): string
     {
-        return storage_path('logs/laravel-'.now()->format('Y-m-d').'.log');
+        return $this->logDir().'/laravel-'.now()->format('Y-m-d').'.log';
+    }
+
+    /**
+     * Not `storage/logs`. This detector is the only one that reads a real
+     * file, so in tests it is pointed at a directory of its own — otherwise
+     * a machine that happened to log an error today would fail every test
+     * elsewhere that asserts a clean shop has nothing to report.
+     */
+    private function logDir(): string
+    {
+        return rtrim((string) config('logging.issue_scan_dir'), '/');
     }
 
     protected function setUp(): void
@@ -55,7 +66,7 @@ class TheServerSaysWhenItBrokeTest extends TestCase
     protected function tearDown(): void
     {
         @unlink($this->log);
-        @unlink(storage_path('logs/laravel.log'));
+        @unlink($this->logDir().'/laravel.log');
 
         parent::tearDown();
     }
@@ -145,7 +156,7 @@ class TheServerSaysWhenItBrokeTest extends TestCase
         @unlink($this->log);
 
         file_put_contents(
-            storage_path('logs/laravel.log'),
+            $this->logDir().'/laravel.log',
             $this->line('08:00').$this->line('09:00').$this->line('10:00'),
         );
 
@@ -160,9 +171,8 @@ class TheServerSaysWhenItBrokeTest extends TestCase
     {
         @unlink($this->log);
 
-        $yesterday = storage_path(
-            'logs/laravel-'.now()->subDay()->format('Y-m-d').'.log',
-        );
+        $yesterday = $this->logDir()
+            .'/laravel-'.now()->subDay()->format('Y-m-d').'.log';
 
         file_put_contents(
             $yesterday,

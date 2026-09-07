@@ -50,6 +50,23 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Where the issue scanner looks for today's errors
+    |--------------------------------------------------------------------------
+    |
+    | `IssueScanner` counts today's ERROR and CRITICAL lines so «سیستم امروز
+    | چند بار خطا داده» can appear on the owner's page. It has to read a real
+    | file, which makes it the one detector whose answer depends on the
+    | machine rather than on the shop's data — so the directory is named here
+    | and the test environment points it somewhere of its own. Otherwise every
+    | test that asserts «a clean shop reports no issues» passes or fails on
+    | whether anything happened to log an error on that machine today.
+    |
+    */
+
+    'issue_scan_dir' => env('ISSUE_SCAN_LOG_DIR', storage_path('logs')),
+
     'channels' => [
 
         'stack' => [
