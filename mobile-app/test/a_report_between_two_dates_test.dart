@@ -75,50 +75,45 @@ void main() {
     expect(find.text('تأیید'), findsNothing);
   });
 
-  testWidgets('a day past the last allowed cannot be confirmed',
-      (tester) async {
-    // The picker opens beyond `last`, which is the state the person lands
-    // in if they scroll the year forward. Accepting it would produce a
-    // report about days that have not happened.
-    await _pick(
-      tester,
-      initial: Jalali(1405, 12, 20).toDateTime(),
-      last: today,
-    );
+  testWidgets('a day past the last allowed cannot be tapped', (tester) async {
+    // Accepting it would produce a report about days that have not
+    // happened. It used to be tappable and refused afterwards, by a
+    // disabled تأیید and a sentence; now the calendar simply does not
+    // take the tap, which is the same rule said earlier.
+    await _pick(tester, initial: today, last: today);
 
-    expect(find.text('این تاریخ بیرون از بازهٔ مجاز است.'), findsOneWidget);
+    await tester.tap(find.text('20'));
+    await tester.pumpAndSettle();
 
-    final button = tester.widget<FilledButton>(find.byType(FilledButton));
-    expect(button.onPressed, isNull, reason: 'تأیید باید غیرفعال باشد.');
+    // Still the eighth: the tap did nothing.
+    expect(find.textContaining('8 شهریور'), findsOneWidget);
   });
 
-  testWidgets('a day before the first allowed cannot be confirmed',
+  testWidgets('a day before the first allowed cannot be tapped',
       (tester) async {
     // This is «تا تاریخ» opening before the «از» already chosen. A picker
     // that accepted it and silently swapped the two would leave the person
     // certain they had asked for something else.
-    await _pick(
-      tester,
-      initial: Jalali(1405, 1, 1).toDateTime(),
-      first: today,
-    );
+    await _pick(tester, initial: today, first: today);
 
-    final button = tester.widget<FilledButton>(find.byType(FilledButton));
-    expect(button.onPressed, isNull);
+    await tester.tap(find.text('3'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('8 شهریور'), findsOneWidget);
   });
 
-  testWidgets('a day inside the bounds is confirmable', (tester) async {
+  testWidgets('a day inside the bounds is taken', (tester) async {
     await _pick(
       tester,
-      initial: Jalali(1405, 6, 3).toDateTime(),
+      initial: today,
       first: Jalali(1405, 6, 1).toDateTime(),
       last: today,
     );
 
-    expect(find.text('این تاریخ بیرون از بازهٔ مجاز است.'), findsNothing);
+    await tester.tap(find.text('3'));
+    await tester.pumpAndSettle();
 
-    final button = tester.widget<FilledButton>(find.byType(FilledButton));
-    expect(button.onPressed, isNotNull);
+    expect(find.textContaining('3 شهریور'), findsOneWidget);
   });
 
   testWidgets('backing out returns nothing rather than a date',
@@ -131,42 +126,58 @@ void main() {
     expect(find.text('انصراف'), findsNothing);
   });
 
-  testWidgets('moving to a shorter month does not leave the day past its end',
-      (tester) async {
-    // 30 Farvardin. Esfand of a common year has 29 days, so the day has
-    // to come back to 29 — and the field must come with it. Left holding
-    // 30 while `items` only goes to 29, Flutter asserts «There should be
-    // exactly one item with this value» and the dialog crashes. A wrong
-    // label would be a nuisance; this is a dead screen.
-    await _pick(tester, initial: Jalali(1405, 1, 30).toDateTime());
-
-    // Driven through the field's own onChanged rather than by tapping
-    // through the menu: the menu opens in an overlay and Esfand is the
-    // twelfth item, off-screen in a test viewport, so tapping it is a
-    // test of scrolling rather than of the bug.
-    final month = tester
-        .widgetList<DropdownButtonFormField<int>>(
-          find.byType(DropdownButtonFormField<int>),
-        )
-        .elementAt(1);
-
-    month.onChanged!(12);
-    await tester.pumpAndSettle();
-
-    expect(tester.takeException(), isNull);
-    // 30 is gone from the list; the field must not still be holding it.
-    expect(find.text('30'), findsNothing);
-  });
-
-  testWidgets('the month dropdown offers all twelve Jalali months',
+  testWidgets('every month is reachable by paging, and they are Jalali',
       (tester) async {
     await _pick(tester, initial: today);
 
-    await tester.tap(find.text('شهریور').first);
+    // Back six months from Shahrivar reaches Farvardin; the names are the
+    // Jalali ones and there are twelve of them, not thirteen.
+    for (var i = 0; i < 5; i++) {
+      await tester.tap(find.byTooltip('ماه قبل'));
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.textContaining('فروردین'), findsWidgets);
+
+    // And forward past the end of the year into the next one.
+    for (var i = 0; i < 11; i++) {
+      await tester.tap(find.byTooltip('ماه بعد'));
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.textContaining('اسفند'), findsWidgets);
+  });
+
+  testWidgets('a short month shows only the days it has', (tester) async {
+    // Esfand of a common year has 29. The old picker kept a day number in
+    // a field whose list no longer contained it, and Flutter asserted
+    // «There should be exactly one item with this value» — a dead dialog,
+    // not a wrong label. A grid cannot hold a day it does not draw.
+    await _pick(tester, initial: Jalali(1405, 12, 1).toDateTime());
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('29'), findsOneWidget);
+    expect(find.text('30'), findsNothing);
+  });
+
+  testWidgets('the chosen day is on screen, which is what was wrong',
+      (tester) async {
+    // The day sat in a dropdown too narrow for its own number: the field
+    // showed an arrow and nothing else, so the one thing the picker is
+    // for was the one thing invisible.
+    await _pick(tester, initial: today);
+
+    expect(find.text('8'), findsOneWidget);
+    expect(find.textContaining('8 شهریور 1405'), findsOneWidget);
+  });
+
+  testWidgets('paging away does not lose the chosen day', (tester) async {
+    await _pick(tester, initial: today);
+
+    await tester.tap(find.byTooltip('ماه قبل'));
     await tester.pumpAndSettle();
 
-    // Not Gregorian names, and not thirteen.
-    expect(find.text('فروردین'), findsWidgets);
-    expect(find.text('اسفند'), findsWidgets);
+    // Looking at another month is not choosing one.
+    expect(find.textContaining('8 شهریور'), findsOneWidget);
   });
 }
