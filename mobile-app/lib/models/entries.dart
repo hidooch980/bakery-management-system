@@ -235,14 +235,21 @@ class AttendanceRecord {
   });
 
   final int id;
-  final DateTime date;
-  final DateTime checkedInAt;
+  final DateTime? date;
+  final DateTime? checkedInAt;
 
+  /// Nothing here is required to be present.
+  ///
+  /// `DateTime.parse` throws on an absent or malformed field, and a throw
+  /// inside a build is drawn in release as a grey rectangle with no text —
+  /// so one row missing a time would have taken the whole history off the
+  /// screen without saying why. A row with a date and no time is still
+  /// worth showing: it says the person was here.
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) =>
       AttendanceRecord(
-        id: json['id'] as int,
-        date: DateTime.parse(json['date'] as String),
-        checkedInAt: DateTime.parse(json['checked_in_at'] as String),
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        date: DateTime.tryParse('${json['date'] ?? ''}'),
+        checkedInAt: DateTime.tryParse('${json['checked_in_at'] ?? ''}'),
       );
 }
 

@@ -10,6 +10,7 @@ import '../../widgets/biometric_tile.dart';
 import '../admin/backup_screen.dart';
 import 'change_password_screen.dart';
 import 'my_advances_screen.dart';
+import 'my_attendance_screen.dart';
 import 'my_devices_screen.dart';
 import 'update_screen.dart';
 import '../../theme/app_theme.dart';
@@ -169,6 +170,24 @@ class SettingsScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => MyDevicesScreen(
+                          api: context.read<BakeryApi>(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Every role again. «این ماه چند روز آمده‌ام» used to be
+                  // a question for the owner, who had to open the panel to
+                  // answer it; the record is the person's own.
+                  ListTile(
+                    leading: const Icon(Icons.event_available_rounded),
+                    title: const Text('حضور من'),
+                    subtitle: const Text('روزهایی که تیک زده‌اید'),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MyAttendanceScreen(
                           api: context.read<BakeryApi>(),
                         ),
                       ),
