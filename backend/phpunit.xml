@@ -23,6 +23,12 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="mysql"/>
+        <!-- The issue scanner counts today's errors out of a real log file.
+             Pointed away from storage/logs so a machine that logged
+             something today does not fail every test asserting a clean
+             shop. The one test that is about the counting creates its own
+             files here. -->
+        <env name="ISSUE_SCAN_LOG_DIR" value="./storage/framework/testing/issue-logs"/>
         <env name="DB_DATABASE" value="bakery_db_test"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>

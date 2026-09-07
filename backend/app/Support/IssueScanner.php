@@ -14,6 +14,8 @@ use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Looks over the shop's own records and reports what does not add up.
@@ -39,6 +41,16 @@ class IssueScanner
      */
     private const ERROR_ATTENTION_COUNT = 3;
 
+    /**
+     * How long a token must be idle before this counts as a missed prune.
+     *
+     * `tokens:prune-idle` closes anything unused for 30 days and is
+     * scheduled nightly, so a token still here at 32 means at least two
+     * nights went by without it running. The two spare days are there so
+     * a token that crossed the line this morning is not read as a fault.
+     */
+    private const PRUNE_OVERDUE_DAYS = 32;
+
     /** @return Collection<int, SystemIssue> */
     public function scan(): Collection
     {
@@ -62,6 +74,7 @@ class IssueScanner
             ...$this->monthlyObligations(),
             ...$this->expensesMostlyUncategorised(),
             ...$this->serverErrorsToday(),
+            ...$this->nightlyMaintenanceNotRunning(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -1113,10 +1126,63 @@ class IssueScanner
      * the channel can be a stack of several, and the question here is only
      * which file exists.
      */
+    /**
+     * The nightly jobs are not running.
+     *
+     * Four commands are scheduled in `routes/console.php`, and every one of
+     * them depends on a single line of cron calling `schedule:run`. If that
+     * line is absent — and this shop's documented crontab calls
+     * `backup:database` directly, without it — then nothing else scheduled
+     * has ever run: idle sessions are never closed and idempotency keys
+     * are never cleared. Nothing anywhere would say so. The schedule is
+     * written down, it looks correct, and it does nothing.
+     *
+     * So the *consequence* is measured rather than the cron line, which
+     * cannot be seen from here anyway. A token idle past the prune
+     * threshold is standing evidence, and it is true whatever the cause:
+     * cron missing, the command failing, or permissions. It is the
+     * security half that matters — an abandoned key is exactly the one
+     * whose loss nobody notices.
+     */
+    private function nightlyMaintenanceNotRunning(): array
+    {
+        if (! Schema::hasTable('personal_access_tokens')) {
+            return [];
+        }
+
+        $cutoff = now()->subDays(self::PRUNE_OVERDUE_DAYS);
+
+        $stale = DB::table('personal_access_tokens')
+            ->whereRaw('COALESCE(last_used_at, created_at) < ?', [$cutoff])
+            ->count();
+
+        if ($stale === 0) {
+            return [];
+        }
+
+        return [new SystemIssue(
+            key: 'nightly-maintenance-not-running',
+            severity: SystemIssue::WARNING,
+            title: 'کارهای شبانهٔ سرور اجرا نمی‌شوند',
+            detail: $stale.' دسترسی که بیش از '.self::PRUNE_OVERDUE_DAYS
+                .' روز استفاده نشده هنوز باز است.',
+            cause: 'بستن این دسترسی‌ها هر شب زمان‌بندی شده، ولی ظاهراً'
+                .' اجرا نمی‌شود — این‌ها باید شب‌های قبل بسته می‌شدند.',
+            suggestion: 'روی سرور بررسی کنید که خط cron مربوط به'
+                .' «schedule:run» وجود دارد. تا آن موقع، دستی:'
+                .' php artisan tokens:prune-idle',
+            url: null,
+            urlLabel: null,
+            magnitude: (float) $stale,
+        )];
+    }
+
     private function logPathFor(string $date): ?string
     {
-        foreach (["logs/laravel-{$date}.log", 'logs/laravel.log'] as $name) {
-            $path = storage_path($name);
+        $dir = rtrim((string) config('logging.issue_scan_dir', storage_path('logs')), '/');
+
+        foreach (["laravel-{$date}.log", 'laravel.log'] as $name) {
+            $path = $dir.'/'.$name;
 
             if (is_readable($path)) {
                 return $path;
