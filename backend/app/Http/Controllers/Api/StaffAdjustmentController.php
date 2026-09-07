@@ -86,6 +86,18 @@ class StaffAdjustmentController extends Controller
             return $this->error('این مورد در فیش حقوقی لحاظ شده و پاک نمی‌شود. اول فیش را اصلاح کنید.', 409);
         }
 
+        // A row the tariff wrote comes back the next time a day changes,
+        // so deleting it here would look like it worked and then undo
+        // itself. Changing the tariff, or the day it was charged for, is
+        // what changes this figure.
+        if ($adjustment->isAutomatic()) {
+            return $this->error(
+                'این کسر را تعرفهٔ تأخیر ثبت کرده و دستی پاک نمی‌شود.'
+                .' برای تغییرش باید تعرفه یا خودِ روزِ تأخیر اصلاح شود.',
+                409,
+            );
+        }
+
         $adjustment->delete();
 
         return $this->success(null, 'حذف شد.');
