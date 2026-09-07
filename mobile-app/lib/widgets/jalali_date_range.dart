@@ -3,15 +3,21 @@ import 'package:shamsi_date/shamsi_date.dart';
 
 import '../utils/formatters.dart';
 
-/// Picking a Jalali day, and a Jalali span of days.
+/// Picking a Jalali day.
 ///
 /// Flutter's own picker is Gregorian, and a shop that thinks in «۸ شهریور»
-/// cannot use it: the person has to convert in their head, twice, and any
-/// mistake produces a report that looks fine and covers the wrong days.
+/// cannot use it: the person converts in their head, twice, and any slip
+/// produces a report that looks right and covers the wrong days.
 ///
-/// Built rather than pulled in, because `shamsi_date` — already a
-/// dependency for every date the app prints — does the arithmetic, and
-/// what is left is three dropdowns.
+/// This was three dropdowns side by side. The day one was narrow enough
+/// that the number did not fit in it — the field showed an arrow and no
+/// value, so the one thing the picker is for was the one thing invisible.
+/// Widening it would have fixed that and left the rest: three separate
+/// choices to make, none of them showing what day of the week anything
+/// falls on, for a shop whose month runs 5th to 4th and whose Fridays
+/// matter.
+///
+/// So it is a calendar. The day is picked by looking at it.
 class JalaliDayPicker extends StatefulWidget {
   const JalaliDayPicker({
     super.key,
@@ -35,33 +41,43 @@ class JalaliDayPicker extends StatefulWidget {
 class _JalaliDayPickerState extends State<JalaliDayPicker> {
   late Jalali _value;
 
+  /// The month on screen, which is not always the month of the chosen day:
+  /// somebody paging back to look does not lose their selection.
+  late Jalali _shown;
+
   static const _months = [
     'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
     'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
   ];
 
+  /// Saturday first, as the week runs here.
+  static const _weekDays = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
+
   @override
   void initState() {
     super.initState();
     _value = Jalali.fromDateTime(widget.initial.toLocal());
+    _shown = Jalali(_value.year, _value.month, 1);
   }
 
-  /// Days in the chosen month — 29, 30 or 31, and 30 in a leap Esfand.
-  int get _daysInMonth => _value.monthLength;
+  void _page(int months) {
+    var year = _shown.year;
+    var month = _shown.month + months;
 
-  void _set({int? year, int? month, int? day}) {
-    final y = year ?? _value.year;
-    final m = month ?? _value.month;
-    // Moving from a 31-day month to a shorter one must not leave the day
-    // past the end of it.
-    final maxDay = Jalali(y, m, 1).monthLength;
-    final d = (day ?? _value.day).clamp(1, maxDay);
+    while (month > 12) {
+      month -= 12;
+      year++;
+    }
+    while (month < 1) {
+      month += 12;
+      year--;
+    }
 
-    setState(() => _value = Jalali(y, m, d));
+    setState(() => _shown = Jalali(year, month, 1));
   }
 
-  bool get _inBounds {
-    final picked = _value.toDateTime();
+  bool _allowed(Jalali day) {
+    final picked = day.toDateTime();
     final first = widget.first;
     final last = widget.last;
 
@@ -71,89 +87,81 @@ class _JalaliDayPickerState extends State<JalaliDayPicker> {
     return true;
   }
 
+  /// Whether paging that way could reach anything pickable at all.
+  bool _canPage(int months) {
+    var year = _shown.year;
+    var month = _shown.month + months;
+
+    if (month > 12) {
+      month -= 12;
+      year++;
+    }
+    if (month < 1) {
+      month += 12;
+      year--;
+    }
+
+    final candidate = Jalali(year, month, 1);
+    final lastOfMonth = Jalali(year, month, candidate.monthLength);
+
+    // Any day in that month being in bounds is enough: the arrow only has
+    // to know whether there is something over there.
+    return _allowed(candidate) || _allowed(lastOfMonth);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final thisYear = Jalali.now().year;
 
     return AlertDialog(
       title: Text(widget.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: DropdownButtonFormField<int>(
-                  // Keyed on the value, because `initialValue` is read
-                  // once and then owned by the field's own state.
-                  // Changing month to a shorter one clamps the day — and
-                  // without this the field would still hold the old one,
-                  // which is no longer in `items`. Flutter asserts on
-                  // that: «There should be exactly one item with this
-                  // value». A crash, not a wrong label.
-                  key: ValueKey('day-${_value.day}-$_daysInMonth'),
-                  initialValue: _value.day,
-                  decoration: const InputDecoration(labelText: 'روز'),
-                  items: [
-                    for (var d = 1; d <= _daysInMonth; d++)
-                      DropdownMenuItem(value: d, child: Text('$d')),
-                  ],
-                  onChanged: (v) => _set(day: v),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 5,
-                child: DropdownButtonFormField<int>(
-                  key: ValueKey('month-${_value.month}'),
-                  initialValue: _value.month,
-                  decoration: const InputDecoration(labelText: 'ماه'),
-                  items: [
-                    for (var m = 1; m <= 12; m++)
-                      DropdownMenuItem(value: m, child: Text(_months[m - 1])),
-                  ],
-                  onChanged: (v) => _set(month: v),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 4,
-                child: DropdownButtonFormField<int>(
-                  key: ValueKey('year-${_value.year}'),
-                  initialValue: _value.year,
-                  decoration: const InputDecoration(labelText: 'سال'),
-                  items: [
-                    for (var y = thisYear - 3; y <= thisYear; y++)
-                      DropdownMenuItem(value: y, child: Text('$y')),
-                  ],
-                  onChanged: (v) => _set(year: v),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            JalaliFormat.longDate(_value.toDateTime()),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: _inBounds ? scheme.onSurface : scheme.error,
-                ),
-          ),
-          if (!_inBounds) ...[
-            const SizedBox(height: 6),
+      contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _MonthBar(
+              label: '${_months[_shown.month - 1]} ${_shown.year}',
+              // In an RTL layout «قبل» is the arrow pointing right.
+              onPrevious: _canPage(-1) ? () => _page(-1) : null,
+              onNext: _canPage(1) ? () => _page(1) : null,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                for (final day in _weekDays)
+                  Expanded(
+                    child: Text(
+                      day,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            _DayGrid(
+              shown: _shown,
+              selected: _value,
+              isAllowed: _allowed,
+              onPick: (day) => setState(() => _value = day),
+            ),
+            const SizedBox(height: 10),
             Text(
-              'این تاریخ بیرون از بازهٔ مجاز است.',
+              JalaliFormat.longDate(_value.toDateTime()),
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.error,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
                   ),
             ),
           ],
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -161,15 +169,167 @@ class _JalaliDayPickerState extends State<JalaliDayPicker> {
           child: const Text('انصراف'),
         ),
         FilledButton(
-          // Disabled rather than accepted-then-swapped: a picker that
-          // silently reorders the dates leaves the person sure they asked
-          // for something else.
-          onPressed: _inBounds
-              ? () => Navigator.pop(context, _value.toDateTime())
-              : null,
+          // Always in bounds now: an out-of-range day cannot be tapped in
+          // the first place, so there is no state where the button has to
+          // refuse what the calendar just accepted.
+          onPressed: () => Navigator.pop(context, _value.toDateTime()),
           child: const Text('تأیید'),
         ),
       ],
+    );
+  }
+}
+
+class _MonthBar extends StatelessWidget {
+  const _MonthBar({
+    required this.label,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final String label;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: onPrevious,
+          icon: const Icon(Icons.chevron_right_rounded),
+          tooltip: 'ماه قبل',
+        ),
+        Expanded(
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+          ),
+        ),
+        IconButton(
+          onPressed: onNext,
+          icon: const Icon(Icons.chevron_left_rounded),
+          tooltip: 'ماه بعد',
+        ),
+      ],
+    );
+  }
+}
+
+class _DayGrid extends StatelessWidget {
+  const _DayGrid({
+    required this.shown,
+    required this.selected,
+    required this.isAllowed,
+    required this.onPick,
+  });
+
+  final Jalali shown;
+  final Jalali selected;
+  final bool Function(Jalali) isAllowed;
+  final ValueChanged<Jalali> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final today = Jalali.now();
+
+    // `weekDay` is 1 for Saturday, so the first of the month sits that
+    // many cells in.
+    final lead = Jalali(shown.year, shown.month, 1).weekDay - 1;
+    final length = shown.monthLength;
+    final cells = <Widget>[];
+
+    for (var i = 0; i < lead; i++) {
+      cells.add(const SizedBox.shrink());
+    }
+
+    for (var day = 1; day <= length; day++) {
+      final date = Jalali(shown.year, shown.month, day);
+      final allowed = isAllowed(date);
+      final isSelected = date.year == selected.year &&
+          date.month == selected.month &&
+          date.day == selected.day;
+      final isToday = date.year == today.year &&
+          date.month == today.month &&
+          date.day == today.day;
+
+      cells.add(_DayCell(
+        day: day,
+        selected: isSelected,
+        today: isToday,
+        // A day outside the range is shown and not tappable, rather than
+        // hidden: a gap in a calendar reads as a fault in the calendar.
+        onTap: allowed ? () => onPick(date) : null,
+        scheme: scheme,
+      ));
+    }
+
+    return GridView.count(
+      crossAxisCount: 7,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      childAspectRatio: 1.1,
+      children: cells,
+    );
+  }
+}
+
+class _DayCell extends StatelessWidget {
+  const _DayCell({
+    required this.day,
+    required this.selected,
+    required this.today,
+    required this.onTap,
+    required this.scheme,
+  });
+
+  final int day;
+  final bool selected;
+  final bool today;
+  final VoidCallback? onTap;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onTap == null;
+
+    return Padding(
+      padding: const EdgeInsets.all(2),
+      child: Material(
+        color: selected ? scheme.primary : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: today && !selected
+              ? BorderSide(color: scheme.primary, width: 1.4)
+              : BorderSide.none,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Center(
+            child: Text(
+              '$day',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight:
+                        selected || today ? FontWeight.w700 : FontWeight.w400,
+                    // Every state names its own colour. This draws over a
+                    // filled square when selected, and an inherited one
+                    // comes out unreadable on it.
+                    color: selected
+                        ? scheme.onPrimary
+                        : disabled
+                            ? scheme.onSurfaceVariant.withValues(alpha: 0.38)
+                            : scheme.onSurface,
+                  ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
