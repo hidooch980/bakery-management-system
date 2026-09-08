@@ -448,6 +448,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/reports/debts', [ReportController::class, 'debts']);
             // What the shop owns against what it owes, as of now.
             Route::get('/reports/balance-sheet', [BalanceSheetController::class, 'show']);
+            Route::get('/reports/profit-and-loss', [ReportController::class, 'profitAndLoss']);
             // Income and cost bucketed daily, weekly or monthly.
             Route::get('/reports/financial-series', [ReportController::class, 'financialSeries']);
             // Flat rows for Power BI and anything else that models its own

@@ -15,6 +15,7 @@ import 'customer_debts_section.dart';
 import 'follow_ups_section.dart';
 import 'income_expense_chart.dart';
 import 'production_report_section.dart';
+import 'profit_and_loss_section.dart';
 import 'sales_breakdown_section.dart';
 import 'seller_debts_section.dart';
 import 'seller_performance_section.dart';
@@ -346,6 +347,22 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
               // Who has to be called today, and about what.
               const SizedBox(height: 22),
               FollowUpsSection(api: widget.api),
+
+              // The statement, over the same range as everything above it.
+              // The halves have been on this page for a while — income in
+              // one card, expenses in another — and never the sum. Two
+              // screens each showing half a sum is how a 164,640,000 Rial
+              // disagreement about profit survived once.
+              const SizedBox(height: 22),
+              () {
+                final range = _reportRange();
+
+                return ProfitAndLossSection(
+                  api: widget.api,
+                  from: range.from,
+                  to: range.to,
+                );
+              }(),
 
               // Last, because it answers the widest question: everything
               // above is this month's movement, this is where the shop

@@ -346,6 +346,76 @@ class ReportController extends Controller
      * Income (sales) against expenses (recorded costs + paid salaries),
      * with the resulting profit.
      */
+    /**
+     * The whole statement on one page, in the order that explains it.
+     *
+     * The panel has had this since «سود و زیان» was written; the phone had
+     * the halves — income on one screen, expenses on another, profit in a
+     * widget — and never the sum.
+     *
+     * Every figure comes from `Ledger`, the same calls the panel makes, so
+     * there is one implementation of each number rather than two. That is
+     * not tidiness: on 2026-08-16 the dashboard and the report disagreed
+     * about profit by 164,640,000 Rial because flour was counted both as
+     * cost of goods and as an expense, and two screens each showing half a
+     * sum is how that survived. Recomputing any of this here would be
+     * building the second screen again.
+     *
+     * The shop's own rule — «پول اول پرداخت می‌شه» — puts a cost on the day
+     * the money leaves, so the headline is income less everything paid out.
+     * The accrual view sits beneath it, labelled, rather than competing.
+     */
+    public function profitAndLoss(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        $income = Ledger::totalIncome($from, $to);
+        $flour = Ledger::flourPurchases($from, $to);
+        $wages = Ledger::paidSalaries($from, $to);
+        $other = Ledger::operatingExpenses($from, $to);
+        $expenses = Ledger::totalExpenses($from, $to);
+        $profit = Ledger::profit($from, $to);
+        $cogs = Ledger::costOfGoodsSold($from, $to);
+        $gross = Ledger::grossProfit($from, $to);
+
+        return $this->success([
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'from_jalali' => Jalali::date($from),
+            'to_jalali' => Jalali::date($to),
+
+            'income' => Ledger::incomeBreakdown($from, $to),
+            'income_total' => Money::convert($income),
+            'income_total_formatted' => Money::format($income),
+
+            // Named in the shape the owner thinks in — flour, wages, the
+            // rest — rather than by the categories the expense table
+            // happens to have.
+            'costs' => [
+                ['label' => 'خرید آرد', 'amount' => Money::convert($flour),
+                    'amount_formatted' => Money::format($flour)],
+                ['label' => 'حقوق پرداخت‌شده', 'amount' => Money::convert($wages),
+                    'amount_formatted' => Money::format($wages)],
+                ['label' => 'سایر هزینه‌ها', 'amount' => Money::convert($other),
+                    'amount_formatted' => Money::format($other)],
+            ],
+            'expense_total' => Money::convert($expenses),
+            'expense_total_formatted' => Money::format($expenses),
+
+            'profit' => Money::convert($profit),
+            'profit_formatted' => Money::format($profit),
+
+            // Beside the profit, never instead of it. Cost of goods counts
+            // flour as it is baked rather than as it is bought, which
+            // answers a different question and disagrees with the headline
+            // in any period where the two do not line up.
+            'cogs' => Money::convert($cogs),
+            'cogs_formatted' => Money::format($cogs),
+            'gross_profit' => Money::convert($gross),
+            'gross_profit_formatted' => Money::format($gross),
+        ]);
+    }
+
     public function financial(Request $request): JsonResponse
     {
         [$from, $to] = $this->range($request);
