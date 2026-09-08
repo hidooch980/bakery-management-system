@@ -555,6 +555,47 @@ class BakeryApi {
   // ------------------------------------------ admin: seller accounts
 
   /// What every seller still owes, and who has asked to settle.
+  // ------------------------------------------------- دنگ: partner shares
+
+  /// How the period's profit divides between the partners.
+  ///
+  /// The server does the dividing. Each cut is rounded to the currency and
+  /// the residual goes to the largest holder so the parts add back up to
+  /// the profit exactly — arithmetic the phone must not repeat, because
+  /// two answers to «سهم من چقدر است» is worse than none.
+  Future<Map<String, dynamic>> profitSplit({
+    required String from,
+    required String to,
+  }) async {
+    final body = await _client.getCached('/shares/split', query: {
+      'from': from,
+      'to': to,
+    });
+
+    return keyedGroup(body['data']);
+  }
+
+  /// Pays one partner their cut for a period.
+  ///
+  /// The amount is left out unless it is being overridden: the server
+  /// snapshots what it worked out, so a later correction to the books does
+  /// not quietly rewrite what somebody was handed.
+  Future<void> settleShare(
+    int shareId, {
+    required String from,
+    required String to,
+    double? amount,
+    int? bankAccountId,
+    String? note,
+  }) =>
+      _client.post('/shares/$shareId/settle', {
+        'from': from,
+        'to': to,
+        if (amount != null) 'amount': amount,
+        if (bankAccountId != null) 'bank_account_id': bankAccountId,
+        if (note != null && note.isNotEmpty) 'note': note,
+      });
+
   /// What is in the shop's bank accounts, and what they come to together.
   ///
   /// Cached like the other admin reads, so the figure is still there when

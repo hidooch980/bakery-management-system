@@ -16,6 +16,7 @@ import 'follow_ups_section.dart';
 import 'income_expense_chart.dart';
 import 'production_report_section.dart';
 import 'profit_and_loss_section.dart';
+import 'share_split_section.dart';
 import 'sales_breakdown_section.dart';
 import 'seller_debts_section.dart';
 import 'seller_performance_section.dart';
@@ -347,6 +348,20 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
               // Who has to be called today, and about what.
               const SizedBox(height: 22),
               FollowUpsSection(api: widget.api),
+
+              // How the period's profit divides, and paying it out. Next
+              // to the statement because it is the same money one step
+              // further on: the profit above, and whose it is below.
+              const SizedBox(height: 22),
+              () {
+                final range = _reportRange();
+
+                return ShareSplitSection(
+                  api: widget.api,
+                  from: range.from,
+                  to: range.to,
+                );
+              }(),
 
               // The statement, over the same range as everything above it.
               // The halves have been on this page for a while — income in
