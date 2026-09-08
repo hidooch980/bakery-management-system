@@ -876,6 +876,15 @@ class BakeryApi {
   }
 
   /// Late starts over a period, for payroll.
+  /// Forgives one late deduction — the tariff stops rewriting it and the
+  /// month stops counting it. The amount stays on the row.
+  Future<void> waiveAdjustment(int id) =>
+      _client.patch('/staff-adjustments/$id/waive', const {});
+
+  /// Takes the waiver back; the figure is recomputed from the days.
+  Future<void> restoreAdjustment(int id) =>
+      _client.patch('/staff-adjustments/$id/restore', const {});
+
   Future<Map<String, dynamic>> workStartLateReport({String? from, String? to}) async {
     final body = await _client.getCached('/work-starts/late-report', query: {
       if (from != null) 'from': from,
