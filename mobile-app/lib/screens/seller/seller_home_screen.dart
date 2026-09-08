@@ -121,7 +121,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
   /// pressed twice into two sales.
   bool _confirming = false;
 
-  void _reload() => setState(() => _data = _load());
+  void _reload() => setState(() { _data = _load(); });
 
   Future<void> _openSaleSheet(ChaneEntry chane) async {
     final saved = await showModalBottomSheet<bool>(

@@ -49,14 +49,14 @@ class _ShareSplitSectionState extends State<ShareSplitSection> {
     super.didUpdateWidget(old);
 
     if (old.from != widget.from || old.to != widget.to) {
-      setState(() => _split = _load());
+      setState(() { _split = _load(); });
     }
   }
 
   Future<Map<String, dynamic>> _load() =>
       widget.api.profitSplit(from: widget.from, to: widget.to);
 
-  void _reload() => setState(() => _split = _load());
+  void _reload() => setState(() { _split = _load(); });
 
   Future<void> _pay(Map<String, dynamic> holder) async {
     final accounts = await _accounts();

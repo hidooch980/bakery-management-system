@@ -45,7 +45,7 @@ class _StaffYieldSectionState extends State<StaffYieldSection> {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.from != widget.from || oldWidget.to != widget.to) {
-      setState(() => _report = _load());
+      setState(() { _report = _load(); });
     }
   }
 

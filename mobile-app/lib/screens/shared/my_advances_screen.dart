@@ -63,7 +63,7 @@ class _MyAdvancesScreenState extends State<MyAdvancesScreen> {
     );
   }
 
-  void _reload() => setState(() => _data = _load());
+  void _reload() => setState(() { _data = _load(); });
 
   Future<void> _ask() async {
     final result = await showModalBottomSheet<({double amount, String? reason})>(

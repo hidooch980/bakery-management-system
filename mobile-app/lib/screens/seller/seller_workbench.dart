@@ -210,7 +210,7 @@ class _ProductionSectionState extends State<_ProductionSection> {
   }
 
   void _reload() {
-    setState(() => _pending = _load());
+    setState(() { _pending = _load(); });
     widget.onChanged();
   }
 
@@ -1247,7 +1247,7 @@ class _StaffAttendanceSectionState extends State<StaffAttendanceSection> {
                       if (_failure != null)
                         TextButton(
                           onPressed: () =>
-                              setState(() => _records = _load()),
+                              setState(() { _records = _load(); }),
                           child: const Text('دوباره'),
                         ),
                     ],
