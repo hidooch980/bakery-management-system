@@ -20,12 +20,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// and the residual goes to the largest holder so the parts add back up to
 /// the profit exactly. Repeating that here would give «سهم من» two
 /// answers, which is worse than none.
-Future<void> _pump(WidgetTester tester, String data) async {
+Future<void> _pump(
+  WidgetTester tester,
+  String data, {
+  String? settlements,
+}) async {
   SharedPreferences.setMockInitialValues({});
   FlutterSecureStorage.setMockInitialValues({});
 
   final client = ApiClient(baseUrl: 'http://server.test/api/v1');
-  client.useAdapterForTest(_Wire('{"success":true,"data":$data}'));
+  client.useAdapterForTest(_Wire({
+    '/shares/split': '{"success":true,"data":$data}',
+    if (settlements != null)
+      '/shares/settlements': '{"success":true,"data":$settlements}',
+  }));
 
   await tester.pumpWidget(MaterialApp(
     home: Scaffold(
@@ -124,12 +132,82 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the history lists what has actually been handed over',
+      (tester) async {
+    // The split only ever shows one stretch. «پارسال چقدر گرفتم» is
+    // answered here and nowhere else on the phone.
+    await _pump(
+      tester,
+      _split(_holder()),
+      settlements: '[{"id":7,"bakery_share_id":1,'
+          '"share":{"id":1,"name":"عبدالناصر"},'
+          '"period_label":"مرداد ۱۴۰۵","amount_formatted":"۴٬۰۰۰٬۰۰۰ ریال",'
+          '"paid_on_display":"۱۴۰۵/۰۶/۰۴","is_paid":true,"note":"نقدی"}]',
+    );
+
+    await tester.tap(find.text('سابقهٔ تسویه‌ها'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('مرداد ۱۴۰۵  •  ۱۴۰۵/۰۶/۰۴'), findsOneWidget);
+    expect(find.text('۴٬۰۰۰٬۰۰۰ ریال'), findsOneWidget);
+    expect(find.text('نقدی'), findsOneWidget);
+  });
+
+  testWidgets('a payout not yet handed over says so', (tester) async {
+    // A row with no paid_on is a decision recorded, not money gone. The
+    // colour and the wording have to keep those apart.
+    await _pump(
+      tester,
+      _split(_holder()),
+      settlements: '[{"id":8,"bakery_share_id":1,'
+          '"share":{"id":1,"name":"حسین"},"period_label":"شهریور ۱۴۰۵",'
+          '"amount_formatted":"۱٬۰۰۰٬۰۰۰ ریال","paid_on_display":null,'
+          '"is_paid":false,"note":null}]',
+    );
+
+    await tester.tap(find.text('سابقهٔ تسویه‌ها'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('پرداخت نشده'), findsOneWidget);
+  });
+
+  testWidgets('an empty history says so rather than showing nothing',
+      (tester) async {
+    await _pump(tester, _split(_holder()), settlements: '[]');
+
+    await tester.tap(find.text('سابقهٔ تسویه‌ها'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('هنوز دنگی پرداخت نشده است.'), findsOneWidget);
+  });
+
+  testWidgets('a history row with no partner name still says which record',
+      (tester) async {
+    await _pump(
+      tester,
+      _split(_holder()),
+      settlements: '[{"id":9,"bakery_share_id":3,'
+          '"period_label":"تیر ۱۴۰۵","amount_formatted":"۱ ریال",'
+          '"is_paid":true}]',
+    );
+
+    await tester.tap(find.text('سابقهٔ تسویه‌ها'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('کارمند #3'), findsOneWidget);
+  });
 }
 
-class _Wire implements HttpClientAdapter {
-  _Wire(this.body);
 
-  final String body;
+class _Wire implements HttpClientAdapter {
+  _Wire(this.bodies);
+
+  /// Keyed by path, because the دنگ section now reads two endpoints and a
+  /// single canned reply would have the history answer the split.
+  final Map<String, String> bodies;
 
   @override
   Future<ResponseBody> fetch(
@@ -137,9 +215,17 @@ class _Wire implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async =>
-      ResponseBody.fromString(body, 200, headers: {
+      ResponseBody.fromString(_bodyFor(options.path), 200, headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       });
+
+  String _bodyFor(String path) {
+    for (final entry in bodies.entries) {
+      if (path.contains(entry.key)) return entry.value;
+    }
+
+    return '{"success":true,"data":[]}';
+  }
 
   @override
   void close({bool force = false}) {}

@@ -596,6 +596,19 @@ class BakeryApi {
         if (note != null && note.isNotEmpty) 'note': note,
       });
 
+  /// Every دنگ payout on record, newest period first.
+  ///
+  /// The split above only ever shows one period. What a partner actually
+  /// argues about is the year: «پارسال چقدر گرفتم». That answer lives
+  /// here and nowhere else on the phone.
+  Future<List<Map<String, dynamic>>> shareSettlements({int? shareId}) async {
+    final body = await _client.getCached('/shares/settlements', query: {
+      if (shareId != null) 'share_id': '$shareId',
+    });
+
+    return rowList(body['data']);
+  }
+
   /// What is in the shop's bank accounts, and what they come to together.
   ///
   /// Cached like the other admin reads, so the figure is still there when
