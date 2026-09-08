@@ -44,7 +44,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
     );
   }
 
-  void _reload() => setState(() => _data = _load());
+  void _reload() => setState(() { _data = _load(); });
 
   @override
   Widget build(BuildContext context) {

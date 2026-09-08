@@ -57,7 +57,7 @@ class _IncomeExpenseChartState extends State<IncomeExpenseChart> {
     if (oldWidget.from != widget.from ||
         oldWidget.to != widget.to ||
         oldWidget.granularity != widget.granularity) {
-      setState(() => _series = _load());
+      setState(() { _series = _load(); });
     }
   }
 

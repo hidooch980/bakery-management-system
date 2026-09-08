@@ -71,7 +71,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
     );
   }
 
-  void _reload() => setState(() => _data = _load());
+  void _reload() => setState(() { _data = _load(); });
 
   @override
   Widget build(BuildContext context) {

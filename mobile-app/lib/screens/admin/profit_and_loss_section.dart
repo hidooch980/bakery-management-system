@@ -50,7 +50,7 @@ class _ProfitAndLossSectionState extends State<ProfitAndLossSection> {
     super.didUpdateWidget(old);
 
     if (old.from != widget.from || old.to != widget.to) {
-      setState(() => _statement = _load());
+      setState(() { _statement = _load(); });
     }
   }
 

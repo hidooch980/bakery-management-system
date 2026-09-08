@@ -142,7 +142,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
   String _toApiDate(DateTime value) =>
       '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
-  void _reload() => setState(() => _report = _load());
+  void _reload() => setState(() { _report = _load(); });
 
   /// Asks for the two ends of the span, «از» then «تا».
   ///

@@ -51,7 +51,7 @@ class _ConsumptionReportSectionState extends State<ConsumptionReportSection> {
     if (oldWidget.from != widget.from ||
         oldWidget.to != widget.to ||
         oldWidget.granularity != widget.granularity) {
-      setState(() => _report = _load());
+      setState(() { _report = _load(); });
     }
   }
 

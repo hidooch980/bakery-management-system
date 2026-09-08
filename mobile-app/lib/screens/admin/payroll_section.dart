@@ -63,7 +63,7 @@ class _PayrollSectionState extends State<PayrollSection> {
     );
   }
 
-  void _reload() => setState(() => _data = _load());
+  void _reload() => setState(() { _data = _load(); });
 
   /// Writing one down as it happens, rather than recalling it at payday.
   Future<void> _addAdjustment(List<Employee> staff) async {
@@ -122,6 +122,44 @@ class _PayrollSectionState extends State<PayrollSection> {
     }
   }
 
+  /// Handing over a slip that was written but never paid.
+  ///
+  /// Not `recordSalary` again: that would write a second slip for the same
+  /// month and the payroll would have paid twice. This marks the one that
+  /// is already there.
+  Future<void> _handOver(
+    Employee person,
+    Payslip slip,
+    List<BankAccount> accounts,
+  ) async {
+    final accountId = await showModalBottomSheet<int?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _HandOverSheet(slip: slip, accounts: accounts),
+    );
+
+    // Distinguishing «چیزی انتخاب نشد» from «از صندوق» is what the sheet's
+    // own return value is for; it closes with a sentinel rather than null
+    // when the sheet is simply dismissed.
+    if (accountId == _dismissed || !mounted) return;
+
+    try {
+      await widget.api.markSalaryPaid(
+        slip.id,
+        bankAccountId: accountId == _fromTill ? null : accountId,
+      );
+
+      if (!mounted) return;
+
+      showMessage(context, 'پرداخت ${person.displayName} ثبت شد.');
+      _reload();
+    } on ApiException catch (e) {
+      // The server refuses a slip already paid, which is the one failure
+      // worth reading here.
+      if (mounted) showMessage(context, e.message, isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_Payroll>(
@@ -150,10 +188,28 @@ class _PayrollSectionState extends State<PayrollSection> {
         // until a month turns: from the first of the next month everyone
         // paid in the last one reads as already paid, and the payroll shuts
         // itself for a month it has not paid at all.
-        final paidThisPeriod = slips
-            .where((s) => s.periodStartJalali == _thisPeriod)
-            .map((s) => s.userId)
-            .toSet();
+        //
+        // And on `isPaid`, not on the slip being there at all. Every slip
+        // this screen writes is paid the moment it is written, so here the
+        // two look like the same question. They are not: the panel has an
+        // «unpaid» filter, a mark-paid action and a badge counting them, so
+        // a slip prepared and not yet handed over is an ordinary state. One
+        // of those made this row print «پرداخت شد» with a tick and refuse
+        // the tap — the wage could not be paid from the phone, and the
+        // screen said it already had been.
+        final thisPeriod =
+            slips.where((s) => s.periodStartJalali == _thisPeriod);
+
+        final paidThisPeriod =
+            thisPeriod.where((s) => s.isPaid).map((s) => s.userId).toSet();
+
+        // The slip that is waiting, by whose it is. Tapping such a row must
+        // hand that one over rather than write a second slip: two slips for
+        // one month is the payroll paid twice.
+        final awaiting = {
+          for (final slip in thisPeriod.where((s) => !s.isPaid))
+            slip.userId: slip,
+        };
 
         return AdminSection(
           title: 'حقوق کارکنان',
@@ -171,19 +227,28 @@ class _PayrollSectionState extends State<PayrollSection> {
               const AdminRow(label: 'کارمندی ثبت نشده', value: '—')
             else
               for (final person in staff) ...[
-                AdminRow(
-                  label: person.displayName,
-                  value: paidThisPeriod.contains(person.id)
-                      ? 'پرداخت شد'
-                      : person.monthlySalaryFormatted,
-                  icon: paidThisPeriod.contains(person.id)
-                      ? Icons.check_circle_rounded
-                      : Icons.arrow_circle_left_rounded,
-                  color: paidThisPeriod.contains(person.id) ? AppColors.moneyIn : null,
-                  onTap: paidThisPeriod.contains(person.id)
-                      ? null
-                      : () => _pay(person, accounts),
-                ),
+                if (paidThisPeriod.contains(person.id))
+                  AdminRow(
+                    label: person.displayName,
+                    value: 'پرداخت شد',
+                    icon: Icons.check_circle_rounded,
+                    color: AppColors.moneyIn,
+                  )
+                else if (awaiting[person.id] case final slip?)
+                  AdminRow(
+                    label: person.displayName,
+                    value: 'پرداخت نشده — ${slip.netAmountFormatted}',
+                    icon: Icons.hourglass_bottom_rounded,
+                    color: AppColors.attention,
+                    onTap: () => _handOver(person, slip, accounts),
+                  )
+                else
+                  AdminRow(
+                    label: person.displayName,
+                    value: person.monthlySalaryFormatted,
+                    icon: Icons.arrow_circle_left_rounded,
+                    onTap: () => _pay(person, accounts),
+                  ),
                 // He has asked. Shown before the row is tapped, because a
                 // person chasing their own wage is the one thing on this
                 // screen that is about somebody waiting.
@@ -596,6 +661,82 @@ class _Field extends StatelessWidget {
       inputFormatters: [GroupedAmountInputFormatter()],
       onChanged: onChanged,
       decoration: InputDecoration(labelText: label),
+    );
+  }
+}
+
+/// Dismissing the sheet and choosing «از صندوق» both come back without an
+/// account, and they are not the same answer: one is «هیچ کاری نکن», the
+/// other is «پرداخت شد، از صندوق». Nullable alone cannot tell them apart.
+const int _dismissed = -1;
+const int _fromTill = 0;
+
+class _HandOverSheet extends StatefulWidget {
+  const _HandOverSheet({required this.slip, required this.accounts});
+
+  final Payslip slip;
+  final List<BankAccount> accounts;
+
+  @override
+  State<_HandOverSheet> createState() => _HandOverSheetState();
+}
+
+class _HandOverSheetState extends State<_HandOverSheet> {
+  int _accountId = _fromTill;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'پرداخت حقوق ${widget.slip.userName}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'فیش ${widget.slip.periodLabel} از قبل ثبت شده و پرداخت نشده'
+            ' است. مبلغ: ${widget.slip.netAmountFormatted}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          if (widget.accounts.isNotEmpty)
+            DropdownButtonFormField<int>(
+              initialValue: _accountId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'از کدام حساب',
+                prefixIcon: Icon(Icons.account_balance_rounded),
+              ),
+              items: [
+                const DropdownMenuItem(value: _fromTill, child: Text('صندوق')),
+                for (final account in widget.accounts)
+                  DropdownMenuItem(
+                    value: account.id,
+                    child: Text(account.title),
+                  ),
+              ],
+              onChanged: (v) => setState(() => _accountId = v ?? _fromTill),
+            ),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, _accountId),
+            child: const Text('پرداخت شد'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, _dismissed),
+            child: const Text('بی‌خیال'),
+          ),
+        ],
+      ),
     );
   }
 }

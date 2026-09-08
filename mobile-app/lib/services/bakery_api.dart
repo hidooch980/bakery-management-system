@@ -346,8 +346,14 @@ class BakeryApi {
   }
 
   /// Marks a slip already written as handed over.
-  Future<void> markSalaryPaid(int id) async {
-    await _client.patch('/salaries/$id/mark-paid', const {});
+  ///
+  /// The account is worth naming: the server only writes the bank posting
+  /// for one that is, so marking a wage paid without it records the money
+  /// as gone and leaves the balance where it was.
+  Future<void> markSalaryPaid(int id, {int? bankAccountId}) async {
+    await _client.patch('/salaries/$id/mark-paid', {
+      if (bankAccountId != null) 'bank_account_id': bankAccountId,
+    });
   }
 
   Future<List<ChaneEntry>> myChaneHistory() async {
