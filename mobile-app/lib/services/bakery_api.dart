@@ -20,6 +20,7 @@ import 'device_name.dart';
 import 'offline_queue.dart';
 import '../models/quota_and_advance.dart';
 import '../models/signed_in_device.dart';
+import '../utils/json.dart';
 
 /// Typed wrapper over every endpoint the mobile app uses.
 class BakeryApi {
@@ -621,6 +622,24 @@ class BakeryApi {
     final body = await _client.getCached('/reports/balance-sheet');
 
     return BalanceSheet.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// The statement: what came in, what went out, and what is left.
+  ///
+  /// Returned as a map rather than a model. Every figure arrives already
+  /// formatted by the server, which is where the shop's currency lives —
+  /// the phone does not know whether the shop counts in rial or toman and
+  /// must not be the second place that decides.
+  Future<Map<String, dynamic>> profitAndLoss({
+    required String from,
+    required String to,
+  }) async {
+    final body = await _client.getCached('/reports/profit-and-loss', query: {
+      'from': from,
+      'to': to,
+    });
+
+    return keyedGroup(body['data']);
   }
 
   /// Money in against money out, cut into days, weeks or months.
