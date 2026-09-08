@@ -331,6 +331,57 @@ class IncomeAndSharesTest extends TestCase
         $this->assertEquals(0.0, $share->settledFor($from, $to));
     }
 
+    public function test_the_history_lists_every_payout_with_its_partner(): void
+    {
+        // The phone reads this list to answer «پارسال چقدر گرفتم»; the
+        // split above it only ever knows one stretch.
+        $this->makeBreadSale(6_000_000);
+
+        $share = BakeryShare::create(['name' => 'الف', 'dang' => 6]);
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->postJson("/api/v1/shares/{$share->id}/settle", [])
+            ->assertCreated();
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->getJson('/api/v1/shares/settlements')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.share.name', 'الف')
+            ->assertJsonPath('data.0.is_paid', true)
+            ->assertJsonPath('data.0.amount', 6_000_000);
+    }
+
+    public function test_the_history_can_be_narrowed_to_one_partner(): void
+    {
+        $this->makeBreadSale(6_000_000);
+
+        $alef = BakeryShare::create(['name' => 'الف', 'dang' => 3]);
+        $be = BakeryShare::create(['name' => 'ب', 'dang' => 3]);
+
+        foreach ([$alef, $be] as $share) {
+            $this->actingAs($this->admin(), 'sanctum')
+                ->postJson("/api/v1/shares/{$share->id}/settle", [])
+                ->assertCreated();
+        }
+
+        $this->actingAs($this->admin(), 'sanctum')
+            ->getJson("/api/v1/shares/settlements?share_id={$be->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.share.name', 'ب');
+    }
+
+    public function test_a_seller_cannot_read_the_settlement_history(): void
+    {
+        $seller = User::factory()->create(['is_active' => true]);
+        $seller->assignRole('seller');
+
+        $this->actingAs($seller, 'sanctum')
+            ->getJson('/api/v1/shares/settlements')
+            ->assertForbidden();
+    }
+
     public function test_a_seller_cannot_see_the_profit_split(): void
     {
         $user = User::factory()->create(['is_active' => true]);

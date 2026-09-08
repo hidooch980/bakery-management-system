@@ -106,6 +106,14 @@ class _ShareSplitSectionState extends State<ShareSplitSection> {
     }
   }
 
+  void _showSettlements() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _SettlementsSheet(api: widget.api),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
@@ -156,6 +164,15 @@ class _ShareSplitSectionState extends State<ShareSplitSection> {
                 ' دفترها آنچه پرداخت شده را عوض نمی‌کند.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.history_rounded,
+                  size: IconSize.row, color: AppColors.moneyIn),
+              title: const Text('سابقهٔ تسویه‌ها'),
+              subtitle: const Text('هرچه تا امروز بابت دنگ پرداخت شده'),
+              trailing: const Icon(Icons.chevron_left_rounded),
+              onTap: _showSettlements,
             ),
           ],
         );
@@ -336,6 +353,143 @@ class _PaySheetState extends State<_PaySheet> {
               ));
             },
             child: const Text('ثبت پرداخت'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+/// What has actually been handed over, period by period.
+///
+/// The split above answers «سهم من چقدر می‌شود» for one stretch. This
+/// answers «چقدر گرفته‌ام», which is the question that comes back a year
+/// later when nobody remembers and the paper is gone.
+class _SettlementsSheet extends StatefulWidget {
+  const _SettlementsSheet({required this.api});
+
+  final BakeryApi api;
+
+  @override
+  State<_SettlementsSheet> createState() => _SettlementsSheetState();
+}
+
+class _SettlementsSheetState extends State<_SettlementsSheet> {
+  late final Future<List<Map<String, dynamic>>> _rows =
+      widget.api.shareSettlements();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'سابقهٔ تسویهٔ دنگ',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _rows,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 28),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'سابقه خوانده نشد.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  );
+                }
+
+                final rows = snapshot.data ?? const <Map<String, dynamic>>[];
+
+                if (rows.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'هنوز دنگی پرداخت نشده است.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  );
+                }
+
+                return ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.6,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: rows.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) => _SettlementRow(row: rows[i]),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettlementRow extends StatelessWidget {
+  const _SettlementRow({required this.row});
+
+  final Map<String, dynamic> row;
+
+  @override
+  Widget build(BuildContext context) {
+    final share = keyedGroup(row['share']);
+    final paid = row['is_paid'] == true;
+    final note = '${row['note'] ?? ''}'.trim();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  personName(
+                    {'name': share['name']},
+                    fallbackId: row['bakery_share_id'],
+                  ),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                Text(
+                  '${row['period_label'] ?? '—'}'
+                  '${paid ? '  •  ${row['paid_on_display'] ?? ''}' : '  •  پرداخت نشده'}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (note.isNotEmpty)
+                  Text(note, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          Text(
+            '${row['amount_formatted'] ?? '—'}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: paid ? AppColors.moneyIn : AppColors.attention,
+                ),
           ),
         ],
       ),
