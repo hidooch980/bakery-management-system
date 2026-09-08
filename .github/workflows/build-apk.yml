@@ -274,6 +274,42 @@ jobs:
           path: ${{ steps.apk.outputs.path }}
           retention-days: 30
 
+      # What changed, in the language the shop reads. GitHub's own
+      # «What's Changed» is a list of English PR titles: useful to
+      # whoever reads the code and nothing at all to whoever sells the
+      # bread. This puts the Persian entry at the top, where it is read
+      # first, and leaves GitHub's list underneath for anybody who wants
+      # the commits.
+      #
+      # A missing entry is not a failed build. The release still goes out
+      # with the instructions and the changelog link — refusing to publish
+      # an APK over a paragraph would be the wrong thing to guard.
+      - name: Read this version's Persian notes
+        id: notes
+        if: steps.config.outputs.release_tag != ''
+        run: |
+          TAG="${{ steps.config.outputs.release_tag }}"
+          FILE=docs/CHANGELOG.fa.md
+
+          # From the line for this tag up to the next «## v», minus that
+          # heading and the trailing rule.
+          BODY=$(awk -v tag="## $TAG" '
+            $0 == tag { found = 1; next }
+            found && /^## v/ { exit }
+            found { print }
+          ' "$FILE" 2>/dev/null | sed -e 's/^---$//' | sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba')
+
+          if [ -z "$BODY" ]; then
+            echo "::warning::No Persian changelog entry for $TAG in $FILE."
+            BODY="یادداشت فارسی برای این نسخه نوشته نشده."
+          fi
+
+          {
+            echo 'body<<CHANGELOG_EOF'
+            echo "$BODY"
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish GitHub Release
         if: steps.config.outputs.release_tag != ''
         uses: softprops/action-gh-release@v2
@@ -287,6 +323,10 @@ jobs:
 
             **نسخه:** ${{ steps.config.outputs.release_tag }}
             **آدرس API این بیلد:** `${{ steps.config.outputs.api_base_url }}`
+
+            ### چه چیزی عوض شد
+
+            ${{ steps.notes.outputs.body }}
 
             ### ⚠️ اگر «برنامه نصب نشد» دیدید
             **گوشی‌هایی که نسخه v1.0.0 یا v1.1.0 روی آن‌ها نصب است، باید اول برنامه را حذف کنند.**

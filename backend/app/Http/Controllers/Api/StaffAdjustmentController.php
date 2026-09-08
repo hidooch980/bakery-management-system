@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\StaffAdjustment;
 use App\Models\User;
 use App\Support\Jalali;
+use App\Support\LateDeduction;
 use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -88,12 +89,12 @@ class StaffAdjustmentController extends Controller
 
         // A row the tariff wrote comes back the next time a day changes,
         // so deleting it here would look like it worked and then undo
-        // itself. Changing the tariff, or the day it was charged for, is
-        // what changes this figure.
+        // itself. Forgiving it is the way to not take it — that decision
+        // is remembered and the tariff stops rewriting the row.
         if ($adjustment->isAutomatic()) {
             return $this->error(
-                'این کسر را تعرفهٔ تأخیر ثبت کرده و دستی پاک نمی‌شود.'
-                .' برای تغییرش باید تعرفه یا خودِ روزِ تأخیر اصلاح شود.',
+                'این کسر را تعرفهٔ تأخیر ثبت کرده و پاک کردنش دوباره برمی‌گردد.'
+                .' اگر نمی‌خواهید بگیرید، «بخشیدن» را بزنید.',
                 409,
             );
         }
@@ -101,6 +102,64 @@ class StaffAdjustmentController extends Controller
         $adjustment->delete();
 
         return $this->success(null, 'حذف شد.');
+    }
+
+    /**
+     * The owner deciding not to take a deduction.
+     *
+     * The figure stays on the row and stops counting. Deleting instead
+     * would lose the amount as well as the decision, and the amount is
+     * what makes the decision legible next month — «چقدر بود که نگرفتم».
+     *
+     * Only an automatic row needs this. One somebody typed can simply be
+     * deleted: nothing writes it back.
+     */
+    public function waive(Request $request, StaffAdjustment $adjustment): JsonResponse
+    {
+        if ($adjustment->salary_payment_id !== null) {
+            return $this->error(
+                'این مورد در فیش حقوقی لحاظ شده. اول فیش را اصلاح کنید.',
+                409,
+            );
+        }
+
+        if ($adjustment->isWaived()) {
+            return $this->success(null, 'قبلاً بخشیده شده بود.');
+        }
+
+        $adjustment->forceFill([
+            'waived_at' => now(),
+            // Named, because forgiving somebody a fine is a decision and
+            // a decision with no name on it is a rule again.
+            'waived_by' => $request->user()->id,
+        ])->save();
+
+        return $this->success(null, 'بخشیده شد و از حقوق کسر نمی‌شود.');
+    }
+
+    /**
+     * Taking the waiver back.
+     *
+     * Hands the row to the tariff again, which recomputes it from the
+     * days — so an amount that changed while it was forgiven is right
+     * rather than stale.
+     */
+    public function restore(StaffAdjustment $adjustment): JsonResponse
+    {
+        if (! $adjustment->isWaived()) {
+            return $this->success(null, 'این مورد بخشیده نشده بود.');
+        }
+
+        $adjustment->forceFill(['waived_at' => null, 'waived_by' => null])->save();
+
+        if ($adjustment->source === LateDeduction::SOURCE) {
+            LateDeduction::sync(
+                (int) $adjustment->user_id,
+                $adjustment->occurred_on->copy(),
+            );
+        }
+
+        return $this->success(null, 'دوباره اعمال شد.');
     }
 
     /**

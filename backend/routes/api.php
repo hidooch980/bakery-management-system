@@ -378,6 +378,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/staff-adjustments', [StaffAdjustmentController::class, 'index']);
             Route::post('/staff-adjustments', [StaffAdjustmentController::class, 'store']);
             Route::delete('/staff-adjustments/{adjustment}', [StaffAdjustmentController::class, 'destroy']);
+            // Whether to take what the tariff worked out is the owner's,
+            // and the literal paths sit before the model-bound one above
+            // would match «waive» as an id.
+            Route::patch('/staff-adjustments/{adjustment}/waive', [StaffAdjustmentController::class, 'waive']);
+            Route::patch('/staff-adjustments/{adjustment}/restore', [StaffAdjustmentController::class, 'restore']);
 
             Route::get('/salaries/employees', [SalaryController::class, 'employees']);
             Route::patch('/salaries/{salary}/mark-paid', [SalaryController::class, 'markPaid']);

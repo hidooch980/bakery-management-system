@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\StaffAdjustment;
 use App\Models\WorkStart;
 use App\Support\AppCalendar;
 use App\Support\Jalali;
+use App\Support\LateDeduction;
 use App\Support\LatePenalty;
 use App\Support\Money;
 use App\Traits\ApiResponse;
@@ -168,6 +170,13 @@ class WorkStartController extends Controller
 
         $late = $records->where('is_late', true);
 
+        // The rows the tariff wrote for this stretch, so each person's
+        // line can carry the one that belongs to them.
+        $deductions = StaffAdjustment::where('source', LateDeduction::SOURCE)
+            ->whereBetween('occurred_on', [$from->toDateString(), $until->toDateString()])
+            ->get()
+            ->keyBy('user_id');
+
         return $this->success([
             'from' => $from->toDateString(),
             'until' => $until->toDateString(),
@@ -188,13 +197,29 @@ class WorkStartController extends Controller
                 'late_minutes' => (int) $late->where('type', $type)->sum('late_minutes'),
             ])->values(),
             // Grouped by person, since a deduction is applied to someone.
-            'by_user' => $late->groupBy('user_id')->map(fn ($group) => [
-                'user' => $group->first()->user?->name,
-                'late_count' => $group->count(),
-                'late_minutes' => (int) $group->sum('late_minutes'),
-                'penalty' => Money::convert($group->sum('penalty_amount')),
-                'penalty_formatted' => Money::format($group->sum('penalty_amount')),
-            ])->values(),
+            // Grouped by person, since a deduction is applied to somebody.
+            //
+            // The deduction's own row is named here, and whether it has
+            // been forgiven. Without that, the screen showing the figure
+            // is not the screen that can do anything about it — and the
+            // owner would be reading a number on the phone and reaching
+            // for a computer to act on it.
+            'by_user' => $late->groupBy('user_id')->map(function ($group) use ($deductions) {
+                $deduction = $deductions->get($group->first()->user_id);
+
+                return [
+                    'user' => $group->first()->user?->name,
+                    'late_count' => $group->count(),
+                    'late_minutes' => (int) $group->sum('late_minutes'),
+                    'penalty' => Money::convert($group->sum('penalty_amount')),
+                    'penalty_formatted' => Money::format($group->sum('penalty_amount')),
+                    'adjustment_id' => $deduction?->id,
+                    'waived' => (bool) $deduction?->isWaived(),
+                    // A month already paid cannot be forgiven after the
+                    // fact, so the screen must not offer it.
+                    'settled' => $deduction?->salary_payment_id !== null,
+                ];
+            })->values(),
             'records' => $late->map(fn (WorkStart $w) => [
                 'date' => $w->date?->toDateString(),
                 'date_display' => $w->date_display,

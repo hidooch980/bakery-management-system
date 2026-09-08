@@ -65,6 +65,14 @@ class LateDeduction
             return;
         }
 
+        // And a waived one is a decision. The tariff works out what is
+        // owed; whether to take it is the owner's, and a rule that
+        // recomputes over that answer is not one the shop is running.
+        // Restoring the waiver hands the row back to this method.
+        if ($existing?->isWaived()) {
+            return;
+        }
+
         $records = WorkStart::acrossBakeries()
             ->where('user_id', $userId)
             ->where('is_late', true)

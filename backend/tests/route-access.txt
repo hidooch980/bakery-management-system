@@ -129,6 +129,8 @@ PATCH api/v1/salaries/{salary}                              admin
 PATCH api/v1/salaries/{salary}/mark-paid                    admin
 PATCH api/v1/salary-requests/{salaryRequest}/reject         admin
 PATCH api/v1/shares/{share}                                 admin
+PATCH api/v1/staff-adjustments/{adjustment}/restore         admin
+PATCH api/v1/staff-adjustments/{adjustment}/waive           admin
 PATCH api/v1/users/{user}                                   admin
 PATCH api/v1/users/{user}/toggle-active                     admin
 POST api/v1/advance-requests                                (any signed-in)

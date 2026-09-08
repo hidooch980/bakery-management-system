@@ -252,6 +252,11 @@ class SalaryPayment extends Model
         [$from, $until] = Jalali::monthRangeFor($this->period_start->copy());
 
         StaffAdjustment::where('user_id', $this->user_id)
+            // A forgiven deduction is not attached to a payslip at all.
+            // Attaching it and not counting it would leave the payslip
+            // holding a row it does not add up, and the next reader of
+            // that payslip would have to work out why.
+            ->counted()
             ->whereBetween('occurred_on', [$from, $until])
             ->where(function ($q) {
                 $q->whereNull('salary_payment_id')->orWhere('salary_payment_id', $this->id);
