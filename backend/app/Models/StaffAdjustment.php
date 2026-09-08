@@ -41,6 +41,30 @@ class StaffAdjustment extends Model
         return $this->source !== null;
     }
 
+    /**
+     * Somebody decided not to take this.
+     *
+     * The figure stays on the row; what changes is that it is not counted
+     * and the tariff stops rewriting it. Deleting instead would lose both
+     * the amount and the decision, and the amount is what makes the
+     * decision legible next month.
+     */
+    public function isWaived(): bool
+    {
+        return $this->waived_at !== null;
+    }
+
+    /** Rows a payslip should actually count. */
+    public function scopeCounted($query)
+    {
+        return $query->whereNull('waived_at');
+    }
+
+    public function waivedBy()
+    {
+        return $this->belongsTo(User::class, 'waived_by');
+    }
+
     /** Days of pay, priced from this person's own monthly wage. */
     public const BY_DAYS = 'days';
 
@@ -63,6 +87,8 @@ class StaffAdjustment extends Model
         'kind',
         'basis',
         'source',
+        'waived_at',
+        'waived_by',
         'amount',
         'days',
         'occurred_on',
@@ -76,6 +102,7 @@ class StaffAdjustment extends Model
             'occurred_on' => 'date',
             'amount' => 'decimal:2',
             'days' => 'decimal:2',
+            'waived_at' => 'datetime',
         ];
     }
 
@@ -174,6 +201,9 @@ class StaffAdjustment extends Model
     {
         $rows = static::with('user:id,monthly_salary')
             ->where('user_id', $userId)
+            // A waiver is the owner saying «this one I am not taking».
+            // Leaving it in the total would make the decision cosmetic.
+            ->counted()
             ->unsettled()
             ->whereBetween('occurred_on', [$from, $until])
             ->get();
