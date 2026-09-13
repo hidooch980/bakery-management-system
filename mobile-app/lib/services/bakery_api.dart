@@ -1077,11 +1077,17 @@ class BakeryApi {
     return body['queued'] == true;
   }
 
+  /// Money in.
+  ///
+  /// [byCard] is how «این کارتخوانی بود» is said from a phone that has no
+  /// account picker: the server sends card takings to the bank and
+  /// everything else to the drawer, which is the rule the owner set.
   Future<bool> recordIncome({
     required String category,
     required String title,
     required double amount,
     String? note,
+    bool byCard = false,
   }) async {
     final body = await _client.postOrQueue(
       '/incomes',
@@ -1089,6 +1095,7 @@ class BakeryApi {
         'category': category,
         'title': title,
         'amount': amount,
+        if (byCard) 'by_card': true,
         if (note != null && note.isNotEmpty) 'note': note,
       },
       label: 'درآمد — $title',

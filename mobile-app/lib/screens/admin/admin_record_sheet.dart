@@ -88,6 +88,11 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
   List<LedgerCategory> _categories = const [];
   String? _category;
 
+  /// Whether the money came through the reader. The server keeps card
+  /// takings out of the drawer, so this one switch is the difference
+  /// between a till that matches the notes in it and one that does not.
+  bool _byCard = false;
+
   /// Which way the flour went, for a consignment entry.
   String _direction = 'lent';
 
@@ -232,6 +237,7 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
             title: _title.text.trim(),
             amount: value,
             note: note,
+            byCard: _byCard,
           ),
         AdminRecordKind.intake => await widget.api.recordStockIntake(
             item: _item.apiValue,
@@ -344,6 +350,22 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                     onChanged: (value) => setState(() => _category = value),
                   ),
                   const SizedBox(height: 16),
+                ],
+
+                if (widget.kind == AdminRecordKind.income) ...[
+                  SwitchListTile(
+                    value: _byCard,
+                    onChanged: (value) => setState(() => _byCard = value),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('با کارتخوان گرفته شد'),
+                    subtitle: Text(
+                      _byCard
+                          ? 'به حساب بانکی می‌رود'
+                          : 'به صندوق نقد می‌رود',
+                    ),
+                    secondary: const Icon(Icons.credit_card_rounded),
+                  ),
+                  const SizedBox(height: 8),
                 ],
 
                 if (widget.kind == AdminRecordKind.intake) ...[

@@ -273,7 +273,21 @@ class FlourSale extends Model
         // A sack still owed for is left alone: that money has not arrived,
         // and banking it here would count it once now and again when it is
         // actually collected.
-        return $this->is_debt ? null : BankAccount::cashBox()?->id;
+        if ($this->is_debt) {
+            return null;
+        }
+
+        // Flour is sold on the reader too, and the drawer fallback caught
+        // those as well until today — every card sack read as notes in the
+        // till, which is exactly the mistake «درامد کارتخوان فقط بره حساب
+        // سفید» was about. The card half goes where card money goes, and
+        // nowhere at all rather than the drawer when the shop has no bank
+        // to name.
+        if (in_array($this->payment_type, Sale::BANKED_TYPES, true)) {
+            return BankAccount::cardAccount()?->id;
+        }
+
+        return BankAccount::cashBox()?->id;
     }
 
     public function bankPostingAmount(): float

@@ -220,20 +220,31 @@ class SellerAccountController extends Controller
             );
         }
 
-        $account = SellerSettlement::settleWithMethod(
-            $seller,
-            $request->user(),
-            $cash,
-            $card,
-            isset($data['bank_account_id'])
-                ? BankAccount::find($data['bank_account_id'])
-                : null,
-        );
+        $named = isset($data['bank_account_id'])
+            ? BankAccount::find($data['bank_account_id'])
+            : null;
+
+        // Less than the account owes is a payment, not a settlement. This
+        // closed the whole account for whatever was handed over, so a
+        // seller who gave back a tenth of what he owed had the rest
+        // written off by the app — the one path in the system where
+        // handing over less money made the debt smaller than the money.
+        $partial = round($cash + $card, 2) < round($owed['total'], 2) - 0.01;
+
+        $account = $partial
+            ? SellerSettlement::payWithMethod($seller, $request->user(), $cash, $card, $named)
+            : SellerSettlement::settleWithMethod($seller, $request->user(), $cash, $card, $named);
 
         return $this->success([
+            'settled' => ! $partial,
+            'left' => Money::convert(
+                round(max(0, SellerSettlement::outstandingFor($seller)['total']), 2)
+            ),
             'cash' => Money::convert($cash),
             'card' => Money::convert($card),
             'account' => $account?->title,
-        ], 'حساب '.$seller->name.' تسویه شد.');
+        ], $partial
+            ? Money::format(round($cash + $card, 2)).' به حساب '.$seller->name.' واریز شد.'
+            : 'حساب '.$seller->name.' تسویه شد.');
     }
 }

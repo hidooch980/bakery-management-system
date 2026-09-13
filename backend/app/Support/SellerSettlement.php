@@ -210,6 +210,34 @@ class SellerSettlement
     }
 
     /**
+     * A handover that does not cover the whole account.
+     *
+     * The panel refuses these outright; the phone took them and then closed
+     * the seller's entire account for whatever was handed over — a seller
+     * who gave back a tenth of the day's takings had the other nine tenths
+     * written off by the app, and nothing on the row said so.
+     *
+     * Oldest debt first, the same order a partial request already uses, and
+     * anything over the sales it covers stays on the account as credit.
+     *
+     * @return BankAccount|null Which account to name on the record.
+     */
+    public static function payWithMethod(
+        User $seller,
+        User $admin,
+        float $cash,
+        float $card,
+        ?BankAccount $account = null,
+        ?SettlementRequest $request = null,
+    ): ?BankAccount {
+        return DB::transaction(function () use ($seller, $admin, $cash, $card, $account, $request) {
+            self::applyPayment($seller, round($cash + $card, 2), $request);
+
+            return self::bankTheHandover($seller, $admin, $cash, $card, $account, $request);
+        });
+    }
+
+    /**
      * Records both halves of a handover against the accounts they reached.
      *
      * Each half is posted only if it was actually handed over, so a pure

@@ -44,13 +44,29 @@ class PutBackTheCashNeverBanked extends Command
 
         $anything = false;
         $counted = false;
+        $blocked = false;
 
         foreach ($bakeries as $bakery) {
+            $audit = CashNeverBanked::auditFor($bakery);
+
             $anything = $this->report($bakery) || $anything;
-            $counted = $counted || CashNeverBanked::auditFor($bakery)['drawer_was_counted'];
+            $counted = $counted || $audit['drawer_was_counted'];
+            $blocked = $blocked || ! $audit['has_till'];
         }
 
         if (! $anything) {
+            // A shop with no drawer flagged is not a shop with nothing to
+            // put back — it is one this cannot look. Saying «همه‌چیز از
+            // قبل ثبت شده» there is the reassurance the owner would act
+            // on, and it would not be true.
+            if ($blocked) {
+                $this->newLine();
+                $this->line('اول در «حساب‌های بانکی» یکی را «صندوق» علامت بزنید،'
+                    .' بعد دوباره این دستور را اجرا کنید.');
+
+                return self::FAILURE;
+            }
+
             $this->info('چیزی برای اصلاح نیست — همه‌چیز از قبل ثبت شده.');
 
             return self::SUCCESS;
