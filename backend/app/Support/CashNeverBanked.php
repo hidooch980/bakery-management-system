@@ -8,7 +8,6 @@ use App\Models\BankTransaction;
 use App\Models\FlourSale;
 use App\Models\Sale;
 use App\Models\SettlementRequest;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -212,9 +211,18 @@ class CashNeverBanked
             ->whereIn('payment_type', Sale::CASH_TYPES)
             ->sum('amount');
 
+        // Every handover posting, whatever asked for it. Matching on the
+        // request alone missed the ones settled straight from the panel or
+        // the phone, which carry no source at all — so money that had been
+        // properly recorded was counted here as missing, and the figure the
+        // owner was shown as unaccounted for was larger than the hole.
+        //
+        // A handover is the only thing that posts money in under 'sale': a
+        // cash bread sale posts nothing until it is handed over, and flour
+        // and income have reasons of their own.
         $accountedFor = (float) BankTransaction::query()
             ->where('direction', 'in')
-            ->where('source_type', Relation::getMorphAlias(SettlementRequest::class))
+            ->where('reason', 'sale')
             ->sum('amount');
 
         return round(max(0, $settledCash - $accountedFor), 2);

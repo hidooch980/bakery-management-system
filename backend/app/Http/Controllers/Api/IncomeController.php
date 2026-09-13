@@ -65,6 +65,16 @@ class IncomeController extends Controller
         //
         // The bank is the fallback's fallback. A shop with no drawer
         // flagged should not lose the income over a missing tick.
+        $byCard = (bool) ($data['by_card'] ?? false);
+        unset($data['by_card']);
+
+        // Nothing rather than the drawer when the shop has no card
+        // account: card money sitting in the till is a figure that looks
+        // right and is not, and the issues page names that shop already.
+        if ($byCard && ! array_key_exists('bank_account_id', $data)) {
+            $data['bank_account_id'] = BankAccount::cardAccount()?->id;
+        }
+
         if (! array_key_exists('bank_account_id', $data)) {
             $data['bank_account_id'] = BankAccount::cashBox()?->id
                 ?? BankAccount::defaultAccount()?->id;
@@ -77,7 +87,10 @@ class IncomeController extends Controller
 
     public function update(Request $request, Income $income): JsonResponse
     {
-        $income->update($this->validated($request));
+        $data = $this->validated($request);
+        unset($data['by_card']);
+
+        $income->update($data);
 
         return $this->success($this->present($income->fresh()), 'درآمد به‌روزرسانی شد.');
     }
@@ -105,6 +118,11 @@ class IncomeController extends Controller
             'received_on' => ['nullable', 'string'],
             'customer_id' => ['nullable', 'exists:customers,id'],
             'bank_account_id' => ['nullable', 'exists:bank_accounts,id'],
+            // How the phone says «این کارتخوانی بود». It has no account
+            // picker and should not grow one — the owner knows whether the
+            // money came through the reader, not which row in a table it
+            // belongs to.
+            'by_card' => ['sometimes', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 

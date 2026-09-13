@@ -76,6 +76,7 @@ class IssueScanner
             ...$this->serverErrorsToday(),
             ...$this->nightlyMaintenanceNotRunning(),
             ...$this->noCashBox(),
+            ...$this->noCardAccount(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -223,6 +224,56 @@ class IssueScanner
             url: '/admin/bank-accounts',
             urlLabel: 'تعیین صندوق نقد',
             magnitude: $held,
+        )];
+    }
+
+    /**
+     * Card takings with no bank to land in.
+     *
+     * The rule the owner set is that everything goes to the drawer except
+     * the reader — «درامد کارتخوان فقط بره حساب سفید». Where the one
+     * account is flagged as the drawer as well, there is no white account
+     * to name, and rather than book card money as notes in the till the
+     * system posts it nowhere. That is recoverable, and silent, so it is
+     * said here instead.
+     *
+     * Only raised once the reader has actually taken money this month.
+     */
+    private function noCardAccount(): array
+    {
+        // The drawer first: a shop without one is already told so above,
+        // and asking about the card account before that costs a question
+        // or two depending on how many banks there are.
+        if (! BankAccount::cashBox() || BankAccount::cardAccount()) {
+            return [];
+        }
+
+        [$from, $to] = Jalali::currentMonthRange();
+
+        $taken = round((float) Sale::query()
+            ->whereIn('payment_type', Sale::BANKED_TYPES)
+            ->whereBetween('created_at', [$from, $to])
+            ->sum('amount'), 2);
+
+        if ($taken <= 0) {
+            return [];
+        }
+
+        return [new SystemIssue(
+            key: 'no-card-account',
+            severity: SystemIssue::WARNING,
+            title: 'حسابی برای درآمد کارتخوان مشخص نیست',
+            detail: 'این ماه '.Money::format($taken).' با کارتخوان گرفته شده'
+                .' و هیچ حسابی برای ثبتش انتخاب نمی‌شود.',
+            cause: 'تنها حساب فعال، خودش صندوق نقد است. پول کارتخوان در'
+                .' صندوق ثبت نمی‌شود، چون آن‌وقت موجودی صندوق به اندازهٔ'
+                .' هر فروش کارتی بیشتر از پول واقعی کشو نشان می‌داد.',
+            suggestion: 'حساب بانکی‌ای که پول کارتخوان به آن می‌رسد را بسازید'
+                .' (یا فعال کنید) و تیک «پیش‌فرض» را به آن بدهید. صندوق نقد'
+                .' سر جای خودش می‌ماند.',
+            url: '/admin/bank-accounts',
+            urlLabel: 'تعریف حساب کارتخوان',
+            magnitude: $taken,
         )];
     }
 
