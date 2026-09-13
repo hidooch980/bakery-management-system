@@ -4,8 +4,11 @@ namespace App\Support;
 
 use App\Models\BakeryShare;
 use App\Models\BankAccount;
+use App\Models\ConsignmentFlour;
 use App\Models\FixedAsset;
+use App\Models\InventoryItem;
 use App\Models\Loan;
+use App\Models\PurchaseItem;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\StaffAdvance;
@@ -54,6 +57,12 @@ class BalanceSheet
     /** @return array<int, array{key: string, label: string, amount: float, note: string|null}> */
     private static function assets(): array
     {
+        // Worked out once and read twice below. It was a `static` inside
+        // the method a moment ago, which is a cache with no way to clear
+        // it: the first shop's figure was handed to every later caller in
+        // the same process, and the tests showed it immediately.
+        $stock = self::stockValue();
+
         return [
             [
                 'key' => 'bank',
@@ -79,6 +88,18 @@ class BalanceSheet
                 'label' => 'علی‌الحساب کارکنان',
                 'amount' => self::staffAdvances(),
                 'note' => 'از حقوق کسر می‌شود',
+            ],
+            [
+                'key' => 'stock',
+                'label' => 'موجودی انبار',
+                'amount' => $stock['amount'],
+                'note' => $stock['note'],
+            ],
+            [
+                'key' => 'consignment_due',
+                'label' => 'آرد امانی نزد همکاران',
+                'amount' => self::consignmentValue('lent'),
+                'note' => 'تحویل داده‌ایم و برنگشته',
             ],
             [
                 'key' => 'fixed_assets',
@@ -114,6 +135,12 @@ class BalanceSheet
                 'note' => null,
             ],
             [
+                'key' => 'consignment_owed',
+                'label' => 'آرد امانی از همکاران',
+                'amount' => self::consignmentValue('borrowed'),
+                'note' => 'در انبار هست ولی باید برگردد',
+            ],
+            [
                 'key' => 'supplier_debt',
                 'label' => 'بدهی به تأمین‌کنندگان',
                 'amount' => self::supplierDebt(),
@@ -136,6 +163,100 @@ class BalanceSheet
     {
         return round((float) Supplier::query()->get()
             ->sum(fn (Supplier $supplier) => max(0, $supplier->balance)), 2);
+    }
+
+    /**
+     * What is in the store, at what the shop last paid for it.
+     *
+     * A bakery's largest ordinary asset, and this sheet said nothing about
+     * it until today: the bank, the debts, the advances and the oven were
+     * all counted, and the hundred sacks in the store were not.
+     *
+     * Priced off the most recent purchase line for each good rather than
+     * an average of every one: what the store is worth is what replacing
+     * it costs, and an average of prices from a year ago answers a
+     * question nobody asked.
+     *
+     * A good the system has never seen bought has no price on record.
+     * Valuing it at zero would read as an empty shelf, so it is left out
+     * of the figure and named in the note instead — a number that is short
+     * and says where is worth more than one that is silently wrong.
+     *
+     * @return array{amount: float, note: string|null}
+     */
+    private static function stockValue(): array
+    {
+        $total = 0.0;
+        $unpriced = [];
+
+        foreach (InventoryItem::all() as $item) {
+            $balance = round((float) $item->balance, 3);
+
+            if ($balance <= 0) {
+                continue;
+            }
+
+            $price = self::lastPaidPerKg($item);
+
+            if ($price === null) {
+                $unpriced[] = $item->name;
+
+                continue;
+            }
+
+            $total += $balance * $price;
+        }
+
+        $note = 'به آخرین قیمت خرید';
+
+        if ($unpriced !== []) {
+            // Named, not counted. The owner can price them by recording a
+            // purchase; until then the figure is short by a known amount
+            // of a known thing.
+            $note .= '. قیمتی برای این‌ها ثبت نشده و حساب نشده‌اند: '
+                .implode('، ', $unpriced);
+        }
+
+        return ['amount' => round($total, 2), 'note' => $note];
+    }
+
+    /** What the shop last paid for one kilo of a good, if it ever has. */
+    private static function lastPaidPerKg(InventoryItem $item): ?float
+    {
+        $price = PurchaseItem::query()
+            ->where('inventory_item_id', $item->id)
+            ->where('unit_price', '>', 0)
+            ->latest('id')
+            ->value('unit_price');
+
+        return $price === null ? null : (float) $price;
+    }
+
+    /**
+     * Flour lent to or borrowed from another baker, still unsettled.
+     *
+     * Both sides were missing and they fail differently. Borrowed flour is
+     * in the store, so the stock figure above counts it as owned — without
+     * the matching liability the shop looks richer for holding somebody
+     * else's sacks. Lent flour has left the store, so it was on this sheet
+     * nowhere at all: value the shop is owed and no line said so.
+     *
+     * Valued at the same price as the store, because it is the same flour.
+     */
+    private static function consignmentValue(string $direction): float
+    {
+        $kg = (float) ConsignmentFlour::query()
+            ->outstanding()
+            ->where('direction', $direction)
+            ->sum('amount_kg');
+
+        if ($kg <= 0) {
+            return 0.0;
+        }
+
+        $price = self::lastPaidPerKg(InventoryItem::ofKey(InventoryItem::FLOUR));
+
+        return $price === null ? 0.0 : round($kg * $price, 2);
     }
 
     /** Cash the sellers are holding, plus bread they owe for. */
