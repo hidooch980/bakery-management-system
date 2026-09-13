@@ -131,6 +131,11 @@ class _PurchaseSheetState extends State<PurchaseSheet> {
       var outcome = await _send(drafts, force: false);
 
       if (outcome == null) {
+        // The sheet may already be gone — somebody closed it while the
+        // request was in flight. Asking through a dead context throws,
+        // and the invoice they typed goes with it.
+        if (!mounted) return;
+
         // The server has this invoice already — same mill, same day, same
         // money — and named it. Two lorries in a day do happen, so it is
         // asked rather than assumed; but the default is «نه», because a

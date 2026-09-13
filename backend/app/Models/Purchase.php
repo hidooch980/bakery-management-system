@@ -102,14 +102,6 @@ class Purchase extends Model
     // --------------------------------------------------------- the total
 
     /**
-     * Re-reads the lines and makes the record agree with them: the invoice
-     * total, and the warehouse.
-     *
-     * Called after the lines are written rather than from a model hook,
-     * because on a new purchase the lines cannot exist until the row they
-     * hang off does.
-     */
-    /**
      * An invoice already filed that looks like this one: the same mill,
      * the same day, the same total.
      *
@@ -143,6 +135,14 @@ class Purchase extends Model
             .'، '.Money::format((float) $this->amount);
     }
 
+    /**
+     * Re-reads the lines and makes the record agree with them: the invoice
+     * total, and the warehouse.
+     *
+     * Called after the lines are written rather than from a model hook,
+     * because on a new purchase the lines cannot exist until the row they
+     * hang off does.
+     */
     public function refreshTotals(): void
     {
         $amount = round((float) $this->items()->sum('amount'), 2);
