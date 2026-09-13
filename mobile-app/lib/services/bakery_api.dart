@@ -347,12 +347,15 @@ class BakeryApi {
 
   /// Marks a slip already written as handed over.
   ///
-  /// The account is worth naming: the server only writes the bank posting
-  /// for one that is, so marking a wage paid without it records the money
-  /// as gone and leaves the balance where it was.
+  /// The key is always sent, null included. The server keeps the slip's
+  /// existing account when the key is *absent* — and a slip prepared in
+  /// the panel defaults to the shop's main account — so leaving it out to
+  /// mean «از صندوق» debits the bank for cash that came out of the till.
+  /// Absent and null are two different answers here, and only one of them
+  /// is «صندوق».
   Future<void> markSalaryPaid(int id, {int? bankAccountId}) async {
     await _client.patch('/salaries/$id/mark-paid', {
-      if (bankAccountId != null) 'bank_account_id': bankAccountId,
+      'bank_account_id': bankAccountId,
     });
   }
 

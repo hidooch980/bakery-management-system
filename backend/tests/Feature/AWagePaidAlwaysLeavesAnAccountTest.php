@@ -156,6 +156,28 @@ class AWagePaidAlwaysLeavesAnAccountTest extends TestCase
         $this->assertSame(20_000_000.0, $this->balance());
     }
 
+    public function test_marking_it_paid_from_the_till_clears_the_account(): void
+    {
+        // Absent and null are two different answers. Leaving the key out
+        // keeps whatever account the slip already carries — and a slip
+        // prepared in the panel defaults to the shop's main one — so «از
+        // صندوق» has to be said with an explicit null, which is what the
+        // phone now sends. Without this the bank is debited for cash that
+        // came out of the till.
+        $slip = $this->payWage(['paid_on' => null]);
+
+        $before = $this->balance();
+
+        Sanctum::actingAs($this->owner);
+        $this->patchJson("/api/v1/salaries/{$slip['id']}/mark-paid", [
+            'bank_account_id' => null,
+        ])->assertOk();
+
+        $this->assertNull(SalaryPayment::find($slip['id'])->bank_account_id);
+        $this->assertSame($before, $this->balance());
+        $this->assertSame(0, BankTransaction::where('reason', 'salary')->count());
+    }
+
     public function test_correcting_the_wage_corrects_the_posting(): void
     {
         $slip = $this->payWage();
