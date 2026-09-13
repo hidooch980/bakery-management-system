@@ -1385,15 +1385,22 @@ class IssueScanner
     {
         $path = (string) config('bakery.tls_certificate');
 
-        if ($path === '' || ! is_readable($path)) {
+        if ($path === '') {
             return [];
         }
 
-        $parsed = @openssl_x509_parse((string) file_get_contents($path));
+        $parsed = is_readable($path)
+            ? @openssl_x509_parse((string) file_get_contents($path))
+            : false;
         $expires = is_array($parsed) ? ($parsed['validTo_time_t'] ?? null) : null;
 
+        // Nothing readable, or something that is not a certificate. Silence
+        // is right on a machine that has no certbot at all — every
+        // developer's — and wrong on the shop's server, where it would
+        // read exactly like a healthy certificate. certbot's own directory
+        // is what tells the two apart.
         if (! is_int($expires)) {
-            return [];
+            return $this->certificateNotWhereItShouldBe($path);
         }
 
         $left = (int) floor(($expires - now()->getTimestamp()) / 86400);
@@ -1496,5 +1503,62 @@ class IssueScanner
         }
 
         return $issues;
+    }
+
+    /**
+     * The configured certificate is missing or unreadable on a server that
+     * plainly has certbot.
+     *
+     * The usual cause is a renewal that opened a new lineage — certbot
+     * writes `example.com-0001` rather than overwriting when the old
+     * configuration is in the way — and the shop then serves the old
+     * certificate until it lapses, while this check reads a path nothing
+     * writes to any more.
+     *
+     * @return array<int, SystemIssue>
+     */
+    private function certificateNotWhereItShouldBe(string $path): array
+    {
+        // Two levels up from .../live/<name>/fullchain.pem — and it has to
+        // actually be that. Accepting any directory two levels up made
+        // every developer's /tmp/whatever.pem into «certbot is here», and
+        // the warning listed the contents of /tmp back at them.
+        $live = dirname($path, 2);
+
+        if (basename($live) !== 'live' || ! is_dir($live) || ! is_readable($live)) {
+            return [];
+        }
+
+        $names = array_values(array_filter(
+            scandir($live) ?: [],
+            fn ($entry) => ! in_array($entry, ['.', '..', 'README'], true)
+                && is_dir($live.'/'.$entry),
+        ));
+
+        // An empty live directory is certbot installed and managing
+        // nothing — a fresh server, or one whose certificates were
+        // removed. There is no other name to point at, so there is
+        // nothing useful to say.
+        if ($names === []) {
+            return [];
+        }
+
+        return [new SystemIssue(
+            key: 'certificate-not-found',
+            severity: SystemIssue::WARNING,
+            title: 'گواهی HTTPS آنجا که باید باشد نیست',
+            detail: 'مسیر تنظیم‌شده: '.$path
+                .' — ولی آنچه هست: '.implode('، ', $names).'.',
+            cause: 'معمولاً تمدید، گواهی را زیر نام تازه‌ای نوشته (مثل'
+                .' name-0001) و این مسیر دیگر به‌روز نمی‌شود. تا وقتی این'
+                .' درست نشود، هشدارِ «نزدیک انقضا» هم هیچ‌وقت داده نمی‌شود:'
+                .' سیستم فایلی را می‌خواند که کسی دیگر عوضش نمی‌کند.',
+            suggestion: 'روی سرور «sudo certbot certificates» بزنید تا نام'
+                .' درست را ببینید، بعد BAKERY_TLS_CERTIFICATE را در .env'
+                .' همان بگذارید — و تنظیمات nginx را هم با همان نام یکی کنید.',
+            url: null,
+            urlLabel: null,
+            magnitude: 0.0,
+        )];
     }
 }
