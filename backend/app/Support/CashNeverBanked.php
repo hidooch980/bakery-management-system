@@ -37,7 +37,8 @@ class CashNeverBanked
      * @return array{
      *     flour_sales: int, flour_toman: float,
      *     settlements: int, settlement_toman: float,
-     *     unrecorded_toman: float, has_till: bool
+     *     unrecorded_toman: float, has_till: bool,
+     *     drawer_was_counted: bool, drawer_opening_toman: float
      * }
      */
     public static function auditFor(Bakery $bakery): array
@@ -46,13 +47,23 @@ class CashNeverBanked
             $flour = self::flourSalesMissingTheirPosting()->get();
             $requests = self::settlementsMissingTheirCash()->get();
 
+            $till = BankAccount::cashBox();
+
             return [
                 'flour_sales' => $flour->count(),
                 'flour_toman' => round((float) $flour->sum('amount'), 2),
                 'settlements' => $requests->count(),
                 'settlement_toman' => round((float) $requests->sum('paid_cash'), 2),
                 'unrecorded_toman' => self::handedOverWithNoRecordOfHow(),
-                'has_till' => BankAccount::cashBox() !== null,
+                'has_till' => $till !== null,
+                // An opening balance somebody typed is almost always the
+                // answer to «چقدر الان در کشو هست», counted by hand. That
+                // figure already contains every past handover — it is what
+                // they came to — so putting the past back on top counts all
+                // of it twice, and afterwards the two are not separable.
+                'drawer_was_counted' => $till !== null
+                    && (float) $till->opening_balance > 0,
+                'drawer_opening_toman' => round((float) ($till?->opening_balance ?? 0), 2),
             ];
         });
     }

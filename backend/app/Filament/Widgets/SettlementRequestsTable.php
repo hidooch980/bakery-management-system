@@ -111,7 +111,7 @@ class SettlementRequestsTable extends BaseWidget
                             Forms\Components\Select::make('bank_account_id')
                                 ->label('واریز کارتخوان به حساب')
                                 ->options(BankAccount::pluck('title', 'id'))
-                                ->default(BankAccount::where('is_default', true)->value('id'))
+                                ->default(BankAccount::cardAccount()?->id)
                                 ->required()
                                 ->native(false),
                         ]

@@ -174,4 +174,35 @@ class BankAccount extends Model
         return static::active()->where('is_default', true)->first()
             ?? static::active()->first();
     }
+
+    /**
+     * Where money taken on the reader lands — «درامد کارتخوان فقط بره حساب
+     * سفید».
+     *
+     * The default account, unless that is the drawer. A shop can flag one
+     * account as both, and then card takings would be booked as cash in
+     * hand: the drawer reads high by every card sale, and the difference is
+     * only found by somebody counting the notes and not finding them.
+     *
+     * Nothing rather than the drawer when there is no bank at all. A card
+     * payment that posts nowhere is a gap somebody can still go and look
+     * for; one sitting in the till is a figure that looks right and is not.
+     */
+    public static function cardAccount(): ?self
+    {
+        $default = static::active()->where('is_default', true)->first();
+
+        if ($default && ! $default->is_cash_box) {
+            return $default;
+        }
+
+        // No usable default. One bank and there is nothing to decide, so
+        // the money goes where it can only have gone. Several and this
+        // stops: picking the lowest id would be a guess, and a guess about
+        // which account took the money is worse than a gap somebody can
+        // still go and look for.
+        $banks = static::active()->where('is_cash_box', false)->limit(2)->get();
+
+        return $banks->count() === 1 ? $banks->first() : null;
+    }
 }
