@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/json.dart';
 import '../../widgets/jalali_date_range.dart';
 import 'admin_home_screen.dart';
+import 'inventory_entries_sheet.dart';
 
 /// A figure without a pointless trailing zero, as the warehouse tab above
 /// writes it. Latin digits, like every other number on that screen.
@@ -227,16 +228,14 @@ class _ItemJourneyState extends State<_ItemJourney> {
 
     if (date.isEmpty) return;
 
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _EntriesSheet(
-        api: widget.api,
-        itemKey: '${item['key'] ?? ''}',
-        itemName: '${item['name'] ?? ''}',
-        date: date,
-        dateLabel: '${day['date_display'] ?? date}',
-      ),
+    showInventoryEntries(
+      context,
+      api: widget.api,
+      itemKey: '${item['key'] ?? ''}',
+      itemName: '${item['name'] ?? ''}',
+      subtitle: '${day['date_display'] ?? date}',
+      from: date,
+      to: date,
     );
   }
 
@@ -490,166 +489,6 @@ class _DayRow extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Every entry behind one day, for one good — «ریز مصرف».
-///
-/// The day above says how much went and roughly where. This says each line
-/// on its own: the amount, the reason, whatever note was left, and whose
-/// name is on it at what hour. A total nobody is named against cannot be
-/// asked about, and «کجا رفت» eventually becomes «کی نوشتش».
-class _EntriesSheet extends StatefulWidget {
-  const _EntriesSheet({
-    required this.api,
-    required this.itemKey,
-    required this.itemName,
-    required this.date,
-    required this.dateLabel,
-  });
-
-  final BakeryApi api;
-  final String itemKey;
-  final String itemName;
-  final String date;
-  final String dateLabel;
-
-  @override
-  State<_EntriesSheet> createState() => _EntriesSheetState();
-}
-
-class _EntriesSheetState extends State<_EntriesSheet> {
-  late final Future<List<Map<String, dynamic>>> _rows =
-      widget.api.inventoryMovements(
-    itemKey: widget.itemKey,
-    from: widget.date,
-    to: widget.date,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              '${widget.itemName} — ${widget.dateLabel}',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: _rows,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 28),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-
-                if (snapshot.hasError) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'ریز این روز خوانده نشد.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  );
-                }
-
-                final rows = snapshot.data ?? const <Map<String, dynamic>>[];
-
-                if (rows.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'در این روز حرکتی ثبت نشده.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  );
-                }
-
-                return ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height * 0.6,
-                  ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: rows.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (_, i) => _EntryRow(row: rows[i]),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EntryRow extends StatelessWidget {
-  const _EntryRow({required this.row});
-
-  final Map<String, dynamic> row;
-
-  @override
-  Widget build(BuildContext context) {
-    final outbound = row['direction'] == 'out';
-    final person = keyedGroup(row['user']);
-    final note = '${row['note'] ?? ''}'.trim();
-    final unit = '${keyedGroup(row['item'])['unit'] ?? ''}';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            outbound ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded,
-            size: IconSize.row,
-            color: outbound ? AppColors.moneyOut : AppColors.moneyIn,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${row['reason_label'] ?? row['reason'] ?? ''}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                ),
-                Text(
-                  // The hour and the name. Whichever of the two is
-                  // missing, the other still narrows the question.
-                  [
-                    '${row['created_at_display'] ?? ''}',
-                    personName(person, fallbackId: person['id']),
-                  ].where((part) => part.trim().isNotEmpty).join('  •  '),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (note.isNotEmpty)
-                  Text(note, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
-          Text(
-            '${_fmt(row['quantity'] as num?)} $unit',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: outbound ? AppColors.moneyOut : AppColors.moneyIn,
-                ),
-          ),
-        ],
       ),
     );
   }

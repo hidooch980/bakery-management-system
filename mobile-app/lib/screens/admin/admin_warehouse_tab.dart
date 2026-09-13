@@ -9,6 +9,7 @@ import '../../widgets/common.dart';
 import '../shared/purchase_sheet.dart';
 import 'admin_home_screen.dart';
 import 'diesel_section.dart';
+import 'inventory_entries_sheet.dart';
 import 'warehouse_journey_section.dart';
 
 typedef _FlourSalesToday = ({
@@ -128,6 +129,18 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                           ? AppColors.moneyOut
                           : null,
                       emphasise: true,
+                      // «۱۰۶ کیسه» invites exactly one question, and until
+                      // now answering it meant scrolling past this card to
+                      // the journey below and opening a day. The balance is
+                      // where the question is asked, so it is where the
+                      // entries open.
+                      onTap: () => showInventoryEntries(
+                        context,
+                        api: widget.api,
+                        itemKey: '${items[i]['key']}',
+                        itemName: '${items[i]['name']}',
+                        subtitle: 'آخرین گردش‌ها',
+                      ),
                     ),
                   ],
                 ],
