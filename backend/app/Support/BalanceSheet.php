@@ -94,6 +94,11 @@ class BalanceSheet
                 'label' => 'موجودی انبار',
                 'amount' => $stock['amount'],
                 'note' => $stock['note'],
+                // Kept even at zero when the note names goods that are in
+                // the store and have no price on record. Dropping it hid
+                // the one sentence saying why the largest thing the shop
+                // owns is missing from its own balance sheet.
+                'keep' => $stock['unpriced'],
             ],
             [
                 'key' => 'consignment_due',
@@ -182,7 +187,7 @@ class BalanceSheet
      * of the figure and named in the note instead — a number that is short
      * and says where is worth more than one that is silently wrong.
      *
-     * @return array{amount: float, note: string|null}
+     * @return array{amount: float, note: string|null, unpriced: bool}
      */
     private static function stockValue(): array
     {
@@ -217,7 +222,11 @@ class BalanceSheet
                 .implode('، ', $unpriced);
         }
 
-        return ['amount' => round($total, 2), 'note' => $note];
+        return [
+            'amount' => round($total, 2),
+            'note' => $note,
+            'unpriced' => $unpriced !== [],
+        ];
     }
 
     /** What the shop last paid for one kilo of a good, if it ever has. */
@@ -315,12 +324,17 @@ class BalanceSheet
     private static function present(array $lines): array
     {
         return array_values(array_map(
-            fn (array $line) => [
-                ...$line,
-                'amount' => round($line['amount'], 2),
-                'amount_formatted' => Money::format($line['amount']),
-            ],
-            array_filter($lines, fn (array $line) => abs($line['amount']) > 0.001),
+            function (array $line) {
+                unset($line['keep']);
+
+                return [
+                    ...$line,
+                    'amount' => round($line['amount'], 2),
+                    'amount_formatted' => Money::format($line['amount']),
+                ];
+            },
+            array_filter($lines, fn (array $line) => abs($line['amount']) > 0.001
+                || ($line['keep'] ?? false)),
         ));
     }
 }

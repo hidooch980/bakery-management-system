@@ -394,7 +394,15 @@ class SalaryPayment extends Model
     /** Only a salary that has actually been paid moves money. */
     public function bankPostingAccountId(): ?int
     {
-        return $this->paid_on === null ? null : $this->bank_account_id;
+        if ($this->paid_on === null) {
+            return null;
+        }
+
+        // «از صندوق» is a real answer, not a missing one. The phone sends
+        // the account as null to mean exactly that, and this used to hand
+        // null straight back — so wages paid out of the drawer left the
+        // shop and no account anywhere was any lighter for it.
+        return $this->bank_account_id ?? BankAccount::cashBox()?->id;
     }
 
     public function bankPostingAmount(): float
