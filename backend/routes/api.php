@@ -326,6 +326,8 @@ Route::prefix('v1')->group(function () {
             // with «what each seller sold» behind the owner's permission.
             Route::get('/reports/staff-yield', [ReportController::class, 'staffYield']);
             Route::get('/reports/flour', [ReportController::class, 'flourConsumption']);
+            // Where every good in the store went, not just how much is left.
+            Route::get('/reports/inventory', [ReportController::class, 'inventory']);
             Route::get('/reports/efficiency', [ReportController::class, 'efficiency']);
             // What the shop got through, a day, a week or a month at a time.
             Route::get('/reports/consumption-series', [ReportController::class, 'consumptionSeries']);

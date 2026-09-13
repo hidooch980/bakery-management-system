@@ -191,8 +191,49 @@ class SellerAccountController extends Controller
             return $this->error('مبلغی برای تسویه وجود ندارد.', 422);
         }
 
-        SellerSettlement::settle($seller);
+        $data = $request->validate([
+            'paid_cash' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'paid_card' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'bank_account_id' => ['sometimes', 'nullable', 'exists:bank_accounts,id'],
+        ]);
 
-        return $this->success(null, 'حساب '.$seller->name.' تسویه شد.');
+        // This used to close the account and move no money whatever — the
+        // seller handed over the day's takings, the row went green, and no
+        // account anywhere heard of it. The panel at least asked for the
+        // split; the phone, which is what the owner actually carries, asked
+        // for nothing and recorded nothing.
+        //
+        // Silence now means notes. A seller settling up at the counter is
+        // handing over cash, so that is what is assumed when the caller
+        // says nothing — and an older copy of the app, which sends neither
+        // field, starts recording the money instead of losing it.
+        $card = isset($data['paid_card']) ? Money::toToman((float) $data['paid_card']) : 0.0;
+        $cash = isset($data['paid_cash'])
+            ? Money::toToman((float) $data['paid_cash'])
+            : round(max(0, $owed['total'] - $card), 2);
+
+        if (round($cash + $card, 2) > round($owed['total'], 2) + 0.01) {
+            return $this->error(
+                'جمع نقد و کارتخوان از بدهی حساب بیشتر است: '
+                    .Money::format($owed['total']).' بدهکار است.',
+                422,
+            );
+        }
+
+        $account = SellerSettlement::settleWithMethod(
+            $seller,
+            $request->user(),
+            $cash,
+            $card,
+            isset($data['bank_account_id'])
+                ? BankAccount::find($data['bank_account_id'])
+                : null,
+        );
+
+        return $this->success([
+            'cash' => Money::convert($cash),
+            'card' => Money::convert($card),
+            'account' => $account?->title,
+        ], 'حساب '.$seller->name.' تسویه شد.');
     }
 }

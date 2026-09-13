@@ -230,6 +230,55 @@ class ReportController extends Controller
     }
 
     /**
+     * Where every good in the store went over a stretch.
+     *
+     * The warehouse was the one part of the shop with no report. It had a
+     * list of current balances and a raw feed of movements, which answers
+     * «چقدر داریم» and never «کجا رفت» — and the second question is the one
+     * that catches flour leaving by a door nobody opened.
+     *
+     * Flour alone had the answer, in a Filament page that the phone cannot
+     * reach and that salt and yeast were never part of.
+     *
+     * Every stocked good is returned, including ones that did not move, so
+     * a good with a quiet month reads as quiet rather than missing.
+     */
+    public function inventory(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->range($request);
+
+        // Items are created the first time something moves them, so a good
+        // the shop stocks but has not touched has no row and would simply
+        // be absent from its own report — the silent omission this report
+        // exists to catch, committed by the report. `ofKey` is
+        // firstOrCreate, so this settles the list rather than growing it.
+        foreach (array_keys(InventoryItem::DEFAULTS) as $key) {
+            InventoryItem::ofKey($key);
+        }
+
+        $items = InventoryItem::orderBy('id')->get()->map(function (InventoryItem $item) use ($from, $to) {
+            $journey = ReportSeries::itemJourney($item, $from, $to);
+
+            return array_merge($journey, [
+                'key' => $item->key,
+                'name' => $item->name,
+                'unit' => $item->unit,
+                'balance_kg' => round($item->balance, 3),
+                'balance_bags' => $item->balance_bags,
+                'is_low' => $item->is_low,
+            ]);
+        })->values();
+
+        return $this->success([
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'from_display' => AppCalendar::date($from),
+            'to_display' => AppCalendar::date($to),
+            'items' => $items,
+        ]);
+    }
+
+    /**
      * Production efficiency: chane produced and dough weight per flour bag.
      */
     public function efficiency(Request $request): JsonResponse

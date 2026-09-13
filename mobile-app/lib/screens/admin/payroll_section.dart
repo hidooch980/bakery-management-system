@@ -132,21 +132,27 @@ class _PayrollSectionState extends State<PayrollSection> {
     Payslip slip,
     List<BankAccount> accounts,
   ) async {
-    final accountId = await showModalBottomSheet<int?>(
+    final answer = await showModalBottomSheet<_HandOver>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _HandOverSheet(slip: slip, accounts: accounts),
     );
 
-    // Distinguishing «چیزی انتخاب نشد» from «از صندوق» is what the sheet's
-    // own return value is for; it closes with a sentinel rather than null
-    // when the sheet is simply dismissed.
-    if (accountId == _dismissed || !mounted) return;
+    // «چیزی انتخاب نشد» and «از صندوق» are two different answers, and both
+    // carry no account. The sheet returns a record for the second and
+    // nothing for the first, so the difference survives.
+    //
+    // It used to return a sentinel int for dismissal — which only the two
+    // buttons could ever send. Tapping the scrim, dragging the sheet down
+    // or pressing back pops null without going through either, so backing
+    // out handed the wage over. The test for it tapped «بی‌خیال» and so
+    // never saw it.
+    if (answer == null || !mounted) return;
 
     try {
       await widget.api.markSalaryPaid(
         slip.id,
-        bankAccountId: accountId == _fromTill ? null : accountId,
+        bankAccountId: answer.accountId,
       );
 
       if (!mounted) return;
@@ -665,10 +671,12 @@ class _Field extends StatelessWidget {
   }
 }
 
-/// Dismissing the sheet and choosing «از صندوق» both come back without an
-/// account, and they are not the same answer: one is «هیچ کاری نکن», the
-/// other is «پرداخت شد، از صندوق». Nullable alone cannot tell them apart.
-const int _dismissed = -1;
+/// An answer from the hand-over sheet. Its absence is the dismissal, so
+/// «از صندوق» — an answer with no account — is not mistaken for one.
+typedef _HandOver = ({int? accountId});
+
+/// The dropdown's own value for «صندوق». Only ever an id or this, and it
+/// never leaves the sheet: what comes back is the record above.
 const int _fromTill = 0;
 
 class _HandOverSheet extends StatefulWidget {
@@ -728,11 +736,13 @@ class _HandOverSheetState extends State<_HandOverSheet> {
             ),
           const SizedBox(height: 12),
           FilledButton(
-            onPressed: () => Navigator.pop(context, _accountId),
+            onPressed: () => Navigator.pop(context, (
+              accountId: _accountId == _fromTill ? null : _accountId,
+            )),
             child: const Text('پرداخت شد'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, _dismissed),
+            onPressed: () => Navigator.pop(context),
             child: const Text('بی‌خیال'),
           ),
         ],

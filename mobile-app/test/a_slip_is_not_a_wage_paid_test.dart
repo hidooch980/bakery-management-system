@@ -36,7 +36,11 @@ String _slip({required bool isPaid}) =>
     '"net_amount":9000000,"net_amount_formatted":"۹٬۰۰۰٬۰۰۰ ریال",'
     '"is_paid":$isPaid}';
 
-Future<_Wire> _pump(WidgetTester tester, {required bool isPaid}) async {
+Future<_Wire> _pump(
+  WidgetTester tester, {
+  required bool isPaid,
+  bool withAccount = false,
+}) async {
   SharedPreferences.setMockInitialValues({});
   FlutterSecureStorage.setMockInitialValues({});
 
@@ -46,7 +50,11 @@ Future<_Wire> _pump(WidgetTester tester, {required bool isPaid}) async {
         '{"id":1,"name":"عبدالناصر","monthly_salary":9000000,'
         '"monthly_salary_formatted":"۹٬۰۰۰٬۰۰۰ ریال"}]}',
     '/salaries': '{"success":true,"data":[${_slip(isPaid: isPaid)}]}',
-    '/bank-accounts': '{"success":true,"data":{"accounts":[],"total":0}}',
+    '/bank-accounts': withAccount
+        ? '{"success":true,"data":{"accounts":[{"id":3,"title":"ملی",'
+            '"is_active":true,"balance":0,"balance_formatted":"۰"}],'
+            '"total":0}}'
+        : '{"success":true,"data":{"accounts":[],"total":0}}',
   });
   client.useAdapterForTest(wire);
 
@@ -109,6 +117,67 @@ void main() {
 
     expect(wire.seen.any((r) => r.startsWith('PATCH')), isFalse);
   });
+
+  testWidgets('dismissing the sheet without answering pays nobody',
+      (tester) async {
+    // Tapping the scrim, dragging down, or the back button pops null —
+    // none of them goes through a button of mine. Treating «no answer» as
+    // an answer hands over a wage the owner just backed out of.
+    final wire = await _pump(tester, isPaid: false);
+
+    await tester.tap(find.textContaining('پرداخت نشده'));
+    await tester.pumpAndSettle();
+
+    // The scrim: the top-left corner of the screen, above the sheet.
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    expect(wire.seen.any((r) => r.startsWith('PATCH')), isFalse);
+  });
+
+  testWidgets('paying from the till says so rather than leaving it unsaid',
+      (tester) async {
+    // The server keeps the slip's existing account when the key is absent,
+    // and a slip prepared in the panel defaults to the shop's main account.
+    // So «از صندوق» has to be said out loud, or cash out of the till debits
+    // the bank.
+    final wire = await _pump(tester, isPaid: false);
+
+    await tester.tap(find.textContaining('پرداخت نشده'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'پرداخت شد'));
+    await tester.pumpAndSettle();
+
+    final patch = wire.sentBodies[wire.seen.indexWhere((r) => r.startsWith('PATCH'))];
+
+    expect(patch, isA<Map<String, dynamic>>());
+    expect((patch! as Map<String, dynamic>).containsKey('bank_account_id'), isTrue);
+    expect((patch as Map<String, dynamic>)['bank_account_id'], isNull);
+  });
+
+  testWidgets('choosing a bank account sends that account', (tester) async {
+    // The other half of the same question: «از صندوق» must send null and
+    // «از حساب» must send the id. One record carries both answers, so both
+    // need a test or the record is only half exercised.
+    final wire = await _pump(tester, isPaid: false, withAccount: true);
+
+    await tester.tap(find.textContaining('پرداخت نشده'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ملی').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'پرداخت شد'));
+    await tester.pumpAndSettle();
+
+    final patch = wire.sentBodies[
+        wire.seen.indexWhere((r) => r.startsWith('PATCH'))]! as Map<String, dynamic>;
+
+    expect(patch['bank_account_id'], 3);
+  });
 }
 
 class _Wire implements HttpClientAdapter {
@@ -120,6 +189,10 @@ class _Wire implements HttpClientAdapter {
   /// call the tap makes, so the calls have to be visible.
   final List<String> seen = [];
 
+  /// And what was sent with it. «از صندوق» and «از حساب» differ only in
+  /// this body, so the body is the only place the difference can be read.
+  final List<Object?> sentBodies = [];
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
@@ -127,6 +200,7 @@ class _Wire implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     seen.add('${options.method} ${options.path}');
+    sentBodies.add(options.data);
 
     return ResponseBody.fromString(_bodyFor(options.path), 200, headers: {
       Headers.contentTypeHeader: [Headers.jsonContentType],

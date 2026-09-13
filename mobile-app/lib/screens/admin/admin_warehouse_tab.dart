@@ -9,6 +9,7 @@ import '../../widgets/common.dart';
 import '../shared/purchase_sheet.dart';
 import 'admin_home_screen.dart';
 import 'diesel_section.dart';
+import 'warehouse_journey_section.dart';
 
 typedef _FlourSalesToday = ({
   List<FlourSale> sales,
@@ -131,6 +132,13 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                   ],
                 ],
               ),
+
+              // Under the balances, because «چقدر داریم» is what the
+              // owner opens this tab for and «کجا رفت» is what he asks
+              // next. Its own request, so a report that cannot be reached
+              // does not take the stock levels down with it.
+              const SizedBox(height: 22),
+              WarehouseJourneySection(api: widget.api),
 
               if (flour != null) ...[
                 const SizedBox(height: 22),
