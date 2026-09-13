@@ -84,6 +84,14 @@ STUB
 echo "composer $*" >> "$LOG"
 STUB
 
+  # `nginx -t` answers whatever NGINX_T says, so a rejected configuration
+  # can be staged without writing a broken one.
+  cat > "$BIN/nginx" <<'STUB'
+#!/usr/bin/env bash
+echo "nginx $*" >> "$LOG"
+exit "${NGINX_T:-0}"
+STUB
+
   cat > "$BIN/curl" <<'STUB'
 #!/usr/bin/env bash
 echo "curl $*" >> "$LOG"
@@ -244,6 +252,69 @@ if echo "$OUT" | grep -q "در جریان است"; then
 else
   PASS=$((PASS + 1))
 fi
+check "مغازه بسته نشد" "$(grep -c 'artisan down' "$LOG")" 0
+rm -rf "$WORLD"
+
+# The nginx step, with the repository's real files and a pretend
+# /etc/nginx in the world. Nothing here can reach the real one: the
+# paths are overridden, and the ordinary worlds above carry no deploy/
+# directory at all, which the step reads as «nothing to install».
+nginx_world() {
+  build_world
+  mkdir -p "$WORLD/app/deploy/snippets" "$WORLD/etc/snippets" "$WORLD/bak"
+  cp "$ROOT/deploy/nginx-bakery.conf" "$WORLD/app/deploy/"
+  cp "$ROOT/deploy/snippets/bakery-app.conf" "$WORLD/app/deploy/snippets/"
+  git -C "$WORLD/app" add -A && git -C "$WORLD/app" commit -qm deploy-files
+  SITE=$WORLD/etc/site
+  SNIP=$WORLD/etc/snippets/bakery-app.conf
+}
+
+run_nginx_deploy() {
+  ( export PATH="$BIN:$PATH" APP="$WORLD/app" LOG="$LOG" \
+      LOCK="$WORLD/lock" PENDING=0 MIGRATE=0 HEALTH="" PANEL_CODE=200 \
+      NGINX_SITE="$SITE" NGINX_SNIPPET="$SNIP" NGINX_BACKUP_DIR="$WORLD/bak" \
+      NGINX_T="${NGINX_T:-0}"
+    bash "$ROOT/scripts/deploy.sh" 2>&1 )
+}
+
+echo
+echo "=== nginx: سرور همان چیزی را دارد که مخزن دارد — دست نمی‌خورد ==="
+nginx_world
+cp "$ROOT/deploy/nginx-bakery.conf" "$SITE"
+cp "$ROOT/deploy/snippets/bakery-app.conf" "$SNIP"
+OUT=$(run_nginx_deploy); CODE=$?
+check "استقرار موفق" "$CODE" 0
+contains "می‌گوید بدون تغییر" "$OUT" "بدون تغییر"
+check "nginx -t صدا زده نشد" "$(grep -c '^nginx' "$LOG")" 0
+check "پشتیبانی گرفته نشد" "$(ls "$WORLD/bak" | wc -l)" 0
+rm -rf "$WORLD"
+
+echo
+echo "=== nginx: سرور فایل دست‌نویس قدیمی دارد — نسخهٔ مخزن نصب می‌شود ==="
+nginx_world
+# What the live server has: the hand-written file with no acme-challenge
+# location, which is the reason this step exists.
+grep -v 'acme-challenge' "$ROOT/deploy/nginx-bakery.conf" > "$SITE"
+cp "$ROOT/deploy/snippets/bakery-app.conf" "$SNIP"
+OUT=$(run_nginx_deploy); CODE=$?
+check "استقرار موفق" "$CODE" 0
+contains "می‌گوید نصب شد" "$OUT" "از مخزن نصب شد"
+check "فایل سرور حالا همان فایل مخزن است" "$(cmp -s "$SITE" "$ROOT/deploy/nginx-bakery.conf" && echo same)" same
+contains "مسیر acme روی سرور هست" "$(cat "$SITE")" "acme-challenge"
+check "nginx -t یک بار" "$(grep -c '^nginx -t' "$LOG")" 1
+check "نسخهٔ قبلی نگه داشته شد" "$(ls "$WORLD"/bak/*/site | wc -l)" 1
+contains "یادآوری تمدید گواهی" "$OUT" "certbot renew --dry-run"
+rm -rf "$WORLD"
+
+echo
+echo "=== nginx: nginx -t رد می‌کند — فایل قبلی عیناً برمی‌گردد ==="
+nginx_world
+printf 'server { listen 80; }\n' > "$SITE"
+cp "$ROOT/deploy/snippets/bakery-app.conf" "$SNIP"
+OUT=$(NGINX_T=1 run_nginx_deploy); CODE=$?
+check "استقرار به‌خاطر nginx نمی‌شکند" "$CODE" 0
+contains "می‌گوید رد شد و برگشت" "$OUT" "برگردانده شد"
+check "فایل سرور همان قبلی است" "$(cat "$SITE")" "server { listen 80; }"
 check "مغازه بسته نشد" "$(grep -c 'artisan down' "$LOG")" 0
 rm -rf "$WORLD"
 
