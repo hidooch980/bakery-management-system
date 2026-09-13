@@ -76,7 +76,14 @@ class IncomeResource extends Resource
                         ->label('حساب بانکی')
                         ->options(fn () => BankAccount::active()
                             ->pluck('title', 'id'))
-                        ->default(fn () => BankAccount::defaultAccount()?->id)
+                        // The drawer, matching what the app does when no
+                        // account is named. Both doors have to agree, or
+                        // the same cash lands in two different places
+                        // depending on which screen recorded it.
+                        ->default(fn () => BankAccount::cashBox()?->id
+                            ?? BankAccount::defaultAccount()?->id)
+                        ->helperText('پیش‌فرض صندوق است. اگر کارتخوانی بود،'
+                            .' حساب بانکی را انتخاب کنید.')
                         ->searchable()
                         ->preload()
                         ->native(false)

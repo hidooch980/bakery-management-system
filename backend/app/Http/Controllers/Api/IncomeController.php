@@ -49,12 +49,25 @@ class IncomeController extends Controller
     {
         $data = $this->validated($request);
 
-        // Money in lands in the shop's account unless it is said to have
-        // stayed in the till — the same assumption an expense makes going
-        // the other way, so income and cost cannot disagree about where the
-        // shop keeps its money.
+        // «بجز مبلغ کارتخوان همه برن همین حساب، همه مدل درامدها.»
+        //
+        // Money in lands in the drawer unless an account is named, and
+        // naming one is how «این کارتخوانی بود» is said. It used to
+        // default to the bank, on an assumption written before the shop
+        // had a drawer at all — so every cash payment the owner recorded
+        // here was booked as having reached an account it never touched.
+        //
+        // Bread sales already work this way and are left alone: a card
+        // line names the bank as it is recorded, and a cash line names
+        // nothing because the money is still in the seller's pocket until
+        // the handover puts it in the drawer. Giving those a drawer
+        // fallback here would bank the same notes twice.
+        //
+        // The bank is the fallback's fallback. A shop with no drawer
+        // flagged should not lose the income over a missing tick.
         if (! array_key_exists('bank_account_id', $data)) {
-            $data['bank_account_id'] = BankAccount::defaultAccount()?->id;
+            $data['bank_account_id'] = BankAccount::cashBox()?->id
+                ?? BankAccount::defaultAccount()?->id;
         }
 
         $income = Income::create($data + ['user_id' => $request->user()->id]);

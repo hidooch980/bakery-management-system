@@ -70,8 +70,15 @@ class SaleRecorder
                 // the sale names the account it landed in. Cash and credit
                 // name none: that money is still with the seller or the
                 // customer, and posting it here would invent a deposit.
+                //
+                // `cardAccount` rather than the default row: a shop can flag
+                // one account as both the default and the drawer, and card
+                // takings booked as cash in hand leave the till reading high
+                // by every card sale. It also skips inactive accounts, which
+                // a bare `where('is_default')` did not — an account switched
+                // off used to swallow every card line in silence.
                 $bankAccountId = in_array($line['payment_type'], Sale::BANKED_TYPES, true)
-                    ? BankAccount::where('is_default', true)->value('id')
+                    ? BankAccount::cardAccount()?->id
                     : null;
 
                 // Bread the seller named as unaccounted-for is its own

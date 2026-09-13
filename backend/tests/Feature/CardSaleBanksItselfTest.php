@@ -134,10 +134,49 @@ class CardSaleBanksItselfTest extends TestCase
         $this->assertEqualsWithDelta(200000, (float) $this->account->fresh()->balance, 0.01);
     }
 
-    /** With no account configured the sale must still go through. */
-    public function test_a_card_sale_without_a_default_account_still_records(): void
+    /**
+     * With the default flag off, the shop's one bank still takes it.
+     *
+     * This used to assert the opposite — no default, no account named —
+     * and that was the wrong half of the intent. What the test is for is
+     * that the sale still records; where the money goes is a separate
+     * question, and «nowhere» is the answer this project has spent a week
+     * removing. «درامد کارتخوان فقط بره حساب سفید»: with one bank there is
+     * nothing to decide, and losing the figure over a missing tick is the
+     * silent gap, not the safe option.
+     */
+    public function test_a_card_sale_without_a_default_account_still_banks(): void
     {
         $this->account->update(['is_default' => false]);
+
+        $this->actingAs($this->seller, 'sanctum')
+            ->postJson('/api/v1/sales', [
+                'chane_entry_id' => $this->chane()->id,
+                'payment_type' => 'card',
+                'bread_count' => 100,
+                'amount' => 500000,
+            ])
+            ->assertCreated();
+
+        $this->assertSame($this->account->id, Sale::first()->bank_account_id);
+    }
+
+    /**
+     * Two banks and no default is a question, not an answer.
+     *
+     * Picking the lowest id would be a guess about which account took the
+     * money — and a wrong guess there is indistinguishable from a right one
+     * afterwards, which is what makes it worse than a gap.
+     */
+    public function test_a_card_sale_with_two_banks_and_no_default_names_none(): void
+    {
+        $this->account->update(['is_default' => false]);
+
+        BankAccount::create([
+            'title' => 'حساب دوم',
+            'opening_balance' => 0,
+            'is_active' => true,
+        ]);
 
         $this->actingAs($this->seller, 'sanctum')
             ->postJson('/api/v1/sales', [

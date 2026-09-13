@@ -227,7 +227,10 @@ class SellerSettlement
         ?BankAccount $account,
         mixed $source,
     ): ?BankAccount {
-        $account ??= BankAccount::defaultAccount();
+        // The card share, so never the drawer even where one account
+        // carries both flags: card takings booked as cash in hand leave the
+        // till reading high by exactly what the reader took.
+        $account ??= BankAccount::cardAccount();
         $named = null;
 
         if ($card > 0 && $account) {
