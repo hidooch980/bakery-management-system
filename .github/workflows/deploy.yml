@@ -18,6 +18,13 @@ on:
         description: 'شاخه یا تگی که مستقر شود (پیش‌فرض: main)'
         required: false
         default: 'main'
+  # A second door. Every dispatch made through the GitHub App lands in
+  # «action_required» and waits for a click in a browser, while a push
+  # runs on its own — so pushing the `deploy` branch is how a deploy is
+  # started from a session that has no browser. It deploys main, not
+  # the branch: the branch is a button, not a version.
+  push:
+    branches: [deploy]
 
 # Two deploys at once would fight over composer and the caches.
 # `scripts/deploy.sh` also takes a lock on the server itself, which
