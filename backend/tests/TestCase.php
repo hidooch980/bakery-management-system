@@ -32,14 +32,6 @@ abstract class TestCase extends BaseTestCase
         // had never mentioned Rial.
         Money::forgetCache();
 
-        // Nothing in the suite may read the machine's own /etc. The
-        // certificate check looks at certbot's directory, and this box
-        // has one — so every test that asserts «a clean shop reports no
-        // issues» failed on a certificate belonging to somebody's old
-        // experiment. A test whose result depends on the host is not a
-        // test of this code.
-        config(['bakery.tls_certificate' => storage_path('framework/testing/no-certificate.pem')]);
-
         // Same reason again. The resolved item also carries a remembered
         // balance, so a stale one would be the previous test's stock read
         // against this test's ledger.

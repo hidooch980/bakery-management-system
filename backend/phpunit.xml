@@ -29,6 +29,12 @@
              shop. The one test that is about the counting creates its own
              files here. -->
         <env name="ISSUE_SCAN_LOG_DIR" value="./storage/framework/testing/issue-logs"/>
+        <!-- Nothing in the suite may read the machine's own /etc. The
+             certificate check looks at certbot's directory, and a
+             developer's box may well have one — this one did, and
+             sixteen tests asserting «a clean shop reports no issues»
+             failed on a certificate from somebody's old experiment. -->
+        <env name="BAKERY_TLS_CERTIFICATE" value="./storage/framework/testing/no-certificate.pem"/>
         <env name="DB_DATABASE" value="bakery_db_test"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
