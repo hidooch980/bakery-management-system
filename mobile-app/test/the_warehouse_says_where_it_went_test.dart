@@ -34,6 +34,20 @@ Future<_Wire> _pump(WidgetTester tester, String data) async {
   return wire;
 }
 
+String _day({
+  String date = '2026-09-12',
+  String display = '۱۴۰۵/۰۶/۲۱',
+  num inKg = 0,
+  num outKg = 160,
+  num closing = 340,
+}) =>
+    '{"date":"$date","date_display":"$display",'
+    '"opening_kg":${closing.toDouble() + outKg.toDouble() - inKg.toDouble()},'
+    '"closing_kg":$closing,"in_kg":$inKg,"out_kg":$outKg,'
+    '"opening_bags":null,"closing_bags":null,"in_bags":null,"out_bags":null,'
+    '"out":[{"reason":"production","label":"مصرف در تولید","kg":$outKg,"bags":null}],'
+    '"in":[]}';
+
 String _flour({
   num opening = 100,
   num inKg = 400,
@@ -41,6 +55,7 @@ String _flour({
   num closing = 340,
   bool balances = true,
   String? bags,
+  String days = '',
 }) =>
     '{"key":"flour","name":"آرد","unit":"کیلوگرم",'
     '"opening_kg":$opening,"closing_kg":$closing,'
@@ -51,7 +66,8 @@ String _flour({
     '"out":[{"reason":"production","label":"مصرف در تولید","kg":120,'
     '"bags":null,"share":75},'
     '{"reason":"flour_sale","label":"فروش آرد","kg":40,"bags":null,"share":25}],'
-    '"in":[{"reason":"purchase","label":"خرید","kg":400,"bags":null,"share":100}]}';
+    '"in":[{"reason":"purchase","label":"خرید","kg":400,"bags":null,"share":100}],'
+    '"days":[$days]}';
 
 void main() {
   testWidgets('it names each destination the stock went to', (tester) async {
@@ -125,6 +141,62 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('گردش انبار'), findsOneWidget);
+  });
+
+  testWidgets('the days are folded away until asked for', (tester) async {
+    // Three goods' worth of days opened at once is a screen nobody can
+    // find anything in.
+    await _pump(tester, '{"items":[${_flour(days: _day())}]}');
+
+    expect(find.text('۱۴۰۵/۰۶/۲۱'), findsNothing);
+    expect(find.textContaining('روز به روز'), findsOneWidget);
+  });
+
+  testWidgets('opening them shows the day and what it closed on',
+      (tester) async {
+    await _pump(tester, '{"items":[${_flour(days: _day())}]}');
+
+    await tester.tap(find.textContaining('روز به روز'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('۱۴۰۵/۰۶/۲۱'), findsOneWidget);
+    // Reading down the closing column is how a day that does not make
+    // sense is spotted without adding anything up by hand.
+    expect(find.textContaining('340'), findsWidgets);
+  });
+
+  testWidgets('a good with no days offers nothing to open', (tester) async {
+    await _pump(tester, '{"items":[${_flour()}]}');
+
+    expect(find.textContaining('روز به روز'), findsNothing);
+  });
+
+  testWidgets('the custom range chip asks for two dates', (tester) async {
+    final wire = await _pump(tester, '{"items":[${_flour()}]}');
+    final before = wire.seen.length;
+
+    await tester.tap(find.text('بازهٔ دلخواه'));
+    await tester.pumpAndSettle();
+
+    // The picker is open and nothing has been fetched on a range nobody
+    // has finished choosing.
+    expect(find.text('از تاریخ'), findsOneWidget);
+    expect(wire.seen.length, before);
+  });
+
+  testWidgets('backing out of the picker leaves the window alone',
+      (tester) async {
+    final wire = await _pump(tester, '{"items":[${_flour()}]}');
+    final before = wire.seen.length;
+
+    await tester.tap(find.text('بازهٔ دلخواه'));
+    await tester.pumpAndSettle();
+
+    Navigator.of(tester.element(find.text('از تاریخ'))).pop();
+    await tester.pumpAndSettle();
+
+    expect(wire.seen.length, before);
+    expect(tester.takeException(), isNull);
   });
 }
 

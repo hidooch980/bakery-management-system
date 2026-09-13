@@ -260,6 +260,10 @@ class ReportController extends Controller
             $journey = ReportSeries::itemJourney($item, $from, $to);
 
             return array_merge($journey, [
+                // One row per day something moved. A window total answers
+                // «چقدر رفت» and never «کدام روز», which is the question
+                // somebody asks when the figures do not match the shop.
+                'days' => ReportSeries::itemDays($item, $from, $to),
                 'key' => $item->key,
                 'name' => $item->name,
                 'unit' => $item->unit,

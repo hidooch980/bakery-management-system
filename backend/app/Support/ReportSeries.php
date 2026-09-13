@@ -334,6 +334,114 @@ class ReportSeries
     }
 
     /**
+     * The same stretch, one row per day something moved.
+     *
+     * A window total answers «چقدر رفت» and not «کدام روز». Somebody who
+     * says «حتماً من جای اشتباه کردم» is looking for the day, and a
+     * thirty-day figure cannot be argued with — there is nothing in it to
+     * disagree about.
+     *
+     * Days nothing moved are left out. A month of empty rows is a wall to
+     * scroll past on a handset, and a quiet day is not what a person
+     * hunting a mistake is looking for.
+     *
+     * The closing balance is carried forward through the window, so
+     * reading down that column shows a day that does not make sense
+     * without adding anything up by hand.
+     *
+     * @return array<int, array{
+     *     date: string, date_display: ?string,
+     *     in_kg: float, out_kg: float, in_bags: ?float, out_bags: ?float,
+     *     opening_kg: float, closing_kg: float,
+     *     opening_bags: ?float, closing_bags: ?float,
+     *     in: array<int, array<string, mixed>>, out: array<int, array<string, mixed>>
+     * }>
+     */
+    public static function itemDays(InventoryItem $item, Carbon $from, Carbon $to): array
+    {
+        $bagWeight = $item->bagWeightKg();
+
+        $running = (float) $item->movements()->where('created_at', '<', $from)
+            ->selectRaw("coalesce(sum(case when direction = 'in' then quantity else -quantity end), 0) as net")
+            ->value('net');
+
+        $byDay = $item->movements()
+            ->whereBetween('created_at', [$from, $to])
+            ->with('reverses')
+            ->get()
+            ->groupBy(fn (InventoryMovement $m) => $m->created_at->toDateString());
+
+        $bags = fn (float $kg) => $bagWeight > 0 ? round($kg / $bagWeight, 2) : null;
+        $days = [];
+
+        // By date rather than by whatever order the rows came back in: the
+        // running balance is only meaningful walked forwards.
+        foreach ($byDay->keys()->sort()->values() as $date) {
+            $net = [];
+
+            foreach ($byDay[$date] as $movement) {
+                $destination = self::movementDestination($movement);
+                $net[$destination] ??= 0.0;
+                $net[$destination] += ($movement->direction === 'out' ? 1 : -1) * (float) $movement->quantity;
+            }
+
+            $out = [];
+            $in = [];
+
+            foreach ($net as $reason => $kg) {
+                $kg = round($kg, 3);
+
+                if (abs($kg) < 0.001) {
+                    continue;
+                }
+
+                $row = [
+                    'reason' => $reason,
+                    'label' => InventoryMovement::REASONS[$reason] ?? $reason,
+                    'kg' => abs($kg),
+                    'bags' => $bags(abs($kg)),
+                ];
+
+                $kg > 0 ? $out[] = $row : $in[] = $row;
+            }
+
+            $outKg = round(array_sum(array_column($out, 'kg')), 3);
+            $inKg = round(array_sum(array_column($in, 'kg')), 3);
+
+            // A day whose ins and outs cancel exactly — a correction and
+            // its reversal — moved nothing and is not a day to report.
+            if ($outKg < 0.001 && $inKg < 0.001) {
+                continue;
+            }
+
+            $opening = round($running, 3);
+            $running = round($running + $inKg - $outKg, 3);
+
+            $biggest = fn (array $rows) => collect($rows)
+                ->sortByDesc('kg')->values()->all();
+
+            $days[] = [
+                'date' => $date,
+                'date_display' => AppCalendar::date(Carbon::parse($date)),
+                'opening_kg' => $opening,
+                'closing_kg' => $running,
+                'opening_bags' => $bags($opening),
+                'closing_bags' => $bags($running),
+                'in_kg' => $inKg,
+                'out_kg' => $outKg,
+                'in_bags' => $bags($inKg),
+                'out_bags' => $bags($outKg),
+                'in' => $biggest($in),
+                'out' => $biggest($out),
+            ];
+        }
+
+        // Newest first. The question is almost always about the recent
+        // past, and a handset opens at the top.
+        return array_reverse($days);
+    }
+
+    /**
      * Which destination a movement belongs to.
      *
      * A reversal belongs to whatever it cancels, so that cancelling a bake

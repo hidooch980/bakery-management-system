@@ -635,6 +635,25 @@ class BakeryApi {
     return keyedGroup(body['data']);
   }
 
+  /// The individual entries behind a day's figure — «ریز مصرف».
+  ///
+  /// Quantity, reason, note and whose name is on each one. A total nobody
+  /// is named against cannot be asked about, and «کجا رفت» eventually
+  /// becomes «کی نوشتش».
+  Future<List<Map<String, dynamic>>> inventoryMovements({
+    String? itemKey,
+    String? from,
+    String? to,
+  }) async {
+    final body = await _client.getCached('/inventory/movements', query: {
+      if (itemKey != null) 'item': itemKey,
+      if (from != null) 'from': from,
+      if (to != null) 'to': to,
+    });
+
+    return rowList(keyedGroup(body['data'])['data']);
+  }
+
   /// What is in the shop's bank accounts, and what they come to together.
   ///
   /// Cached like the other admin reads, so the figure is still there when

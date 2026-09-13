@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
 use App\Support\AppCalendar;
+use App\Support\Jalali;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,6 +52,21 @@ class InventoryController extends Controller
                 'item', fn ($i) => $i->where('key', $key)
             ))
             ->when($request->query('direction'), fn ($q, $d) => $q->where('direction', $d))
+            // «ریز مصرف» for one day, or one stretch. The list has carried
+            // the quantity, the reason and whose name is on each entry
+            // since it was written, and took no dates — so reading back one
+            // day meant paging through every movement the shop has made.
+            //
+            // Jalali or ISO, because the shop types the first and the app
+            // sends the second.
+            ->when(
+                Jalali::parseFlexible($request->query('from')),
+                fn ($q, $from) => $q->where('created_at', '>=', $from->startOfDay()),
+            )
+            ->when(
+                Jalali::parseFlexible($request->query('to')),
+                fn ($q, $to) => $q->where('created_at', '<=', $to->endOfDay()),
+            )
             ->latest()
             ->paginate(30)
             ->through(fn (InventoryMovement $m) => [

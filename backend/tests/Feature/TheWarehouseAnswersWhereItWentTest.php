@@ -124,4 +124,187 @@ class TheWarehouseAnswersWhereItWentTest extends TestCase
             ->getJson('/api/v1/reports/inventory')
             ->assertForbidden();
     }
+
+    public function test_it_breaks_the_window_down_by_day(): void
+    {
+        // «حتماً من جای اشتباه کردم» — a thirty-day total cannot answer
+        // that. Finding the day something went wrong needs the days.
+        $flour = $this->flour();
+
+        // Taken before travelling. `now()` inside the second travelTo
+        // would be the *already frozen* time, so the two days would land
+        // four days apart rather than two — and the test would hunt for a
+        // date that was never written.
+        $today = now();
+
+        $this->travelTo($today->copy()->subDays(3)->setTime(9, 0));
+        $flour->move('in', 400, 'purchase', $this->admin->id);
+
+        $this->travelTo($today->copy()->subDays(1)->setTime(9, 0));
+        $flour->move('out', 120, 'production', $this->admin->id);
+        $flour->move('out', 40, 'flour_sale', $this->admin->id);
+        $this->travelBack();
+
+        $row = collect($this->report(['from' => now()->subDays(4)->toDateString()])
+            ->assertOk()->json('data.items'))->firstWhere('key', InventoryItem::FLOUR);
+
+        $days = collect($row['days'])->keyBy('date');
+
+        $arrived = $days[now()->subDays(3)->toDateString()];
+        $this->assertEqualsWithDelta(400, $arrived['in_kg'], 0.01);
+        $this->assertEqualsWithDelta(0, $arrived['out_kg'], 0.01);
+
+        $spent = $days[now()->subDays(1)->toDateString()];
+        $this->assertEqualsWithDelta(160, $spent['out_kg'], 0.01);
+    }
+
+    public function test_each_day_carries_the_balance_it_ended_on(): void
+    {
+        // Reading down the closing column is how a day that does not make
+        // sense is spotted without adding anything up by hand.
+        $flour = $this->flour();
+
+        $today = now();
+
+        $this->travelTo($today->copy()->subDays(2)->setTime(9, 0));
+        $flour->move('in', 500, 'purchase', $this->admin->id);
+
+        $this->travelTo($today->copy()->subDays(1)->setTime(9, 0));
+        $flour->move('out', 200, 'production', $this->admin->id);
+        $this->travelBack();
+
+        $days = collect(collect($this->report(['from' => now()->subDays(3)->toDateString()])
+            ->assertOk()->json('data.items'))
+            ->firstWhere('key', InventoryItem::FLOUR)['days'])->keyBy('date');
+
+        $this->assertEqualsWithDelta(500, $days[now()->subDays(2)->toDateString()]['closing_kg'], 0.01);
+        $this->assertEqualsWithDelta(300, $days[now()->subDays(1)->toDateString()]['closing_kg'], 0.01);
+    }
+
+    public function test_a_day_names_where_its_stock_went(): void
+    {
+        $flour = $this->flour();
+
+        // Stocked first: the ledger refuses an «out» bigger than the
+        // balance, and rightly — a shop cannot bake flour it does not
+        // have. A fixture that skips it is testing an impossible day.
+        $today = now();
+
+        $this->travelTo($today->copy()->subDays(4)->setTime(9, 0));
+        $flour->move('in', 500, 'purchase', $this->admin->id);
+
+        $this->travelTo($today->copy()->subDays(1)->setTime(9, 0));
+        $flour->move('out', 120, 'production', $this->admin->id);
+        $flour->move('out', 40, 'flour_sale', $this->admin->id);
+        $this->travelBack();
+
+        $days = collect(collect($this->report(['from' => now()->subDays(3)->toDateString()])
+            ->assertOk()->json('data.items'))
+            ->firstWhere('key', InventoryItem::FLOUR)['days'])->keyBy('date');
+
+        $out = collect($days[now()->subDays(1)->toDateString()]['out'])->keyBy('reason');
+
+        $this->assertEqualsWithDelta(120, $out['production']['kg'], 0.01);
+        $this->assertEqualsWithDelta(40, $out['flour_sale']['kg'], 0.01);
+    }
+
+    public function test_a_day_nothing_moved_is_left_out(): void
+    {
+        // A month of empty rows is a wall to scroll past, and the quiet
+        // days are not what somebody hunting a mistake is looking for.
+        $flour = $this->flour();
+
+        $this->travelTo(now()->subDays(1)->setTime(9, 0));
+        $flour->move('in', 100, 'purchase', $this->admin->id);
+        $this->travelBack();
+
+        $days = collect(collect($this->report(['from' => now()->subDays(10)->toDateString()])
+            ->assertOk()->json('data.items'))
+            ->firstWhere('key', InventoryItem::FLOUR)['days']);
+
+        $this->assertCount(1, $days);
+        $this->assertSame(now()->subDays(1)->toDateString(), $days->first()['date']);
+    }
+
+    public function test_each_day_carries_the_date_the_shop_writes(): void
+    {
+        $flour = $this->flour();
+
+        $this->travelTo(now()->subDays(1)->setTime(9, 0));
+        $flour->move('in', 100, 'purchase', $this->admin->id);
+        $this->travelBack();
+
+        $day = collect(collect($this->report(['from' => now()->subDays(3)->toDateString()])
+            ->assertOk()->json('data.items'))
+            ->firstWhere('key', InventoryItem::FLOUR)['days'])->first();
+
+        // The shop reads Jalali. A report it has to convert in its head is
+        // a report that gets read wrong.
+        $this->assertNotEmpty($day['date_display']);
+        $this->assertStringContainsString('/', $day['date_display']);
+    }
+
+    public function test_the_movement_list_can_be_narrowed_to_a_day(): void
+    {
+        // «ریز مصرف» — the individual entries behind a day's figure, with
+        // who wrote each one. The endpoint has had them all along and took
+        // no dates, so asking for one day meant paging through everything.
+        $flour = $this->flour();
+        $today = now();
+
+        $this->travelTo($today->copy()->subDays(5)->setTime(9, 0));
+        $flour->move('in', 500, 'purchase', $this->admin->id);
+
+        $this->travelTo($today->copy()->subDays(2)->setTime(9, 0));
+        $flour->move('out', 120, 'production', $this->admin->id);
+        $this->travelBack();
+
+        $day = $today->copy()->subDays(2)->toDateString();
+
+        $rows = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/inventory/movements?'.http_build_query([
+                'item' => InventoryItem::FLOUR,
+                'from' => $day,
+                'to' => $day,
+            ]))
+            ->assertOk()
+            ->json('data.data');
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('production', $rows[0]['reason']);
+        $this->assertEqualsWithDelta(120, $rows[0]['quantity'], 0.01);
+    }
+
+    public function test_each_movement_says_who_wrote_it(): void
+    {
+        // A figure nobody's name is on cannot be asked about.
+        $this->flour()->move('in', 100, 'purchase', $this->admin->id);
+
+        $rows = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/inventory/movements?item='.InventoryItem::FLOUR)
+            ->assertOk()
+            ->json('data.data');
+
+        $this->assertSame($this->admin->name, $rows[0]['user']['name']);
+        $this->assertNotEmpty($rows[0]['created_at_display']);
+    }
+
+    public function test_a_day_outside_the_range_is_not_listed(): void
+    {
+        $flour = $this->flour();
+        $today = now();
+
+        $this->travelTo($today->copy()->subDays(9)->setTime(9, 0));
+        $flour->move('in', 300, 'purchase', $this->admin->id);
+        $this->travelBack();
+
+        $rows = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/inventory/movements?'.http_build_query([
+                'from' => $today->copy()->subDays(3)->toDateString(),
+            ]))
+            ->assertOk()
+            ->json('data.data');
+
+        $this->assertSame([], $rows);
+    }
 }
