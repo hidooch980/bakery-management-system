@@ -62,6 +62,18 @@ class SettlementRequest extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * What this handover put into an account.
+     *
+     * The card share has always written one. The cash share did not, and
+     * this is how the repair tells a request it has already put right from
+     * one it has not.
+     */
+    public function bankTransactions()
+    {
+        return $this->morphMany(BankTransaction::class, 'source');
+    }
+
     public function bankAccount()
     {
         return $this->belongsTo(BankAccount::class);
