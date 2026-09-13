@@ -66,6 +66,18 @@ class BankAccountResource extends Resource
                         ->label('حساب پیش‌فرض')
                         ->helperText('فقط یک حساب می‌تواند پیش‌فرض باشد'),
 
+                    // Everything that banks cash finds the drawer through
+                    // this flag. It was set once by the migration that
+                    // added it, for an account titled exactly «صندوق نقد»,
+                    // and this form never offered it — so a shop without
+                    // that exact name had no till, could not make one, and
+                    // every cash path silently had nowhere to put money.
+                    Forms\Components\Toggle::make('is_cash_box')
+                        ->label('صندوق نقد')
+                        ->helperText('پول نقدی که تحویل می‌گیرید — تسویهٔ'
+                            .' فروشنده، وصول نسیه، فروش آرد نقدی — به این'
+                            .' حساب می‌رود. فقط یک حساب می‌تواند صندوق باشد.'),
+
                     Forms\Components\Toggle::make('is_active')
                         ->label('فعال')
                         ->default(true),
@@ -110,6 +122,14 @@ class BankAccountResource extends Resource
 
                 Tables\Columns\IconColumn::make('is_default')
                     ->label('پیش‌فرض')
+                    ->boolean(),
+
+                // Which account the cash goes into is worth seeing without
+                // opening a row: a shop with no tick in this column has no
+                // till, and that is the state where handed-over cash has
+                // nowhere to be recorded.
+                Tables\Columns\IconColumn::make('is_cash_box')
+                    ->label('صندوق')
                     ->boolean(),
 
                 Tables\Columns\IconColumn::make('is_active')
