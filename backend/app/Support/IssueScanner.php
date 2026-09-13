@@ -1535,14 +1535,20 @@ class IssueScanner
                 && is_dir($live.'/'.$entry),
         ));
 
+        // An empty live directory is certbot installed and managing
+        // nothing — a fresh server, or one whose certificates were
+        // removed. There is no other name to point at, so there is
+        // nothing useful to say.
+        if ($names === []) {
+            return [];
+        }
+
         return [new SystemIssue(
             key: 'certificate-not-found',
             severity: SystemIssue::WARNING,
             title: 'گواهی HTTPS آنجا که باید باشد نیست',
             detail: 'مسیر تنظیم‌شده: '.$path
-                .($names === []
-                    ? ' — و هیچ گواهی‌ای در '.$live.' نیست.'
-                    : ' — ولی آنچه هست: '.implode('، ', $names).'.'),
+                .' — ولی آنچه هست: '.implode('، ', $names).'.',
             cause: 'معمولاً تمدید، گواهی را زیر نام تازه‌ای نوشته (مثل'
                 .' name-0001) و این مسیر دیگر به‌روز نمی‌شود. تا وقتی این'
                 .' درست نشود، هشدارِ «نزدیک انقضا» هم هیچ‌وقت داده نمی‌شود:'
