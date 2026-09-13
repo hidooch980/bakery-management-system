@@ -389,4 +389,71 @@ class PuttingBackTheCashThatWasNeverBankedTest extends TestCase
         $this->assertEqualsWithDelta(300_000, $this->tillBalance(), 0.01);
         $this->assertEqualsWithDelta(500_000, (float) $bank->fresh()->balance, 0.01);
     }
+
+    public function test_a_counted_drawer_is_named_as_the_reason_not_to_run(): void
+    {
+        // «پول واقعی رو بشمارم بذارم، گذشته رو اجرا نکن.»
+        //
+        // Counting the notes and putting the figure in as the opening
+        // balance already accounts for every past handover — it is what
+        // the money came to. Putting the past back on top counts all of it
+        // twice, and the drawer then reads high by an amount nobody can
+        // separate out afterwards.
+        $this->till->update(['opening_balance' => 4_000_000]);
+
+        $this->oldFlourSale();
+
+        $audit = CashNeverBanked::auditFor($this->bakery);
+
+        $this->assertTrue($audit['drawer_was_counted']);
+    }
+
+    public function test_an_empty_drawer_is_not_treated_as_counted(): void
+    {
+        $this->oldFlourSale();
+
+        $this->assertFalse(CashNeverBanked::auditFor($this->bakery)['drawer_was_counted']);
+    }
+
+    public function test_the_command_warns_before_writing_over_a_counted_drawer(): void
+    {
+        $this->till->update(['opening_balance' => 4_000_000]);
+
+        $this->oldFlourSale();
+
+        $this->artisan('cash:put-back')
+            ->expectsOutputToContain('موجودی اولیه')
+            ->expectsConfirmation('با این حال ادامه بدهم؟', 'no')
+            ->assertSuccessful();
+
+        // Refused, so the drawer is untouched apart from what was counted.
+        $this->assertEqualsWithDelta(4_000_000, $this->tillBalance(), 0.01);
+    }
+
+    public function test_saying_yes_to_the_warning_still_runs_it(): void
+    {
+        // The warning is a warning, not a lock. A shop that set an opening
+        // balance for some other reason must still be able to repair.
+        $this->till->update(['opening_balance' => 4_000_000]);
+
+        $this->oldFlourSale();
+
+        $this->artisan('cash:put-back')
+            ->expectsConfirmation('با این حال ادامه بدهم؟', 'yes')
+            ->expectsConfirmation('طبق جدول بالا در دفترها ثبت شود؟', 'yes')
+            ->assertSuccessful();
+
+        $this->assertEqualsWithDelta(5_000_000, $this->tillBalance(), 0.01);
+    }
+
+    public function test_an_uncounted_drawer_asks_only_the_usual_question(): void
+    {
+        $this->oldFlourSale();
+
+        $this->artisan('cash:put-back')
+            ->expectsConfirmation('طبق جدول بالا در دفترها ثبت شود؟', 'yes')
+            ->assertSuccessful();
+
+        $this->assertEqualsWithDelta(1_000_000, $this->tillBalance(), 0.01);
+    }
 }

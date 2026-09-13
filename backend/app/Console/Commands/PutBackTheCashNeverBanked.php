@@ -43,9 +43,11 @@ class PutBackTheCashNeverBanked extends Command
         }
 
         $anything = false;
+        $counted = false;
 
         foreach ($bakeries as $bakery) {
             $anything = $this->report($bakery) || $anything;
+            $counted = $counted || CashNeverBanked::auditFor($bakery)['drawer_was_counted'];
         }
 
         if (! $anything) {
@@ -58,6 +60,16 @@ class PutBackTheCashNeverBanked extends Command
             $this->newLine();
             $this->line('اجرای آزمایشی — چیزی نوشته نشد.');
             $this->line('برای اعمال، همین دستور را بدون --dry-run اجرا کنید.');
+
+            return self::SUCCESS;
+        }
+
+        // The one way to get this wrong that cannot be undone by reading
+        // the ledger afterwards. A counted opening balance already holds
+        // every past handover; adding them again leaves a drawer that is
+        // high by an amount nobody can separate out later.
+        if ($counted && ! $this->confirm('با این حال ادامه بدهم؟', false)) {
+            $this->line('کاری انجام نشد.');
 
             return self::SUCCESS;
         }
@@ -101,6 +113,15 @@ class PutBackTheCashNeverBanked extends Command
                 .' ساخته نشود، جایی برای ثبت این پول نیست.');
 
             return false;
+        }
+
+        if ($audit['drawer_was_counted']) {
+            $this->newLine();
+            $this->warn('این صندوق «موجودی اولیه» دارد: '
+                .$money($audit['drawer_opening_toman']));
+            $this->line('اگر آن عدد از شمردن پول کشو آمده، همهٔ تحویل‌های'
+                .' گذشته از قبل داخلش هست. اجرای این دستور آن‌ها را دوباره'
+                .' اضافه می‌کند و بعد دیگر نمی‌شود از هم جدایشان کرد.');
         }
 
         $this->table(['چه چیزی', 'تعداد', 'مبلغ'], [
