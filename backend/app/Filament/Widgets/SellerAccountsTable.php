@@ -182,8 +182,8 @@ class SellerAccountsTable extends BaseWidget
                             : ''))
                     ->modalSubmitActionLabel('تسویه شد')
                     // A handover arrives partly in notes and partly through the
-                    // reader, and the two do not land in the same place: cash
-                    // stays in the till, the card share reaches a bank account.
+                    // reader, and the two do not land in the same place: the
+                    // cash reaches the drawer, the card share a bank account.
                     // Settling without asking left that money unbanked.
                     ->form(fn (User $record) => [
                         Forms\Components\TextInput::make('paid_cash')
@@ -234,9 +234,15 @@ class SellerAccountsTable extends BaseWidget
                             return;
                         }
 
+                        // The cash figure goes in too. This form has always
+                        // asked for it, checked it against the account and
+                        // read it back in the notification — and then handed
+                        // over only the card share, so the number the owner
+                        // typed reached no account at all.
                         $banked = SellerSettlement::settleWithMethod(
                             $record,
                             auth()->user(),
+                            $cash,
                             $card,
                             isset($data['bank_account_id'])
                                 ? BankAccount::find($data['bank_account_id'])

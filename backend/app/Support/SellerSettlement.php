@@ -165,66 +165,101 @@ class SellerSettlement
     }
 
     /**
-     * Settles the account and banks whatever came in on the card reader.
+     * Settles the account and banks both halves of what was handed over.
      *
-     * The two halves of a handover land in different places: cash stays in
-     * the till and is no bank movement at all, while the card share really
-     * did arrive in an account and has to be recorded there or the bank
-     * balance reads short by exactly what the seller paid that way.
+     * The two halves land in different places — the card share in a bank
+     * account, the cash in the drawer — but they both land. Cash used to be
+     * described here as «staying in the till», which was only true while
+     * there was no till to stay in: the money was taken, the account was
+     * marked clear, and nothing anywhere recorded where it went.
      *
+     * The panel made that worse than a silent omission. It asks the owner
+     * for the cash figure, refuses the form unless cash and card add up to
+     * the account, and reports «نقد X • کارتخوان Y» back — then passed only
+     * the card share in. Every one of those numbers was thrown away.
+     *
+     * Customer collections were fixed this way first
+     * (SellerCollectionController); this is the same money in the same shop
+     * arriving by a different door.
+     *
+     * @param  float  $cash  Toman handed over in notes, for the drawer.
      * @param  float  $card  Toman taken on the reader, not the whole handover.
      * @param  mixed  $source  What the movement is recorded against — a
      *                         settlement request, or null when an admin
      *                         settled the account directly.
      * @param  array<int>|null  $saleIds  Only these sales are closed, for a
      *                                    partial handover. Null closes all.
-     * @return BankAccount|null The account the card share went to, if any.
+     * @return BankAccount|null Which account to name on the record: the one
+     *                          the card reached, or the drawer when it was
+     *                          all cash.
      */
     public static function settleWithMethod(
         User $seller,
         User $admin,
+        float $cash,
         float $card,
         ?BankAccount $account = null,
         mixed $source = null,
         ?array $saleIds = null,
     ): ?BankAccount {
-        return DB::transaction(function () use ($seller, $admin, $card, $account, $source, $saleIds) {
+        return DB::transaction(function () use ($seller, $admin, $cash, $card, $account, $source, $saleIds) {
             self::settle($seller, $saleIds);
 
-            return self::bankTheCardShare($seller, $admin, $card, $account, $source);
+            return self::bankTheHandover($seller, $admin, $cash, $card, $account, $source);
         });
     }
 
     /**
-     * Records the card share of a handover against a bank account.
+     * Records both halves of a handover against the accounts they reached.
      *
-     * Cash stays in the till and is no bank movement at all; the card share
-     * really did arrive somewhere and has to be recorded or the balance
-     * reads short by exactly what the seller paid that way.
+     * Each half is posted only if it was actually handed over, so a pure
+     * cash handover writes one row in the drawer and none in the bank.
+     *
+     * A missing drawer is not silently absorbed: the shop that has taken
+     * cash and has nowhere to put it should say so rather than lose the
+     * figure a second time, which is what the notes on these rows are for.
      */
-    private static function bankTheCardShare(
+    private static function bankTheHandover(
         User $seller,
         User $admin,
+        float $cash,
         float $card,
         ?BankAccount $account,
         mixed $source,
     ): ?BankAccount {
-        $account ??= BankAccount::where('is_default', true)->first();
+        $account ??= BankAccount::defaultAccount();
+        $named = null;
 
-        if ($card <= 0 || ! $account) {
-            return null;
+        if ($card > 0 && $account) {
+            $account->record(
+                'in',
+                $card,
+                'sale',
+                $admin->id,
+                $source,
+                'تسویه کارتخوان — '.$seller->name,
+            );
+
+            $named = $account;
         }
 
-        $account->record(
-            'in',
-            $card,
-            'sale',
-            $admin->id,
-            $source,
-            'تسویه کارتخوان — '.$seller->name,
-        );
+        if ($cash > 0 && $till = BankAccount::cashBox()) {
+            $till->record(
+                'in',
+                $cash,
+                'sale',
+                $admin->id,
+                $source,
+                'تسویه نقدی — '.$seller->name,
+            );
 
-        return $account;
+            // Only when the card did not already name one: a split handover
+            // is one row on the request and the bank is the more useful half
+            // to point at, the drawer being where cash goes by definition.
+            $named ??= $till;
+        }
+
+        return $named;
     }
 
     /**
@@ -248,9 +283,10 @@ class SellerSettlement
 
             if ($partialAmount) {
                 self::applyPayment($request->user, (float) $request->amount, $request);
-                $banked = self::bankTheCardShare(
+                $banked = self::bankTheHandover(
                     $request->user,
                     $admin,
+                    (float) $request->paid_cash,
                     (float) $request->paid_card,
                     $account,
                     $request,
@@ -259,6 +295,7 @@ class SellerSettlement
                 $banked = self::settleWithMethod(
                     $request->user,
                     $admin,
+                    (float) $request->paid_cash,
                     (float) $request->paid_card,
                     $account,
                     $request,

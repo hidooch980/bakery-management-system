@@ -261,7 +261,19 @@ class FlourSale extends Model
 
     public function bankPostingAccountId(): ?int
     {
-        return $this->bank_account_id;
+        if ($this->bank_account_id !== null) {
+            return $this->bank_account_id;
+        }
+
+        // Nobody picked an account, and the form does not make them. Sold
+        // over the counter that means notes, and notes go in the drawer —
+        // which is the difference between a shop that knows it sold four
+        // sacks and one that also knows where the money for them is.
+        //
+        // A sack still owed for is left alone: that money has not arrived,
+        // and banking it here would count it once now and again when it is
+        // actually collected.
+        return $this->is_debt ? null : BankAccount::cashBox()?->id;
     }
 
     public function bankPostingAmount(): float
