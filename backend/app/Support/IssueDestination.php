@@ -43,6 +43,7 @@ class IssueDestination
         'consignment-open-' => self::WAREHOUSE,
         'diesel-tank-empty-' => self::WAREHOUSE,
         'diesel-running-out-' => self::WAREHOUSE,
+        'duplicate-purchase-' => self::WAREHOUSE,
 
         'negative-bank-' => self::FINANCE,
         'seller-account-stale-' => self::FINANCE,

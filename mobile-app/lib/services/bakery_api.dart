@@ -1577,10 +1577,15 @@ class BakeryApi {
     int? bankAccountId,
     bool paidInCash = false,
     String? note,
+    bool force = false,
   }) async {
     final body = await _client.postOrQueue(
       '/purchases',
       {
+        // «بله، واقعاً دو بار خریدیم.» The server refuses an invoice that
+        // matches one filed today with a 409; this is the second attempt
+        // saying it was read.
+        if (force) 'force': true,
         if (supplierId != null) 'supplier_id': supplierId,
         if (supplierId == null && supplierName != null)
           'supplier_name': supplierName,

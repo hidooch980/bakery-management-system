@@ -10,6 +10,7 @@ use App\Models\Expense;
 use App\Models\FlourAllocation;
 use App\Models\InventoryItem;
 use App\Models\Loan;
+use App\Models\Purchase;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\User;
@@ -79,6 +80,7 @@ class IssueScanner
             ...$this->noCashBox(),
             ...$this->noCardAccount(),
             ...$this->certificateRunningOut(),
+            ...$this->purchasesFiledTwice(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -1421,5 +1423,78 @@ class IssueScanner
             urlLabel: null,
             magnitude: (float) max(0, self::CERTIFICATE_WARN_DAYS - $left),
         )];
+    }
+
+    /** How far back twins are looked for. Older ones are in a closed month. */
+    public const DUPLICATE_PURCHASE_DAYS = 60;
+
+    /**
+     * Two invoices from the same mill, on the same day, for the same money.
+     *
+     * The API refuses the second one now; these are the ones that got in
+     * before it did, or came through the panel. Each pair is one line with
+     * the later invoice linked, because that is the one to delete — and
+     * deleting it gives the sacks and the money back on its own.
+     *
+     * Two queries whatever the size of the shop: one for the groups, one
+     * for the rows in them.
+     */
+    private function purchasesFiledTwice(): array
+    {
+        $since = now()->subDays(self::DUPLICATE_PURCHASE_DAYS)->toDateString();
+
+        $groups = Purchase::query()
+            ->select('supplier_id', 'purchased_on', 'amount')
+            ->where('purchased_on', '>=', $since)
+            ->where('amount', '>', 0)
+            ->groupBy('supplier_id', 'purchased_on', 'amount')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        if ($groups->isEmpty()) {
+            return [];
+        }
+
+        $rows = Purchase::query()
+            ->with('supplier')
+            ->where('purchased_on', '>=', $since)
+            ->where(function ($q) use ($groups) {
+                foreach ($groups as $g) {
+                    $q->orWhere(fn ($w) => $w
+                        ->where('supplier_id', $g->supplier_id)
+                        ->whereDate('purchased_on', $g->purchased_on)
+                        ->where('amount', $g->amount));
+                }
+            })
+            ->orderBy('id')
+            ->get()
+            ->groupBy(fn (Purchase $p) => $p->supplier_id.'|'.$p->purchased_on->toDateString().'|'.$p->amount);
+
+        $issues = [];
+
+        foreach ($rows as $pair) {
+            $first = $pair->first();
+            $later = $pair->last();
+
+            $issues[] = new SystemIssue(
+                key: 'duplicate-purchase-'.$later->id,
+                severity: SystemIssue::WARNING,
+                title: 'خرید از '.($first->supplier?->name ?? 'تأمین‌کننده').' '
+                    .$pair->count().' بار ثبت شده',
+                detail: AppCalendar::date($first->purchased_on).'، هر بار '
+                    .Money::format((float) $first->amount).' — فاکتورهای #'
+                    .$pair->pluck('id')->implode('، #').'.',
+                cause: 'یک فاکتور دو بار وارد شده — معمولاً یک بار سر بار و یک بار'
+                    .' از روی کاغذ. انبار و بدهی تأمین‌کننده هر دو دو برابر خوانده‌اند.',
+                suggestion: 'اگر واقعاً یک خرید بوده، فاکتور دوم را حذف کنید؛ حذف،'
+                    .' کیسه‌ها و پول را خودش برمی‌گرداند. اگر واقعاً دو بار خریده‌اید،'
+                    .' در یادداشتِ یکی بنویسید تا دوباره پرسیده نشود.',
+                url: '/admin/purchases/'.$later->id.'/edit',
+                urlLabel: 'فاکتور دوم',
+                magnitude: (float) $first->amount,
+            );
+        }
+
+        return $issues;
     }
 }

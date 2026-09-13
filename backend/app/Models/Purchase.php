@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Models\Concerns\RecordsAudit;
+use App\Support\AppCalendar;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Support\StockLedger;
@@ -108,6 +109,40 @@ class Purchase extends Model
      * because on a new purchase the lines cannot exist until the row they
      * hang off does.
      */
+    /**
+     * An invoice already filed that looks like this one: the same mill,
+     * the same day, the same total.
+     *
+     * «خرید از کارخانه وحدت دوبار ثبت شده» — typed in once at the door and
+     * once from the paper that evening, and nothing in between could tell
+     * the second from a second lorry. The total is compared to the Toman,
+     * because two deliveries that happen to cost exactly the same are
+     * rarer than one typed twice, and the caller can still say «واقعاً
+     * دو تا بود».
+     */
+    public function twin(): ?self
+    {
+        if ((float) $this->amount <= 0) {
+            return null;
+        }
+
+        return static::query()
+            ->whereKeyNot($this->getKey())
+            ->where('supplier_id', $this->supplier_id)
+            ->whereDate('purchased_on', $this->purchased_on)
+            ->whereBetween('amount', [(float) $this->amount - 0.01, (float) $this->amount + 0.01])
+            ->orderBy('id')
+            ->first();
+    }
+
+    /** One line naming this invoice, for a message about it. */
+    public function describe(): string
+    {
+        return '#'.$this->id.' — '.($this->supplier?->name ?? 'بدون نام')
+            .'، '.AppCalendar::date($this->purchased_on)
+            .'، '.Money::format((float) $this->amount);
+    }
+
     public function refreshTotals(): void
     {
         $amount = round((float) $this->items()->sum('amount'), 2);
