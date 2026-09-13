@@ -226,14 +226,39 @@ class ReportSeries
      */
     public static function flourJourney(Carbon $from, Carbon $to): array
     {
-        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
-        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+        return self::itemJourney(InventoryItem::ofKey(InventoryItem::FLOUR), $from, $to);
+    }
 
-        $opening = (float) $flour->movements()->where('created_at', '<', $from)
+    /**
+     * The same question of any good the shop stocks.
+     *
+     * Flour had this report and nothing else did — salt and yeast had a
+     * current balance and a raw list of movements, which answers «چقدر
+     * داریم» and not «کجا رفت». The arithmetic was never flour-specific;
+     * only the caller was.
+     *
+     * The sack size comes off the item, which already knows that flour's
+     * lives on the production formula and everything else's on the row. A
+     * good nobody has sized reads in kilograms and reports no sacks rather
+     * than inventing a size.
+     *
+     * @return array{
+     *     opening_kg: float, closing_kg: float,
+     *     in: array<int, array{reason: string, label: string, kg: float, bags: ?float, share: float}>,
+     *     out: array<int, array{reason: string, label: string, kg: float, bags: ?float, share: float}>,
+     *     in_kg: float, out_kg: float, in_bags: ?float, out_bags: ?float,
+     *     opening_bags: ?float, closing_bags: ?float, balances: bool
+     * }
+     */
+    public static function itemJourney(InventoryItem $item, Carbon $from, Carbon $to): array
+    {
+        $bagWeight = $item->bagWeightKg();
+
+        $opening = (float) $item->movements()->where('created_at', '<', $from)
             ->selectRaw("coalesce(sum(case when direction = 'in' then quantity else -quantity end), 0) as net")
             ->value('net');
 
-        $movements = $flour->movements()
+        $movements = $item->movements()
             ->whereBetween('created_at', [$from, $to])
             ->with('reverses')
             ->get();
@@ -243,7 +268,7 @@ class ReportSeries
         $net = [];
 
         foreach ($movements as $movement) {
-            $destination = self::flourDestination($movement);
+            $destination = self::movementDestination($movement);
             $net[$destination] ??= 0.0;
             $net[$destination] += ($movement->direction === 'out' ? 1 : -1) * (float) $movement->quantity;
         }
@@ -312,9 +337,9 @@ class ReportSeries
      * Which destination a movement belongs to.
      *
      * A reversal belongs to whatever it cancels, so that cancelling a bake
-     * reduces the bake rather than appearing as a delivery of flour.
+     * reduces the bake rather than appearing as a delivery of stock.
      */
-    private static function flourDestination(InventoryMovement $movement): string
+    private static function movementDestination(InventoryMovement $movement): string
     {
         if ($movement->reverses) {
             return $movement->reverses->reason;

@@ -618,6 +618,23 @@ class BakeryApi {
     return rowList(body['data']);
   }
 
+  /// Where every good in the store went over a stretch.
+  ///
+  /// The warehouse tab has only ever shown what is left. «چقدر داریم» and
+  /// «کجا رفت» are different questions, and the second is the one that
+  /// catches flour leaving by a door nobody opened.
+  Future<Map<String, dynamic>> inventoryJourney({
+    required String from,
+    required String to,
+  }) async {
+    final body = await _client.getCached('/reports/inventory', query: {
+      'from': from,
+      'to': to,
+    });
+
+    return keyedGroup(body['data']);
+  }
+
   /// What is in the shop's bank accounts, and what they come to together.
   ///
   /// Cached like the other admin reads, so the figure is still there when

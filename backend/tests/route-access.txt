@@ -76,6 +76,7 @@ GET api/v1/reports/financial                                admin
 GET api/v1/reports/financial-series                         admin
 GET api/v1/reports/financial-trend                          admin
 GET api/v1/reports/flour                                    admin
+GET api/v1/reports/inventory                                admin
 GET api/v1/reports/payroll                                  admin
 GET api/v1/reports/production                               admin
 GET api/v1/reports/profit-and-loss                          admin
