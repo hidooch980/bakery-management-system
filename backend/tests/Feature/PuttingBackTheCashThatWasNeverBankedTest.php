@@ -350,4 +350,43 @@ class PuttingBackTheCashThatWasNeverBankedTest extends TestCase
             ->expectsOutputToContain('چیزی برای اصلاح نیست')
             ->assertSuccessful();
     }
+
+    public function test_a_seller_named_like_the_note_is_still_repaired(): void
+    {
+        // Whether a handover has been put right is asked of the account,
+        // not of the wording on the row. It was asked of the note first,
+        // and no name could actually have defeated that — but a question
+        // about where money is should not be answered by matching a
+        // sentence somebody is free to rewrite.
+        $this->seller->update(['name' => 'تسویه نقدی زاده']);
+
+        $this->oldSettlement();
+
+        CashNeverBanked::repairFor($this->bakery);
+
+        $this->assertEqualsWithDelta(800_000, $this->tillBalance(), 0.01);
+    }
+
+    public function test_a_card_only_handover_is_not_treated_as_cash(): void
+    {
+        // The card share posts against the same request, so the mere
+        // existence of a posting cannot mean the cash was banked. The card
+        // goes to a bank and the cash to the drawer, and the drawer is
+        // what is asked about.
+        $bank = BankAccount::create([
+            'title' => 'حساب سفید',
+            'opening_balance' => 0,
+            'is_active' => true,
+            'is_default' => true,
+        ]);
+
+        $request = $this->oldSettlement(['paid_cash' => 300_000, 'paid_card' => 500_000]);
+
+        $bank->record('in', 500_000, 'sale', $this->owner->id, $request, 'تسویه کارتخوان');
+
+        CashNeverBanked::repairFor($this->bakery);
+
+        $this->assertEqualsWithDelta(300_000, $this->tillBalance(), 0.01);
+        $this->assertEqualsWithDelta(500_000, (float) $bank->fresh()->balance, 0.01);
+    }
 }

@@ -139,14 +139,21 @@ class CashNeverBanked
         return SettlementRequest::query()
             ->whereNotNull('confirmed_at')
             ->where('paid_cash', '>', 0)
-            // A request whose cash share is already in an account has been
+            // A request whose cash share is already in the drawer has been
             // put right — by an earlier run of this, or by a confirmation
-            // that happened after the fix landed. The card share posts
-            // against the request too, so the note is what tells them
-            // apart rather than the mere existence of a row.
+            // that happened after the fix landed.
+            //
+            // Told apart by the account, not by the note. The card share
+            // posts against this same request, so the existence of a row
+            // proves nothing; but the card share goes to a bank and the
+            // cash to the till, and the till is the one asked about here.
+            // The note was what asked this first. No seller name could
+            // actually have defeated it, so this fixes no bug — but «is
+            // this money already in the drawer» should be asked of the
+            // drawer, not of a sentence that is free to be reworded.
             ->whereDoesntHave(
                 'bankTransactions',
-                fn ($q) => $q->where('note', 'like', 'تسویه نقدی%'),
+                fn ($q) => $q->where('bank_account_id', BankAccount::cashBox()?->id),
             );
     }
 
