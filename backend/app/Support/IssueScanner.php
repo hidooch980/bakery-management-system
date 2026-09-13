@@ -13,6 +13,7 @@ use App\Models\Loan;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -77,6 +78,7 @@ class IssueScanner
             ...$this->nightlyMaintenanceNotRunning(),
             ...$this->noCashBox(),
             ...$this->noCardAccount(),
+            ...$this->certificateRunningOut(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -1358,6 +1360,66 @@ class IssueScanner
             url: null,
             urlLabel: null,
             magnitude: (float) $count,
+        )];
+    }
+
+    /** Days of certificate left below which the issues page says so. */
+    public const CERTIFICATE_WARN_DAYS = 21;
+
+    /**
+     * The HTTPS certificate is about to lapse.
+     *
+     * certbot renews it every sixty days, and when it cannot — the
+     * challenge path missing from nginx, a firewall, an expired account —
+     * it fails quietly and the site works right up until the day it does
+     * not. Twenty-one days is a renewal that has already been missed at
+     * least once, which is the moment somebody should look, not the
+     * morning the phones stop connecting.
+     *
+     * Read from the file, not fetched over the network: the server asking
+     * itself through Arvan would be reading the CDN's certificate.
+     */
+    private function certificateRunningOut(): array
+    {
+        $path = (string) config('bakery.tls_certificate');
+
+        if ($path === '' || ! is_readable($path)) {
+            return [];
+        }
+
+        $parsed = @openssl_x509_parse((string) file_get_contents($path));
+        $expires = is_array($parsed) ? ($parsed['validTo_time_t'] ?? null) : null;
+
+        if (! is_int($expires)) {
+            return [];
+        }
+
+        $left = (int) floor(($expires - now()->getTimestamp()) / 86400);
+
+        if ($left > self::CERTIFICATE_WARN_DAYS) {
+            return [];
+        }
+
+        $expired = $left < 0;
+
+        return [new SystemIssue(
+            key: 'certificate-running-out',
+            severity: $left <= 7 ? SystemIssue::CRITICAL : SystemIssue::WARNING,
+            title: $expired
+                ? 'گواهی HTTPS منقضی شده'
+                : 'گواهی HTTPS تا '.$left.' روز دیگر تمام می‌شود',
+            detail: 'تاریخ انقضا: '.AppCalendar::date(Carbon::createFromTimestamp($expires)).'.'
+                .($expired
+                    ? ' الان آدرس https:// مغازه برای گوشی‌ها و مرورگرها خطا می‌دهد.'
+                    : ' تمدید خودکار باید سی روز مانده انجام می‌شد و نشده.'),
+            cause: 'certbot نتوانسته گواهی را تمدید کند — معمولاً چون مسیر'
+                .' /.well-known/acme-challenge/ در nginx نیست، یا پورت ۸۰ از'
+                .' بیرون بسته است.',
+            suggestion: 'روی سرور: sudo certbot renew --dry-run — خطایش می‌گوید'
+                .' چه چیزی جلوی تمدید را گرفته. بعد از رفع، sudo certbot renew.',
+            url: null,
+            urlLabel: null,
+            magnitude: (float) max(0, self::CERTIFICATE_WARN_DAYS - $left),
         )];
     }
 }
