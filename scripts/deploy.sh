@@ -81,7 +81,7 @@ restore() {
 }
 trap restore EXIT INT TERM
 
-say "۱/۶  کد"
+say "۱/۷  کد"
 cd "$APP" || fail "پوشهٔ برنامه پیدا نشد: $APP"
 
 # Remembered before the pull, so a migration that fails has somewhere to
@@ -118,7 +118,7 @@ fi
 
 git log --oneline -1
 
-say "۲/۶  وابستگی‌ها"
+say "۲/۷  وابستگی‌ها"
 cd "$BACK" || fail "پوشهٔ بک‌اند پیدا نشد: $BACK"
 # Never --no-dev. See the note at the top; it has taken the shop down
 # twice.
@@ -135,10 +135,10 @@ artisan package:discover -q
 artisan filament:upgrade -q
 echo "    نصب شد"
 
-say "۳/۶  قالب‌بندی"
+say "۳/۷  قالب‌بندی"
 ./vendor/bin/pint --test 2>&1 | tail -2
 
-say "۴/۶  مهاجرت‌ها"
+say "۴/۷  مهاجرت‌ها"
 PENDING=$(artisan migrate:status 2>/dev/null | grep -ci pending || true)
 
 if [ "$PENDING" -eq 0 ]; then
@@ -175,7 +175,54 @@ else
   fi
 fi
 
-say "۵/۶  کش"
+say "۵/۷  nginx"
+# The nginx configuration is in the repository and was never installed
+# from it: the live file was written by hand on 2026-08-25 and the
+# repository caught up with it afterwards. What the repository has and
+# the server does not is the acme-challenge location — without it the
+# certificate stops renewing, and nothing says so until the day HTTPS
+# goes dark.
+#
+# Installed only when it differs, tested with `nginx -t` before it is
+# kept, and put back exactly as it was when the test fails. The reload
+# in the next step is what makes it take. A rejected file is reported,
+# not fatal: the shop is still running on the configuration it had.
+NGINX_SITE=${NGINX_SITE:-/etc/nginx/sites-available/bakery}
+NGINX_SNIPPET=${NGINX_SNIPPET:-/etc/nginx/snippets/bakery-app.conf}
+NGINX_BACKUP_DIR=${NGINX_BACKUP_DIR:-/root}
+SITE_SRC=$APP/deploy/nginx-bakery.conf
+SNIPPET_SRC=$APP/deploy/snippets/bakery-app.conf
+
+nginx_changed=no
+for pair in "$SITE_SRC:$NGINX_SITE" "$SNIPPET_SRC:$NGINX_SNIPPET"; do
+  src=${pair%%:*}; dst=${pair#*:}
+  [ -f "$src" ] || continue
+  sudo cmp -s "$src" "$dst" 2>/dev/null || nginx_changed=yes
+done
+
+if [ "$nginx_changed" = no ]; then
+  echo "    بدون تغییر"
+else
+  BAK=$NGINX_BACKUP_DIR/bakery-nginx-$(date +%F-%H%M%S)
+  sudo mkdir -p "$BAK" "$(dirname "$NGINX_SITE")" "$(dirname "$NGINX_SNIPPET")"
+  [ -f "$NGINX_SITE" ] && sudo cp "$NGINX_SITE" "$BAK/site"
+  [ -f "$NGINX_SNIPPET" ] && sudo cp "$NGINX_SNIPPET" "$BAK/snippet"
+
+  sudo cp "$SITE_SRC" "$NGINX_SITE"
+  sudo cp "$SNIPPET_SRC" "$NGINX_SNIPPET"
+
+  if sudo nginx -t >/dev/null 2>&1; then
+    echo "    تنظیمات nginx از مخزن نصب شد — نسخهٔ قبلی در $BAK"
+    echo "    بعد از استقرار یک بار بزنید: sudo certbot renew --dry-run"
+  else
+    if [ -f "$BAK/site" ]; then sudo cp "$BAK/site" "$NGINX_SITE"; else sudo rm -f "$NGINX_SITE"; fi
+    if [ -f "$BAK/snippet" ]; then sudo cp "$BAK/snippet" "$NGINX_SNIPPET"; else sudo rm -f "$NGINX_SNIPPET"; fi
+    echo "    !!! nginx -t تنظیمات مخزن را رد کرد — نسخهٔ قبلی برگردانده شد" >&2
+    sudo nginx -t 2>&1 | tail -3 | sed 's/^/    /' >&2
+  fi
+fi
+
+say "۶/۷  کش"
 artisan config:cache -q
 artisan route:cache -q
 artisan view:cache -q
@@ -186,7 +233,7 @@ echo "    ساخته و بارگذاری شد"
 # Before the health check, or every check below answers 503 by design.
 restore
 
-say "۶/۶  آیا کار می‌کند"
+say "۷/۷  آیا کار می‌کند"
 HEALTH=$(curl -s -m 10 http://127.0.0.1/api/v1/health || true)
 PANEL=$(curl -s -o /dev/null -w "%{http_code}" -m 10 http://127.0.0.1/admin/login || true)
 
