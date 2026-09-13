@@ -75,6 +75,7 @@ class IssueScanner
             ...$this->expensesMostlyUncategorised(),
             ...$this->serverErrorsToday(),
             ...$this->nightlyMaintenanceNotRunning(),
+            ...$this->noCashBox(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -172,6 +173,56 @@ class IssueScanner
             url: '/admin/manage-bakery',
             urlLabel: 'تکمیل اطلاعات نانوایی',
             magnitude: (float) $missing->count(),
+        )];
+    }
+
+    /**
+     * Cash is being taken and no account can receive it.
+     *
+     * Three paths bank cash through `BankAccount::cashBox()` — a seller's
+     * handover, a customer's collection, a counter sale of flour. Each of
+     * them was losing the money until it was fixed, and each of them does
+     * nothing at all when no account carries the flag. The same silence,
+     * one step further along, which is why this is here rather than left
+     * to somebody noticing a balance that never moves.
+     *
+     * Only raised once the shop is actually holding cash. On an empty
+     * ledger it would be a setup checklist, and this page is read every
+     * morning by somebody looking for real problems.
+     */
+    private function noCashBox(): array
+    {
+        if (BankAccount::cashBox()) {
+            return [];
+        }
+
+        // What sellers are holding right now: money that has been taken
+        // and will be handed over, with nowhere to land when it is.
+        $held = round((float) Sale::query()
+            ->whereNull('cash_settled_on')
+            ->whereIn('payment_type', Sale::CASH_TYPES)
+            ->sum('amount'), 2);
+
+        if ($held <= 0) {
+            return [];
+        }
+
+        return [new SystemIssue(
+            key: 'no-cash-box',
+            severity: SystemIssue::WARNING,
+            title: 'هیچ حسابی به‌عنوان صندوق نقد تعیین نشده',
+            detail: 'الان '.Money::format($held).' پول نقد دست فروشنده‌هاست،'
+                .' و وقتی تحویل بدهند هیچ حسابی برای ثبتش وجود ندارد.',
+            cause: 'در «حساب‌های بانکی» هیچ حسابی تیک «صندوق نقد» را ندارد.'
+                .' تا این تیک نخورد، تسویهٔ نقدی فروشنده، وصول نسیهٔ نقدی و'
+                .' فروش آرد نقدی هیچ‌کدام موجودی هیچ حسابی را تکان نمی‌دهند.',
+            suggestion: 'حسابی که پول نقد مغازه در آن است را ویرایش کنید و'
+                .' تیک «صندوق نقد» را بزنید. اگر چنین حسابی ندارید یکی بسازید'
+                .' و موجودی اولیه‌اش را همان پولی بگذارید که واقعاً در صندوق'
+                .' است. فقط یک حساب می‌تواند صندوق باشد.',
+            url: '/admin/bank-accounts',
+            urlLabel: 'تعیین صندوق نقد',
+            magnitude: $held,
         )];
     }
 
