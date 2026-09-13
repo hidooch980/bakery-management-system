@@ -383,5 +383,49 @@ check "کش یک بار ساخته شد" "$(grep -c 'config:cache' "$LOG")" 1
 rm -rf "$WORLD"
 
 echo
+echo "=== nginx: پشتیبان خوانده نمی‌شود — باز هم فایل زنده پاک نمی‌شود ==="
+nginx_world
+printf 'server { listen 80; }\n' > "$SITE"
+cp "$ROOT/deploy/snippets/bakery-app.conf" "$SNIP"
+# The live server runs this as `ubuntu`, and the backup lives under
+# /root. `[ -f "$BAK/site" ]` is false there whether the backup exists
+# or not — and the restore read that as «nothing was here before» and
+# deleted the live vhost, then reloaded nginx with no site at all.
+#
+# The stub makes the backup unreadable at exactly the moment the real
+# permission check would bite: after the install, before the restore.
+# (Removing it stands in for «this user cannot read /root», which a test
+# running as root could not otherwise reproduce.)
+cat > "$BIN/nginx" <<STUB
+#!/usr/bin/env bash
+echo "nginx \$*" >> "\$LOG"
+rm -rf "$WORLD"/bak/bakery-nginx-* 2>/dev/null
+exit "\${NGINX_T:-0}"
+STUB
+chmod +x "$BIN/nginx"
+OUT=$(NGINX_T=1 run_nginx_deploy); CODE=$?
+check "استقرار نمی‌شکند" "$CODE" 0
+check "فایل زنده هنوز هست" "$([ -f "$SITE" ] && echo yes)" yes
+contains "می‌گوید برگرداندن نشد" "$OUT" "برگرداندن هم نشد"
+rm -rf "$WORLD"
+
+echo
+echo "=== مهاجرتِ شکست‌خورده بعد از شروع دوباره، به کامیت درست برمی‌گردد ==="
+script_world
+BEFORE=$(git -C "$WORLD/app" rev-parse HEAD)
+OUT=$( export PATH="$BIN:$PATH" APP="$WORLD/app" LOG="$LOG" \
+      LOCK="$WORLD/lock" PENDING=1 MIGRATE=1 HEALTH="" PANEL_CODE=200 \
+      CHANGES_SCRIPT=1
+    bash "$COPY" 2>&1 ); CODE=$?
+# The rollback anchor is read before the pull; the second half runs
+# after it. Read again there, «کد به X برمی‌گردد» would name the very
+# commit being rolled back from, and the shop would stay on the code
+# whose migration had just failed.
+check "استقرار شکست خورد" "$CODE" 1
+check "به کامیت پیش از کشیدن برگشت" "$(git -C "$WORLD/app" rev-parse HEAD)" "$BEFORE"
+contains "مغازه دوباره باز شد" "$OUT" "باز کردن مغازه"
+rm -rf "$WORLD"
+
+echo
 echo "$PASS قبول، $FAIL رد"
 [ "$FAIL" -eq 0 ]

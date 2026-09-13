@@ -99,7 +99,11 @@ cd "$APP" || fail "پوشهٔ برنامه پیدا نشد: $APP"
 
 # Remembered before the pull, so a migration that fails has somewhere to
 # put the shop back to.
-WAS=$(git rev-parse HEAD)
+#
+# Carried across the restart below: the second half runs *after* the
+# pull, so reading it again there would anchor the rollback to the
+# commit being rolled back from — «کد به X برمی‌گردد» where X is X.
+WAS=${BAKERY_DEPLOY_WAS:-$(git rev-parse HEAD)}
 
 # Nothing is pulled over uncommitted work. A `git pull` onto a dirty
 # tree either fails half way or quietly merges around the change, and
@@ -147,6 +151,7 @@ if [ "${BAKERY_DEPLOY_RESTARTED:-}" != 1 ] \
   echo
   echo "    خودِ اسکریپت استقرار عوض شد — با نسخهٔ تازه ادامه می‌دهد."
   export BAKERY_DEPLOY_RESTARTED=1
+  export BAKERY_DEPLOY_WAS="$WAS"
   exec bash "$SELF" "$REF"
 fi
 
@@ -237,19 +242,50 @@ if [ "$nginx_changed" = no ]; then
 else
   BAK=$NGINX_BACKUP_DIR/bakery-nginx-$(date +%F-%H%M%S)
   sudo mkdir -p "$BAK" "$(dirname "$NGINX_SITE")" "$(dirname "$NGINX_SNIPPET")"
-  [ -f "$NGINX_SITE" ] && sudo cp "$NGINX_SITE" "$BAK/site"
-  [ -f "$NGINX_SNIPPET" ] && sudo cp "$NGINX_SNIPPET" "$BAK/snippet"
 
-  sudo cp "$SITE_SRC" "$NGINX_SITE"
-  sudo cp "$SNIPPET_SRC" "$NGINX_SNIPPET"
+  # Whether each file was there, written down now rather than looked up
+  # later. The backup lives under /root, which the user running this is
+  # not: `[ -f "$BAK/site" ]` is false for them whether the file is
+  # there or not, and the restore below read that as «there was nothing
+  # here before» and deleted the live configuration. The shop would then
+  # be reloaded with no vhost at all — by the step meant to protect it.
+  had_site=no; sudo test -f "$NGINX_SITE" && had_site=yes
+  had_snippet=no; sudo test -f "$NGINX_SNIPPET" && had_snippet=yes
+
+  [ "$had_site" = yes ] && sudo cp "$NGINX_SITE" "$BAK/site"
+  [ "$had_snippet" = yes ] && sudo cp "$NGINX_SNIPPET" "$BAK/snippet"
+
+  # Each half only if the repository has it. An older tag may carry one
+  # and not the other, and half a pair installed while the message says
+  # both is worse than neither.
+  [ -f "$SITE_SRC" ] && sudo cp "$SITE_SRC" "$NGINX_SITE"
+  [ -f "$SNIPPET_SRC" ] && sudo cp "$SNIPPET_SRC" "$NGINX_SNIPPET"
 
   if sudo nginx -t >/dev/null 2>&1; then
     echo "    تنظیمات nginx از مخزن نصب شد — نسخهٔ قبلی در $BAK"
     echo "    بعد از استقرار یک بار بزنید: sudo certbot renew --dry-run"
   else
-    if [ -f "$BAK/site" ]; then sudo cp "$BAK/site" "$NGINX_SITE"; else sudo rm -f "$NGINX_SITE"; fi
-    if [ -f "$BAK/snippet" ]; then sudo cp "$BAK/snippet" "$NGINX_SNIPPET"; else sudo rm -f "$NGINX_SNIPPET"; fi
-    echo "    !!! nginx -t تنظیمات مخزن را رد کرد — نسخهٔ قبلی برگردانده شد" >&2
+    restored=yes
+
+    if [ "$had_site" = yes ]; then
+      sudo cp "$BAK/site" "$NGINX_SITE" || restored=no
+    else
+      sudo rm -f "$NGINX_SITE"
+    fi
+
+    if [ "$had_snippet" = yes ]; then
+      sudo cp "$BAK/snippet" "$NGINX_SNIPPET" || restored=no
+    else
+      sudo rm -f "$NGINX_SNIPPET"
+    fi
+
+    if [ "$restored" = yes ]; then
+      echo "    !!! nginx -t تنظیمات مخزن را رد کرد — نسخهٔ قبلی برگردانده شد" >&2
+    else
+      # Said loudly, because the shop is now holding a configuration
+      # nginx has refused and the copy back did not work either.
+      echo "    !!! nginx -t رد کرد و برگرداندن هم نشد — نسخهٔ قبلی در $BAK" >&2
+    fi
     sudo nginx -t 2>&1 | tail -3 | sed 's/^/    /' >&2
   fi
 fi
