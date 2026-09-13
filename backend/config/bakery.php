@@ -50,4 +50,22 @@ return [
 
     'partner_drawings' => env('BAKERY_PARTNER_DRAWINGS', false),
 
+    /*
+    |--------------------------------------------------------------------------
+    | The shop's certificate
+    |--------------------------------------------------------------------------
+    |
+    | Where certbot keeps the certificate for baker.molido.shop. The issues
+    | page reads its expiry so a renewal that has quietly stopped is seen
+    | three weeks before HTTPS goes dark, not on the morning it does. A
+    | machine without the file — every developer's — simply has no such
+    | issue.
+    |
+    */
+
+    'tls_certificate' => env(
+        'BAKERY_TLS_CERTIFICATE',
+        '/etc/letsencrypt/live/baker.molido.shop/fullchain.pem',
+    ),
+
 ];
