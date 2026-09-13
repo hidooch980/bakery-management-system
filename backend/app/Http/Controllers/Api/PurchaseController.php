@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\DuplicatePurchase;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\InventoryItem;
@@ -118,6 +119,23 @@ class PurchaseController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        try {
+            return $this->record($request);
+        } catch (DuplicatePurchase $e) {
+            // 409, with the earlier invoice named: the phone shows it and
+            // asks «باز هم ثبت شود؟», and the same body with force=true
+            // is the answer.
+            return response()->json([
+                'success' => false,
+                'message' => 'همین خرید امروز یک بار ثبت شده: '.$e->twin->describe()
+                    .'. اگر واقعاً دو بار خریده‌اید، دوباره با تأیید ثبت کنید.',
+                'data' => ['duplicate_of' => $e->twin->id],
+            ], 409);
+        }
+    }
+
+    private function record(Request $request): JsonResponse
+    {
         $data = $request->validate([
             // Either an existing supplier or a name to open one under. A
             // lorry at the door is not the moment to send somebody to a
@@ -130,6 +148,11 @@ class PurchaseController extends Controller
             'bank_account_id' => ['nullable', 'exists:bank_accounts,id'],
             'paid_in_cash' => ['nullable', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
+            // «بله، واقعاً دو بار خریدیم.» Two identical lorries in one
+            // day happen; two identical invoices typed in are the usual
+            // reason. The first attempt is refused with the twin named,
+            // and this is how the second attempt says it was read.
+            'force' => ['nullable', 'boolean'],
 
             'items' => ['required', 'array', 'min:1'],
             // A stocked good, or nothing at all for a line that is money
@@ -171,6 +194,13 @@ class PurchaseController extends Controller
             // from them. Both are the model's own doing, so the panel and
             // any other caller get exactly the same behaviour.
             $purchase->refreshTotals();
+
+            // Checked after the lines are in, because the total is theirs
+            // to write and the twin is found by it. Throwing here rolls
+            // the whole invoice back — stock, money and all.
+            if (! ($data['force'] ?? false) && $twin = $purchase->twin()) {
+                throw new DuplicatePurchase($twin);
+            }
 
             return $purchase;
         });

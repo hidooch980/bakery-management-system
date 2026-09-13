@@ -128,13 +128,18 @@ class _PurchaseSheetState extends State<PurchaseSheet> {
     setState(() => _saving = true);
 
     try {
-      final outcome = await widget.api.recordPurchase(
-        lines: drafts,
-        supplierId: _supplier?.id,
-        supplierName: _newSupplier.text.trim(),
-        invoiceNo: _invoiceNo.text.trim(),
-        paidAmount: double.tryParse(_paid.text.trim()) ?? 0,
-      );
+      var outcome = await _send(drafts, force: false);
+
+      if (outcome == null) {
+        // The server has this invoice already — same mill, same day, same
+        // money — and named it. Two lorries in a day do happen, so it is
+        // asked rather than assumed; but the default is «نه», because a
+        // docket typed twice is far more common than a delivery repeated.
+        final again = await _askIfReallyTwice();
+        if (!mounted || !again) return;
+        outcome = await _send(drafts, force: true);
+        if (outcome == null) return;
+      }
 
       if (!mounted) return;
 
@@ -155,6 +160,52 @@ class _PurchaseSheetState extends State<PurchaseSheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Null when the server answered 409 — «همین خرید امروز ثبت شده».
+  Future<({Purchase? purchase, bool queued})?> _send(
+    List<PurchaseLineDraft> drafts, {
+    required bool force,
+  }) async {
+    try {
+      return await widget.api.recordPurchase(
+        lines: drafts,
+        supplierId: _supplier?.id,
+        supplierName: _newSupplier.text.trim(),
+        invoiceNo: _invoiceNo.text.trim(),
+        paidAmount: double.tryParse(_paid.text.trim()) ?? 0,
+        force: force,
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode == 409) {
+        _duplicateMessage = e.message;
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  String _duplicateMessage = '';
+
+  Future<bool> _askIfReallyTwice() async {
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('این خرید قبلاً ثبت شده'),
+        content: Text(_duplicateMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('نه، همان است'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('بله، واقعاً دو بار خریدیم'),
+          ),
+        ],
+      ),
+    );
+    return answer ?? false;
   }
 
   @override
