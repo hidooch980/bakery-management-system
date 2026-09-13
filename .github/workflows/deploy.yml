@@ -18,11 +18,11 @@ on:
         description: 'شاخه یا تگی که مستقر شود (پیش‌فرض: main)'
         required: false
         default: 'main'
-  # A second door. Every dispatch made through the GitHub App lands in
-  # «action_required» and waits for a click in a browser, while a push
-  # runs on its own — so pushing the `deploy` branch is how a deploy is
-  # started from a session that has no browser. It deploys main, not
-  # the branch: the branch is a button, not a version.
+  # A second door. A dispatch made through the GitHub App needs a click
+  # in a browser before it runs, while a push runs on its own — so
+  # pushing the `deploy` branch is how a deploy is started from a
+  # session that has no browser. It deploys main, not the branch: the
+  # branch is a button, not a version.
   push:
     branches: [deploy]
 
@@ -39,37 +39,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Names only, never values — `jq keys` cannot print one, and the
-      # runner masks them regardless. It exists because three rounds of
-      # «they are set» / «they arrive empty» is two rounds too many: this
-      # is the list of what the workflow can actually see, from the
-      # workflow's own side, and it settles the question in one run.
-      - name: List the secrets this workflow can see
-        env:
-          ALL: ${{ toJSON(secrets) }}
-        run: |
-          echo "secretهایی که این workflow می‌بیند:"
-          printf '%s' "$ALL" | jq -r 'keys[]' | sed 's/^/  - /'
-          echo
-          echo "variableها:"
-          printf '%s' '${{ toJSON(vars) }}' | jq -r 'keys[] // empty' | sed 's/^/  - /'
-          echo "  (اگر چیزی زیر این خط نیست، یعنی هیچ variableای ندارید)"
-
+      # There used to be a step here that printed `toJSON(secrets)` —
+      # names only — so «they are set» / «they arrive empty» could be
+      # settled in one run. It settled nothing: a workflow that
+      # serialises the whole secrets context is the shape of an
+      # exfiltration, and every run was held for approval before a
+      # single job was created. The check below names what is missing
+      # without touching anything it does not need.
       - name: Check the secrets are set
         env:
           KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           HOST: ${{ secrets.DEPLOY_HOST }}
           HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
-          # The same three names read as *variables* rather than secrets.
-          #
-          # «Settings → Secrets and variables → Actions» is one page with
-          # two tabs, and a value put in the wrong one is simply not
-          # there as far as `secrets.` is concerned — with nothing to say
-          # so. The first deploy failed exactly this way, reported as
-          # «not set» to somebody who had just set them.
-          VAR_KEY: ${{ vars.DEPLOY_SSH_KEY }}
-          VAR_HOST: ${{ vars.DEPLOY_HOST }}
-          VAR_HOST_KEY: ${{ vars.DEPLOY_HOST_KEY }}
         run: |
           missing=
           [ -n "$KEY" ] || missing="$missing DEPLOY_SSH_KEY"
@@ -81,20 +62,12 @@ jobs:
           echo "::error::این secretها خالی رسیدند:$missing"
           echo
 
-          if [ -n "$VAR_KEY$VAR_HOST$VAR_HOST_KEY" ]; then
-            echo "پیدا شد — ولی در تب «Variables» ثبت شده، نه «Secrets»."
-            echo "همان صفحه است با دو تب. مقادیر را از Variables پاک کنید"
-            echo "و در «Secrets» دوباره بسازید (New repository secret)."
-            echo
-            echo "و کلید خصوصی حتماً باید Secret باشد: مقدار یک Variable"
-            echo "در لاگ اجرا دیده می‌شود."
-            exit 1
-          fi
-
           cat <<'WHY'
           سه جای معمولِ اشتباه، به ترتیب احتمال:
 
-          ۱. تب اشتباه — «Variables» به‌جای «Secrets».
+          ۱. تب اشتباه — «Variables» به‌جای «Secrets». همان صفحه است با
+             دو تب؛ و کلید خصوصی حتماً باید Secret باشد، چون مقدار یک
+             Variable در لاگ اجرا دیده می‌شود.
           ۲. «Environment secret» به‌جای «Repository secret». این workflow
              هیچ environmentی اعلام نمی‌کند، پس آن‌ها را نمی‌بیند.
              در «New repository secret» بسازید، نه زیر یک Environment.
