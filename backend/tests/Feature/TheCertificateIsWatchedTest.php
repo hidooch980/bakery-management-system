@@ -36,8 +36,7 @@ class TheCertificateIsWatchedTest extends TestCase
 
     protected function tearDown(): void
     {
-        array_map('unlink', glob($this->dir.'/*') ?: []);
-        @rmdir($this->dir);
+        exec('rm -rf '.escapeshellarg($this->dir));
 
         parent::tearDown();
     }
@@ -60,6 +59,11 @@ class TheCertificateIsWatchedTest extends TestCase
     private function issue(): ?SystemIssue
     {
         return (new IssueScanner)->scan()->firstWhere('key', 'certificate-running-out');
+    }
+
+    private function missing(): ?SystemIssue
+    {
+        return (new IssueScanner)->scan()->firstWhere('key', 'certificate-not-found');
     }
 
     public function test_a_certificate_with_two_months_left_is_not_an_issue(): void
@@ -90,19 +94,71 @@ class TheCertificateIsWatchedTest extends TestCase
 
     public function test_a_machine_without_the_file_has_no_such_issue(): void
     {
-        // Every developer's laptop, and the test suite itself.
+        // Every developer's laptop, and the test suite itself: no
+        // certbot directory anywhere, so nothing to say.
         config(['bakery.tls_certificate' => $this->dir.'/nowhere.pem']);
 
         $this->assertNull($this->issue());
+        $this->assertNull($this->missing());
     }
 
-    public function test_a_file_that_is_not_a_certificate_is_ignored(): void
+    // ---------------------------------------------- the path nothing writes
+
+    /**
+     * Lays out certbot's directory: live/<name>/fullchain.pem for each
+     * name given.
+     */
+    private function certbotHolding(array $names): string
     {
-        // Wrong is worse than absent here: a warning built from garbage
-        // would send somebody to the server for nothing.
-        file_put_contents($this->dir.'/junk.pem', 'not a certificate');
-        config(['bakery.tls_certificate' => $this->dir.'/junk.pem']);
+        $live = $this->dir.'/live';
+        mkdir($live, 0777, true);
+
+        foreach ($names as $name) {
+            mkdir($live.'/'.$name);
+            file_put_contents($live.'/'.$name.'/fullchain.pem', 'x');
+        }
+
+        return $live;
+    }
+
+    public function test_a_configured_path_that_does_not_exist_on_a_certbot_server_is_named(): void
+    {
+        // What a renewal into a new lineage leaves behind: certbot writes
+        // baker.molido.shop-0001 and the configured path stops being
+        // updated by anything. Silence here would read exactly like a
+        // healthy certificate, for ever.
+        $live = $this->certbotHolding(['baker.molido.shop-0001']);
+        config(['bakery.tls_certificate' => $live.'/baker.molido.shop/fullchain.pem']);
+
+        $issue = $this->missing();
+
+        $this->assertNotNull($issue);
+        $this->assertSame(SystemIssue::WARNING, $issue->severity);
+        $this->assertStringContainsString('baker.molido.shop-0001', $issue->detail);
+        $this->assertStringContainsString('certbot certificates', $issue->suggestion);
+    }
+
+    public function test_a_file_that_is_not_a_certificate_is_treated_as_missing(): void
+    {
+        $live = $this->certbotHolding(['baker.molido.shop']);
+        $path = $live.'/baker.molido.shop/fullchain.pem';
+        file_put_contents($path, 'not a certificate');
+        config(['bakery.tls_certificate' => $path]);
+
+        // No expiry can be read from it, so nothing would ever warn.
+        $this->assertNull($this->issue());
+        $this->assertNotNull($this->missing());
+    }
+
+    public function test_a_certificate_that_is_where_it_should_be_says_nothing(): void
+    {
+        $live = $this->certbotHolding([]);
+        mkdir($live.'/baker.molido.shop');
+        $path = $live.'/baker.molido.shop/fullchain.pem';
+        copy($this->certificate(60), $path);
+        config(['bakery.tls_certificate' => $path]);
 
         $this->assertNull($this->issue());
+        $this->assertNull($this->missing());
     }
 }
