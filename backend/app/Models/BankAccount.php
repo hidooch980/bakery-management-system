@@ -51,6 +51,21 @@ class BankAccount extends Model
                     ->where('is_default', true)
                     ->update(['is_default' => false]);
             }
+
+            // And exactly one drawer. The migration that added the column
+            // said so — «two tills is a question with no answer» — and
+            // then only the default was ever held to it, so a second one
+            // could be flagged and `cashBox()` would answer with whichever
+            // came first by id.
+            //
+            // Separate from the default on purpose: a one-account shop
+            // keeps its cash and its takings in the same place, and
+            // neither flag should push the other off.
+            if ($account->is_cash_box) {
+                static::where('id', '!=', $account->id)
+                    ->where('is_cash_box', true)
+                    ->update(['is_cash_box' => false]);
+            }
         });
     }
 
