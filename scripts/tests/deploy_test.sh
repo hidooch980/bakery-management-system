@@ -318,6 +318,70 @@ check "فایل سرور همان قبلی است" "$(cat "$SITE")" "server { li
 check "مغازه بسته نشد" "$(grep -c 'artisan down' "$LOG")" 0
 rm -rf "$WORLD"
 
+# A pull that replaces the deploy script itself.
+#
+# What happened on the live server the day the nginx step landed: bash was
+# running the copy it read at the start, the pull swapped the file under
+# it, and every step *except* the new one ran. The code was current and
+# the step that installs the certificate's renewal path was silently not
+# there.
+#
+# A copy in the world is what runs here, so the real script is never the
+# one being rewritten.
+script_world() {
+  build_world
+  COPY=$WORLD/deploy.sh
+  cp "$ROOT/scripts/deploy.sh" "$COPY"
+
+  # `git fetch` as before, and it also appends a line to the copy — which
+  # is what a pull that changes this script amounts to.
+  cat > "$BIN/git" <<STUB
+#!/usr/bin/env bash
+GIT=$(command -v git)
+if [ "\$1" = fetch ]; then
+  cur=\$("\$GIT" -C "$WORLD/app" rev-parse --abbrev-ref HEAD)
+  "\$GIT" -C "$WORLD/app" checkout -q -B __incoming
+  echo two > "$WORLD/app/file"
+  "\$GIT" -C "$WORLD/app" commit -qam two
+  printf '%s\t\tbranch '"'"'main'"'"' of origin\n' \
+    "\$("\$GIT" -C "$WORLD/app" rev-parse HEAD)" > "$WORLD/app/.git/FETCH_HEAD"
+  "\$GIT" -C "$WORLD/app" checkout -q "\$cur"
+  [ "\${CHANGES_SCRIPT:-0}" = 1 ] && echo 'echo "SCRIPT-IS-NEW"' >> "$COPY"
+  exit 0
+fi
+exec "\$GIT" "\$@"
+STUB
+  chmod +x "$BIN/git"
+}
+
+run_copy() {
+  ( export PATH="$BIN:$PATH" APP="$WORLD/app" LOG="$LOG" \
+      LOCK="$WORLD/lock" PENDING=0 MIGRATE=0 HEALTH="" PANEL_CODE=200 \
+      CHANGES_SCRIPT="${CHANGES_SCRIPT:-0}"
+    bash "$COPY" 2>&1 )
+}
+
+echo
+echo "=== اسکریپت خودش عوض شد: با نسخهٔ تازه دوباره شروع می‌کند ==="
+script_world
+OUT=$(CHANGES_SCRIPT=1 run_copy); CODE=$?
+check "استقرار موفق" "$CODE" 0
+contains "می‌گوید دوباره شروع می‌کند" "$OUT" "با نسخهٔ تازه ادامه می‌دهد"
+contains "نسخهٔ تازه واقعاً اجرا شد" "$OUT" "SCRIPT-IS-NEW"
+check "فقط یک بار دوباره شروع شد" "$(echo "$OUT" | grep -c 'با نسخهٔ تازه ادامه می‌دهد')" 1
+check "«استقرار در جریان است» نگفت" "$(echo "$OUT" | grep -c 'در جریان است')" 0
+check "کش یک بار ساخته شد" "$(grep -c 'config:cache' "$LOG")" 1
+rm -rf "$WORLD"
+
+echo
+echo "=== اسکریپت عوض نشد: دوباره شروع نمی‌کند ==="
+script_world
+OUT=$(CHANGES_SCRIPT=0 run_copy); CODE=$?
+check "استقرار موفق" "$CODE" 0
+check "چیزی دربارهٔ نسخهٔ تازه نگفت" "$(echo "$OUT" | grep -c 'با نسخهٔ تازه')" 0
+check "کش یک بار ساخته شد" "$(grep -c 'config:cache' "$LOG")" 1
+rm -rf "$WORLD"
+
 echo
 echo "$PASS قبول، $FAIL رد"
 [ "$FAIL" -eq 0 ]

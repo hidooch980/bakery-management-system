@@ -39,16 +39,25 @@ REF=${1:-main}
 # already running» — sending somebody to hunt for a deploy that
 # did not exist. Every test passed a writable path, so the arm
 # was never once run.
-if ! : >>"$LOCK" 2>/dev/null; then
-  echo "قفل «$LOCK» باز نشد. مسیر دیگری بدهید:" >&2
-  echo "  sudo LOCK=/var/lock/bakery.lock $0 <tag>" >&2
-  exit 4
-fi
+#
+# Skipped when this run is the second half of itself: the re-exec below
+# keeps file descriptor 9 open across it, so the lock is still held.
+# Taking it again on a fresh descriptor would be this process refusing
+# its own deploy.
+if [ "${BAKERY_DEPLOY_HOLDS_LOCK:-}" != 1 ]; then
+  if ! : >>"$LOCK" 2>/dev/null; then
+    echo "قفل «$LOCK» باز نشد. مسیر دیگری بدهید:" >&2
+    echo "  sudo LOCK=/var/lock/bakery.lock $0 <tag>" >&2
+    exit 4
+  fi
 
-exec 9>>"$LOCK"
-if ! flock -n 9; then
-  echo "یک استقرار در جریان است." >&2
-  exit 3
+  exec 9>>"$LOCK"
+  if ! flock -n 9; then
+    echo "یک استقرار در جریان است." >&2
+    exit 3
+  fi
+
+  export BAKERY_DEPLOY_HOLDS_LOCK=1
 fi
 
 say() { echo; echo "=== $* ==="; }
@@ -80,6 +89,10 @@ restore() {
   fi
 }
 trap restore EXIT INT TERM
+
+# Read before the pull, compared after it. See the re-exec below.
+SELF=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+WAS_SCRIPT=$(cat "$SELF" 2>/dev/null | cksum)
 
 say "۱/۷  کد"
 cd "$APP" || fail "پوشهٔ برنامه پیدا نشد: $APP"
@@ -117,6 +130,25 @@ else
 fi
 
 git log --oneline -1
+
+# The pull may have just replaced this file, and bash is running the copy
+# it read at the start — so a deploy that adds a step runs everything
+# except that step, and says nothing. It cost a step the day the nginx
+# one landed: the code was current, the shop was served by it, and the
+# certificate's renewal path was not installed because the old script
+# knew nothing about installing it. Nobody would have noticed until the
+# certificate lapsed.
+#
+# So: start again as the new script, once. The environment carries the
+# lock (descriptor 9 survives exec) and a flag, so the second half takes
+# neither the lock nor this branch again.
+if [ "${BAKERY_DEPLOY_RESTARTED:-}" != 1 ] \
+   && [ "$(cat "$SELF" 2>/dev/null | cksum)" != "$WAS_SCRIPT" ]; then
+  echo
+  echo "    خودِ اسکریپت استقرار عوض شد — با نسخهٔ تازه ادامه می‌دهد."
+  export BAKERY_DEPLOY_RESTARTED=1
+  exec bash "$SELF" "$REF"
+fi
 
 say "۲/۷  وابستگی‌ها"
 cd "$BACK" || fail "پوشهٔ بک‌اند پیدا نشد: $BACK"
