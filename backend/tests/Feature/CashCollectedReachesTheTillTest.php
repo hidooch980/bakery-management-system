@@ -136,16 +136,20 @@ class CashCollectedReachesTheTillTest extends TestCase
         $this->assertEquals(1_000_000, $this->till->fresh()->balance);
     }
 
-    public function test_only_what_cleared_an_invoice_is_banked(): void
+    public function test_the_part_that_cleared_no_invoice_is_banked_too(): void
     {
         $this->debt(1_000_000);
         $this->debt(1_000_000);
 
-        // Enough for one invoice and part of the next: the part that
-        // settles nothing is not money the shop can say it has.
+        // This used to assert the opposite, on the reasoning that money
+        // settling no invoice «is not money the shop can say it has». That
+        // was backwards: the notes were in the seller's hand either way,
+        // and refusing to record them is precisely how the shop ends up
+        // unable to say it has them. What no invoice swallowed is banked
+        // and held against the buyer — see MoneyABuyerPaidIsNeverDroppedTest.
         $this->collect(1_500_000, 'cash')->assertOk();
 
-        $this->assertEquals(1_000_000, $this->till->fresh()->balance);
+        $this->assertEquals(1_500_000, $this->till->fresh()->balance);
     }
 
     public function test_the_till_says_where_the_money_came_from(): void

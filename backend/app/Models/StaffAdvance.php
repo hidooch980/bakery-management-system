@@ -115,7 +115,15 @@ class StaffAdvance extends Model
 
     public function bankPostingAccountId(): ?int
     {
-        return $this->bank_account_id;
+        // «از صندوق» یک جواب است، نه جوابِ نداده.
+        //
+        // فرم پنل خودش می‌نویسد «خالی بگذارید اگر از صندوق پرداخت شده» و
+        // همین خالی، تا امروز یعنی هیچ حسابی سبک نشود: اسکناس از کشو
+        // بیرون می‌رفت و دفتر همچنان آن را در کشو می‌دید.
+        //
+        // همین ایراد برای فیش حقوقی پیدا و بسته شده بود و به مساعده
+        // نرسیده بود — دو مدل خواهر با یک سؤال و دو جواب.
+        return $this->bank_account_id ?? BankAccount::cashBox()?->id;
     }
 
     public function bankPostingAmount(): float
