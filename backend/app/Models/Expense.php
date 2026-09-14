@@ -3,14 +3,18 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\HasATwin;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Models\Concerns\RecordsAudit;
+use App\Support\AppCalendar;
 use App\Support\Jalali;
+use App\Support\Money;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Expense extends Model
 {
-    use BelongsToBakery, PostsToBankAccount, RecordsAudit;
+    use BelongsToBakery, HasATwin, PostsToBankAccount, RecordsAudit;
 
     /**
      * Order matters: this is the order the picker offers them in, so the
@@ -69,6 +73,27 @@ class Expense extends Model
         'bank_account_id',
         'note',
     ];
+
+    /**
+     * What makes two expenses the same payment: the same category, on the
+     * same day. The amount is compared by the trait.
+     *
+     * Not the title: «گازوئیل» and «گازوییل» are the same payment typed
+     * twice, and matching on the words would let the second through.
+     */
+    protected function twinScope(Builder $query): void
+    {
+        $query->where('category', $this->category)
+            ->whereDate('spent_on', $this->spent_on);
+    }
+
+    /** One line naming this expense, for a message about it. */
+    public function describe(): string
+    {
+        return '#'.$this->id.' — '.$this->title
+            .'، '.AppCalendar::date($this->spent_on)
+            .'، '.Money::format((float) $this->amount);
+    }
 
     protected function casts(): array
     {

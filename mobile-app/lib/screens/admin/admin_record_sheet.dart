@@ -226,12 +226,7 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
       final note = _note.text.trim();
 
       final queued = switch (widget.kind) {
-        AdminRecordKind.expense => await widget.api.recordExpense(
-            category: _category!,
-            title: _title.text.trim(),
-            amount: value,
-            note: note,
-          ),
+        AdminRecordKind.expense => await _expense(value, note, force: false),
         AdminRecordKind.income => await widget.api.recordIncome(
             category: _category!,
             title: _title.text.trim(),
@@ -254,6 +249,27 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
           ),
       };
 
+      if (queued == null) {
+        // Already filed today, same category, same money — and the server
+        // named it. Two payments for one thing in a day do happen, so it
+        // is asked rather than assumed; the default is «نه».
+        if (!mounted) return;
+        if (!await _askIfReallyTwice()) return;
+
+        final again = await _expense(value, note, force: true);
+        if (!mounted || again == null) return;
+
+        Navigator.pop(context, true);
+        showMessage(
+          context,
+          again
+              ? 'اینترنت وصل نیست؛ ثبت ذخیره شد و با اتصال بعدی ارسال می‌شود.'
+              : '${widget.kind.label} ثبت شد.',
+        );
+
+        return;
+      }
+
       if (!mounted) return;
       Navigator.pop(context, true);
       showMessage(
@@ -268,6 +284,50 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Null when the server answered 409 — «همین هزینه امروز ثبت شده».
+  Future<bool?> _expense(double value, String note, {required bool force}) async {
+    try {
+      return await widget.api.recordExpense(
+        category: _category!,
+        title: _title.text.trim(),
+        amount: value,
+        note: note,
+        force: force,
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode == 409) {
+        _duplicateMessage = e.message;
+
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  String _duplicateMessage = '';
+
+  Future<bool> _askIfReallyTwice() async {
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('این هزینه قبلاً ثبت شده'),
+        content: Text(_duplicateMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('نه، همان است'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('بله، واقعاً دو بار'),
+          ),
+        ],
+      ),
+    );
+
+    return answer ?? false;
   }
 
   String get _amountLabel => switch (widget.kind) {

@@ -42,6 +42,11 @@ class ExpenseController extends Controller
             // shop's own account is assumed, because that is where the card
             // takings sit and where the shop pays from.
             'paid_in_cash' => ['nullable', 'boolean'],
+            // «بله، واقعاً دو بار پرداختیم.» The same cost paid twice in a
+            // day happens; the same receipt typed twice is commoner. The
+            // first attempt is refused with the twin named, and this is
+            // how the second says it was read.
+            'force' => ['nullable', 'boolean'],
         ]);
 
         $expense = Expense::create([
@@ -62,6 +67,20 @@ class ExpenseController extends Controller
             // depending on where it was typed.
             'bank_account_id' => $this->accountFor($data),
         ]);
+
+        if (! ($data['force'] ?? false) && $twin = $expense->twin()) {
+            // Deleted rather than rolled back: one row, written outside a
+            // transaction, and PostsToBankAccount takes its money back
+            // with it on delete.
+            $expense->delete();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'همین هزینه امروز یک بار ثبت شده: '.$twin->describe()
+                    .'. اگر واقعاً دو بار پرداخت شده، دوباره با تأیید ثبت کنید.',
+                'data' => ['duplicate_of' => $twin->id],
+            ], 409);
+        }
 
         return $this->success($this->payload($expense), 'هزینه ثبت شد.', 201);
     }
