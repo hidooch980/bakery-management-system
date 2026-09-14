@@ -308,8 +308,21 @@ class SellerSettlement
             // leaving the remainder as credit. One that named neither is
             // the whole account, which is what older copies of the app send.
             $owed = self::outstandingFor($request->user)['total'];
+
+            // A request that names neither sales nor an amount would fall
+            // through to «the whole account» below and close every open
+            // sale for whatever happens to be on `paid_cash` — which can
+            // be nothing. The endpoint refuses to write such a row, so
+            // this only guards rows made some other way, but the cost of
+            // being wrong here is a seller's whole account cleared for
+            // money nobody received.
+            if ($request->sale_ids === null && (float) $request->amount <= 0) {
+                throw new RuntimeException(
+                    'این درخواست تسویه مبلغی ندارد و نمی‌توان حساب را با آن بست.',
+                );
+            }
+
             $partialAmount = $request->sale_ids === null
-                && (float) $request->amount > 0
                 && (float) $request->amount < $owed - 0.01;
 
             if ($partialAmount) {

@@ -96,6 +96,42 @@ class SettlementRequestController extends Controller
 
         $breakdown = $this->breakdownFrom($data);
 
+        // How much of the handover was money, and of what kind.
+        //
+        // Only `cash` and `card` are money that reaches the shop. The other
+        // lines a seller can name — منزل، مدارس، خیرات — clear the debt
+        // without anything changing hands, so they settle the account and
+        // must not be posted to any of it.
+        //
+        // The default below used to be the whole amount as cash whenever
+        // `paid_cash` was absent, which is exactly what the app sends: it
+        // names the split under `payments` and never sends `paid_cash`. So
+        // a handover of ۴۰۰ نقد و ۲۰۰ کارت was stored as ۶۰۰ cash plus ۲۰۰
+        // card, and the drawer and the bank between them recorded ۸۰۰ for
+        // ۶۰۰ handed over — the till reading high by the card share on
+        // every split settlement the shop has ever made.
+        //
+        // With no breakdown at all the whole amount is still cash, which is
+        // what an older copy of the app means by sending neither.
+        $paidCash = isset($data['paid_cash'])
+            ? Money::toToman($data['paid_cash'])
+            : ($breakdown === [] ? $paying : ($breakdown['cash'] ?? 0));
+
+        $paidCard = isset($data['paid_card'])
+            ? Money::toToman($data['paid_card'])
+            : ($breakdown['card'] ?? 0);
+
+        // Never more than the debt being cleared. Anything over that is
+        // money the ledger would gain that the account never lost, and a
+        // seller cannot hand over more than they owe — the check above
+        // already refuses that for the amount itself.
+        if ($paidCash + $paidCard > $paying + 0.01) {
+            return $this->error(
+                'مبلغ نقد و کارت روی هم از مبلغ تسویه بیشتر است.',
+                422,
+            );
+        }
+
         // The figures are captured now rather than read back at
         // confirmation, so a sale recorded in between cannot quietly
         // change what the two of them agreed on.
@@ -106,14 +142,8 @@ class SettlementRequestController extends Controller
             'difference_amount' => $owed['difference'],
             'shortfall_amount' => $owed['shortfall'],
             'note' => $data['note'] ?? null,
-            // Defaults to all of it in cash, which is the common case and
-            // what an older copy of the app sends.
-            'paid_cash' => isset($data['paid_cash'])
-                ? Money::toToman($data['paid_cash'])
-                : ($data['paid_card'] ?? null ? 0 : $paying),
-            'paid_card' => isset($data['paid_card'])
-                ? Money::toToman($data['paid_card'])
-                : ($breakdown['card'] ?? 0),
+            'paid_cash' => $paidCash,
+            'paid_card' => $paidCard,
             'paid_breakdown' => $breakdown ?: null,
             'sale_ids' => $chosen,
         ]);
