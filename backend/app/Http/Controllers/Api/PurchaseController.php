@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Exceptions\DuplicatePurchase;
+use App\Exceptions\DuplicateRecord;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\InventoryItem;
@@ -121,7 +121,7 @@ class PurchaseController extends Controller
     {
         try {
             return $this->record($request);
-        } catch (DuplicatePurchase $e) {
+        } catch (DuplicateRecord $e) {
             // 409, with the earlier invoice named: the phone shows it and
             // asks «باز هم ثبت شود؟», and the same body with force=true
             // is the answer.
@@ -199,7 +199,7 @@ class PurchaseController extends Controller
             // to write and the twin is found by it. Throwing here rolls
             // the whole invoice back — stock, money and all.
             if (! ($data['force'] ?? false) && $twin = $purchase->twin()) {
-                throw new DuplicatePurchase($twin);
+                throw new DuplicateRecord($twin);
             }
 
             return $purchase;

@@ -1062,6 +1062,7 @@ class BakeryApi {
     required String title,
     required double amount,
     String? note,
+    bool force = false,
   }) async {
     final body = await _client.postOrQueue(
       '/expenses',
@@ -1069,6 +1070,10 @@ class BakeryApi {
         'category': category,
         'title': title,
         'amount': amount,
+        // «بله، واقعاً دو بار پرداختیم.» The server refuses a cost already
+        // filed today in the same category for the same money with a 409;
+        // this is the second attempt saying it was read.
+        if (force) 'force': true,
         if (note != null && note.isNotEmpty) 'note': note,
       },
       label: 'هزینه — $title',

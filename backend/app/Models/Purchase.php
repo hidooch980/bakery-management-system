@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\HasATwin;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Models\Concerns\RecordsAudit;
 use App\Support\AppCalendar;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Support\StockLedger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -39,7 +41,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Purchase extends Model
 {
-    use BelongsToBakery, PostsToBankAccount, RecordsAudit;
+    use BelongsToBakery, HasATwin, PostsToBankAccount, RecordsAudit;
 
     protected $fillable = [
         'supplier_id',
@@ -102,29 +104,13 @@ class Purchase extends Model
     // --------------------------------------------------------- the total
 
     /**
-     * An invoice already filed that looks like this one: the same mill,
-     * the same day, the same total.
-     *
-     * «خرید از کارخانه وحدت دوبار ثبت شده» — typed in once at the door and
-     * once from the paper that evening, and nothing in between could tell
-     * the second from a second lorry. The total is compared to the Toman,
-     * because two deliveries that happen to cost exactly the same are
-     * rarer than one typed twice, and the caller can still say «واقعاً
-     * دو تا بود».
+     * What makes two invoices the same delivery: the same mill, the same
+     * day. The amount is compared by the trait.
      */
-    public function twin(): ?self
+    protected function twinScope(Builder $query): void
     {
-        if ((float) $this->amount <= 0) {
-            return null;
-        }
-
-        return static::query()
-            ->whereKeyNot($this->getKey())
-            ->where('supplier_id', $this->supplier_id)
-            ->whereDate('purchased_on', $this->purchased_on)
-            ->whereBetween('amount', [(float) $this->amount - 0.01, (float) $this->amount + 0.01])
-            ->orderBy('id')
-            ->first();
+        $query->where('supplier_id', $this->supplier_id)
+            ->whereDate('purchased_on', $this->purchased_on);
     }
 
     /** One line naming this invoice, for a message about it. */
