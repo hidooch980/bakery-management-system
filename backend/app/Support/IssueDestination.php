@@ -40,6 +40,7 @@ class IssueDestination
         'empty-stock-' => self::WAREHOUSE,
         'quota-over' => self::WAREHOUSE,
         'reader-gap-' => self::WAREHOUSE,
+        'reader-unchecked-' => self::WAREHOUSE,
         'consignment-open-' => self::WAREHOUSE,
         'diesel-tank-empty-' => self::WAREHOUSE,
         'diesel-running-out-' => self::WAREHOUSE,
