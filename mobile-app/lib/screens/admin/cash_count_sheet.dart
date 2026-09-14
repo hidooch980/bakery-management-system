@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../models/cash_count.dart';
 import '../../services/api_client.dart';
@@ -43,6 +44,16 @@ class _CashCountSheetState extends State<CashCountSheet> {
   bool _adjust = false;
   bool _saving = false;
 
+  /// نام همین یک شمارش، زده‌شده وقتی صفحه باز می‌شود و ثابت در هر تلاش
+  /// دوباره.
+  ///
+  /// صفحه برای ثبت **یک** شمارش باز می‌شود، پس یک نام هم بس است. اگر
+  /// جواب سرور گم شود — timeout، که روی موبایل ایران معمول است — دکمه
+  /// دوباره فعال می‌شود و مالک دوباره می‌زند. بدون این نام، سرور آن تلاش
+  /// دوم را یک شمارش تازه می‌بیند و اگر کلید «اصلاح» روشن باشد، دو بار
+  /// اصلاح می‌نویسد.
+  final String _attempt = const Uuid().v4();
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +77,7 @@ class _CashCountSheetState extends State<CashCountSheet> {
 
       final count = await widget.api.recordCashCount(
         countedAmount: value,
+        attemptKey: _attempt,
         adjust: _adjust,
         note: _note.text.trim(),
       );
