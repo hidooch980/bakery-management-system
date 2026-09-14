@@ -141,8 +141,12 @@ class TheStockBalanceIsCountedOnceTest extends TestCase
         // burn rate is grouped by date in SQL, so a busier shop adds rows,
         // not queries. The bound moves with it and still catches the
         // thing it exists to catch, which is forty sums for one sack.
+        // 80 with the unrecorded-purchase check: one aggregate that asks
+        // both of its questions — how much flour was used lately, and when
+        // the last purchase was — in a single grouped row rather than two
+        // reads, precisely so this bound moves by one and not by two.
         $this->assertLessThan(
-            80,
+            83,
             $queries,
             "the answer page took {$queries} queries",
         );

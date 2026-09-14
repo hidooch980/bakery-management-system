@@ -65,16 +65,36 @@ class AnsweringAnIssueTest extends TestCase
     }
 
     /**
+     * آردی که مغازه خریده، تا تنها مشکلِ این تست‌ها منفی بودن موجودی
+     * بماند.
+     *
+     * بدون این، ثبتِ تولیدِ زیر یعنی «نان پخته شده و هیچ خریدی ثبت نشده»
+     * و اسکنر — به‌درستی — یک مشکل دوم هم گزارش می‌کند. اینجا موضوع
+     * پاسخ‌دادن به یک مشکل است، نه اینکه چند تا هست.
+     */
+    private const STOCKED = 1_000;
+
+    /**
      * Flour below zero — an issue with a size, which is what makes it the
      * right one to test answers against. move() will not take a balance
      * under zero, so the movement is written straight in.
+     *
+     * به اندازهٔ خریدِ بالا بیشتر برداشته می‌شود، پس موجودیِ نهایی دقیقاً
+     * همان `-$kg` می‌ماند که این تست‌ها روی آن حساب کرده‌اند.
      */
     private function short(float $kg): void
     {
         InventoryMovement::create([
             'inventory_item_id' => InventoryItem::ofKey(InventoryItem::FLOUR)->id,
+            'direction' => 'in',
+            'quantity' => self::STOCKED,
+            'reason' => 'purchase',
+        ]);
+
+        InventoryMovement::create([
+            'inventory_item_id' => InventoryItem::ofKey(InventoryItem::FLOUR)->id,
             'direction' => 'out',
-            'quantity' => $kg,
+            'quantity' => $kg + self::STOCKED,
             'reason' => 'production',
         ]);
     }
