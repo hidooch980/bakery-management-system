@@ -9,6 +9,7 @@ import '../models/entries.dart';
 import '../models/payroll.dart';
 import '../models/purchase.dart';
 import '../models/staff_adjustment.dart';
+import '../models/stock_count.dart';
 import '../models/today_answer.dart';
 import '../models/flour_sale.dart';
 import '../models/ledger_entry.dart';
@@ -681,6 +682,45 @@ class BakeryApi {
     });
 
     return CashCount.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  // ------------------------------------------------------- شمارش انبار
+
+  /// آنچه دفتر دربارهٔ انبار می‌گوید، به‌علاوهٔ شمارش‌های پیشین.
+  ///
+  /// بدون کش، به همان دلیل شمارش صندوق: موجودیِ به‌یادسپرده یعنی کسی در
+  /// برابر عدد دیروز بشمارد و کسری‌ای پیدا کند که فقط کش است.
+  Future<StockCountBook> stockCounts({String item = 'flour'}) async {
+    final body = await _client.get('/stock-counts', query: {'item': item});
+
+    return StockCountBook.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// ثبت آنچه واقعاً روی قفسه بود.
+  ///
+  /// [counted] به همان واحدی که صفحه نشان می‌دهد — کیسه برای آرد.
+  ///
+  /// [adjust] دفتر را با قفسه یکی می‌کند. پیش‌فرض خاموش و همیشه تصمیم
+  /// مالک: اصلاحِ بی‌صدا دقیقاً همان چیزی را پنهان می‌کند که کسی برای
+  /// پیدا کردنش شمرده. سرور هم این را فقط از مدیر می‌پذیرد.
+  ///
+  /// هیچ‌وقت صف نمی‌شود. شمارش حرفی دربارهٔ یک لحظه است، و شمارشی که فردا
+  /// صبح فرستاده شود با دفتر فردا مقایسه می‌شود — اختلافی که خودِ تأخیر
+  /// ساخته است.
+  Future<StockCount> recordStockCount({
+    required double counted,
+    String item = 'flour',
+    bool adjust = false,
+    String? note,
+  }) async {
+    final body = await _client.post('/stock-counts', {
+      'item': item,
+      'counted': counted,
+      if (adjust) 'adjust': true,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+
+    return StockCount.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   /// How the shop was staffed over a stretch: working days, who was

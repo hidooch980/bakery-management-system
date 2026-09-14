@@ -10,6 +10,7 @@ import '../shared/purchase_sheet.dart';
 import 'admin_home_screen.dart';
 import 'diesel_section.dart';
 import 'inventory_entries_sheet.dart';
+import 'stock_count_sheet.dart';
 
 typedef _FlourSalesToday = ({
   List<FlourSale> sales,
@@ -114,13 +115,38 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
               // The delivery is written down where the stock is read, so
               // the sacks that just arrived and the balance they change
               // are one screen apart rather than one menu apart.
-              FilledButton.icon(
-                onPressed: () async {
-                  if (await PurchaseSheet.open(context, widget.api)) _reload();
-                },
-                icon: const Icon(Icons.local_shipping_rounded,
-                    size: IconSize.button),
-                label: const Text('ثبت محموله'),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () async {
+                        if (await PurchaseSheet.open(context, widget.api)) {
+                          _reload();
+                        }
+                      },
+                      icon: const Icon(Icons.local_shipping_rounded,
+                          size: IconSize.button),
+                      label: const Text('ثبت محموله'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // کنار «ثبت محموله»، چون همان‌جا که کیسه‌های تازه نوشته
+                  // می‌شوند، همان‌جا هم معلوم می‌شود دفتر با قفسه می‌خواند
+                  // یا نه.
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        if (await showStockCountSheet(context, widget.api) ==
+                            true) {
+                          _reload();
+                        }
+                      },
+                      icon: const Icon(Icons.fact_check_rounded,
+                          size: IconSize.button),
+                      label: const Text('شمارش انبار'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               DieselSection(api: widget.api),

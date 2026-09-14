@@ -107,6 +107,7 @@ GET api/v1/staff-adjustments/period                         admin
 GET api/v1/staff-advances                                   admin
 GET api/v1/staff-advances/mine                              (any signed-in)
 GET api/v1/staff-advances/outstanding                       admin
+GET api/v1/stock-counts                                     admin, seller
 GET api/v1/supplier-payments                                admin
 GET api/v1/suppliers                                        admin, seller
 GET api/v1/suppliers/balances                               admin
@@ -177,6 +178,7 @@ POST api/v1/shares                                          admin
 POST api/v1/shares/{share}/settle                           admin
 POST api/v1/staff-adjustments                               admin
 POST api/v1/staff-advances                                  admin
+POST api/v1/stock-counts                                    admin, seller
 POST api/v1/supplier-payments                               admin
 POST api/v1/suppliers                                       admin
 POST api/v1/users                                           admin
