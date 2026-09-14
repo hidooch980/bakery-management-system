@@ -27,6 +27,7 @@ GET api/v1/backups                                          admin
 GET api/v1/bakery                                           (any signed-in)
 GET api/v1/bank-accounts                                    admin
 GET api/v1/bank-accounts/{account}/transactions             admin
+GET api/v1/cash-counts                                      admin
 GET api/v1/chane-board                                      admin, chane_gir, seller, shater
 GET api/v1/chane-entries/my-history                         admin, chane_gir, seller
 GET api/v1/chane-entries/pending                            admin, seller
@@ -141,6 +142,7 @@ POST api/v1/backups                                         admin
 POST api/v1/bank-accounts                                   admin
 POST api/v1/bank-accounts/transfer                          admin
 POST api/v1/bank-accounts/{account}/transactions            admin
+POST api/v1/cash-counts                                     admin
 POST api/v1/chane-entries                                   admin, chane_gir, seller
 POST api/v1/change-password                                 admin, chane_gir, dough_maker, seller, shater
 POST api/v1/consignment-flour                               admin, seller

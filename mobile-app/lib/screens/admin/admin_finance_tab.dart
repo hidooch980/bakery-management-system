@@ -10,6 +10,7 @@ import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import 'balance_sheet_section.dart';
 import 'bank_balances_section.dart';
+import 'cash_count_sheet.dart';
 import 'consumption_report_section.dart';
 import 'customer_debts_section.dart';
 import 'follow_ups_section.dart';
@@ -321,6 +322,25 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
               // still owed — the money that is really in hand.
               const SizedBox(height: 22),
               BankBalancesSection(api: widget.api),
+
+              // And whether that figure is true. The ledger cannot find
+              // its own errors: change given from the drawer, a sale typed
+              // at the wrong price, a handover half remembered — each
+              // leaves both sides agreeing about something that is not
+              // what is in the till. Only counting finds those, and only
+              // counting soon enough that somebody still remembers the day.
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final counted = await showCashCountSheet(context, widget.api);
+
+                  // The count may have corrected the books, so the
+                  // balances above are stale the moment it returns.
+                  if (counted == true && mounted) setState(() {});
+                },
+                icon: const Icon(Icons.calculate_rounded),
+                label: const Text('شمارش صندوق'),
+              ),
 
               // What each seller sold, before what any of them owes. The
               // debts list drops anybody at zero, so on its own it said

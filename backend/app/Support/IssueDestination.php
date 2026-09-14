@@ -49,6 +49,7 @@ class IssueDestination
         'seller-account-stale-' => self::FINANCE,
         'seller-account-' => self::FINANCE,
         'unsettled-shortfalls' => self::FINANCE,
+        'drawer-not-counted' => self::FINANCE,
         'trading-at-a-loss-' => self::FINANCE,
         'loan-due-' => self::FINANCE,
         'monthly-' => self::FINANCE,

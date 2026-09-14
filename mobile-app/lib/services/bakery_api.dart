@@ -1,6 +1,7 @@
 import '../models/bakery.dart';
 import '../models/balance_sheet.dart';
 import '../models/bank_account.dart';
+import '../models/cash_count.dart';
 import '../models/financial_series.dart';
 import '../models/chane_board.dart';
 import '../models/customer.dart';
@@ -663,6 +664,40 @@ class BakeryApi {
     final body = await _client.getCached('/bank-accounts');
 
     return BankBalances.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// What the books say is in the drawer, and every count made against it.
+  ///
+  /// Not cached: the figure somebody is about to count against has to be
+  /// the live one. A remembered balance would have them counting against
+  /// yesterday and finding a gap that is only the cache.
+  Future<CashCountBook> cashCounts() async {
+    final body = await _client.get('/cash-counts');
+
+    return CashCountBook.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// Records what was actually in the drawer.
+  ///
+  /// [adjust] brings the books into line with the count. Off by default
+  /// and always the owner's decision: correcting quietly would hide the
+  /// very thing somebody counted to find.
+  ///
+  /// Never queued. A count is a statement about a moment, and one sent
+  /// tomorrow morning would be compared against tomorrow's ledger — a
+  /// gap invented by the delay.
+  Future<CashCount> recordCashCount({
+    required double countedAmount,
+    bool adjust = false,
+    String? note,
+  }) async {
+    final body = await _client.post('/cash-counts', {
+      'counted_amount': countedAmount,
+      if (adjust) 'adjust': true,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+
+    return CashCount.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   /// How the shop was staffed over a stretch: working days, who was
