@@ -83,6 +83,7 @@ class IssueScanner
             ...$this->certificateRunningOut(),
             ...$this->purchasesFiledTwice(),
             ...$this->drawerNotCounted(),
+            ...$this->debtsGoingStale(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -1624,5 +1625,80 @@ class IssueScanner
             urlLabel: 'شمارش صندوق',
             magnitude: $held,
         )];
+    }
+
+    /**
+     * How long an unpaid credit sale may sit before the morning page says
+     * so, and how long before it says so loudly.
+     *
+     * The debts screen already calls thirty days overdue, and thirty days
+     * is ordinary here: the schools settle on their own month. Sixty is
+     * late, and by four months a debt is usually not going to be paid
+     * without somebody going and asking.
+     */
+    public const DEBT_STALE_DAYS = 60;
+
+    public const DEBT_LOST_DAYS = 120;
+
+    /**
+     * A school or office whose oldest unpaid bread has been waiting.
+     *
+     * Everything else somebody is owed is watched from this page — the
+     * cash a seller is holding, a partner's flour, a loan instalment
+     * coming due. Money owed by the buyers was not, and it is the one
+     * that goes quiet on its own: a debt list is a screen somebody has to
+     * decide to open, and nobody opens it to look for bad news.
+     *
+     * One line per customer, because chasing a debt is a conversation
+     * with one school about one number rather than about nine receipts.
+     */
+    private function debtsGoingStale(): array
+    {
+        $sales = Sale::query()
+            ->outstanding()
+            ->whereNotNull('customer_id')
+            ->with('customer:id,name,phone')
+            ->get()
+            ->groupBy('customer_id');
+
+        $issues = [];
+
+        foreach ($sales as $customerId => $lines) {
+            $oldest = $lines->min('created_at');
+            $days = (int) $oldest->startOfDay()->diffInDays(now()->startOfDay());
+
+            if ($days < self::DEBT_STALE_DAYS) {
+                continue;
+            }
+
+            $amount = round((float) $lines->sum('amount'), 2);
+            $customer = $lines->first()->customer;
+            $name = $customer?->name ?? 'مشتری';
+            $lost = $days >= self::DEBT_LOST_DAYS;
+
+            $issues[] = new SystemIssue(
+                key: "customer-debt-stale-{$customerId}",
+                severity: $lost ? SystemIssue::WARNING : SystemIssue::INFO,
+                title: $name.' '.$days.' روز است تسویه نکرده',
+                detail: Money::format($amount).' در '.$lines->count()
+                    .' فاکتور، قدیمی‌ترینش '.AppCalendar::date($oldest).'.',
+                cause: $lost
+                    ? 'نسیه‌ای که چهار ماه بماند معمولاً بدون رفتن و خواستن'
+                        .' وصول نمی‌شود — و هرچه بیشتر بماند، سخت‌تر.'
+                    : 'نسیه‌ای که از ماه خودش گذشته باشد، خودش وصول نمی‌شود.',
+                suggestion: 'با '.$name.' تماس بگیرید'
+                    .($customer?->phone ? ' — '.$customer->phone : ' (شمارهٔ تماسش در سیستم نیست)')
+                    .'. وقتی پرداخت شد، در «مشتریان» تسویه‌اش کنید تا از'
+                    .' این فهرست برود.',
+                // The debts table lives on the customers page — there is
+                // no page of its own, and a link to one that does not
+                // exist is the silent kind of broken.
+                url: '/admin/customers',
+                urlLabel: 'مشتریان و طلب‌ها',
+                magnitude: $amount,
+            );
+        }
+
+        return $issues;
     }
 }
