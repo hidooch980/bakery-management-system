@@ -28,6 +28,23 @@ class InventoryMovementResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    /**
+     * از منو برداشته شد، نه حذف.
+     *
+     * مالک گفت صفحه را پر کرده و راست می‌گوید: کسی که نان می‌فروشد روزش
+     * را با فهرست تراکنش‌های انبار شروع نمی‌کند. «موجودی انبار» جواب
+     * روزمره را می‌دهد و این یکی جواب «چرا».
+     *
+     * ولی حذفش نکردم، چون همین ردیف‌ها بودند که ۱۴۰۵/۰۶/۲۳ نشان دادند
+     * دفتر آرد ۸ کیسه کم دارد و پیش از آن ۲۳۶ کیسه اصلاح دستی خورده —
+     * چیزی که از هیچ صفحهٔ دیگری پیدا نمی‌شد. صفحه سر جایش است و از
+     * «موجودی انبار» می‌شود به آن رسید؛ فقط دیگر جا نمی‌گیرد.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([
