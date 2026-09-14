@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\DuplicateRecord;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\Income;
@@ -10,6 +11,7 @@ use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class IncomeController extends Controller
 {
@@ -67,6 +69,8 @@ class IncomeController extends Controller
         // flagged should not lose the income over a missing tick.
         $byCard = (bool) ($data['by_card'] ?? false);
         unset($data['by_card']);
+        $force = $data['force'] ?? false;
+        unset($data['force']);
 
         // Nothing rather than the drawer when the shop has no card
         // account: card money sitting in the till is a figure that looks
@@ -80,7 +84,29 @@ class IncomeController extends Controller
                 ?? BankAccount::defaultAccount()?->id;
         }
 
-        $income = Income::create($data + ['user_id' => $request->user()->id]);
+        try {
+            $income = DB::transaction(function () use ($data, $request, $force) {
+                $income = Income::create($data + ['user_id' => $request->user()->id]);
+
+                // Written and checked together: a row that committed first
+                // and removed itself afterwards would leave a created-and-
+                // deleted pair in the audit trail for money never taken,
+                // and two identical submissions arriving at once would
+                // refuse each other and keep neither.
+                if (! $force && $twin = $income->twin()) {
+                    throw new DuplicateRecord($twin);
+                }
+
+                return $income;
+            });
+        } catch (DuplicateRecord $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'همین درآمد امروز یک بار ثبت شده: '.$e->twin->describe()
+                    .'. اگر واقعاً دو بار دریافت شده، دوباره با تأیید ثبت کنید.',
+                'data' => ['duplicate_of' => $e->twin->getKey()],
+            ], 409);
+        }
 
         return $this->success($this->present($income), 'درآمد ثبت شد.', 201);
     }
@@ -88,7 +114,7 @@ class IncomeController extends Controller
     public function update(Request $request, Income $income): JsonResponse
     {
         $data = $this->validated($request);
-        unset($data['by_card']);
+        unset($data['by_card'], $data['force']);
 
         $income->update($data);
 
@@ -123,6 +149,9 @@ class IncomeController extends Controller
             // money came through the reader, not which row in a table it
             // belongs to.
             'by_card' => ['sometimes', 'boolean'],
+            // «بله، واقعاً دو بار گرفتیم.» How the second attempt says the
+            // named twin was read and this really is separate money.
+            'force' => ['sometimes', 'boolean'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 

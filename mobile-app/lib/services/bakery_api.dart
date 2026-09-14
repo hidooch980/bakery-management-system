@@ -1093,6 +1093,7 @@ class BakeryApi {
     required double amount,
     String? note,
     bool byCard = false,
+    bool force = false,
   }) async {
     final body = await _client.postOrQueue(
       '/incomes',
@@ -1101,6 +1102,10 @@ class BakeryApi {
         'title': title,
         'amount': amount,
         if (byCard) 'by_card': true,
+        // «بله، واقعاً دو بار گرفتیم.» The server refuses money already
+        // recorded today of the same kind for the same amount with a 409;
+        // this is the second attempt saying it was read.
+        if (force) 'force': true,
         if (note != null && note.isNotEmpty) 'note': note,
       },
       label: 'درآمد — $title',
