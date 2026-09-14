@@ -4,6 +4,7 @@ import '../../models/bank_account.dart';
 import '../../models/payroll.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../utils/one_write.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
@@ -38,6 +39,10 @@ typedef _Payroll = ({
 });
 
 class _PayrollSectionState extends State<PayrollSection> {
+  /// نام‌های نوشتن‌هایی که هنوز نگرفته‌اند، تا تلاش دوباره همان را
+  /// ببرد و یک جوابِ گم‌شده به دو فیش تبدیل نشود.
+  final _writes = OneWrite();
+
   late Future<_Payroll> _data;
 
   @override
@@ -98,6 +103,11 @@ class _PayrollSectionState extends State<PayrollSection> {
 
     if (result == null) return;
 
+    // قصد، خودِ فیش است: همان کارگر، همان ماه، همان عددها. اگر مالک
+    // بعداً عدد دیگری بزند، کار دیگری است و نام دیگری می‌گیرد.
+    final intent = 'salary-${person.id}-$_thisPeriod'
+        '-${result.base}-${result.bonus}-${result.deduction}';
+
     try {
       await widget.api.recordSalary(
         userId: person.id,
@@ -105,6 +115,7 @@ class _PayrollSectionState extends State<PayrollSection> {
         baseAmount: result.base,
         bonus: result.bonus,
         deduction: result.deduction,
+        attemptKey: _writes.nameFor(intent),
         // Recorded as handed over, because that is what pressing «پرداخت
         // شد» means. A slip prepared before payday is a different action
         // and does not exist yet.
@@ -112,6 +123,8 @@ class _PayrollSectionState extends State<PayrollSection> {
         bankAccountId: result.accountId,
         note: result.note,
       );
+
+      _writes.done(intent);
 
       if (!mounted) return;
       showMessage(context, 'حقوق ${person.displayName} ثبت شد.');

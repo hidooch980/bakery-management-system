@@ -257,6 +257,10 @@ class BakeryApi {
   /// [basis] is 'amount', 'days' or 'note'. A reason is required by the
   /// server and refused if missing: a deduction nobody can explain a month
   /// later is one the person it was taken from will dispute.
+  ///
+  /// [attemptKey] نام همین یک نوشتن، ثابت در هر تلاش دوباره. یک timeout
+  /// یعنی درخواست احتمالاً اجرا شده و فقط جوابش گم شده؛ بدون نام، تلاش
+  /// دوم یک نوشتن تازه دیده می‌شود و پول دو بار جابه‌جا می‌شود.
   Future<StaffAdjustment> recordAdjustment({
     required int userId,
     required String kind,
@@ -265,6 +269,7 @@ class BakeryApi {
     double? amount,
     double? days,
     String? occurredOn,
+    String? attemptKey,
   }) async {
     final body = await _client.post('/staff-adjustments', {
       'user_id': userId,
@@ -274,7 +279,7 @@ class BakeryApi {
       if (amount != null) 'amount': amount,
       if (days != null) 'days': days,
       if (occurredOn != null) 'occurred_on': occurredOn,
-    });
+    }, attemptKey);
 
     return StaffAdjustment.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -320,6 +325,10 @@ class BakeryApi {
   /// [paidOn] set means the money has actually been handed over. Left null
   /// the slip is written and owed, which is the honest state for a payroll
   /// prepared before payday.
+  ///
+  /// [attemptKey] نام همین یک نوشتن، ثابت در هر تلاش دوباره. یک timeout
+  /// یعنی درخواست احتمالاً اجرا شده و فقط جوابش گم شده؛ بدون نام، تلاش
+  /// دوم یک نوشتن تازه دیده می‌شود و پول دو بار جابه‌جا می‌شود.
   Future<Payslip> recordSalary({
     required int userId,
     required String periodStart,
@@ -329,6 +338,7 @@ class BakeryApi {
     String? paidOn,
     int? bankAccountId,
     String? note,
+    String? attemptKey,
   }) async {
     final body = await _client.post('/salaries', {
       'user_id': userId,
@@ -342,7 +352,7 @@ class BakeryApi {
       // account, so the wage is paid and the balance never falls.
       'bank_account_id': bankAccountId,
       if (note != null && note.isNotEmpty) 'note': note,
-    });
+    }, attemptKey);
 
     return Payslip.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -929,8 +939,9 @@ class BakeryApi {
     return body['queued'] == true;
   }
 
-  Future<void> settleCustomerDebt(int customerId) =>
-      _client.post('/customer-debts/$customerId/settle', const {});
+  /// [attemptKey] نام همین یک وصول، ثابت در هر تلاش دوباره.
+  Future<void> settleCustomerDebt(int customerId, {String? attemptKey}) =>
+      _client.post('/customer-debts/$customerId/settle', const {}, attemptKey);
 
   Future<({List<Sale> sales, int count, double total})> todaySales() async {
     final body = await _client.getCached('/sales/today');
@@ -1734,6 +1745,10 @@ class BakeryApi {
   }
 
   /// Money paid to a mill on account, after the delivery.
+  ///
+  /// [attemptKey] نام همین یک پرداخت، ثابت در هر تلاش دوباره. یک timeout
+  /// یعنی پرداخت احتمالاً ثبت شده و فقط جوابش گم شده؛ بدون نام، تلاش دوم
+  /// پرداخت دومی به کارخانه است و از حساب دو بار کم می‌شود.
   Future<void> paySupplier({
     required int supplierId,
     required double amount,
@@ -1741,6 +1756,7 @@ class BakeryApi {
     int? bankAccountId,
     bool paidInCash = false,
     String? note,
+    String? attemptKey,
   }) =>
       _client.post('/supplier-payments', {
         'supplier_id': supplierId,
@@ -1749,7 +1765,7 @@ class BakeryApi {
         if (bankAccountId != null) 'bank_account_id': bankAccountId,
         if (paidInCash) 'paid_in_cash': true,
         if (note != null && note.isNotEmpty) 'note': note,
-      });
+      }, attemptKey);
 
   List<Map<String, dynamic>> _paginated(Map<String, dynamic> body) {
     final data = body['data'];

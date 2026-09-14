@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../utils/one_write.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import '../../theme/app_theme.dart';
@@ -27,6 +28,10 @@ class CustomerDebtsSection extends StatefulWidget {
 }
 
 class _CustomerDebtsSectionState extends State<CustomerDebtsSection> {
+  /// نام‌های نوشتن‌هایی که هنوز نگرفته‌اند، تا تلاش دوباره همان را
+  /// ببرد و یک جوابِ گم‌شده به دو ردیف تبدیل نشود.
+  final _writes = OneWrite();
+
   late Future<_Debts> _debts;
 
   @override
@@ -62,7 +67,16 @@ class _CustomerDebtsSectionState extends State<CustomerDebtsSection> {
     if (ok != true) return;
 
     try {
-      await widget.api.settleCustomerDebt(customer['customer_id'] as int);
+      final id = customer['customer_id'] as int;
+      final intent = 'customer-debt-$id';
+
+      await widget.api.settleCustomerDebt(
+        id,
+        attemptKey: _writes.nameFor(intent),
+      );
+
+      _writes.done(intent);
+
       if (!mounted) return;
       showMessage(context, 'بدهی تسویه شد.');
       _reload();
