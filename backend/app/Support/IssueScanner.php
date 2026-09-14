@@ -83,10 +83,7 @@ class IssueScanner
             ...$this->certificateRunningOut(),
             ...$this->purchasesFiledTwice(),
             ...$this->drawerNotCounted(),
-<<<<<<< HEAD
             ...$this->debtsGoingStale(),
-=======
->>>>>>> origin/main
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -1629,7 +1626,6 @@ class IssueScanner
             magnitude: $held,
         )];
     }
-<<<<<<< HEAD
 
     /**
      * How long an unpaid credit sale may sit before the morning page says
@@ -1705,6 +1701,4 @@ class IssueScanner
 
         return $issues;
     }
-=======
->>>>>>> origin/main
 }
