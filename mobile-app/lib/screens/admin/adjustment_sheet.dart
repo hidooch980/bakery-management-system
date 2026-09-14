@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../models/payroll.dart';
 import '../../services/api_client.dart';
@@ -30,6 +31,14 @@ class AdjustmentSheet extends StatefulWidget {
 enum _Basis { amount, days, note }
 
 class _AdjustmentSheetState extends State<AdjustmentSheet> {
+  /// نام همین یک ثبت، زده‌شده وقتی صفحه باز می‌شود و ثابت در هر تلاش
+  /// دوباره.
+  ///
+  /// صفحه برای نوشتن **یک** تشویقی یا تنبیهی باز می‌شود. اگر جواب سرور گم
+  /// شود، دکمه دوباره فعال می‌شود و مالک دوباره می‌زند — بدون این نام،
+  /// کارگر دو بار جریمه می‌شود.
+  final String _attempt = const Uuid().v4();
+
   final _amount = TextEditingController();
   final _reason = TextEditingController();
 
@@ -91,6 +100,7 @@ class _AdjustmentSheetState extends State<AdjustmentSheet> {
         amount: _basis == _Basis.amount ? _worth : null,
         days: _basis == _Basis.days ? _days : null,
         occurredOn: JalaliFormat.date(DateTime.now()),
+        attemptKey: _attempt,
       );
 
       if (!mounted) return;

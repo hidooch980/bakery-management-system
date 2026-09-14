@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/purchase.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../utils/one_write.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
@@ -28,6 +29,10 @@ class SupplierDebtsSection extends StatefulWidget {
 }
 
 class _SupplierDebtsSectionState extends State<SupplierDebtsSection> {
+  /// نام‌های نوشتن‌هایی که هنوز نگرفته‌اند، تا تلاش دوباره همان را
+  /// ببرد و یک جوابِ گم‌شده به دو ردیف تبدیل نشود.
+  final _writes = OneWrite();
+
   late Future<_Debts> _debts;
 
   @override
@@ -83,7 +88,17 @@ class _SupplierDebtsSectionState extends State<SupplierDebtsSection> {
     if (amount == null) return;
 
     try {
-      await widget.api.paySupplier(supplierId: supplier.id, amount: amount);
+      // قصد، مبلغ را هم در خود دارد: پرداخت شکست‌خوردهٔ ۱ میلیون و
+      // پرداخت بعدیِ ۲ میلیون دو کار جدا هستند و نباید یک نام ببرند.
+      final intent = 'supplier-${supplier.id}-$amount';
+
+      await widget.api.paySupplier(
+        supplierId: supplier.id,
+        amount: amount,
+        attemptKey: _writes.nameFor(intent),
+      );
+
+      _writes.done(intent);
       if (!mounted) return;
       showMessage(context, 'پرداخت ثبت شد.');
       _reload();
