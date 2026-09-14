@@ -670,16 +670,27 @@ class BakeryApi {
   /// Never queued. A count is a statement about a moment, and one sent
   /// tomorrow morning would be compared against tomorrow's ledger — a
   /// gap invented by the delay.
+  ///
+  /// [attemptKey] نام همین یک نوشتن است و باید در هر تلاش دوباره **همان**
+  /// بماند. دو شکستِ ممکن — timeout فرستادن و timeout گرفتن — یعنی
+  /// درخواست به سرور رسیده و به احتمال زیاد اجرا هم شده و فقط جوابش گم
+  /// شده. بدون نام، سرور آن تکرار را از یک شمارش تازه تشخیص نمی‌دهد و هر
+  /// دو را ثبت می‌کند — و اگر کلید «اصلاح» روشن باشد، دو بار هم پول
+  /// جابه‌جا می‌کند.
+  ///
+  /// همین استدلال در [ApiClient.postOrQueue] نوشته شده بود و به این مسیر
+  /// که صف نمی‌شود نرسیده بود.
   Future<CashCount> recordCashCount({
     required double countedAmount,
     bool adjust = false,
     String? note,
+    String? attemptKey,
   }) async {
     final body = await _client.post('/cash-counts', {
       'counted_amount': countedAmount,
       if (adjust) 'adjust': true,
       if (note != null && note.isNotEmpty) 'note': note,
-    });
+    }, attemptKey);
 
     return CashCount.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -707,18 +718,22 @@ class BakeryApi {
   /// هیچ‌وقت صف نمی‌شود. شمارش حرفی دربارهٔ یک لحظه است، و شمارشی که فردا
   /// صبح فرستاده شود با دفتر فردا مقایسه می‌شود — اختلافی که خودِ تأخیر
   /// ساخته است.
+  ///
+  /// [attemptKey] مثل شمارش صندوق: نام همین یک نوشتن، ثابت در هر تلاش
+  /// دوباره، تا جوابِ گم‌شده به دو شمارش و دو اصلاح تبدیل نشود.
   Future<StockCount> recordStockCount({
     required double counted,
     String item = 'flour',
     bool adjust = false,
     String? note,
+    String? attemptKey,
   }) async {
     final body = await _client.post('/stock-counts', {
       'item': item,
       'counted': counted,
       if (adjust) 'adjust': true,
       if (note != null && note.isNotEmpty) 'note': note,
-    });
+    }, attemptKey);
 
     return StockCount.fromJson(body['data'] as Map<String, dynamic>);
   }
