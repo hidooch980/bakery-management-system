@@ -165,8 +165,15 @@ class ExpenseController extends Controller
             return (int) $data['bank_account_id'];
         }
 
+        // «از صندوق» یک جواب است، نه جوابِ نداده.
+        //
+        // تا امروز یعنی هیچ حساب: دیزل و کرایه و باربری که نقد پرداخت
+        // می‌شد از کشو بیرون می‌رفت و دفتر همچنان آن را در کشو می‌دید.
+        // همان اشتباهی که برای فیش حقوقی پیدا شد، بعد مساعده، بعد پرداخت
+        // به کارخانه — و اینجا از همه پرتکرارتر، چون هزینهٔ روزمرهٔ مغازه
+        // همین‌هاست.
         if (filter_var($data['paid_in_cash'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-            return null;
+            return BankAccount::cashBox()?->id;
         }
 
         return BankAccount::defaultAccount()?->id;

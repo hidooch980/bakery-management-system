@@ -133,9 +133,16 @@ class SupplierPaymentController extends Controller
     }
 
     /**
-     * The same rule as an expense and a purchase: the shop's own account
-     * is the assumption, naming one overrides it, saying it was cash
-     * clears it.
+     * حساب پیش‌فرض مغازه، مگر حسابی نام برده شود یا گفته شود نقدی بود.
+     *
+     * «نقدی» قبلاً یعنی هیچ حساب — یعنی پول کارخانه از کشو بیرون برود و
+     * دفتر همچنان آن را در کشو ببیند. این سومین جایی است که همین اشتباه
+     * پیدا شد، بعد از فیش حقوقی و مساعده: «نقدی» یک جواب است، نه
+     * جوابِ نداده، و جوابش صندوق است.
+     *
+     * بدون صندوق همچنان هیچ — مغازه‌ای که کشو تعریف نکرده، حسابی ندارد
+     * که این پول را به آن ببندیم، و صفحهٔ «مشکلات» همان مغازه را نام
+     * می‌برد.
      *
      * @param  array<string, mixed>  $data
      */
@@ -146,7 +153,7 @@ class SupplierPaymentController extends Controller
         }
 
         if (filter_var($data['paid_in_cash'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-            return null;
+            return BankAccount::cashBox()?->id;
         }
 
         return BankAccount::defaultAccount()?->id;
