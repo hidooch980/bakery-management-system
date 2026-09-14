@@ -124,24 +124,24 @@ class TheCertificateIsWatchedTest extends TestCase
     public function test_a_configured_path_that_does_not_exist_on_a_certbot_server_is_named(): void
     {
         // What a renewal into a new lineage leaves behind: certbot writes
-        // baker.molido.shop-0001 and the configured path stops being
+        // baker.molido.ir-0001 and the configured path stops being
         // updated by anything. Silence here would read exactly like a
         // healthy certificate, for ever.
-        $live = $this->certbotHolding(['baker.molido.shop-0001']);
-        config(['bakery.tls_certificate' => $live.'/baker.molido.shop/fullchain.pem']);
+        $live = $this->certbotHolding(['baker.molido.ir-0001']);
+        config(['bakery.tls_certificate' => $live.'/baker.molido.ir/fullchain.pem']);
 
         $issue = $this->missing();
 
         $this->assertNotNull($issue);
         $this->assertSame(SystemIssue::WARNING, $issue->severity);
-        $this->assertStringContainsString('baker.molido.shop-0001', $issue->detail);
+        $this->assertStringContainsString('baker.molido.ir-0001', $issue->detail);
         $this->assertStringContainsString('certbot certificates', $issue->suggestion);
     }
 
     public function test_a_file_that_is_not_a_certificate_is_treated_as_missing(): void
     {
-        $live = $this->certbotHolding(['baker.molido.shop']);
-        $path = $live.'/baker.molido.shop/fullchain.pem';
+        $live = $this->certbotHolding(['baker.molido.ir']);
+        $path = $live.'/baker.molido.ir/fullchain.pem';
         file_put_contents($path, 'not a certificate');
         config(['bakery.tls_certificate' => $path]);
 
@@ -153,8 +153,8 @@ class TheCertificateIsWatchedTest extends TestCase
     public function test_a_certificate_that_is_where_it_should_be_says_nothing(): void
     {
         $live = $this->certbotHolding([]);
-        mkdir($live.'/baker.molido.shop');
-        $path = $live.'/baker.molido.shop/fullchain.pem';
+        mkdir($live.'/baker.molido.ir');
+        $path = $live.'/baker.molido.ir/fullchain.pem';
         copy($this->certificate(60), $path);
         config(['bakery.tls_certificate' => $path]);
 
