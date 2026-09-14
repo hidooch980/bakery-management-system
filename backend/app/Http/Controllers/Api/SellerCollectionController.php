@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
-use App\Models\CustomerCredit;
 use App\Models\Customer;
+use App\Models\CustomerCredit;
 use App\Models\Sale;
 use App\Support\AppCalendar;
 use App\Support\Money;
