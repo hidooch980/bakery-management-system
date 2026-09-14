@@ -277,6 +277,19 @@ class FlourSale extends Model
             return null;
         }
 
+        // خیرات و منزل: آرد از انبار بیرون رفت و پولی بابتش نیامد. قیمت
+        // روی ردیف می‌ماند چون مغازه باید بداند چه چیزی بخشیده — ولی
+        // نشاندنش در صندوق، کشو را به اندازهٔ همان بخشش بالا می‌برد.
+        //
+        // یک سالن خیرات و یک گونی منزل در ماه، صندوق را دو برابر یک فروش
+        // واقعی نشان می‌داد. تنها راه پیدا شدنش شمردن کشو بود.
+        //
+        // CashNeverBanked از همان اول همین دو نوع را کنار می‌گذاشت؛ قاعده
+        // از ابتدا همین بود و فقط اینجا نوشته نشده بود.
+        if ($this->isGiveaway()) {
+            return null;
+        }
+
         // Flour is sold on the reader too, and the drawer fallback caught
         // those as well until today — every card sack read as notes in the
         // till, which is exactly the mistake «درامد کارتخوان فقط بره حساب
