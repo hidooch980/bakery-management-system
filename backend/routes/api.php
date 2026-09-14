@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\BakeryController;
 use App\Http\Controllers\Api\BakeryShareController;
 use App\Http\Controllers\Api\BalanceSheetController;
 use App\Http\Controllers\Api\BankAccountController;
+use App\Http\Controllers\Api\CashCountController;
 use App\Http\Controllers\Api\ChaneBoardController;
 use App\Http\Controllers\Api\ChaneEntryController;
 use App\Http\Controllers\Api\ConsignmentFlourController;
@@ -437,6 +438,10 @@ Route::prefix('v1')->group(function () {
 
         // --- Admin: bank accounts and balances ---
         Route::middleware('permission:manage-finance')->group(function () {
+            // What is actually in the drawer, against what the books say.
+            Route::get('/cash-counts', [CashCountController::class, 'index']);
+            Route::post('/cash-counts', [CashCountController::class, 'store']);
+
             Route::post('/bank-accounts/transfer', [BankAccountController::class, 'transfer']);
             Route::get('/bank-accounts/{account}/transactions', [BankAccountController::class, 'transactions']);
             Route::post('/bank-accounts/{account}/transactions', [BankAccountController::class, 'record']);

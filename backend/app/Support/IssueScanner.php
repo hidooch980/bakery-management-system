@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\BankAccount;
+use App\Models\CashCount;
 use App\Models\ChaneEntry;
 use App\Models\DieselAllocation;
 use App\Models\DoughEntry;
@@ -81,6 +82,7 @@ class IssueScanner
             ...$this->noCardAccount(),
             ...$this->certificateRunningOut(),
             ...$this->purchasesFiledTwice(),
+            ...$this->drawerNotCounted(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -1559,6 +1561,68 @@ class IssueScanner
             url: null,
             urlLabel: null,
             magnitude: 0.0,
+        )];
+    }
+
+    /** How long a till may go uncounted before it is worth saying. */
+    public const COUNT_OVERDUE_DAYS = 14;
+
+    /**
+     * Nobody has counted the notes in a fortnight.
+     *
+     * The ledger cannot find its own errors: change given from the drawer,
+     * a sale typed at the wrong price, a handover half remembered — each
+     * leaves both sides agreeing about a figure that is not what is in the
+     * till. Only counting finds those, and only counting soon enough that
+     * somebody still remembers the day.
+     *
+     * Silent on a shop that has never counted and holds nothing, and on
+     * one with no till flagged — that shop is told about the till itself,
+     * above, and two lines about the same missing thing is nagging.
+     */
+    private function drawerNotCounted(): array
+    {
+        $till = BankAccount::cashBox();
+
+        if (! $till) {
+            return [];
+        }
+
+        $held = round((float) $till->balance, 2);
+
+        if ($held <= 0) {
+            return [];
+        }
+
+        $last = CashCount::where('bank_account_id', $till->id)->latest('counted_at')->first();
+        $days = $last
+            ? (int) $last->counted_at->startOfDay()->diffInDays(now()->startOfDay())
+            : null;
+
+        if ($days !== null && $days < self::COUNT_OVERDUE_DAYS) {
+            return [];
+        }
+
+        return [new SystemIssue(
+            key: 'drawer-not-counted',
+            severity: SystemIssue::INFO,
+            title: $last === null
+                ? 'صندوق تا حالا شمرده نشده'
+                : $days.' روز است صندوق شمرده نشده',
+            detail: 'دفتر می‌گوید '.Money::format($held).' در صندوق است'
+                .($last === null
+                    ? ' — ولی هیچ‌وقت با پول واقعی کشو مقایسه نشده.'
+                    : '. آخرین شمارش: '.AppCalendar::date($last->counted_at).'.'),
+            cause: 'دفتر خطای خودش را پیدا نمی‌کند: پول خردی که از همان کشو'
+                .' داده می‌شود، فروشی که با قیمت اشتباه ثبت شده، تحویلی که'
+                .' نصفه یادت مانده — هر کدام دو طرف دفتر را با هم جور'
+                .' می‌گذارد و با کشو نه.',
+            suggestion: 'یک بار پول کشو را بشمارید و در «شمارش صندوق» وارد'
+                .' کنید. اختلافی که همان شب دیده شود سؤالی است که هنوز جواب'
+                .' دارد؛ همان اختلاف آخر ماه فقط یک عدد است.',
+            url: '/admin/cash-counts',
+            urlLabel: 'شمارش صندوق',
+            magnitude: $held,
         )];
     }
 }

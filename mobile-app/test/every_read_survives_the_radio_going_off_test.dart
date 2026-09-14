@@ -33,9 +33,12 @@ void main() {
         'outlive a session the owner had revoked',
     '/devices': 'the screen is opened because something just changed, so '
         'this morning\'s list is worse than no list',
+    '/cash-counts': 'the figure being counted against has to be the live '
+        'one — a remembered balance would have somebody counting against '
+        'yesterday and finding a gap that is only the cache',
   };
 
-  test('every read but the two that must be current survives no signal', () {
+  test('every read but the three that must be current survives no signal', () {
     final source = File('lib/services/bakery_api.dart').readAsStringSync();
 
     final plain = RegExp(r"_client\.get\(\s*'([^']+)'")
