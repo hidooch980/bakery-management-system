@@ -11,9 +11,11 @@ use App\Support\Jalali;
 use App\Support\Money;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 
 class ExpenseResource extends Resource
 {
@@ -157,6 +159,42 @@ class ExpenseResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    // Half the shop's costs sat under «سایر» — a category
+                    // that answers nothing. Fixing them one at a time is
+                    // twelve clicks a row, so nobody was going to, and the
+                    // expense report stayed meaningless for as long as that
+                    // was true. Filter to «سایر», tick the rows that share
+                    // a category, set it once.
+                    Tables\Actions\BulkAction::make('setCategory')
+                        ->label('تغییر دسته‌بندی')
+                        ->icon('heroicon-o-tag')
+                        ->form([
+                            Forms\Components\Select::make('category')
+                                ->label('دستهٔ تازه')
+                                // Only the categories still offered. A row
+                                // may sit under a retired key and stay
+                                // readable, but nothing is moved *into* one.
+                                ->options(Expense::CATEGORIES)
+                                ->required()
+                                ->native(false),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            // Saved one at a time on purpose: each row has a
+                            // bank posting rebuilt on save and an audit line
+                            // written, and a mass update would skip both —
+                            // leaving the books and the history disagreeing
+                            // with the rows.
+                            $records->each(fn (Expense $expense) => $expense->update([
+                                'category' => $data['category'],
+                            ]));
+
+                            Notification::make()
+                                ->title($records->count().' هزینه جابه‌جا شد.')
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
                     Tables\Actions\DeleteBulkAction::make()->label('حذف انتخاب‌شده‌ها'),
                 ]),
             ])
