@@ -64,6 +64,7 @@ class IssueScanner
             ...$this->lowStock(),
             ...$this->emptyStock(),
             ...$this->quotaOverrun(),
+            ...$this->readerFigureNeverEntered(),
             ...$this->readerDisagreesWithUs(),
             ...$this->negativeBankBalance(),
             ...$this->sellerAccounts(),
@@ -437,6 +438,67 @@ class IssueScanner
      * Silent until somebody types the reader's figure in: a period nobody
      * has checked is not a period that agrees.
      */
+    /**
+     * A finished period whose reader figure nobody has typed in.
+     *
+     * `readerDisagreesWithUs()` below is deliberately silent on these — a
+     * period nobody has checked is not a period that agrees — and that is
+     * right. But being silent left nothing at all pointing at them: the
+     * shop health command counts them, and the owner does not run the
+     * shop health command. So the one check that could have caught a
+     * shrinking quota stayed quiet for the exact periods it could not see.
+     *
+     * The cost is not bookkeeping. Next month's allocation is worked out
+     * from the reader's number, not from what the shop wrote down, so a
+     * period left unchecked is a month whose quota is decided without
+     * anybody having looked. The shop finds out when the flour arrives
+     * short, by which time the period is closed.
+     *
+     * Only periods that have ended. One still running has no final figure
+     * to enter, and nagging about it would teach the owner to ignore the
+     * row that matters.
+     */
+    private function readerFigureNeverEntered(): array
+    {
+        $issues = [];
+        $today = now()->startOfDay();
+
+        foreach (FlourAllocation::with('periods')->get() as $allocation) {
+            $waiting = $allocation->periods
+                ->filter(fn ($period) => $period->ends_on->lt($today))
+                ->reject->is_checked_against_reader;
+
+            if ($waiting->isEmpty()) {
+                continue;
+            }
+
+            $names = $waiting->pluck('label')->filter()->implode('، ');
+
+            $issues[] = new SystemIssue(
+                key: "reader-unchecked-{$allocation->id}",
+                severity: SystemIssue::WARNING,
+                title: $waiting->count() === 1
+                    ? "رقم سامانه برای «{$names}» وارد نشده"
+                    : "رقم سامانه برای {$waiting->count()} دوره وارد نشده",
+                detail: $waiting->count() === 1
+                    ? 'این دوره تمام شده و رقم کارتخوان آن هنوز ثبت نشده است.'
+                    : "دوره‌های تمام‌شده‌ای که رقمشان ثبت نشده: {$names}.",
+                cause: 'رقم کارتخوان دستی وارد می‌شود و برای این دوره‌ها'
+                    .' وارد نشده است.',
+                suggestion: 'سهمیهٔ ماه بعد از روی رقم سامانه بسته می‌شود.'
+                    .' تا وقتی وارد نشود، اگر ثبت ما بیشتر از سامانه باشد'
+                    .' کسی خبردار نمی‌شود و سهمیه کمتر می‌آید.',
+                url: '/admin/flour-allocations',
+                urlLabel: 'سهمیه‌ها',
+                // Periods waiting. Three unchecked is a worse blind spot
+                // than one, and it grows the longer nobody types them in.
+                magnitude: (float) $waiting->count(),
+            );
+        }
+
+        return $issues;
+    }
+
     private function readerDisagreesWithUs(): array
     {
         $issues = [];
