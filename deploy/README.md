@@ -70,10 +70,19 @@ sudo nginx -t && sudo systemctl restart nginx php8.3-fpm && sudo systemctl enabl
 > پس یک بار روی سرور:
 >
 > ```bash
-> sudo certbot certonly --webroot -w /var/www/bakery/backend/public \
->   -d baker.molido.ir
+> # مسیر تأیید را باز کنید و بیازمایید
+> sudo mkdir -p /var/www/html/.well-known/acme-challenge
+> echo ok | sudo tee /var/www/html/.well-known/acme-challenge/test >/dev/null
+> curl -s http://baker.molido.ir/.well-known/acme-challenge/test   # باید ok بدهد
+>
+> sudo certbot certonly --webroot -w /var/www/html -d baker.molido.ir
 > sudo nginx -t && sudo systemctl reload nginx
 > ```
+>
+> `-w` اینجا **پوشهٔ برنامه نیست**، پوشه‌ای است که بلوک
+> `/.well-known/acme-challenge/` در کانفیگ به آن اشاره می‌کند: `/var/www/html`.
+> اگر آن `curl` بالا `ok` نداد، همان ایراد شمارهٔ ۱ همین راهنماست — بلوک
+> روی سرور نیست و اول باید اضافه شود، وگرنه certbot نام را اثبات نمی‌کند.
 >
 > **تا وقتی این اجرا نشده، `server.json` را روی نام جدید نبرید** —
 > اپ به آدرسی وصل می‌شود که گواهی ندارد و همهٔ گوشی‌ها هم‌زمان می‌خوابند.

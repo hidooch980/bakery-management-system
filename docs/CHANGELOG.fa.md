@@ -43,7 +43,8 @@
 > **قبل از نصب این نسخه روی گوشی‌ها، یک بار روی سرور گواهی را بگیرید:**
 >
 > ```
-> sudo certbot certonly --webroot -w /var/www/bakery/backend/public -d baker.molido.ir
+> sudo mkdir -p /var/www/html/.well-known/acme-challenge
+> sudo certbot certonly --webroot -w /var/www/html -d baker.molido.ir
 > sudo nginx -t && sudo systemctl reload nginx
 > ```
 >
