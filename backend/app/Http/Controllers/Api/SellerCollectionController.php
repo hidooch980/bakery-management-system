@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
+use App\Models\CustomerCredit;
 use App\Models\Customer;
 use App\Models\Sale;
 use App\Support\AppCalendar;
@@ -105,18 +106,26 @@ class SellerCollectionController extends Controller
 
         $owed = round((float) $open->sum('amount'), 2);
 
-        if ($amount > $owed + 0.01) {
+        // Money the shop is already holding for this buyer, from a previous
+        // payment that did not land on an invoice boundary. It is spent
+        // before any new money is asked for, so a school that overpaid on
+        // Sunday does not pay it again on Monday.
+        $credit = CustomerCredit::balanceFor($customer->id);
+
+        if ($amount > $owed - $credit + 0.01) {
             return $this->error(sprintf(
                 'مبلغ دریافتی (%s) از بدهی این مشتری (%s) بیشتر است.',
                 Money::format($amount),
-                Money::format($owed),
+                Money::format(max(0, $owed - $credit)),
             ), 422);
         }
 
-        $settled = DB::transaction(function () use ($open, $amount, $method, $request, $customer) {
-            $remaining = $amount;
+        $settled = DB::transaction(function () use ($open, $amount, $credit, $method, $request, $customer) {
+            // The credit the shop is already holding pays first, so it is
+            // spent rather than sitting there while the buyer keeps paying
+            // whole invoices around it.
+            $remaining = round($amount + $credit, 2);
             $count = 0;
-            $collected = 0.0;
 
             foreach ($open as $sale) {
                 if ($remaining + 0.01 < (float) $sale->amount) {
@@ -125,25 +134,30 @@ class SellerCollectionController extends Controller
 
                 $sale->update(['settled_on' => now()]);
                 $remaining -= (float) $sale->amount;
-                $collected += (float) $sale->amount;
                 $count++;
             }
 
-            // Only what actually cleared an invoice is banked, so no
-            // account ever shows more than the debt that was settled.
+            // The whole handover is banked, not just the part that landed
+            // on an invoice boundary.
             //
-            // Both ways now, not just the card. Cash used to be described as
-            // staying in the till and went nowhere at all, because there was
-            // no till — money the shop knew it had taken and could not say
-            // where it was.
-            if ($collected > 0) {
+            // It used to bank only what cleared an invoice and drop the
+            // rest: a school paying ۲۵۰ against three invoices of ۱۰۰ had
+            // ۲۰۰ recorded and ۵۰ recorded nowhere — money in the seller's
+            // hand that nothing in the shop knew existed, and the seller
+            // was shown «ثبت شد».
+            //
+            // The card share goes to the card account, as everywhere else
+            // in the shop. Here alone it went to the default bank, so a
+            // shop that keeps the reader on its own account had these
+            // collections land in the wrong one.
+            if ($amount > 0) {
                 $account = $method === 'card'
-                    ? BankAccount::defaultAccount()
+                    ? BankAccount::cardAccount()
                     : BankAccount::cashBox();
 
                 $account?->record(
                     'in',
-                    $collected,
+                    $amount,
                     'settlement',
                     $request->user()->id,
                     null,
@@ -152,19 +166,48 @@ class SellerCollectionController extends Controller
                 );
             }
 
+            // What this payment and the old credit together did not close.
+            // Written as the change since the balance before, so the
+            // balance stays the sum of the column rather than a figure two
+            // places have to keep agreeing on.
+            $change = round($remaining - $credit, 2);
+
+            if (abs($change) >= 0.01) {
+                CustomerCredit::create([
+                    'customer_id' => $customer->id,
+                    'user_id' => $request->user()->id,
+                    'amount' => $change,
+                    'note' => $change > 0
+                        ? 'باقی‌ماندهٔ دریافت، تا فاکتور بعدی'
+                        : 'خرج شدن اعتبار در دریافت',
+                ]);
+            }
+
             return $count;
         });
 
-        if ($settled === 0) {
-            return $this->error(
-                'مبلغ دریافتی از قدیمی‌ترین فاکتور این مشتری کمتر است. پرداخت جزئی در پنل ثبت می‌شود.',
-                422
-            );
-        }
+        // Nothing closed is no longer a refusal. The money is recorded and
+        // waiting, and this payment with the next one will close the
+        // invoice between them — where refusing sent the seller away
+        // holding cash the shop had no row for.
+        $held = CustomerCredit::balanceFor($customer->id);
 
         return $this->success(
-            ['settled' => $settled],
-            sprintf('دریافت از %s ثبت شد (%d فاکتور تسویه شد).', $customer->name, $settled)
+            ['settled' => $settled, 'credit' => Money::convert($held)],
+            $settled === 0
+                ? sprintf(
+                    'دریافت از %s ثبت شد. هنوز فاکتوری کامل نشده؛ %s نزد مغازه می‌ماند و روی دریافت بعدی خرج می‌شود.',
+                    $customer->name,
+                    Money::format($held),
+                )
+                : sprintf(
+                    'دریافت از %s ثبت شد (%d فاکتور تسویه شد).%s',
+                    $customer->name,
+                    $settled,
+                    $held >= 0.01
+                        ? ' '.Money::format($held).' باقی‌مانده، روی دریافت بعدی.'
+                        : '',
+                ),
         );
     }
 }
