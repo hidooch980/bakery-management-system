@@ -181,4 +181,29 @@ void main() {
     expect(book.counts.single.differenceLabel, '');
     expect(book.neverCounted, isTrue);
   });
+
+  test('the books being behind is carried through, and its absence too', () async {
+    // Read straight from the server rather than worked out here: whether
+    // the shop's past cash ever reached the till is a question about the
+    // ledger, and the phone has no way to ask it.
+    final it = apiThat((_) => _ok({
+          'first_count': true,
+          'ledger_behind': {
+            'amount_formatted': '۱۲٬۰۰۰٬۰۰۰ تومان',
+            'message': 'این اولین شمارش است',
+          },
+          'counts': const [],
+        }));
+
+    final book = await it.api.cashCounts();
+
+    expect(book.ledgerBehind!.amountFormatted, '۱۲٬۰۰۰٬۰۰۰ تومان');
+    expect(book.ledgerBehind!.message, 'این اولین شمارش است');
+  });
+
+  test('a shop whose books are not behind carries nothing to show', () async {
+    final it = apiThat((_) => _ok({'ledger_behind': null, 'counts': const []}));
+
+    expect((await it.api.cashCounts()).ledgerBehind, isNull);
+  });
 }

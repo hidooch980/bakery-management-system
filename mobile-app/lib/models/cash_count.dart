@@ -62,12 +62,18 @@ class CashCountBook {
     required this.counts,
     this.lastCountedAt,
     this.daysSinceCount,
+    this.ledgerBehind,
   });
 
   final String expectedFormatted;
   final List<CashCount> counts;
   final String? lastCountedAt;
   final int? daysSinceCount;
+
+  /// Why the books are behind the drawer, sent only before the first
+  /// count. The server decides whether it applies and how it is worded —
+  /// the app shows it or does not.
+  final LedgerBehind? ledgerBehind;
 
   bool get neverCounted => lastCountedAt == null;
 
@@ -78,9 +84,32 @@ class CashCountBook {
         lastCountedAt:
             json['last_counted_at'] is String ? json['last_counted_at'] as String : null,
         daysSinceCount: (json['days_since_count'] as num?)?.toInt(),
+        ledgerBehind: json['ledger_behind'] is Map<String, dynamic>
+            ? LedgerBehind.fromJson(json['ledger_behind'] as Map<String, dynamic>)
+            : null,
         counts: [
           for (final row in (json['counts'] as List?) ?? const [])
             if (row is Map<String, dynamic>) CashCount.fromJson(row),
         ],
+      );
+}
+
+/// Cash the shop took in the past that never reached the till account.
+///
+/// Shown once, above the first count, so a large «اضافه» is read as the
+/// books catching up rather than as money nobody can explain.
+class LedgerBehind {
+  const LedgerBehind({
+    required this.amountFormatted,
+    required this.message,
+  });
+
+  final String amountFormatted;
+  final String message;
+
+  factory LedgerBehind.fromJson(Map<String, dynamic> json) => LedgerBehind(
+        amountFormatted:
+            json['amount_formatted'] is String ? json['amount_formatted'] as String : '',
+        message: json['message'] is String ? json['message'] as String : '',
       );
 }

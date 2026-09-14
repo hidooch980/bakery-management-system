@@ -6,6 +6,7 @@ use App\Filament\Resources\CashCountResource\Pages\CreateCashCount;
 use App\Models\BankAccount;
 use App\Models\BankTransaction;
 use App\Models\CashCount;
+use App\Models\SettlementRequest;
 use App\Models\User;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -160,6 +161,80 @@ class TheDrawerIsCountedTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.days_since_count', 3)
             ->assertJsonPath('data.counts.0.difference_label', 'کسری');
+    }
+
+    // ---------------------------------------------- the books catching up
+
+    /**
+     * A handover the shop confirmed whose cash never reached the till.
+     *
+     * This is the shape of every settlement made before the posting was
+     * written: the figure survives on the request and nothing was booked.
+     */
+    private function aHandoverThatNeverReachedTheTill(float $cash): void
+    {
+        SettlementRequest::create([
+            'user_id' => $this->admin->id,
+            'amount' => $cash,
+            'paid_cash' => $cash,
+            'paid_card' => 0,
+            'confirmed_at' => now()->subMonth(),
+            'confirmed_by' => $this->admin->id,
+        ]);
+    }
+
+    public function test_before_the_first_count_the_page_says_the_books_are_behind(): void
+    {
+        $this->aHandoverThatNeverReachedTheTill(3_000_000);
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/cash-counts')
+            ->assertOk()
+            ->assertJsonPath('data.first_count', true)
+            ->assertJsonPath('data.ledger_behind.settlements', 1);
+    }
+
+    public function test_once_the_drawer_has_been_counted_the_warning_stops(): void
+    {
+        $this->aHandoverThatNeverReachedTheTill(3_000_000);
+        $this->countDrawer(['counted_amount' => 8_000_000])->assertCreated();
+
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/cash-counts')
+            ->assertOk()
+            ->assertJsonPath('data.first_count', false)
+            ->assertJsonPath('data.ledger_behind', null);
+    }
+
+    public function test_books_that_are_not_behind_say_nothing(): void
+    {
+        $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/v1/cash-counts')
+            ->assertOk()
+            ->assertJsonPath('data.ledger_behind', null);
+    }
+
+    public function test_the_first_correction_is_named_an_opening_balance(): void
+    {
+        $this->countDrawer(['counted_amount' => 9_000_000, 'adjust' => true])
+            ->assertCreated();
+
+        $this->assertSame(
+            'موجودی اولیهٔ صندوق، پس از اولین شمارش',
+            BankTransaction::latest('id')->first()->note,
+        );
+    }
+
+    public function test_a_later_correction_is_named_a_correction(): void
+    {
+        $this->countDrawer(['counted_amount' => 5_000_000])->assertCreated();
+        $this->countDrawer(['counted_amount' => 4_000_000, 'adjust' => true])
+            ->assertCreated();
+
+        $this->assertSame(
+            'اصلاح پس از شمارش صندوق',
+            BankTransaction::latest('id')->first()->note,
+        );
     }
 
     public function test_a_shop_with_no_till_is_told_so_rather_than_failing(): void
