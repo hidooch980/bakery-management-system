@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\DuplicateRecord;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\Expense;
@@ -10,6 +11,7 @@ use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ExpenseController extends Controller
@@ -49,40 +51,59 @@ class ExpenseController extends Controller
             'force' => ['nullable', 'boolean'],
         ]);
 
-        $expense = Expense::create([
-            'user_id' => $request->user()->id,
-            'category' => $data['category'],
-            'title' => $data['title'],
-            // Typed in whatever unit the shop is set to, stored in Toman.
-            // Without this a shop working in Rial had its costs saved ten
-            // times over: the figure went in raw and came back out through
-            // the display conversion, one zero longer every time it was read.
-            'amount' => Money::toToman($data['amount']),
-            // Accepts either a Jalali date or a Gregorian one; defaults to today.
-            'spent_on' => Jalali::parseFlexible($data['spent_on'] ?? null) ?? now(),
-            'note' => $data['note'] ?? null,
-            // An expense recorded from the app never named an account, so it
-            // never came off the bank — the panel defaulted it and the app
-            // did not, and the same expense meant two different things
-            // depending on where it was typed.
-            'bank_account_id' => $this->accountFor($data),
-        ]);
-
-        if (! ($data['force'] ?? false) && $twin = $expense->twin()) {
-            // Deleted rather than rolled back: one row, written outside a
-            // transaction, and PostsToBankAccount takes its money back
-            // with it on delete.
-            $expense->delete();
-
+        try {
+            $expense = $this->record($request, $data);
+        } catch (DuplicateRecord $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'همین هزینه امروز یک بار ثبت شده: '.$twin->describe()
+                'message' => 'همین هزینه امروز یک بار ثبت شده: '.$e->twin->describe()
                     .'. اگر واقعاً دو بار پرداخت شده، دوباره با تأیید ثبت کنید.',
-                'data' => ['duplicate_of' => $twin->id],
+                'data' => ['duplicate_of' => $e->twin->getKey()],
             ], 409);
         }
 
         return $this->success($this->payload($expense), 'هزینه ثبت شد.', 201);
+    }
+
+    /**
+     * Writes the cost and refuses it in the same transaction.
+     *
+     * It used to commit the row, look for a twin, and delete the row again
+     * when it found one — which left a created-and-deleted pair in the
+     * audit trail with the admin's name on both, and let two identical
+     * submissions arriving together each find the other and each delete
+     * itself, so neither was recorded at all.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function record(Request $request, array $data): Expense
+    {
+        return DB::transaction(function () use ($request, $data) {
+            $expense = Expense::create([
+                'user_id' => $request->user()->id,
+                'category' => $data['category'],
+                'title' => $data['title'],
+                // Typed in whatever unit the shop is set to, stored in Toman.
+                // Without this a shop working in Rial had its costs saved ten
+                // times over: the figure went in raw and came back out through
+                // the display conversion, one zero longer every time it was read.
+                'amount' => Money::toToman($data['amount']),
+                // Accepts either a Jalali date or a Gregorian one; defaults to today.
+                'spent_on' => Jalali::parseFlexible($data['spent_on'] ?? null) ?? now(),
+                'note' => $data['note'] ?? null,
+                // An expense recorded from the app never named an account, so it
+                // never came off the bank — the panel defaulted it and the app
+                // did not, and the same expense meant two different things
+                // depending on where it was typed.
+                'bank_account_id' => $this->accountFor($data),
+            ]);
+
+            if (! ($data['force'] ?? false) && $twin = $expense->twin()) {
+                throw new DuplicateRecord($twin);
+            }
+
+            return $expense;
+        });
     }
 
     public function update(Request $request, Expense $expense): JsonResponse

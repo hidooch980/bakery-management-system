@@ -22,11 +22,23 @@ trait HasATwin
     /** What makes two of these the same thing, apart from the amount. */
     abstract protected function twinScope(Builder $query): void;
 
+    /**
+     * Whether a twin is worth looking for at all.
+     *
+     * Some kinds of record repeat identically as a matter of course, and
+     * asking about those trains the owner to tap «بله» without reading —
+     * which costs the guard its whole value on the records that matter.
+     */
+    protected function looksForATwin(): bool
+    {
+        return true;
+    }
+
     public function twin(): ?static
     {
         $amount = (float) $this->amount;
 
-        if ($amount <= 0) {
+        if ($amount <= 0 || ! $this->looksForATwin()) {
             return null;
         }
 
