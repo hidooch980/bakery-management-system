@@ -51,25 +51,37 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
   }
 
   Future<_WarehouseData> _load() async {
+    // موجودی، خودِ صفحه است: اگر این نیاید چیزی برای نشان دادن نمانده و
+    // خطا درست است.
+    //
+    // سهمیه و فروش آرد امروز، هر دو کنارش‌اند. سهمیه تا امروز داخل همان
+    // `Future.wait` بود، پس یک شکست در آن کل تب را خطا می‌کرد و
+    // موجودی انبار — تنها چیزی که مالک این تب را برایش باز می‌کند — با
+    // خودش می‌برد. و صفحه از قبل حالت «سهمیه‌ای تعریف نشده» را دارد، پس
+    // نبودنش وضعیت شناخته‌شده‌ای است نه خرابی.
     final results = await Future.wait([
       widget.api.inventory(),
-      widget.api.currentFlourAllocation(),
+      _orNull(widget.api.currentFlourAllocation()),
+      _orNull(widget.api.todayFlourSales()),
     ]);
-
-    // Today's flour sales explain movement in the balance above, but the
-    // rest of the page must still render if the call fails.
-    _FlourSalesToday? flour;
-    try {
-      flour = await widget.api.todayFlourSales();
-    } on ApiException {
-      flour = null;
-    }
 
     return (
       items: results[0] as List<Map<String, dynamic>>,
       quota: results[1] as Map<String, dynamic>?,
-      flour: flour,
+      flour: results[2] as _FlourSalesToday?,
     );
+  }
+
+  /// چیزی که اگر نیامد، صفحه بدونش کار می‌کند.
+  ///
+  /// فقط `ApiException` — خطای برنامه‌نویسی نباید اینجا بلعیده شود و
+  /// به‌جای دیده شدن، به شکل یک کارت خالی دربیاید.
+  static Future<T?> _orNull<T>(Future<T?> call) async {
+    try {
+      return await call;
+    } on ApiException {
+      return null;
+    }
   }
 
   void _reload() => setState(() { _data = _load(); });

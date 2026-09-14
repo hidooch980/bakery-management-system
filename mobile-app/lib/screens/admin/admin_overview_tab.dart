@@ -3,6 +3,7 @@ import '../../utils/json.dart';
 
 import '../../models/bakery.dart';
 import '../../models/chane_board.dart';
+import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
@@ -23,7 +24,7 @@ class AdminOverviewTab extends StatefulWidget {
 }
 
 class _AdminOverviewTabState extends State<AdminOverviewTab> {
-  late Future<({Map<String, dynamic> dashboard, ChaneBoard board})> _data;
+  late Future<({Map<String, dynamic> dashboard, ChaneBoard? board})> _data;
 
   @override
   void initState() {
@@ -31,17 +32,32 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
     _data = _load();
   }
 
-  Future<({Map<String, dynamic> dashboard, ChaneBoard board})> _load() async {
-    // Both calls are independent, so run them together.
+  Future<({Map<String, dynamic> dashboard, ChaneBoard? board})> _load() async {
+    // هر دو مستقل‌اند، پس با هم.
+    //
+    // داشبورد خودِ صفحه است. تختهٔ چانه دو جا روی آن دیده می‌شود و تا
+    // امروز اگر نمی‌آمد، کل تب خطا می‌شد — یعنی یک فراخوانی فرعی، همهٔ
+    // «امروز» و «صف کاری» و «کارکنان» را با خودش می‌برد.
     final results = await Future.wait([
       widget.api.dashboard(),
-      widget.api.chaneBoard(),
+      _boardOrNull(),
     ]);
 
     return (
       dashboard: results[0] as Map<String, dynamic>,
-      board: results[1] as ChaneBoard,
+      board: results[1] as ChaneBoard?,
     );
+  }
+
+  /// تخته‌ای که اگر نیامد، صفحه بدونش کار می‌کند.
+  ///
+  /// فقط `ApiException` — خطای برنامه‌نویسی نباید اینجا بلعیده شود.
+  Future<ChaneBoard?> _boardOrNull() async {
+    try {
+      return await widget.api.chaneBoard();
+    } on ApiException {
+      return null;
+    }
   }
 
   void _reload() => setState(() { _data = _load(); });
@@ -50,7 +66,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: () async => _reload(),
-      child: FutureBuilder<({Map<String, dynamic> dashboard, ChaneBoard board})>(
+      child: FutureBuilder<({Map<String, dynamic> dashboard, ChaneBoard? board})>(
         future: _data,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -131,8 +147,10 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                 ],
               ),
 
-              const SizedBox(height: 22),
-              ChaneComparison(board: board),
+              if (board != null) ...[
+                const SizedBox(height: 22),
+                ChaneComparison(board: board),
+              ],
 
               const SizedBox(height: 22),
               AdminSection(
@@ -150,12 +168,14 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                     value: '${_num(queues['pending_chane'])} دسته',
                     icon: Icons.storefront_rounded,
                   ),
-                  const Divider(height: 1),
-                  AdminRow(
-                    label: 'چانه در انتظار پخت',
-                    value: '${board.waitingChane} عدد',
-                    icon: Icons.local_fire_department_rounded,
-                  ),
+                  if (board != null) ...[
+                    const Divider(height: 1),
+                    AdminRow(
+                      label: 'چانه در انتظار پخت',
+                      value: '${board.waitingChane} عدد',
+                      icon: Icons.local_fire_department_rounded,
+                    ),
+                  ],
                 ],
               ),
 
