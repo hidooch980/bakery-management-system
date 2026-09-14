@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\BankAccount;
 use App\Models\Expense;
 use App\Models\User;
@@ -108,6 +109,31 @@ class AnExpenseTypedTwiceIsCaughtTest extends TestCase
     {
         $this->send(['spent_on' => now()->subDay()->toDateString()])->assertCreated();
         $this->send()->assertCreated();
+
+        $this->assertSame(2, Expense::count());
+    }
+
+    public function test_a_refused_cost_leaves_nothing_in_the_audit_trail(): void
+    {
+        // It used to write the row, look for a twin, then delete it —
+        // leaving «ثبت شد» and «حذف شد» in the trail with the admin's
+        // name on both, for a cost that was never recorded. A trail that
+        // says a thing happened when it did not is worse than none.
+        $this->send()->assertCreated();
+        $before = AuditLog::count();
+
+        $this->send()->assertStatus(409);
+
+        $this->assertSame($before, AuditLog::count());
+    }
+
+    public function test_two_wages_the_same_size_on_one_day_are_not_questioned(): void
+    {
+        // Every payday, for every pair paid alike. Asking here would
+        // teach the owner to answer «بله» without looking, and the same
+        // answer would come just as fast on the diesel typed twice.
+        $this->send(['category' => 'salary', 'title' => 'حقوق — رضا'])->assertCreated();
+        $this->send(['category' => 'salary', 'title' => 'حقوق — حسن'])->assertCreated();
 
         $this->assertSame(2, Expense::count());
     }

@@ -227,13 +227,7 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
 
       final queued = switch (widget.kind) {
         AdminRecordKind.expense => await _expense(value, note, force: false),
-        AdminRecordKind.income => await widget.api.recordIncome(
-            category: _category!,
-            title: _title.text.trim(),
-            amount: value,
-            note: note,
-            byCard: _byCard,
-          ),
+        AdminRecordKind.income => await _income(value, note, force: false),
         AdminRecordKind.intake => await widget.api.recordStockIntake(
             item: _item.apiValue,
             quantity: value,
@@ -256,7 +250,9 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
         if (!mounted) return;
         if (!await _askIfReallyTwice()) return;
 
-        final again = await _expense(value, note, force: true);
+        final again = widget.kind == AdminRecordKind.income
+            ? await _income(value, note, force: true)
+            : await _expense(value, note, force: true);
         if (!mounted || again == null) return;
 
         Navigator.pop(context, true);
@@ -306,13 +302,34 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
     }
   }
 
+  /// Null when the server answered 409 — «همین درآمد امروز ثبت شده».
+  Future<bool?> _income(double value, String note, {required bool force}) async {
+    try {
+      return await widget.api.recordIncome(
+        category: _category!,
+        title: _title.text.trim(),
+        amount: value,
+        note: note,
+        byCard: _byCard,
+        force: force,
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode == 409) {
+        _duplicateMessage = e.message;
+
+        return null;
+      }
+      rethrow;
+    }
+  }
+
   String _duplicateMessage = '';
 
   Future<bool> _askIfReallyTwice() async {
     final answer = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('این هزینه قبلاً ثبت شده'),
+        title: Text('این ${widget.kind.label} قبلاً ثبت شده'),
         content: Text(_duplicateMessage),
         actions: [
           TextButton(

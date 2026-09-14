@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
+use App\Models\Concerns\HasATwin;
 use App\Models\Concerns\PostsToBankAccount;
 use App\Models\Concerns\RecordsAudit;
 use App\Support\AppCalendar;
 use App\Support\Money;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -15,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Income extends Model
 {
-    use BelongsToBakery, PostsToBankAccount, RecordsAudit;
+    use BelongsToBakery, HasATwin, PostsToBankAccount, RecordsAudit;
 
     public const CATEGORIES = [
         'subsidy' => 'یارانه و کمک دولتی',
@@ -36,6 +38,30 @@ class Income extends Model
         'received_on',
         'note',
     ];
+
+    /**
+     * What makes two of these the same money: the same kind, on the same
+     * day. Not the title, for the reason an expense gives — one payment
+     * spelled two ways is still one payment.
+     *
+     * Money in matters more here than anywhere: it now lands in the till
+     * by default, so a receipt entered twice puts the drawer ahead of the
+     * notes actually in it — and that gap is only ever found by somebody
+     * counting and coming up short.
+     */
+    protected function twinScope(Builder $query): void
+    {
+        $query->where('category', $this->category)
+            ->whereDate('received_on', $this->received_on);
+    }
+
+    /** One line naming this income, for a message about it. */
+    public function describe(): string
+    {
+        return '#'.$this->id.' — '.$this->title
+            .'، '.AppCalendar::date($this->received_on)
+            .'، '.Money::format((float) $this->amount);
+    }
 
     protected function casts(): array
     {

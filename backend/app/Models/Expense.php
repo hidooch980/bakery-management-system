@@ -81,6 +81,23 @@ class Expense extends Model
      * Not the title: «گازوئیل» and «گازوییل» are the same payment typed
      * twice, and matching on the words would let the second through.
      */
+    /**
+     * Wages are excluded, and only wages.
+     *
+     * Two bakers on the same pay, settled the same afternoon, are two
+     * correct rows — and that happens every payday, for every pair paid
+     * alike. Asking there would teach the owner to answer «بله، واقعاً دو
+     * بار» without looking, and the answer would come just as quickly on
+     * the diesel that really was typed twice.
+     *
+     * Freight and unloading are not excluded: they repeat far less often
+     * and they are exactly what gets copied off a receipt at night.
+     */
+    protected function looksForATwin(): bool
+    {
+        return $this->category !== 'salary';
+    }
+
     protected function twinScope(Builder $query): void
     {
         $query->where('category', $this->category)
