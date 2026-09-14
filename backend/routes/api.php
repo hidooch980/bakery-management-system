@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\StaffAdjustmentController;
 use App\Http\Controllers\Api\StaffAdvanceController;
 use App\Http\Controllers\Api\StaffAdvanceRequestController;
+use App\Http\Controllers\Api\StockCountController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SupplierPaymentController;
 use App\Http\Controllers\Api\TodayController;
@@ -207,6 +208,10 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:manage-inventory')->group(function () {
             Route::post('/inventory/movements', [InventoryController::class, 'store']);
             Route::patch('/inventory/{key}/threshold', [InventoryController::class, 'updateThreshold']);
+
+            // آنچه واقعاً روی قفسه هست، در برابر آنچه دفتر می‌گوید.
+            Route::get('/stock-counts', [StockCountController::class, 'index']);
+            Route::post('/stock-counts', [StockCountController::class, 'store']);
         });
 
         // --- Flour quota, split across the three delivery periods ---

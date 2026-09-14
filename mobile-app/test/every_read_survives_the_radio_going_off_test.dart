@@ -36,6 +36,9 @@ void main() {
     '/cash-counts': 'the figure being counted against has to be the live '
         'one — a remembered balance would have somebody counting against '
         'yesterday and finding a gap that is only the cache',
+    '/stock-counts': 'the same, for the shelf: a remembered balance would '
+        'have somebody counting sacks against yesterday\'s ledger and '
+        'correcting a gap the cache invented',
   };
 
   test('every read but the three that must be current survives no signal', () {
