@@ -51,6 +51,7 @@ class IssueDestination
         'unsettled-shortfalls' => self::FINANCE,
         'customer-debt-stale-' => self::FINANCE,
         'drawer-not-counted' => self::FINANCE,
+        'flour-purchase-gap' => self::WAREHOUSE,
         'trading-at-a-loss-' => self::FINANCE,
         'loan-due-' => self::FINANCE,
         'monthly-' => self::FINANCE,

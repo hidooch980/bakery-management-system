@@ -10,6 +10,7 @@ use App\Models\DoughEntry;
 use App\Models\Expense;
 use App\Models\FlourAllocation;
 use App\Models\InventoryItem;
+use App\Models\InventoryMovement;
 use App\Models\Loan;
 use App\Models\Purchase;
 use App\Models\SalaryPayment;
@@ -84,6 +85,7 @@ class IssueScanner
             ...$this->purchasesFiledTwice(),
             ...$this->drawerNotCounted(),
             ...$this->debtsGoingStale(),
+            ...$this->flourArrivingUnrecorded(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -1624,6 +1626,101 @@ class IssueScanner
             url: '/admin/cash-counts',
             urlLabel: 'شمارش صندوق',
             magnitude: $held,
+        )];
+    }
+
+    /**
+     * چند روز است آرد مصرف می‌شود و هیچ خریدی ثبت نشده.
+     *
+     * ۱۴۰۵/۰۶/۲۳ انبار شمرده شد و دفتر ۸ کیسه کم داشت. نگاه به دفتر آرد
+     * نشان داد این بار اول نبوده: پنج بار موجودی دستی بالا برده شده بود،
+     * جمعاً ۲۳۶ کیسه — و هر پنج بار در یک جهت. در برابر ۵۵۷ کیسه خرید
+     * ثبت‌شدهٔ کل تاریخ مغازه، یعنی حدود یک‌سوم آردی که آمده هیچ‌وقت
+     * به‌عنوان خرید وارد نشده.
+     *
+     * اصلاح موجودی این را حل نمی‌کند، پنهانش می‌کند. خریدی که ثبت نشود سه
+     * عدد را هم‌زمان دروغ می‌گوید: موجودی انبار، بدهی به کارخانه، و بهای
+     * تمام‌شدهٔ نان. دو تای آخر با شمردن انبار هم پیدا نمی‌شوند.
+     *
+     * سنجه، مصرف است نه تقویم: مغازه‌ای که این هفته خمیر نزده، دلیلی
+     * ندارد خرید ثبت کرده باشد.
+     */
+    public const PURCHASE_GAP_DAYS = 12;
+
+    public const PURCHASE_GAP_LOUD_DAYS = 25;
+
+    private function flourArrivingUnrecorded(): array
+    {
+        $flour = InventoryItem::ofKey(InventoryItem::FLOUR);
+
+        if (! $flour) {
+            return [];
+        }
+
+        $since = now()->subDays(self::PURCHASE_GAP_DAYS);
+
+        // یک کوئری برای هر دو سؤال، نه دو تا.
+        //
+        // این اسکنر هر بار که صفحهٔ «امروز» باز می‌شود اجرا می‌شود و یک
+        // تست نگه می‌داردش که تعدادش با بزرگ‌تر شدن مغازه بالا نرود. دو
+        // پرسش جدا از یک جدول، همان دو کوئری است که آن تست برای پیدا
+        // کردنش نوشته شده.
+        $row = InventoryMovement::query()
+            ->where('inventory_item_id', $flour->getKey())
+            ->selectRaw(
+                'SUM(CASE WHEN direction = ? AND reason IN (?, ?) AND created_at >= ?'
+                .' THEN quantity ELSE 0 END) AS used_kg,'
+                .' MAX(CASE WHEN reason = ? THEN created_at END) AS last_purchase_at',
+                ['out', 'production', 'flour_sale', $since, 'purchase'],
+            )
+            ->first();
+
+        $usedKg = (float) ($row->used_kg ?? 0);
+
+        // مصرف، یعنی مغازه کار کرده. بدون این، مغازه‌ای که تعطیل بوده هم
+        // هر روز یادآوری می‌گرفت.
+        if ($usedKg <= 0) {
+            return [];
+        }
+
+        $lastPurchaseAt = $row->last_purchase_at
+            ? Carbon::parse($row->last_purchase_at)
+            : null;
+
+        if ($lastPurchaseAt && $lastPurchaseAt->gt($since)) {
+            return [];
+        }
+
+        $days = $lastPurchaseAt
+            ? (int) $lastPurchaseAt->startOfDay()->diffInDays(now()->startOfDay())
+            : null;
+
+        $bag = (float) (CurrentBakery::get()?->flour_bag_weight_kg ?: 40);
+        $usedBags = $bag > 0 ? $usedKg / $bag : 0;
+
+        return [new SystemIssue(
+            key: 'flour-purchase-gap',
+            severity: $days === null || $days >= self::PURCHASE_GAP_LOUD_DAYS
+                ? SystemIssue::WARNING
+                : SystemIssue::INFO,
+            title: $days === null
+                ? 'هیچ خرید آردی ثبت نشده'
+                : $days.' روز است خرید آرد ثبت نشده',
+            detail: 'در '.self::PURCHASE_GAP_DAYS.' روز گذشته حدود '
+                .number_format($usedBags, 1).' کیسه آرد مصرف شده'
+                .($days === null
+                    ? ' و هیچ خریدی در دفتر نیست.'
+                    : '. آخرین خرید ثبت‌شده: '
+                        .AppCalendar::date($lastPurchaseAt).'.'),
+            cause: 'آرد بدون ثبت فاکتور وارد انبار شده — تحویلی که گرفته شده'
+                .' و در سیستم وارد نشده.',
+            suggestion: 'فاکتورهای ثبت‌نشده را وارد کنید. اصلاح موجودی انبار'
+                .' این را درست نمی‌کند: خریدی که ثبت نشود، هم بدهی به'
+                .' کارخانه را کمتر نشان می‌دهد هم بهای تمام‌شدهٔ نان را، و'
+                .' آن دو با شمردن انبار پیدا نمی‌شوند.',
+            url: '/admin/purchases',
+            urlLabel: 'فاکتورهای خرید',
+            magnitude: $usedBags,
         )];
     }
 
