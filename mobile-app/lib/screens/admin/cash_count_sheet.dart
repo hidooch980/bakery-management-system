@@ -174,6 +174,56 @@ class _CashCountSheetState extends State<CashCountSheet> {
                       ),
                     ),
                   ),
+
+                  // Said before the figure is typed, not after it is judged:
+                  // the first count against books that never received the
+                  // shop's past cash will read «اضافه» by a great deal, and
+                  // that is the books catching up, not money gone astray.
+                  if (book.ledgerBehind != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 20,
+                            color: theme.colorScheme.onTertiaryContainer,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'دفتر حدود ${book.ledgerBehind!.amountFormatted}'
+                                  ' عقب است',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: theme.colorScheme.onTertiaryContainer,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  book.ledgerBehind!.message,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onTertiaryContainer,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 16),
 
                   TextFormField(

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\CashCount;
 use App\Support\AppCalendar;
+use App\Support\CashNeverBanked;
+use App\Support\CurrentBakery;
 use App\Support\Money;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -46,6 +48,11 @@ class CashCountController extends Controller
 
         return $this->success([
             'account' => ['id' => $till->id, 'title' => $till->title],
+            // The first count is not a measurement of how well the shop is
+            // keeping its books — it is the moment the drawer gets a true
+            // figure for the first time.
+            'first_count' => $counts->isEmpty(),
+            'ledger_behind' => $this->ledgerBehind($counts->isEmpty()),
             // What the books say right now, so the screen can show the
             // figure to count against before anything is typed.
             'expected' => Money::convert($expected),
@@ -77,7 +84,9 @@ class CashCountController extends Controller
             return $this->error('حسابی به‌عنوان صندوق نقد تعیین نشده.', 422);
         }
 
-        $count = DB::transaction(function () use ($data, $request, $till) {
+        $first = ! CashCount::where('bank_account_id', $till->id)->exists();
+
+        $count = DB::transaction(function () use ($data, $request, $till, $first) {
             // Read inside the transaction, so the figure written as
             // «expected» is the one the adjustment below is computed from.
             $expected = round((float) $till->balance, 2);
@@ -100,7 +109,12 @@ class CashCountController extends Controller
                     'manual',
                     $request->user()->id,
                     $count,
-                    'اصلاح پس از شمارش صندوق',
+                    // Named for what it actually is. Calling the first one
+                    // an «اصلاح» would file the whole un-posted history of
+                    // the shop as this afternoon's mistake.
+                    $first
+                        ? 'موجودی اولیهٔ صندوق، پس از اولین شمارش'
+                        : 'اصلاح پس از شمارش صندوق',
                 );
             }
 
@@ -114,6 +128,55 @@ class CashCountController extends Controller
                 : 'شمارش ثبت شد.',
             201
         );
+    }
+
+    /**
+     * Why the books are behind the drawer, before the first count.
+     *
+     * The till opened at zero and years of cash never reached it: every
+     * counter sale of flour that named no account, every handover whose
+     * cash share was validated and dropped. So the first count will read
+     * «اضافه» by something close to the shop's whole history, and read on
+     * its own that says the drawer is over — which it is not. It says the
+     * ledger never had the money.
+     *
+     * Only asked before the first count. Afterwards the opening figure is
+     * in the books and a gap means what it says.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function ledgerBehind(bool $firstCount): ?array
+    {
+        $bakery = CurrentBakery::get();
+
+        if (! $firstCount || ! $bakery) {
+            return null;
+        }
+
+        $audit = CashNeverBanked::auditFor($bakery);
+
+        $known = $audit['flour_toman'] + $audit['settlement_toman'];
+        $behind = $known + $audit['unrecorded_toman'];
+
+        if ($behind <= 0) {
+            return null;
+        }
+
+        return [
+            'amount' => Money::convert($behind),
+            'amount_formatted' => Money::format($behind),
+            'flour_sales' => $audit['flour_sales'],
+            'settlements' => $audit['settlements'],
+            // Told apart because they are answered differently: the known
+            // share could be posted from the rows it came from, the rest
+            // cannot be recovered from anywhere and only counting settles it.
+            'known_formatted' => Money::format($known),
+            'unrecorded_formatted' => Money::format($audit['unrecorded_toman']),
+            'message' => 'این اولین شمارش است و دفتر هنوز عقب است: پول نقدی که'
+                .' در گذشته تحویل گرفته شده و هیچ‌وقت به حساب صندوق ننشسته.'
+                .' پس اختلاف این بار «اضافه» نشان می‌دهد و ایراد شما نیست —'
+                .' عددی که می‌شمارید موجودی درست صندوق است.',
+        ];
     }
 
     /** @return array<string, mixed> */
