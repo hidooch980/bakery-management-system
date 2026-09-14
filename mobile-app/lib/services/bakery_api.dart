@@ -943,14 +943,19 @@ class BakeryApi {
         String totalFormatted,
       })> todayFlourSales() async {
     final body = await _client.getCached('/flour-sales/today');
-    final data = body['data'] as Map<String, dynamic>;
-    final summary = data['summary'] as Map<String, dynamic>;
+
+    // خوانده‌شده با همان کمک‌تابع‌های بردبار بقیهٔ فایل.
+    //
+    // پیش از این هر سه سطح مستقیم cast می‌شدند، و پاسخی که `summary`
+    // نداشت — سروری کمی قدیمی‌تر از اپ، یا یک روز خالی که شکلش فرق کند —
+    // خطای نوع می‌داد. آن خطا `ApiException` نیست، پس تب انبار که برای
+    // همین فراخوانی محافظ گذاشته بود هم آن را نمی‌گرفت و کل صفحه، از
+    // جمله موجودی انبار، خالی می‌شد.
+    final data = keyedGroup(body['data']);
+    final summary = keyedGroup(data['summary']);
 
     return (
-      sales: (data['sales'] as List)
-          .cast<Map<String, dynamic>>()
-          .map(FlourSale.fromJson)
-          .toList(),
+      sales: rowList(data['sales']).map(FlourSale.fromJson).toList(),
       count: (summary['count'] as num?)?.toInt() ?? 0,
       totalWeightKg:
           double.tryParse('${summary['total_weight_kg']}') ?? 0,
