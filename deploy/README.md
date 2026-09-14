@@ -60,9 +60,25 @@ sudo nginx -t && sudo systemctl restart nginx php8.3-fpm && sudo systemctl enabl
 
 ## HTTPS
 
-**این کار انجام شده.** مغازه از ۱۴۰۵/۰۶/۰۳ روی `baker.molido.shop` گواهی
-واقعی Let's Encrypt دارد، با آروان جلویش. آنچه پایین می‌آید توضیح وضعیت
-موجود است، نه دستورالعملی برای اجرا.
+> **۱۴۰۵/۰۶/۲۳ — نام عوض شد: `baker.molido.ir`.**
+>
+> رکورد `baker` از زون `molido.shop` رفته بود؛ نام به هیچ جا resolve
+> نمی‌شد، `certbot renew` هر بار NXDOMAIN می‌گرفت و مغازه فقط با IP بالا
+> بود. زونی که در دست مالک است `molido.ir` است و رکورد `baker` آنجا از
+> قبل به همین سرور اشاره می‌کند.
+>
+> پس یک بار روی سرور:
+>
+> ```bash
+> sudo certbot certonly --webroot -w /var/www/bakery/backend/public \
+>   -d baker.molido.ir
+> sudo nginx -t && sudo systemctl reload nginx
+> ```
+>
+> **تا وقتی این اجرا نشده، `server.json` را روی نام جدید نبرید** —
+> اپ به آدرسی وصل می‌شود که گواهی ندارد و همهٔ گوشی‌ها هم‌زمان می‌خوابند.
+
+مغازه از ۱۴۰۵/۰۶/۰۳ گواهی واقعی Let's Encrypt دارد، با آروان جلویش.
 
 > **هشدار، و دلیل بازنویسی این بخش.** تا ۱۴۰۵/۰۶/۲۲ اینجا راهنمای نصب
 > روی `baker.molido.ir` نوشته بود، با فایلی که هیچ TLSی نداشت. مغازه
@@ -83,7 +99,7 @@ sudo nginx -t && sudo systemctl restart nginx php8.3-fpm && sudo systemctl enabl
 
 | | آدرس | |
 |---|---|---|
-| پنل، از مرورگر | `https://baker.molido.shop` | پشت آروان، گواهی واقعی |
+| پنل، از مرورگر | `https://baker.molido.ir` | پشت آروان، گواهی واقعی |
 | آروان به سرور | پورت ۴۴۳ روی همین کانفیگ | رمزنگاری تا خود مغازه می‌رسد، نه فقط تا CDN |
 | گوشی‌های نصب‌شده | `http://37.32.21.125` و `:8000` | **هنوز بدون رمزنگاری** |
 
@@ -150,7 +166,7 @@ sudo nginx -t && sudo systemctl reload nginx
 بعدش **هر سه را بیازمایید**، نه فقط اولی:
 
 ```bash
-curl -s https://baker.molido.shop/api/v1/health
+curl -s https://baker.molido.ir/api/v1/health
 curl -s -o /dev/null -w '%{http_code}\n' http://37.32.21.125/api/v1/health
 curl -s -o /dev/null -w '%{http_code}\n' http://37.32.21.125:8000/api/v1/health
 ```
@@ -167,12 +183,11 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ### گوشی‌ها هنوز روی HTTP هستند
 
-`server.json` هنوز به IP اشاره می‌کند، پس رمز فروشنده از گوشی خوانا رد
-می‌شود. حالا که دامنه از قبل گواهی دارد، این دیگر کار زیرساختی نیست —
-فقط تغییر آدرس:
+`server.json` از ۱۴۰۵/۰۶/۲۳ روی نام است، نه IP. **شرطش این است که
+گواهی `baker.molido.ir` گرفته شده باشد** (بالاتر):
 
 ```json
-"api_base_url": "https://baker.molido.shop/api/v1",
+"api_base_url": "https://baker.molido.ir/api/v1",
 "fallback_urls": [
   "http://37.32.21.125/api/v1",
   "http://37.32.21.125:8000/api/v1"
@@ -189,7 +204,7 @@ fallbackها می‌مانند تا وقتی مطمئن شوید همهٔ گوش
 
 ```bash
 # در backend/.env
-APP_URL=https://baker.molido.shop
+APP_URL=https://baker.molido.ir
 ```
 
 ```bash
