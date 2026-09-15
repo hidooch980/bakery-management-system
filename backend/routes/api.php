@@ -83,7 +83,12 @@ Route::prefix('v1')->group(function () {
     // `active` runs after sanctum has resolved the user and before
     // anything reads or writes: an account switched off must stop working
     // on the next request, not at the next sign-in it never makes.
-    Route::middleware(['auth:sanctum', 'active', 'app-version', 'idempotent'])->group(function () {
+    // `picks-bakery` sits right after sanctum and before anything reads:
+    // an owner with several shops names the one on screen, and it has to
+    // be in force before the first global scope runs, not after.
+    Route::middleware([
+        'auth:sanctum', 'active', 'app-version', 'picks-bakery', 'idempotent',
+    ])->group(function () {
         // --- Available to every authenticated user ---
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -99,6 +104,9 @@ Route::prefix('v1')->group(function () {
         Route::delete('/devices/{token}', [AuthController::class, 'revokeDevice'])
             ->whereNumber('token');
         Route::get('/bakery', [BakeryController::class, 'show']);
+        // No permission gate: it lists only what this person already
+        // reaches, and somebody who reaches one shop gets one row.
+        Route::get('/bakeries/mine', [BakeryController::class, 'mine']);
 
         // --- Attendance (all staff) ---
         Route::middleware('permission:record-attendance')->group(function () {

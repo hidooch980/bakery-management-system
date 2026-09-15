@@ -4,6 +4,7 @@ use App\Exceptions\AlreadyClaimedException;
 use App\Exceptions\InsufficientStockException;
 use App\Http\Middleware\EndsInactiveSessions;
 use App\Http\Middleware\IdempotentWrites;
+use App\Http\Middleware\PicksTheBakery;
 use App\Http\Middleware\RecordsAppVersion;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\AuthenticationException;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EndsInactiveSessions::class,
             'app-version' => RecordsAppVersion::class,
             'idempotent' => IdempotentWrites::class,
+            'picks-bakery' => PicksTheBakery::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,

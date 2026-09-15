@@ -8,6 +8,7 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -53,6 +54,59 @@ class User extends Authenticatable implements FilamentUser
     public function bakery()
     {
         return $this->belongsTo(Bakery::class);
+    }
+
+    /**
+     * The other shops this person may reach, beside their own.
+     *
+     * Their own is `bakery_id` and is not listed here: it is where they
+     * work and it cannot be taken away by deleting a row. Somebody with
+     * nothing in this table reaches exactly one shop, which is every
+     * member of staff and the shape the system had before owners with
+     * more than one shop existed.
+     */
+    public function bakeries()
+    {
+        return $this->belongsToMany(Bakery::class);
+    }
+
+    /**
+     * Every shop this person may look at, their own first.
+     *
+     * Ordered with home at the front because that is the one they want
+     * nine times in ten, and a switcher that opens on somebody else's
+     * shop is a switcher people learn to distrust.
+     *
+     * @return Collection<int, Bakery>
+     */
+    public function reachableBakeries()
+    {
+        $extra = $this->bakeries()->orderBy('name')->get();
+        $home = $this->bakery;
+
+        return $home === null
+            ? $extra
+            : collect([$home])->concat($extra->reject->is($home))->values();
+    }
+
+    /**
+     * Whether this person may act as the given shop.
+     *
+     * Asked before any switch is honoured. An id that is merely *sent* is
+     * a request, not a permission — without this check, a header would be
+     * enough to read another shop's money.
+     */
+    public function canReachBakery(?int $bakeryId): bool
+    {
+        if ($bakeryId === null) {
+            return false;
+        }
+
+        if ((int) $this->bakery_id === $bakeryId) {
+            return true;
+        }
+
+        return $this->bakeries()->whereKey($bakeryId)->exists();
     }
 
     public function scopeOfCurrentBakery($query)
