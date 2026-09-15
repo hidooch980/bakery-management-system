@@ -56,10 +56,35 @@ class CashCount {
 }
 
 /// The drawer as the books see it, plus every count made against it.
+/// یک حسابی که می‌شود موجودی‌اش را با دفتر سنجید.
+///
+/// کشو و حساب بانکی هر دو همین‌اند. تفاوتشان در [isCashBox] است و فقط
+/// کلمات را عوض می‌کند: کشو شمرده می‌شود، حساب بانکی از روی صورت‌حساب
+/// خوانده می‌شود.
+class MoneyAccount {
+  const MoneyAccount({
+    required this.id,
+    required this.title,
+    required this.isCashBox,
+  });
+
+  final int id;
+  final String title;
+  final bool isCashBox;
+
+  factory MoneyAccount.fromJson(Map<String, dynamic> json) => MoneyAccount(
+        id: (json['id'] as num?)?.toInt() ?? 0,
+        title: json['title'] is String ? json['title'] as String : '',
+        isCashBox: json['is_cash_box'] == true,
+      );
+}
+
 class CashCountBook {
   const CashCountBook({
     required this.expectedFormatted,
     required this.counts,
+    this.account,
+    this.accounts = const [],
     this.lastCountedAt,
     this.daysSinceCount,
     this.ledgerBehind,
@@ -67,6 +92,16 @@ class CashCountBook {
 
   final String expectedFormatted;
   final List<CashCount> counts;
+
+  /// حسابی که این ارقام مال آن است.
+  final MoneyAccount? account;
+
+  /// هر حسابی که می‌شود سراغش را گرفت.
+  ///
+  /// خالی می‌ماند اگر سرور قدیمی باشد و این کلید را نفرستد — آن‌وقت صفحه
+  /// همان رفتار قبلی را دارد و فقط صندوق را نشان می‌دهد.
+  final List<MoneyAccount> accounts;
+
   final String? lastCountedAt;
   final int? daysSinceCount;
 
@@ -87,6 +122,13 @@ class CashCountBook {
         ledgerBehind: json['ledger_behind'] is Map<String, dynamic>
             ? LedgerBehind.fromJson(json['ledger_behind'] as Map<String, dynamic>)
             : null,
+        account: json['account'] is Map<String, dynamic>
+            ? MoneyAccount.fromJson(json['account'] as Map<String, dynamic>)
+            : null,
+        accounts: [
+          for (final row in (json['accounts'] as List?) ?? const [])
+            if (row is Map<String, dynamic>) MoneyAccount.fromJson(row),
+        ],
         counts: [
           for (final row in (json['counts'] as List?) ?? const [])
             if (row is Map<String, dynamic>) CashCount.fromJson(row),
