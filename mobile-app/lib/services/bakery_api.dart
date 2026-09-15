@@ -665,8 +665,13 @@ class BakeryApi {
   /// Not cached: the figure somebody is about to count against has to be
   /// the live one. A remembered balance would have them counting against
   /// yesterday and finding a gap that is only the cache.
-  Future<CashCountBook> cashCounts() async {
-    final body = await _client.get('/cash-counts');
+  ///
+  /// [accountId] کدام حساب. بدون آن، صندوق — همان رفتاری که همیشه بوده.
+  Future<CashCountBook> cashCounts({int? accountId}) async {
+    final body = await _client.get(
+      '/cash-counts',
+      query: accountId == null ? null : {'account_id': '$accountId'},
+    );
 
     return CashCountBook.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -690,16 +695,19 @@ class BakeryApi {
   ///
   /// همین استدلال در [ApiClient.postOrQueue] نوشته شده بود و به این مسیر
   /// که صف نمی‌شود نرسیده بود.
+  /// [accountId] کدام حساب شمرده شد. بدون آن، صندوق.
   Future<CashCount> recordCashCount({
     required double countedAmount,
     bool adjust = false,
     String? note,
     String? attemptKey,
+    int? accountId,
   }) async {
     final body = await _client.post('/cash-counts', {
       'counted_amount': countedAmount,
       if (adjust) 'adjust': true,
       if (note != null && note.isNotEmpty) 'note': note,
+      if (accountId != null) 'account_id': accountId,
     }, attemptKey);
 
     return CashCount.fromJson(body['data'] as Map<String, dynamic>);

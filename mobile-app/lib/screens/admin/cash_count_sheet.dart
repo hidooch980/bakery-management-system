@@ -54,10 +54,37 @@ class _CashCountSheetState extends State<CashCountSheet> {
   /// اصلاح می‌نویسد.
   final String _attempt = const Uuid().v4();
 
+  /// کدام حساب. خالی یعنی صندوق — همان پیش‌فرضِ سرور.
+  int? _accountId;
+
+  /// نامِ این نوشتن، برای همین حساب.
+  ///
+  /// `_attempt` یکی است و به ازای هر بار باز شدن صفحه زده می‌شود، چون
+  /// صفحه برای **یک** شمارش باز می‌شد. حالا که می‌شود وسط کار حساب را
+  /// عوض کرد، یک نامِ تنها دو شمارشِ واقعاً متفاوت را یکی نشان می‌دهد و
+  /// سرور دومی را تکرار می‌شمارد و اصلاً ثبت نمی‌کند — بدتر از دوباره
+  /// نوشتن.
+  String get _attemptForAccount => '$_attempt-${_accountId ?? 0}';
+
   @override
   void initState() {
     super.initState();
     _book = widget.api.cashCounts();
+  }
+
+  /// حساب عوض شد: ارقام و تاریخچهٔ همان حساب دوباره خوانده می‌شود.
+  ///
+  /// مبلغِ تایپ‌شده پاک می‌شود. عددی که برای یک حساب شمرده شده، زیر نام
+  /// حساب دیگر ثبت نشود.
+  void _switchTo(int? id) {
+    if (id == _accountId) return;
+
+    setState(() {
+      _accountId = id;
+      _amount.clear();
+      _adjust = false;
+      _book = widget.api.cashCounts(accountId: id);
+    });
   }
 
   @override
@@ -77,9 +104,10 @@ class _CashCountSheetState extends State<CashCountSheet> {
 
       final count = await widget.api.recordCashCount(
         countedAmount: value,
-        attemptKey: _attempt,
+        attemptKey: _attemptForAccount,
         adjust: _adjust,
         note: _note.text.trim(),
+        accountId: _accountId,
       );
 
       if (!mounted) return;
@@ -88,7 +116,9 @@ class _CashCountSheetState extends State<CashCountSheet> {
       showMessage(
         context,
         count.isExact
-            ? 'صندوق با دفتر می‌خواند.'
+            ? (_accountId == null
+                ? 'صندوق با دفتر می‌خواند.'
+                : 'بانک با دفتر می‌خواند.')
             : '${count.differenceLabel} ${count.differenceFormatted} ثبت شد.',
         isError: !count.isExact,
       );
@@ -131,7 +161,7 @@ class _CashCountSheetState extends State<CashCountSheet> {
                 child: Text(
                   snapshot.error is ApiException
                       ? (snapshot.error as ApiException).message
-                      : 'خواندن صندوق ممکن نشد.',
+                      : 'خواندن حساب ممکن نشد.',
                   style: theme.textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
@@ -151,12 +181,42 @@ class _CashCountSheetState extends State<CashCountSheet> {
                       Icon(Icons.calculate_rounded, color: theme.colorScheme.primary),
                       const SizedBox(width: 10),
                       Text(
-                        'شمارش صندوق',
+                        // کشو شمرده می‌شود، حساب بانکی از روی صورت‌حساب
+                        // خوانده می‌شود. یک عنوان برای هر دو، یکی از آن
+                        // دو را غلط توصیف می‌کند.
+                        (book.account?.isCashBox ?? true)
+                            ? 'شمارش صندوق'
+                            : 'بررسی ${book.account!.title}',
                         style: theme.textTheme.titleLarge
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                     ],
                   ),
+
+                  // چند حساب که باشد، انتخاب دست مالک است. یکی که باشد
+                  // انتخابی در کار نیست و ردیف فقط جا می‌گیرد.
+                  if (book.accounts.length > 1) ...[
+                    const SizedBox(height: 14),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final a in book.accounts)
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(end: 8),
+                              child: ChoiceChip(
+                                label: Text(a.title),
+                                selected: a.id == book.account?.id,
+                                onSelected: _saving
+                                    ? null
+                                    : (_) => _switchTo(a.isCashBox ? null : a.id),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 18),
 
                   // What to count against, before anything is typed.
@@ -177,8 +237,11 @@ class _CashCountSheetState extends State<CashCountSheet> {
                           const SizedBox(height: 6),
                           Text(
                             book.neverCounted
-                                ? 'تا حالا شمرده نشده'
-                                : 'آخرین شمارش: ${book.lastCountedAt}'
+                                ? ((book.account?.isCashBox ?? true)
+                                    ? 'تا حالا شمرده نشده'
+                                    : 'تا حالا بررسی نشده')
+                                : '${(book.account?.isCashBox ?? true) ? 'آخرین شمارش' : 'آخرین بررسی'}:'
+                                    ' ${book.lastCountedAt}'
                                     ' (${book.daysSinceCount} روز پیش)',
                             style: theme.textTheme.bodySmall,
                           ),
