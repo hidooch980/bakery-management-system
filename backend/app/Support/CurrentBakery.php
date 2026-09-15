@@ -81,6 +81,25 @@ class CurrentBakery
         }
     }
 
+    /**
+     * Acts as this shop for the rest of the request.
+     *
+     * Unlike [for], which wraps a block and puts the previous answer
+     * back, this holds until the request ends — it is how a switch made
+     * by an owner with several shops takes effect everywhere at once,
+     * including inside every global scope.
+     *
+     * The caller is responsible for having checked that the signed-in
+     * person may reach this shop. Nothing here can check it: this class
+     * is what the permission check itself is asked through, and having
+     * it consult the user would be the same circle `User::bakery()`
+     * documents.
+     */
+    public static function actAs(?int $bakeryId): void
+    {
+        self::$forcedId = $bakeryId;
+    }
+
     /** Cleared between requests and tests, so one never answers for another. */
     public static function forget(): void
     {

@@ -27,6 +27,28 @@ class BakeryController extends Controller
      * would show every total ten times over. Anything that reads a price
      * and writes it straight back must convert it first.
      */
+    /**
+     * The shops the signed-in person may look at.
+     *
+     * Almost always one, and a screen that offers a choice of one is
+     * clutter — so the app is told plainly how many there are and hides
+     * the switcher when there is nothing to switch to.
+     */
+    public function mine(Request $request): JsonResponse
+    {
+        $shops = $request->user()->reachableBakeries();
+        $current = CurrentBakery::id();
+
+        return $this->success([
+            'current_id' => $current,
+            'bakeries' => $shops->map(fn ($shop) => [
+                'id' => $shop->id,
+                'name' => $shop->name,
+                'is_current' => $shop->id === $current,
+            ])->values(),
+        ]);
+    }
+
     public function show(): JsonResponse
     {
         $bakery = CurrentBakery::get();
