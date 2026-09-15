@@ -32,29 +32,54 @@ class OpenBakery
     public const IDENTITY = ['name', 'address', 'phone', 'logo', 'description'];
 
     /**
+     * Opens a shop, run either by a new manager or by somebody already here.
+     *
+     * A shop used to mean a new sign-in, because the only shape the system
+     * knew was one person to one shop. An owner opening their third shop
+     * got a third email and a third password to remember, and three
+     * accounts that could never see each other's figures.
+     *
+     * So `$runBy` is the other way: the shop is handed to somebody who
+     * already signs in, and appears in their switcher instead. No admin is
+     * created and none of the login arguments are read — passing them
+     * beside a `$runBy` would quietly make an account nobody asked for.
+     *
      * @throws ValidationException when the login is taken or the password is blank
      */
     public function run(
         string $name,
-        string $adminName,
-        string $email,
-        ?string $phone,
-        string $password,
+        ?string $adminName = null,
+        ?string $email = null,
+        ?string $phone = null,
+        ?string $password = null,
         ?Bakery $copyFrom = null,
+        ?User $runBy = null,
     ): Bakery {
-        $this->refuseATakenLogin($email, $phone);
+        if ($runBy === null) {
+            $this->refuseATakenLogin((string) $email, $phone);
 
-        if (blank($password)) {
-            throw ValidationException::withMessages([
-                'password' => 'رمز عبور نمی‌تواند خالی باشد.',
-            ]);
+            if (blank($password)) {
+                throw ValidationException::withMessages([
+                    'password' => 'رمز عبور نمی‌تواند خالی باشد.',
+                ]);
+            }
         }
 
-        return DB::transaction(function () use ($name, $adminName, $email, $phone, $password, $copyFrom) {
+        return DB::transaction(function () use ($name, $adminName, $email, $phone, $password, $copyFrom, $runBy) {
             $bakery = Bakery::create([
                 'name' => $name,
                 ...($copyFrom ? self::settingsFrom($copyFrom) : []),
             ]);
+
+            if ($runBy !== null) {
+                // Their home shop is untouched: this is a shop they also
+                // reach, not a move. Taking it away later is deleting a
+                // row, and the place they work cannot be taken from them
+                // by accident.
+                $runBy->bakeries()->syncWithoutDetaching([$bakery->id]);
+
+                return $bakery;
+            }
 
             // Created inside the new shop, so the user and everything the
             // panel later sets up for them is stamped with it rather than

@@ -84,7 +84,10 @@ class OpenBakery extends Page implements HasForms
     {
         abort_unless(self::canAccess(), 403);
 
-        $this->form->fill(['copy_from' => self::headShop()?->id]);
+        $this->form->fill([
+            'copy_from' => self::headShop()?->id,
+            'run_by' => 'me',
+        ]);
     }
 
     public function form(Form $form): Form
@@ -119,13 +122,30 @@ class OpenBakery extends Page implements HasForms
 
                 Forms\Components\Section::make('مدیر این نانوایی')
                     ->icon('heroicon-o-user-circle')
+                    ->schema([
+                        Forms\Components\Radio::make('run_by')
+                            ->label('چه کسی این نانوایی را می‌گرداند؟')
+                            ->options([
+                                'me' => 'خودم — با همین حساب',
+                                'someone_else' => 'یک نفر دیگر — حساب تازه بسازد',
+                            ])
+                            ->default('me')
+                            ->required()
+                            ->live()
+                            ->helperText('اگر خودتان، نانوایی تازه به فهرست مغازه‌های همین'
+                                .' حساب اضافه می‌شود و لازم نیست ورود دیگری به خاطر بسپارید.'),
+                    ]),
+
+                Forms\Components\Section::make('حساب مدیر تازه')
+                    ->icon('heroicon-o-key')
                     ->description('این شخص با همین ایمیل یا تلفن وارد پنل و اپلیکیشن می‌شود و'
                         .' فقط نانوایی خودش را می‌بیند.')
+                    ->visible(fn (Forms\Get $get) => $get('run_by') === 'someone_else')
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('admin_name')
                             ->label('نام مدیر')
-                            ->required()
+                            ->requiredIf('run_by', 'someone_else')
                             ->maxLength(255),
 
                         Forms\Components\TextInput::make('phone')
@@ -138,7 +158,7 @@ class OpenBakery extends Page implements HasForms
                         Forms\Components\TextInput::make('email')
                             ->label('ایمیل (نام کاربری)')
                             ->email()
-                            ->required()
+                            ->requiredIf('run_by', 'someone_else')
                             ->maxLength(255)
                             ->unique('users', 'email')
                             ->columnSpanFull(),
@@ -147,7 +167,7 @@ class OpenBakery extends Page implements HasForms
                             ->label('رمز عبور')
                             ->password()
                             ->revealable()
-                            ->required()
+                            ->requiredIf('run_by', 'someone_else')
                             ->minLength(8)
                             ->rule(new NotAGuessablePassword)
                             ->same('password_confirmation')
@@ -157,7 +177,7 @@ class OpenBakery extends Page implements HasForms
                             ->label('تکرار رمز عبور')
                             ->password()
                             ->revealable()
-                            ->required()
+                            ->requiredIf('run_by', 'someone_else')
                             ->dehydrated(false)
                             ->helperText('رمزی که کسی نتواند با آن وارد شود، نانوایی را قفل می‌کند.'),
                     ]),
@@ -187,18 +207,23 @@ class OpenBakery extends Page implements HasForms
 
         $data = $this->form->getState();
 
+        $mine = ($data['run_by'] ?? 'me') === 'me';
+
         $bakery = app(OpenBakeryAction::class)->run(
             name: $data['name'],
-            adminName: $data['admin_name'],
-            email: $data['email'],
-            phone: filled($data['phone'] ?? null) ? $data['phone'] : null,
-            password: $data['password'],
+            adminName: $mine ? null : $data['admin_name'],
+            email: $mine ? null : $data['email'],
+            phone: $mine || blank($data['phone'] ?? null) ? null : $data['phone'],
+            password: $mine ? null : $data['password'],
             copyFrom: filled($data['copy_from'] ?? null) ? Bakery::find($data['copy_from']) : null,
+            runBy: $mine ? auth()->user() : null,
         );
 
         Notification::make()
             ->title("نانوایی «{$bakery->name}» ساخته شد.")
-            ->body("مدیر آن با {$data['email']} وارد می‌شود. تعداد پخت را خودش از پنل خودش تنظیم می‌کند.")
+            ->body($mine
+                ? 'به فهرست مغازه‌های شما اضافه شد. از بالای صفحه می‌توانید بینشان جابه‌جا شوید.'
+                : "مدیر آن با {$data['email']} وارد می‌شود. تعداد پخت را خودش از پنل خودش تنظیم می‌کند.")
             ->success()
             ->persistent()
             ->send();
@@ -206,7 +231,10 @@ class OpenBakery extends Page implements HasForms
         // Emptied rather than left filled: the next shop is a different shop,
         // and a form still holding the last admin's email invites creating
         // the same person twice.
-        $this->form->fill(['copy_from' => self::headShop()?->id]);
+        $this->form->fill([
+            'copy_from' => self::headShop()?->id,
+            'run_by' => 'me',
+        ]);
     }
 
     protected function getFormActions(): array

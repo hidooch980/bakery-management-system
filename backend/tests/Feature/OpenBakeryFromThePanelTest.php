@@ -68,6 +68,11 @@ class OpenBakeryFromThePanelTest extends TestCase
             ->fillForm([
                 'name' => 'نانوایی دلشادی',
                 'copy_from' => $this->head->id,
+                // These tests are about the shop getting a manager of its
+                // own. The form now also opens a shop the signed-in owner
+                // runs themselves, which is the default and is covered
+                // separately below.
+                'run_by' => 'someone_else',
                 'admin_name' => 'مدیر دلشادی',
                 'email' => 'delshadi@bakery.test',
                 'phone' => '09121110001',
@@ -76,6 +81,56 @@ class OpenBakeryFromThePanelTest extends TestCase
                 ...$overrides,
             ])
             ->call('create');
+    }
+
+    public function test_a_shop_the_owner_runs_themselves_needs_no_new_sign_in(): void
+    {
+        // Opening a shop used to mean inventing a third email and a third
+        // password, and ending with three accounts that could never see
+        // each other's figures. An owner whose shops share one manager —
+        // which is the shop this was built for — wanted none of that.
+        $before = User::count();
+
+        Livewire::test(OpenBakery::class)
+            ->fillForm([
+                'name' => 'نانوایی سوم',
+                'copy_from' => $this->head->id,
+                'run_by' => 'me',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $new = Bakery::query()->where('name', 'نانوایی سوم')->firstOrFail();
+
+        $this->assertSame($before, User::count(), 'حسابی که کسی نخواسته ساخته شده.');
+        $this->assertTrue($this->owner->fresh()->canReachBakery($new->id));
+    }
+
+    public function test_running_it_themselves_does_not_move_them_out_of_their_own_shop(): void
+    {
+        // The shop they work at is not a row that can be deleted. Handing
+        // them a second shop must not quietly become a transfer.
+        $home = $this->owner->bakery_id;
+
+        Livewire::test(OpenBakery::class)
+            ->fillForm([
+                'name' => 'نانوایی چهارم',
+                'run_by' => 'me',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame($home, $this->owner->fresh()->bakery_id);
+    }
+
+    public function test_the_manager_fields_are_not_demanded_when_they_run_it(): void
+    {
+        // They are hidden in that mode, so demanding them would refuse a
+        // form nobody can correct.
+        Livewire::test(OpenBakery::class)
+            ->fillForm(['name' => 'نانوایی پنجم', 'run_by' => 'me'])
+            ->call('create')
+            ->assertHasNoFormErrors();
     }
 
     public function test_the_owner_can_open_a_shop_without_a_terminal(): void
