@@ -21,6 +21,18 @@ use Illuminate\Support\Facades\DB;
  * it says whether the figure is true: change is given from the same
  * drawer, notes are handed over in a hurry, and a sale typed at the wrong
  * price leaves a gap both sides of the ledger agree about.
+ *
+ * The same question is worth asking of a bank account, and for a while
+ * nothing here could. The shop's «حساب سفید» drifted 70,292,603 Toman
+ * from the bank by 1405/05, and the answer was a hand-typed withdrawal
+ * labelled «برداشت شخصی: اختلاف» — the gap closed without the cause ever
+ * being found. A month later it had reopened at 13,022,850.
+ *
+ * A gap one week wide can be traced; a gap three months wide cannot, and
+ * the window is what decides that, not the size of the number. So the
+ * account is now the caller's to name, and the till is only the default.
+ * Everything else — the history, the «adjust» decision, the audit line —
+ * was never cash-specific and is reused as it stands.
  */
 class CashCountController extends Controller
 {
@@ -29,12 +41,43 @@ class CashCountController extends Controller
     /** How many counts the history shows. A season's worth. */
     private const HISTORY = 60;
 
-    public function index(): JsonResponse
+    /**
+     * The account being counted: the one asked for, or the till.
+     *
+     * Scoped to the shop by `BelongsToBakery`, so an id from another
+     * bakery finds nothing rather than counting somebody else's money.
+     * Inactive accounts are refused too — a closed account has no balance
+     * worth arguing with, and counting one would only add a row nobody
+     * will read.
+     */
+    private function accountFor(Request $request): ?BankAccount
     {
-        $till = BankAccount::cashBox();
+        $id = $request->integer('account_id') ?: null;
+
+        if ($id === null) {
+            return BankAccount::cashBox();
+        }
+
+        return BankAccount::query()
+            ->where('id', $id)
+            ->where('is_active', true)
+            ->first();
+    }
+
+    /** Said differently depending on what was actually asked for. */
+    private function noAccountMessage(Request $request): string
+    {
+        return $request->integer('account_id')
+            ? 'این حساب پیدا نشد یا فعال نیست.'
+            : 'حسابی به‌عنوان صندوق نقد تعیین نشده.';
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $till = $this->accountFor($request);
 
         if (! $till) {
-            return $this->error('حسابی به‌عنوان صندوق نقد تعیین نشده.', 422);
+            return $this->error($this->noAccountMessage($request), 422);
         }
 
         $counts = CashCount::with('user')
@@ -48,6 +91,20 @@ class CashCountController extends Controller
 
         return $this->success([
             'account' => ['id' => $till->id, 'title' => $till->title],
+            // Every account worth asking the question of, so the screen
+            // can offer a choice instead of hard-coding the till the way
+            // this controller used to.
+            'accounts' => BankAccount::query()
+                ->where('is_active', true)
+                ->orderByDesc('is_cash_box')
+                ->orderBy('title')
+                ->get()
+                ->map(fn (BankAccount $a) => [
+                    'id' => $a->id,
+                    'title' => $a->title,
+                    'is_cash_box' => (bool) $a->is_cash_box,
+                ])
+                ->values(),
             // The first count is not a measurement of how well the shop is
             // keeping its books — it is the moment the drawer gets a true
             // figure for the first time.
@@ -76,12 +133,15 @@ class CashCountController extends Controller
             // default and always the caller's decision: adjusting quietly
             // would hide the very thing this screen exists to show.
             'adjust' => ['nullable', 'boolean'],
+            // Which account is being counted. Absent means the till, so
+            // every app version already installed keeps working unchanged.
+            'account_id' => ['nullable', 'integer'],
         ]);
 
-        $till = BankAccount::cashBox();
+        $till = $this->accountFor($request);
 
         if (! $till) {
-            return $this->error('حسابی به‌عنوان صندوق نقد تعیین نشده.', 422);
+            return $this->error($this->noAccountMessage($request), 422);
         }
 
         $first = ! CashCount::where('bank_account_id', $till->id)->exists();
@@ -112,9 +172,11 @@ class CashCountController extends Controller
                     // Named for what it actually is. Calling the first one
                     // an «اصلاح» would file the whole un-posted history of
                     // the shop as this afternoon's mistake.
-                    $first
-                        ? 'موجودی اولیهٔ صندوق، پس از اولین شمارش'
-                        : 'اصلاح پس از شمارش صندوق',
+                    // A drawer is counted; a bank account is read off a
+                    // statement. Filing the second under «شمارش صندوق»
+                    // would make the history unreadable the day somebody
+                    // asks which account this line belonged to.
+                    $this->adjustmentNote($till, $first),
                 );
             }
 
@@ -124,10 +186,26 @@ class CashCountController extends Controller
         return $this->success(
             $this->present($count->fresh(['user', 'adjustment'])),
             $count->is_exact
-                ? 'شمارش ثبت شد — صندوق با دفتر می‌خواند.'
-                : 'شمارش ثبت شد.',
+                ? ($till->is_cash_box
+                    ? 'شمارش ثبت شد — صندوق با دفتر می‌خواند.'
+                    : 'ثبت شد — بانک با دفتر می‌خواند.')
+                : 'ثبت شد.',
             201
         );
+    }
+
+    /** What the correcting transaction is called, in the account's own terms. */
+    private function adjustmentNote(BankAccount $account, bool $first): string
+    {
+        if ($account->is_cash_box) {
+            return $first
+                ? 'موجودی اولیهٔ صندوق، پس از اولین شمارش'
+                : 'اصلاح پس از شمارش صندوق';
+        }
+
+        return $first
+            ? "موجودی اولیهٔ «{$account->title}»، پس از اولین بررسی"
+            : "اصلاح پس از بررسی «{$account->title}»";
     }
 
     /**
