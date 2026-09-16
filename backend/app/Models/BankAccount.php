@@ -190,6 +190,24 @@ class BankAccount extends Model
      */
     public static function cardAccount(): ?self
     {
+        return static::mainBank();
+    }
+
+    /**
+     * The shop's bank account — the one that is not the drawer.
+     *
+     * `cardAccount()` was this rule under a name that only described one
+     * of its uses. Money that leaves the shop by bank rather than out of
+     * the till needs the same answer, and calling that «the card account»
+     * would leave the next person reading the wrong thing.
+     *
+     * Nothing rather than the drawer when there is no bank at all: a
+     * payment that posts nowhere is a gap somebody can still go and look
+     * for, while one sitting in the till is a figure that looks right and
+     * is not.
+     */
+    public static function mainBank(): ?self
+    {
         $default = static::active()->where('is_default', true)->first();
 
         if ($default && ! $default->is_cash_box) {
