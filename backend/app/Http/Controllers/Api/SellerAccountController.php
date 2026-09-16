@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
+use App\Models\SellerAccountCredit;
 use App\Models\SettlementRequest;
 use App\Models\User;
 use App\Support\AppCalendar;
@@ -37,10 +38,22 @@ class SellerAccountController extends Controller
         // page put a query on it for each person who has ever sold bread.
         $owedBySeller = SellerSettlement::outstandingForMany($people);
 
+        // Money a seller has already handed over that has not closed a
+        // sale yet — a sale settles whole or not at all, so somebody who
+        // pays most of what they owe leaves the debt standing and the
+        // money sitting against it.
+        //
+        // Without this the page showed the whole debt and nothing else: a
+        // seller who had just handed over ۴۰۰ of ۴۵۰ still read as owing
+        // ۴۵۰, and the owner would ask him for it again.
+        $onAccount = SellerAccountCredit::balancesFor($people->pluck('id'));
+
         $sellers = $people
-            ->map(function (User $seller) use ($pending, $owedBySeller) {
+            ->map(function (User $seller) use ($pending, $owedBySeller, $onAccount) {
                 $owed = $owedBySeller[$seller->id];
                 $request = $pending->get($seller->id);
+                $paid = $onAccount[$seller->id] ?? 0.0;
+                $left = round(max(0, $owed['total'] - $paid), 2);
 
                 return [
                     'id' => $seller->id,
@@ -53,6 +66,12 @@ class SellerAccountController extends Controller
                     'credit_formatted' => Money::format($owed['credit']),
                     'settleable' => Money::convert($owed['total']),
                     'settleable_formatted' => Money::format($owed['total']),
+                    // Already handed over, and what is genuinely left to
+                    // ask for once it is taken off.
+                    'on_account' => Money::convert($paid),
+                    'on_account_formatted' => Money::format($paid),
+                    'still_owed' => Money::convert($left),
+                    'still_owed_formatted' => Money::format($left),
                     'request' => $request ? [
                         'id' => $request->id,
                         'amount_formatted' => $request->amount_formatted,
@@ -65,7 +84,9 @@ class SellerAccountController extends Controller
             })
             // A seller who owes nothing and has asked for nothing is not
             // something the admin needs to scroll past.
-            ->filter(fn (array $s) => $s['settleable'] > 0
+            // Somebody who has paid every last toman on account owes
+            // nothing and does not belong on a page of people to chase.
+            ->filter(fn (array $s) => $s['still_owed'] > 0
                 || $s['credit'] > 0
                 || $s['request'] !== null)
             ->values();
