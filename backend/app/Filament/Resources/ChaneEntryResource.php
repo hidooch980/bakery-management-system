@@ -7,6 +7,7 @@ use App\Models\ChaneEntry;
 use App\Support\CurrentBakery;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
+use App\Support\WhatDeletingCosts;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -273,7 +274,15 @@ class ChaneEntryResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('ویرایش'),
-                Tables\Actions\DeleteAction::make()->label('حذف'),
+                Tables\Actions\DeleteAction::make()
+                    ->label('حذف')
+                    // فروش‌های همین دسته با آن پاک می‌شوند و ثبت بانکی‌شان
+                    // هم. پولش در بانک می‌ماند و دفتر دیگر نمی‌داند بابت
+                    // چیست — یک بار همین شد و مبلغش دو هفته بعد دستی
+                    // برگردانده شد. دسته‌ای که هنوز فروشی نداشته چیزی
+                    // نشان نمی‌دهد: هشدارِ بی‌مورد، همان چیزی است که به
+                    // آدم یاد می‌دهد از روی هشدارِ به‌مورد هم رد شود.
+                    ->modalDescription(fn ($record) => WhatDeletingCosts::warningFor($record)),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

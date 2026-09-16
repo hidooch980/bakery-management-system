@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\DoughEntryResource\Pages;
 use App\Models\DoughEntry;
 use App\Support\Jalali;
+use App\Support\WhatDeletingCosts;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -123,7 +124,15 @@ class DoughEntryResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('ویرایش'),
-                Tables\Actions\DeleteAction::make()->label('حذف'),
+                Tables\Actions\DeleteAction::make()
+                    ->label('حذف')
+                    // فروش‌های همین دسته با آن پاک می‌شوند و ثبت بانکی‌شان
+                    // هم. پولش در بانک می‌ماند و دفتر دیگر نمی‌داند بابت
+                    // چیست — یک بار همین شد و مبلغش دو هفته بعد دستی
+                    // برگردانده شد. دسته‌ای که هنوز فروشی نداشته چیزی
+                    // نشان نمی‌دهد: هشدارِ بی‌مورد، همان چیزی است که به
+                    // آدم یاد می‌دهد از روی هشدارِ به‌مورد هم رد شود.
+                    ->modalDescription(fn ($record) => WhatDeletingCosts::warningFor($record)),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
