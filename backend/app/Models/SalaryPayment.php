@@ -398,11 +398,15 @@ class SalaryPayment extends Model
             return null;
         }
 
-        // «از صندوق» is a real answer, not a missing one. The phone sends
-        // the account as null to mean exactly that, and this used to hand
-        // null straight back — so wages paid out of the drawer left the
-        // shop and no account anywhere was any lighter for it.
-        return $this->bank_account_id ?? BankAccount::cashBox()?->id;
+        // خالی یعنی «از حساب مغازه»، نه «از کشو».
+        //
+        // تا دیروز خالی اصلاً هیچ حسابی را سبک نمی‌کرد و پول بیرون می‌رفت
+        // بی‌آنکه دفتر بفهمد. آن درست شد، ولی روی صندوق نشست — همان حدسی
+        // که مساعده را هم اشتباه برد. مالک گفت «حقوق و مزایا حساب سفید»،
+        // و او کسی است که پول را دستی می‌دهد.
+        //
+        // هرکس واقعاً از کشو حقوق بدهد، صندوق را روی خودِ فیش می‌نویسد.
+        return $this->bank_account_id ?? BankAccount::mainBank()?->id;
     }
 
     public function bankPostingAmount(): float
