@@ -27,7 +27,7 @@ use Tests\TestCase;
  *
  * Each one is the same shape as the holes the drawer was meant to close,
  * and each was opened or left behind by the work that closed them: wages
- * paid «از صندوق» posting nothing, card flour landing in the till, a
+ * paid with no account named posting nothing, card flour landing in the till, a
  * partial handover written off as a settlement, an audit calling properly
  * recorded money missing, a balance sheet dropping the sentence that
  * explains its own gap, and a command telling a shop with no drawer that
@@ -105,11 +105,19 @@ class MoneyWithNowhereToLandTest extends TestCase
         ]);
     }
 
-    // ------------------------------------------------ wages from the drawer
+    // ------------------------------------------------ wages leave somewhere
 
-    public function test_wages_paid_from_the_drawer_leave_the_drawer(): void
+    public function test_wages_with_no_account_named_still_leave_an_account(): void
     {
-        // «از صندوق» is what the phone means when it sends no account.
+        // The hole this file was written to close: a wage that posted
+        // nowhere at all, so the money left the shop and every balance
+        // still had it.
+        //
+        // It used to close it by treating a blank as «از صندوق». That was
+        // a guess, made from a sentence under a form, and it was wrong —
+        // the owner, asked directly, says «حقوق و مزایا حساب سفید». What
+        // this file actually cares about is unchanged: the money leaves
+        // an account. Which account is his answer, not the code's.
         $payment = SalaryPayment::create([
             'user_id' => $this->seller->id,
             'period_start' => now()->subMonth(),
@@ -119,8 +127,8 @@ class MoneyWithNowhereToLandTest extends TestCase
             'bank_account_id' => null,
         ]);
 
-        $this->assertEqualsWithDelta(-5_000_000, (float) $this->till->fresh()->balance, 0.01);
-        $this->assertSame(0.0, (float) $this->bank->fresh()->balance);
+        $this->assertEqualsWithDelta(-5_000_000, (float) $this->bank->fresh()->balance, 0.01);
+        $this->assertSame(0.0, (float) $this->till->fresh()->balance);
         $this->assertSame(1, BankTransaction::where('reason', 'salary')->count());
         $this->assertNotNull($payment->fresh());
     }

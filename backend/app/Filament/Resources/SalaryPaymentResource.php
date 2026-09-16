@@ -34,6 +34,21 @@ class SalaryPaymentResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    /**
+     * Where a blank account actually sends the money, in words.
+     *
+     * «حقوق و مزایا حساب سفید» — the owner, asked directly. Anyone paying
+     * a wage out of the drawer picks the till on the row itself.
+     */
+    private static function whereBlankGoes(): string
+    {
+        $account = BankAccount::mainBank();
+
+        return $account
+            ? "خالی بگذارید اگر از «{$account->title}» پرداخت شده."
+            : 'حسابی برای پرداخت تعریف نشده — حساب را انتخاب کنید.';
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([
@@ -165,8 +180,12 @@ class SalaryPaymentResource extends Resource
                         ->searchable()
                         ->preload()
                         ->native(false)
-                        ->default(fn () => BankAccount::defaultAccount()?->id)
-                        ->helperText('خالی بگذارید اگر از صندوق پرداخت شده.'),
+                        ->default(fn () => BankAccount::mainBank()?->id)
+                        // Computed from the same rule the model uses. A
+                        // fixed sentence is what said «از صندوق» while the
+                        // rule said something else, and the sentence is
+                        // what everybody believed.
+                        ->helperText(fn () => self::whereBlankGoes()),
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')

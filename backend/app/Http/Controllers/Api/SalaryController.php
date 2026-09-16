@@ -285,7 +285,7 @@ class SalaryController extends Controller
      */
     public function employees(): JsonResponse
     {
-        $fallback = BankAccount::defaultAccount()?->id;
+        $fallback = BankAccount::mainBank()?->id;
 
         [$monthFrom, $monthUntil] = Jalali::currentMonthRange();
 

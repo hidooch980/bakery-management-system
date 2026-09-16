@@ -156,14 +156,16 @@ class AWagePaidAlwaysLeavesAnAccountTest extends TestCase
         $this->assertSame(20_000_000.0, $this->balance());
     }
 
-    public function test_marking_it_paid_from_the_till_clears_the_account(): void
+    public function test_clearing_the_account_when_marking_it_paid_sends_it_to_the_bank(): void
     {
-        // Absent and null are two different answers. Leaving the key out
-        // keeps whatever account the slip already carries — and a slip
-        // prepared in the panel defaults to the shop's main one — so «از
-        // صندوق» has to be said with an explicit null, which is what the
-        // phone now sends. Without this the bank is debited for cash that
-        // came out of the till.
+        // Absent and null were once two different answers: leaving the key
+        // out kept the slip's account, and sending null meant «از صندوق»
+        // — which, in a shop with no drawer defined, meant the wage posted
+        // nowhere at all. The hole this whole file exists to close, reached
+        // by a different door.
+        //
+        // Null now means what a blank means everywhere else: the shop's
+        // bank. Cash out of the drawer is said by naming the drawer.
         $slip = $this->payWage(['paid_on' => null]);
 
         $before = $this->balance();
@@ -174,8 +176,8 @@ class AWagePaidAlwaysLeavesAnAccountTest extends TestCase
         ])->assertOk();
 
         $this->assertNull(SalaryPayment::find($slip['id'])->bank_account_id);
-        $this->assertSame($before, $this->balance());
-        $this->assertSame(0, BankTransaction::where('reason', 'salary')->count());
+        $this->assertEqualsWithDelta($before - 8_000_000, $this->balance(), 0.01);
+        $this->assertSame(1, BankTransaction::where('reason', 'salary')->count());
     }
 
     public function test_correcting_the_wage_corrects_the_posting(): void
@@ -202,15 +204,39 @@ class AWagePaidAlwaysLeavesAnAccountTest extends TestCase
         $this->assertSame(20_000_000.0, $this->balance());
     }
 
-    public function test_a_wage_from_the_till_moves_no_account_on_purpose(): void
+    public function test_a_wage_from_the_drawer_is_said_by_naming_the_drawer(): void
     {
+        // Cash out of the drawer is a real answer and it must stay one.
+        // What it must not be is what happens when the field is skipped —
+        // «حقوق و مزایا حساب سفید», and a wage nobody said anything about
+        // goes there.
+        $till = BankAccount::create([
+            'title' => 'صندوق نقد',
+            'opening_balance' => 50_000_000,
+            'is_active' => true,
+            'is_cash_box' => true,
+        ]);
+
+        $this->payWage(['bank_account_id' => $till->id]);
+
+        $this->assertEqualsWithDelta(50_000_000 - 8_000_000, (float) $till->fresh()->balance, 0.01);
+        $this->assertSame(20_000_000.0, $this->balance());
+    }
+
+    public function test_and_a_wage_nobody_said_anything_about_goes_to_the_bank(): void
+    {
+        BankAccount::create([
+            'title' => 'صندوق نقد',
+            'opening_balance' => 50_000_000,
+            'is_active' => true,
+            'is_cash_box' => true,
+        ]);
+
         $before = $this->balance();
 
         $this->payWage(['bank_account_id' => null]);
 
-        // Cash out of the drawer is a real answer, and it must stay one.
-        // What it must not be is what happens when the field is skipped.
-        $this->assertSame($before, $this->balance());
+        $this->assertEqualsWithDelta($before - 8_000_000, $this->balance(), 0.01);
         $this->assertNull(SalaryPayment::first()->bank_account_id);
     }
 
