@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/bakery.dart';
+import '../models/my_bakery.dart';
 import '../providers/auth_provider.dart';
 import '../screens/shared/settings_screen.dart';
+import '../services/api_client.dart';
 import '../services/bakery_api.dart';
 import 'common.dart';
 import 'saved_copy_banner.dart';
@@ -115,6 +117,88 @@ class RoleHomeScaffold extends StatefulWidget {
 class _RoleHomeScaffoldState extends State<RoleHomeScaffold> {
   int _tab = 0;
 
+  /// مغازه‌هایی که این شخص می‌تواند ببیند.
+  ///
+  /// خالی می‌ماند تا وقتی جواب برسد، و اگر نرسد خالی می‌ماند — کسی که یک
+  /// مغازه دارد هیچ فرقی نمی‌بیند، و آن تقریباً همهٔ کسانی است که این
+  /// صفحه را باز می‌کنند.
+  List<MyBakery> _shops = const [];
+
+  Future<void> _loadShops() async {
+    try {
+      final shops = await widget.api.myBakeries();
+
+      if (mounted) setState(() => _shops = shops);
+    } on ApiException {
+      // یک صفحهٔ خانه به خاطر نبودنِ یک انتخابِ اضافه خراب نمی‌شود.
+    }
+  }
+
+  /// مغازه عوض شد: انتخاب ثبت می‌شود و فهرست دوباره خوانده می‌شود تا
+  /// «انتخاب‌شده» را از سرور بگیرد، نه از حدسِ گوشی — سرور ممکن است
+  /// شناسه‌ای را که حقش نیست نادیده گرفته باشد.
+  Future<void> _switchTo(MyBakery shop) async {
+    await widget.api.client.actAsBakery(shop.id);
+
+    if (mounted) await _loadShops();
+  }
+
+  /// نامی که در نوار بالا می‌نشیند.
+  ///
+  /// بعد از جابه‌جایی، `widget.bakery` هنوز مغازهٔ قبلی است — یک بار
+  /// خوانده شده و صفحه‌ای که آن را می‌خواند تازه دارد از نو ساخته
+  /// می‌شود. جوابِ سرور دربارهٔ اینکه کدام مغازه انتخاب است تازه‌تر است،
+  /// پس همان می‌نشیند و نام، یک لحظه هم دروغ نمی‌گوید.
+  String get _currentShopName {
+    for (final shop in _shops) {
+      if (shop.isCurrent) return shop.name;
+    }
+
+    return widget.bakery?.name ?? 'نانوایی';
+  }
+
+  /// فهرست را همان لحظه‌ای می‌گیرد که لازم است.
+  ///
+  /// تعدادِ مغازه‌ها از `/me` آمده، پس تا کسی روی نام نزند این درخواست
+  /// اصلاً فرستاده نمی‌شود — و کسی که یک مغازه دارد هیچ‌وقت نمی‌زند.
+  Future<void> _offerShops() async {
+    if (_shops.isEmpty) await _loadShops();
+
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Text(
+              'کدام مغازه',
+              style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            for (final shop in _shops)
+              ListTile(
+                title: Text(shop.name),
+                trailing: shop.isCurrent
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () {
+                  Navigator.pop(sheetContext);
+
+                  if (!shop.isCurrent) _switchTo(shop);
+                },
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void didUpdateWidget(RoleHomeScaffold oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -135,7 +219,14 @@ class _RoleHomeScaffoldState extends State<RoleHomeScaffold> {
 
     return HomeTabs(
       goTo: _goTo,
-      child: _scaffold(context, theme, user, tabs, current),
+      child: _scaffold(
+        context,
+        theme,
+        user,
+        tabs,
+        current,
+        user?.hasSeveralBakeries == true,
+      ),
     );
   }
 
@@ -158,6 +249,7 @@ class _RoleHomeScaffoldState extends State<RoleHomeScaffold> {
     dynamic user,
     List<HomeTab> tabs,
     HomeTab current,
+    bool several,
   ) {
     return Scaffold(
       floatingActionButton: widget.floatingActionButton,
@@ -182,11 +274,33 @@ class _RoleHomeScaffoldState extends State<RoleHomeScaffold> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    widget.bakery?.name ?? 'نانوایی',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800),
-                  ),
+                  // یک مغازه که باشد، اسم فقط اسم است. چند تا که باشد،
+                  // همان اسم دکمهٔ جابه‌جایی می‌شود — جایی که آدم برای
+                  // فهمیدنِ «کجا هستم» همان‌جا را نگاه می‌کند.
+                  child: several
+                      ? InkWell(
+                          onTap: _offerShops,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _currentShopName,
+                                  style: theme.textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.unfold_more_rounded, size: 18),
+                            ],
+                          ),
+                        )
+                      : Text(
+                          widget.bakery?.name ?? 'نانوایی',
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
                 ),
                 Text(
                   user?.name ?? '',
@@ -215,11 +329,18 @@ class _RoleHomeScaffoldState extends State<RoleHomeScaffold> {
               child: SavedCopyBanner(client: widget.api.client),
             ),
             Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: KeyedSubtree(
-                  key: ValueKey(_tab),
-                  child: Builder(builder: current.builder),
+              // کلید، هم تب است و هم نسلِ مغازه. صفحه‌ها ارقامشان را در
+              // `initState` می‌گیرند، پس بدون عوض شدن کلید، بعد از
+              // جابه‌جایی همان ارقامِ مغازهٔ قبلی زیر نام مغازهٔ تازه
+              // می‌ماند — بدتر از صفحهٔ خالی.
+              child: ValueListenableBuilder<int>(
+                valueListenable: widget.api.client.shopGeneration,
+                builder: (context, generation, _) => AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: KeyedSubtree(
+                    key: ValueKey('$generation-$_tab'),
+                    child: Builder(builder: current.builder),
+                  ),
                 ),
               ),
             ),

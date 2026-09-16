@@ -6,6 +6,7 @@ import '../models/financial_series.dart';
 import '../models/chane_board.dart';
 import '../models/customer.dart';
 import '../models/entries.dart';
+import '../models/my_bakery.dart';
 import '../models/payroll.dart';
 import '../models/purchase.dart';
 import '../models/staff_adjustment.dart';
@@ -60,13 +61,42 @@ class BakeryApi {
     return AppUser.fromJson(body['data'] as Map<String, dynamic>);
   }
 
+  /// مغازه‌هایی که این شخص می‌تواند ببیند، مالِ خودش اول.
+  ///
+  /// تقریباً همیشه یکی است. بدون کش: انتخاب مغازه تصمیمی است که فهرستِ
+  /// به‌یادسپرده می‌تواند غلط از آب دربیاورد — مغازه‌ای که دیگر مال این
+  /// شخص نیست همچنان در فهرست می‌ماند و زدنش هیچ اثری ندارد، که از
+  /// نبودنش گیج‌کننده‌تر است.
+  Future<List<MyBakery>> myBakeries() async {
+    // کش‌شده: فهرست مغازه‌های یک نفر تقریباً هیچ‌وقت عوض نمی‌شود، و
+    // انتخابی که وقتی آنتن می‌رود ناپدید شود بدتر از انتخابی است که یک
+    // نام کهنه در آن باشد.
+    final body = await _client.getCached('/bakeries/mine');
+
+    // هر لایه با `is` خوانده می‌شود نه با cast: این فهرست فقط یک انتخابِ
+    // اضافه است و شکلی که عوض شده باشد باید «انتخابی نیست» معنی بدهد، نه
+    // اینکه صفحهٔ خانه بالا نیاید. سروری که این مسیر را ندارد هم دقیقاً
+    // همین‌جا می‌افتد.
+    final data = body['data'];
+    final rows = data is Map<String, dynamic> ? data['bakeries'] : null;
+
+    return [
+      for (final row in rows is List ? rows : const [])
+        if (row is Map<String, dynamic>) MyBakery.fromJson(row),
+    ];
+  }
+
   Future<void> logout() async {
     try {
       await _client.post('/logout');
     } finally {
       // Always drop the local token, even if the server call failed.
       await _client.clearToken();
-    await _client.clearCache();
+
+      // Forgets the chosen shop as well as the cache. Without it the next
+      // person to sign in on this phone would open inside whichever shop
+      // the last one was looking at.
+      await _client.actAsBakery(null);
     }
   }
 
@@ -102,7 +132,7 @@ class BakeryApi {
     });
 
     await _client.clearToken();
-    await _client.clearCache();
+    await _client.actAsBakery(null);
 
     return body['message'] as String? ?? 'رمز عبور تغییر کرد.';
   }

@@ -93,6 +93,11 @@ class AuthProvider extends ChangeNotifier {
   /// A server that answers «401» and a server that never answered are
   /// different facts. Only the first one means the token is no good.
   Future<void> bootstrap() async {
+    // پیش از هر خواندنی. اگر بعد از اولین درخواست برداشته شود، همان
+    // درخواست به مغازهٔ خانگی می‌رود و صفحهٔ اول ارقام مغازه‌ای را نشان
+    // می‌دهد که کاربر از آن بیرون نیامده بود.
+    await _api.client.restoreBakeryChoice();
+
     final token = await _api.client.readToken();
 
     if (token == null) {

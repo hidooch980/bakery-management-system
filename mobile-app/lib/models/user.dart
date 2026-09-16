@@ -46,6 +46,7 @@ class AppUser {
     this.email,
     this.phone,
     this.permissions = const [],
+    this.bakeryCount = 1,
   });
 
   final int id;
@@ -54,6 +55,16 @@ class AppUser {
   final String? phone;
   final UserRole role;
   final List<String> permissions;
+
+  /// چند مغازه این شخص می‌تواند ببیند.
+  ///
+  /// تقریباً همیشه یک. از `/me` می‌آید تا صفحهٔ خانه بدون هیچ درخواست
+  /// اضافه‌ای بداند انتخابی در کار هست یا نه — وگرنه هر فروشنده و شاطری
+  /// به ازای هر بار باز کردن اپ یک درخواست می‌داد تا چیزی را بفهمد که
+  /// همین‌جا رایگان نوشته شده.
+  final int bakeryCount;
+
+  bool get hasSeveralBakeries => bakeryCount > 1;
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
     final roles = (json['roles'] as List?)?.cast<String>() ?? const [];
@@ -65,6 +76,9 @@ class AppUser {
       phone: json['phone'] as String?,
       role: UserRole.fromApi(roles.isEmpty ? null : roles.first),
       permissions: (json['permissions'] as List?)?.cast<String>() ?? const [],
+      // سروری که این را نمی‌فرستد، یعنی یک مغازه — که تا دیروز تنها
+      // حالتِ ممکن بود.
+      bakeryCount: (json['bakery_count'] as num?)?.toInt() ?? 1,
     );
   }
 
@@ -78,6 +92,7 @@ class AppUser {
         'phone': phone,
         'roles': [role.apiValue],
         'permissions': permissions,
+        'bakery_count': bakeryCount,
       };
 
   bool can(String permission) => permissions.contains(permission);
