@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\StaffAdvanceResource\Pages;
+use App\Models\BankAccount;
 use App\Models\StaffAdvance;
 use App\Support\AppCalendar;
 use App\Support\Money;
@@ -38,6 +39,22 @@ class StaffAdvanceResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    /**
+     * حسابی که خالی گذاشتن به آن می‌رود، به زبان خودش.
+     *
+     * از روی همان قاعده‌ای که `StaffAdvance::bankPostingAccountId()`
+     * به کار می‌برد. اگر روزی آن قاعده عوض شود و این جمله ثابت بماند،
+     * فرم چیزی می‌گوید که دیگر راست نیست — و همین یک بار اتفاق افتاد.
+     */
+    private static function whereBlankGoes(): string
+    {
+        $account = BankAccount::mainBank();
+
+        return $account
+            ? "خالی بگذارید اگر از «{$account->title}» پرداخت شده."
+            : 'حسابی برای پرداخت تعریف نشده — حساب را انتخاب کنید.';
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([
@@ -67,7 +84,17 @@ class StaffAdvanceResource extends Resource
                         ->searchable()
                         ->preload()
                         ->native(false)
-                        ->helperText('خالی بگذارید اگر از حساب سفید پرداخت شده.'),
+                        // فیش حقوقی از اول همین پیش‌فرض را داشت و مساعده
+                        // نداشت — و همین تفاوت بود که مساعده‌ها را روی
+                        // صندوق نشاند: خانه خالی ذخیره می‌شد و حساب را
+                        // قاعده‌ای پشت صحنه تعیین می‌کرد که کسی نمی‌دیدش.
+                        // پرشده، حساب پیش از ذخیره روی صفحه است.
+                        ->default(fn () => BankAccount::mainBank()?->id)
+                        // متن از روی همان قاعده‌ای ساخته می‌شود که مدل
+                        // به کار می‌برد. جملهٔ ثابتِ قبلی «از صندوق»
+                        // می‌گفت در حالی که قاعده چیز دیگری بود، و من
+                        // همان جمله را باور کردم.
+                        ->helperText(fn () => self::whereBlankGoes()),
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیح')
