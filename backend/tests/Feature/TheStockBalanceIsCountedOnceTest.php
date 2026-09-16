@@ -145,8 +145,14 @@ class TheStockBalanceIsCountedOnceTest extends TestCase
         // both of its questions — how much flour was used lately, and when
         // the last purchase was — in a single grouped row rather than two
         // reads, precisely so this bound moves by one and not by two.
+        // 85 with the stranded-payment check: one aggregate per kind of
+        // payment that can be left unposted — wages, advances, expenses,
+        // supplier payments — counting and summing in the database rather
+        // than reading the rows. Four, not one, because they are four
+        // tables; fixed all the same, so a shop with a year of wages
+        // behind it costs the page the same four reads as an empty one.
         $this->assertLessThan(
-            83,
+            87,
             $queries,
             "the answer page took {$queries} queries",
         );
