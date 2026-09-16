@@ -13,17 +13,21 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * مساعده‌ای که از کشو داده می‌شود، از کشو کم می‌شود.
+ * مساعده از حسابی کم می‌شود که از آن پرداخت شده.
  *
- * فرم پنل خودش می‌نویسد «خالی بگذارید اگر از صندوق پرداخت شده» — و همان
- * خالی گذاشتن، تا امروز یعنی هیچ حسابی سبک نشود. اسکناس از کشو بیرون
- * می‌رفت و دفتر همچنان آن را در کشو می‌دید.
+ * دو بار غلط بود. اول اصلاً هیچ حسابی سبک نمی‌شد: پول بیرون می‌رفت و
+ * دفتر همچنان آن را داشت. آن درست شد و این فایل همان را نگه می‌داشت —
+ * ولی روی حدسِ غلط، که خالی یعنی «از صندوق».
  *
- * دقیقاً همین ایراد برای فیش حقوقی پیدا و بسته شده بود، با همین جمله که
- * «از صندوق» یک جواب است نه جوابِ نداده — و به مساعده نرسیده بود. دو مدل
- * خواهر، یک سؤال، دو جواب.
+ * حدس از خودِ فرم پنل آمده بود: «خالی بگذارید اگر از صندوق پرداخت شده».
+ * مالک گفت مساعده از حساب سفید می‌رود، و او می‌داند پول از کجا بیرون
+ * می‌رود — جملهٔ فرم هم با همین عوض شد، چون جمله‌ای که باعثِ حدسِ غلط
+ * بوده اگر بماند نفر بعدی را هم همان‌جا می‌برد.
+ *
+ * نکتهٔ ماندگارش این است: «کدام حساب» را کد نمی‌تواند از روی چیزی در
+ * خودش بفهمد. تنها کسی که می‌داند، کسی است که اسکناس را داده.
  */
-class AnAdvanceOutOfTheDrawerLeavesTheDrawerTest extends TestCase
+class AnAdvanceLeavesTheAccountItWasPaidFromTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -76,11 +80,29 @@ class AnAdvanceOutOfTheDrawerLeavesTheDrawerTest extends TestCase
         return round((float) $this->till->fresh()->balance, 2);
     }
 
-    public function test_an_advance_with_no_account_named_comes_out_of_the_till(): void
+    private function bankBalance(): float
+    {
+        return round((float) $this->bank->fresh()->balance, 2);
+    }
+
+    public function test_an_advance_with_no_account_named_comes_out_of_the_bank(): void
     {
         $this->advance(1_000_000);
 
+        $this->assertEqualsWithDelta(4_000_000, $this->bankBalance(), 0.01);
+
+        // و صندوق دست نمی‌خورد. همین بود که غلط بود.
+        $this->assertEqualsWithDelta(5_000_000, $this->tillBalance(), 0.01);
+    }
+
+    public function test_an_advance_really_paid_from_the_drawer_still_can_be_said(): void
+    {
+        // پیش‌فرض عوض شد، نه امکانش. مساعده‌ای که واقعاً از کشو داده شده
+        // همچنان با نام بردنِ صندوق ثبت می‌شود.
+        $this->advance(1_000_000, $this->till->id);
+
         $this->assertEqualsWithDelta(4_000_000, $this->tillBalance(), 0.01);
+        $this->assertEqualsWithDelta(5_000_000, $this->bankBalance(), 0.01);
     }
 
     public function test_it_is_recorded_as_money_going_out(): void
@@ -95,24 +117,18 @@ class AnAdvanceOutOfTheDrawerLeavesTheDrawerTest extends TestCase
         $this->assertEqualsWithDelta(1_000_000, (float) $posting->amount, 0.01);
     }
 
-    public function test_an_advance_from_a_named_account_still_comes_out_of_that_one(): void
+    public function test_a_shop_with_no_bank_writes_nothing_rather_than_guessing(): void
     {
-        $this->advance(1_000_000, $this->bank->id);
-
-        $this->assertEqualsWithDelta(4_000_000, (float) $this->bank->fresh()->balance, 0.01);
-        $this->assertEqualsWithDelta(5_000_000, $this->tillBalance(), 0.01);
-    }
-
-    public function test_a_shop_with_no_till_loses_nothing_but_says_nothing_either(): void
-    {
-        // بدون صندوق جایی برای نوشتنش نیست. ساختن حساب از خودمان یعنی
-        // سیستم تصمیم بگیرد مغازه حسابی دارد که هیچ‌وقت به او گفته نشده؛
-        // صفحهٔ «مشکلات» همین مغازه را از قبل نام می‌برد.
-        $this->till->update(['is_cash_box' => false]);
+        // بدون حساب بانکی جایی برای نوشتنش نیست، و **صندوق جوابِ جایگزین
+        // نیست**: پرداختی که هیچ‌جا ننشیند شکافی است که می‌شود دنبالش
+        // گشت، ولی پرداختی که اشتباه در کشو بنشیند عددی است که درست به
+        // نظر می‌رسد و نیست. همان چیزی که امروز اصلاحش کردیم.
+        $this->bank->delete();
 
         $advance = $this->advance(1_000_000);
 
         $this->assertCount(0, $advance->bankTransactions);
+        $this->assertEqualsWithDelta(5_000_000, $this->tillBalance(), 0.01);
     }
 
     public function test_correcting_the_amount_moves_the_posting_with_it(): void
@@ -124,7 +140,7 @@ class AnAdvanceOutOfTheDrawerLeavesTheDrawerTest extends TestCase
         $advance->update(['amount' => 600_000]);
 
         $this->assertCount(1, $advance->fresh()->bankTransactions);
-        $this->assertEqualsWithDelta(4_400_000, $this->tillBalance(), 0.01);
+        $this->assertEqualsWithDelta(4_400_000, $this->bankBalance(), 0.01);
     }
 
     public function test_deleting_an_advance_puts_the_money_back(): void
@@ -132,6 +148,6 @@ class AnAdvanceOutOfTheDrawerLeavesTheDrawerTest extends TestCase
         $advance = $this->advance(1_000_000);
         $advance->delete();
 
-        $this->assertEqualsWithDelta(5_000_000, $this->tillBalance(), 0.01);
+        $this->assertEqualsWithDelta(5_000_000, $this->bankBalance(), 0.01);
     }
 }

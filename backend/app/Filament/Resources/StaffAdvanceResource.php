@@ -67,7 +67,7 @@ class StaffAdvanceResource extends Resource
                         ->searchable()
                         ->preload()
                         ->native(false)
-                        ->helperText('خالی بگذارید اگر از صندوق پرداخت شده.'),
+                        ->helperText('خالی بگذارید اگر از حساب سفید پرداخت شده.'),
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیح')
