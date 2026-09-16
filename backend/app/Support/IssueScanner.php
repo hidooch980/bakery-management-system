@@ -15,6 +15,8 @@ use App\Models\Loan;
 use App\Models\Purchase;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
+use App\Models\StaffAdvance;
+use App\Models\SupplierPayment;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -87,6 +89,7 @@ class IssueScanner
             ...$this->drawerNotCounted(),
             ...$this->debtsGoingStale(),
             ...$this->flourArrivingUnrecorded(),
+            ...$this->moneyThatMovedNowhere(),
         ]);
 
         // Worst first, so the page opens on what actually needs attention.
@@ -104,6 +107,91 @@ class IssueScanner
      * ledger is missing an inflow — almost always a purchase that was
      * never entered.
      */
+    /**
+     * Money the shop paid out that made no account any lighter.
+     *
+     * Every payment rule in this system ends the same way: name an account
+     * or, when the shop has not said which bank it pays from, post
+     * nowhere. That second half is deliberate — a payment sitting on the
+     * wrong account is a figure that looks right and is not, while one
+     * that posted nowhere is «a gap somebody can still go and look for».
+     *
+     * Nobody was looking. That sentence is written in four places in this
+     * codebase as the reason the fallback is safe, and until now there was
+     * no page anywhere that showed the gap. This is that page.
+     *
+     * What it cannot be is a guess at where the money went. It names the
+     * payments and their total and asks the one person who knows.
+     */
+    private function moneyThatMovedNowhere(): array
+    {
+        // The amount each kind of payment actually moves. A payslip moves
+        // its net pay, not its gross — the advances it recovers left the
+        // bank when they were handed over.
+        $sources = [
+            'فیش حقوقی' => [SalaryPayment::query()->whereNotNull('paid_on'), 'net_amount'],
+            'مساعده' => [StaffAdvance::query(), 'amount'],
+            'هزینه' => [Expense::query(), 'amount'],
+            'پرداخت به تأمین‌کننده' => [SupplierPayment::query(), 'amount'],
+        ];
+
+        $counts = [];
+        $total = 0.0;
+
+        foreach ($sources as $label => [$query, $column]) {
+            // Counted and summed in the database, never read into memory:
+            // this runs on every load of the issues page, and a shop with
+            // a year of wages behind it would be hydrating every one of
+            // them to add up a figure the database can add up itself.
+            //
+            // Asked through the relation rather than the morph column, so
+            // it keeps working whatever the stored class name looks like.
+            $row = $query->doesntHave('bankTransactions')
+                ->selectRaw("COUNT(*) as n, COALESCE(SUM(ABS({$column})), 0) as total")
+                ->first();
+
+            if (! $row || (int) $row->n === 0) {
+                continue;
+            }
+
+            $counts[] = (int) $row->n.' '.$label;
+            $total += (float) $row->total;
+        }
+
+        if ($total <= 0) {
+            return [];
+        }
+
+        $hasBank = BankAccount::mainBank() !== null;
+
+        return [new SystemIssue(
+            key: 'money-that-moved-nowhere',
+            severity: SystemIssue::CRITICAL,
+            title: 'پولی پرداخت شده که از هیچ حسابی کم نشده',
+            detail: Money::format($total).' پرداخت شده ('
+                .implode('، ', $counts).') ولی موجودی هیچ حسابی'
+                .' به اندازهٔ آن پایین نیامده.',
+            cause: $hasBank
+                ? 'این ردیف‌ها وقتی ثبت شده‌اند که حسابِ پرداخت مشخص نبوده.'
+                    .' حالا حساب هست، ولی ثبت بانکی فقط موقع ذخیرهٔ دوبارهٔ'
+                    .' هر ردیف ساخته می‌شود.'
+                : 'هیچ حساب بانکی‌ای به‌عنوان حساب اصلی مشخص نیست، پس سیستم'
+                    .' نمی‌داند این پول از کجا رفته. عمداً حدس نمی‌زند:'
+                    .' پرداختی که اشتباه در صندوق بنشیند عددی است که درست'
+                    .' به نظر می‌رسد و نیست.',
+            suggestion: $hasBank
+                ? 'هر ردیف را باز کنید و حسابش را انتخاب کنید، یا برای'
+                    .' مساعده و حقوق دستورهای advances:off-the-till و'
+                    .' salaries:off-the-till را بزنید.'
+                : 'حساب بانکی‌ای که از آن پرداخت می‌کنید را بسازید (یا فعال'
+                    .' کنید) و تیک «پیش‌فرض» را به آن بدهید. صندوق نقد سر'
+                    .' جای خودش می‌ماند.',
+            url: $hasBank ? '/admin/staff-advances' : '/admin/bank-accounts',
+            urlLabel: $hasBank ? 'دیدن پرداخت‌ها' : 'تعریف حساب',
+            magnitude: $total,
+        )];
+    }
+
     private function negativeStock(): array
     {
         $issues = [];
