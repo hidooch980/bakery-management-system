@@ -78,6 +78,14 @@ class ApiClient {
             options.headers['X-App-Version'] = version;
           }
 
+          // سرور خودش بررسی می‌کند که این شخص حق این مغازه را دارد یا نه
+          // و شناسه‌ای را که نباید، نادیده می‌گیرد. اینجا فقط گفته می‌شود
+          // کدام روی صفحه است.
+          final bakery = actingBakeryId;
+          if (bakery != null) {
+            options.headers['X-Bakery-Id'] = '$bakery';
+          }
+
           handler.next(options);
         },
       ),
@@ -146,12 +154,60 @@ class ApiClient {
   bool knownOffline = false;
   static const _uuid = Uuid();
 
+  static const _bakeryKey = 'acting_bakery_id';
+
+  /// کدام مغازه روی صفحه است، برای مالکی که چند تا دارد.
+  ///
+  /// روی هر درخواست می‌نشیند نه روی یکی‌یکیِ صداها: اگر هر صفحه خودش
+  /// باید می‌فرستاد، اولین صفحه‌ای که یادش می‌رفت ارقام مغازهٔ دیگری را
+  /// نشان می‌داد و هیچ‌چیز نمی‌گفت کدام است.
+  ///
+  /// خالی یعنی «همان مغازهٔ خودم» — که سرور هم بدون این هدر همان را
+  /// می‌فهمد، پس کسی که یک مغازه دارد هیچ‌وقت چیزی نمی‌فرستد.
+  int? actingBakeryId;
+
+  /// هر بار که مغازه عوض می‌شود یکی بالا می‌رود.
+  ///
+  /// صفحه‌ها ارقامشان را در `initState` می‌گیرند، پس یک `setState` ساده
+  /// چیزی را دوباره نمی‌خواند — ارقام مغازهٔ قبلی روی صفحه می‌ماند زیر
+  /// نام مغازهٔ تازه، که بدترین حالت ممکن است. این شماره کلیدِ درختِ
+  /// صفحه‌هاست: عوض که شود، همه از نو ساخته می‌شوند و از نو می‌پرسند.
+  final shopGeneration = ValueNotifier<int>(0);
+
   Future<void> saveToken(String token) =>
       _storage.write(key: _tokenKey, value: token);
 
   Future<String?> readToken() => _storage.read(key: _tokenKey);
 
   Future<void> clearToken() => _storage.delete(key: _tokenKey);
+
+  /// انتخابِ مغازه را از دفعهٔ قبل برمی‌دارد.
+  ///
+  /// اگر آن مغازه دیگر مال این شخص نباشد، سرور نادیده‌اش می‌گیرد و
+  /// مغازهٔ خودش را جواب می‌دهد — پس انتخابِ کهنه خطرناک نیست، فقط
+  /// بی‌اثر می‌شود.
+  Future<void> restoreBakeryChoice() async {
+    final saved = await _storage.read(key: _bakeryKey);
+
+    actingBakeryId = saved == null ? null : int.tryParse(saved);
+  }
+
+  /// مغازه عوض شد.
+  ///
+  /// کش پاک می‌شود چون هر عددی که در آن است مالِ مغازهٔ قبلی است، و
+  /// نشان دادنِ آن زیر نام مغازهٔ تازه بدتر از خالی بودنِ صفحه است.
+  Future<void> actAsBakery(int? id) async {
+    actingBakeryId = id;
+
+    if (id == null) {
+      await _storage.delete(key: _bakeryKey);
+    } else {
+      await _storage.write(key: _bakeryKey, value: '$id');
+    }
+
+    await clearCache();
+    shopGeneration.value++;
+  }
 
   /// Identical GETs that overlap in time share one round trip.
   ///

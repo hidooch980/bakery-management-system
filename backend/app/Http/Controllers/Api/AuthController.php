@@ -241,6 +241,16 @@ class AuthController extends Controller
             'is_active' => $user->is_active,
             'roles' => $user->getRoleNames(),
             'permissions' => $user->getAllPermissions()->pluck('name'),
+            // How many shops this person reaches, so the phone knows
+            // whether to offer a switcher at all.
+            //
+            // Sent here rather than fetched: almost everybody reaches one,
+            // and a separate read at every home screen would cost every
+            // seller and baker in the shop a request on every open to be
+            // told what this field says for free. It also cannot fail on
+            // its own — a switcher that vanishes when the signal drops is
+            // worse than one that was never offered.
+            'bakery_count' => 1 + $user->bakeries()->count(),
         ];
     }
 
