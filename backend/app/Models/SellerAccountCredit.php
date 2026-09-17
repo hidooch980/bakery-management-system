@@ -49,6 +49,33 @@ class SellerAccountCredit extends Model
     }
 
     /**
+     * The same figure for a whole list of sellers, in one query.
+     *
+     * The accounts page shows every seller at once, and asking per person
+     * would put a query on it for each one — the shape this page has
+     * already been fixed for once.
+     *
+     * @param  iterable<int>  $userIds
+     * @return array<int, float>
+     */
+    public static function balancesFor(iterable $userIds): array
+    {
+        $ids = collect($userIds)->map(fn ($id) => (int) $id)->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return static::query()
+            ->whereIn('user_id', $ids)
+            ->selectRaw('user_id, COALESCE(SUM(amount), 0) as total')
+            ->groupBy('user_id')
+            ->pluck('total', 'user_id')
+            ->map(fn ($total) => round((float) $total, 2))
+            ->all();
+    }
+
+    /**
      * How this row names itself in the trail.
      *
      * The log outlives the record: once the row is gone its id points at

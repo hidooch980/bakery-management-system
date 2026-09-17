@@ -27,6 +27,14 @@ on:
       - 'mobile-app/**'
       - '.github/workflows/mobile-tests.yml'
 
+  # And by hand. On 1405/06/26 the `pull_request` event stopped firing on
+  # an open branch: five pushes in a row produced no run at all, on a PR
+  # carrying a money fix. The backend suite and the script tests could be
+  # started manually and were; this one could not, so the Dart half of
+  # that change had no CI signal until it merged — which is the state
+  # this workflow was written to end.
+  workflow_dispatch:
+
 env:
   FLUTTER_VERSION: '3.44.6'
 

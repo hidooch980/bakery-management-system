@@ -79,12 +79,49 @@ class SettlementRequestController extends Controller
             return $this->error('مبلغی برای تسویه وجود ندارد.', 422);
         }
 
+        $breakdown = $this->breakdownFrom($data);
+
         // A named amount is what the seller is actually handing over. It
         // pays down the running account oldest debt first, so it does not
         // have to match any particular sale.
-        $paying = isset($data['amount'])
-            ? Money::toToman($data['amount'])
-            : $owed['total'];
+        //
+        // With no amount named, what is being settled is whatever the
+        // seller said they were handing over — and only when they said
+        // nothing at all is it the whole account.
+        //
+        // It used to be the whole account whenever `amount` was absent,
+        // however little the seller named beside it. A handover of ۴۰۰
+        // against a debt of ۴۵۰ therefore closed the account for ۴۵۰,
+        // banked the ۴۰۰, and forgave the ۵۰ — no credit, no remaining
+        // debt, nothing on any page to say it had happened. The seller
+        // was simply fifty thousand better off and the shop could not
+        // have found it.
+        //
+        // «مبلغ تسویه باید بیشتر از صفر باشد» below still catches a
+        // handover that names only zeroes, so this cannot settle an
+        // account for nothing.
+        $named = round(
+            (isset($data['paid_cash']) ? Money::toToman($data['paid_cash']) : 0)
+                + (isset($data['paid_card']) ? Money::toToman($data['paid_card']) : 0)
+                + array_sum($breakdown),
+            2,
+        );
+
+        // `paid_cash`/`paid_card` and `payments` are two ways of saying
+        // the same thing, so a caller sending both would be counted twice.
+        // The app sends `payments`; older copies send the pair.
+        if ($breakdown !== [] && (isset($data['paid_cash']) || isset($data['paid_card']))) {
+            return $this->error(
+                'هم مبلغ نقد و کارت فرستاده شده و هم ریز پرداخت‌ها. یکی را بفرستید.',
+                422,
+            );
+        }
+
+        $paying = match (true) {
+            isset($data['amount']) => Money::toToman($data['amount']),
+            $named > 0 => $named,
+            default => $owed['total'],
+        };
 
         if ($paying <= 0) {
             return $this->error('مبلغ تسویه باید بیشتر از صفر باشد.', 422);
@@ -93,8 +130,6 @@ class SettlementRequestController extends Controller
         if ($paying > $owed['total'] + 0.01) {
             return $this->error('مبلغ واردشده از بدهی شما بیشتر است.', 422);
         }
-
-        $breakdown = $this->breakdownFrom($data);
 
         // How much of the handover was money, and of what kind.
         //

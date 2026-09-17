@@ -125,13 +125,31 @@ class _SellerDebtsSectionState extends State<SellerDebtsSection> {
     );
   }
 
+  /// A line naming what this seller has already handed over, or nothing
+  /// when they have handed over nothing — which is the usual case, and a
+  /// «قبلاً پرداخت: ۰» would be noise on every other row.
+  String _alreadyPaidLine(Map<String, dynamic> seller) {
+    final paid = (seller['on_account'] as num?)?.toDouble() ?? 0;
+
+    if (paid <= 0) return '';
+
+    return '\nقبلاً ${seller['on_account_formatted']} پرداخت کرده.';
+  }
+
   Future<void> _settleDirect(Map<String, dynamic> seller) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: Text('تسویه ${seller['name']}'),
         content: Text(
-          'مبلغ ${seller['settleable_formatted']} را از این فروشنده تحویل گرفته‌اید؟'
+          // What is genuinely left to hand over, not the whole debt.
+          // Somebody who has already paid most of their account was being
+          // asked whether they had handed over all of it — and the honest
+          // answer to that question is «no», for a man who owes fifty
+          // thousand.
+          'مبلغ ${seller['still_owed_formatted'] ?? seller['settleable_formatted']}'
+          ' را از این فروشنده تحویل گرفته‌اید؟'
+          '${_alreadyPaidLine(seller)}'
           '\nنسیه‌ها با پرداخت مشتری تسویه می‌شوند و در این مبلغ نیستند.',
         ),
         actions: [
@@ -229,6 +247,18 @@ class _SellerTile extends StatelessWidget {
     final settleable = (seller['settleable'] as num?)?.toDouble() ?? 0;
     final credit = (seller['credit'] as num?)?.toDouble() ?? 0;
 
+    // Money this seller has already handed over that has not closed a
+    // sale — a sale settles whole or not at all. The figure that matters
+    // to the person reading this row is what is left, not the debt as it
+    // stood before they paid anything.
+    //
+    // Older servers do not send either field, so the row falls back to
+    // the debt and reads exactly as it always did.
+    final paid = (seller['on_account'] as num?)?.toDouble() ?? 0;
+    final owed = (seller['still_owed'] as num?)?.toDouble() ?? settleable;
+    final owedLabel =
+        '${seller['still_owed_formatted'] ?? seller['settleable_formatted']}';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -246,16 +276,30 @@ class _SellerTile extends StatelessWidget {
                 ),
               ),
               Text(
-                '${seller['settleable_formatted']}',
+                owedLabel,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: settleable > 0
+                      color: owed > 0
                           ? AppColors.attention
                           : scheme.onSurfaceVariant,
                     ),
               ),
             ],
           ),
+          if (paid > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                // Without this the row reads as though nothing had been
+                // handed over, and the owner asks for it twice.
+                'قبلاً پرداخت شده: ${seller['on_account_formatted']}'
+                ' (از ${seller['settleable_formatted']})',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+
           if (credit > 0)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -317,7 +361,10 @@ class _SellerTile extends StatelessWidget {
                 ),
               ],
             ),
-          ] else if (settleable > 0)
+          ] else if (owed > 0)
+            // `owed`, not the debt before he paid: somebody who has
+            // already handed everything over onto their account has
+            // nothing left to settle, whatever the sales still say.
             OutlinedButton.icon(
               onPressed: onSettle,
               icon: const Icon(Icons.handshake_rounded, size: IconSize.row),
