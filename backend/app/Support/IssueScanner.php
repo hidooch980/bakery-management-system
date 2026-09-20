@@ -12,6 +12,7 @@ use App\Models\FlourAllocation;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
 use App\Models\Loan;
+use App\Models\LoanPayment;
 use App\Models\Purchase;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
@@ -133,6 +134,12 @@ class IssueScanner
             'مساعده' => [StaffAdvance::query(), 'amount'],
             'هزینه' => [Expense::query(), 'amount'],
             'پرداخت به تأمین‌کننده' => [SupplierPayment::query(), 'amount'],
+            // A repayment was left out of this list when it was written,
+            // and it is the one kind the shop pays in the largest single
+            // lumps. Its own test says so out loud — «پرداختی که هیچ
+            // حسابی ندارد، پولی است که دفتر ندیده بیرون برود» — and
+            // nothing was reading it.
+            'قسط وام' => [LoanPayment::query(), 'amount'],
         ];
 
         $counts = [];
