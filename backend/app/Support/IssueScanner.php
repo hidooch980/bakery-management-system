@@ -640,11 +640,31 @@ class IssueScanner
         return $issues;
     }
 
+    /**
+     * Every account with its balance, read once per scan.
+     *
+     * Two checks want this — the overdrawn one and the loan instalment —
+     * and a second query for the second of them made the scan's question
+     * count depend on which caches happened to be warm. The growth guard
+     * caught it: 48 questions for a small shop and 47 for a large one,
+     * which is not growth but is not a number anybody can reason about
+     * either.
+     *
+     * @var Collection<int, BankAccount>|null
+     */
+    private $accountsWithBalance = null;
+
+    /** @return Collection<int, BankAccount> */
+    private function accountsWithBalance()
+    {
+        return $this->accountsWithBalance ??= BankAccount::query()->withBalance()->get();
+    }
+
     private function negativeBankBalance(): array
     {
         $issues = [];
 
-        foreach (BankAccount::query()->withBalance()->get() as $account) {
+        foreach ($this->accountsWithBalance() as $account) {
             if ($account->balance >= 0) {
                 continue;
             }
@@ -934,6 +954,18 @@ class IssueScanner
         $issues = [];
         $soon = now()->addDays(7);
 
+        // «حساب سفید» — the instalment comes off the bank, which is the
+        // rule LoanPayment itself follows. Asking about the drawer would
+        // answer a question nobody asked.
+        //
+        // Found in the collection the scan has already loaded rather than
+        // queried again: mainBank() picks the same row by the same rule,
+        // and a second query here is what made the question count depend
+        // on the shop's state.
+        $bank = BankAccount::mainBankAmong($this->accountsWithBalance());
+
+        $available = $bank === null ? null : (float) $bank->balance;
+
         foreach (Loan::outstanding()->withPaid()->get() as $loan) {
             $due = $loan->next_due_on;
 
@@ -969,10 +1001,20 @@ class IssueScanner
                 cause: $overdue
                     ? 'یا قسط پرداخت نشده، یا پرداخت شده و در سامانه ثبت نشده است.'
                     : 'موعد ماهانه‌ی این وام نزدیک شده است.',
-                suggestion: $overdue
+                // It used to end «مطمئن شوید موجودی حساب کافی است» — asking
+                // the owner to go and look up a figure this very scan has
+                // already read. A prompt to check something the shop knows
+                // is a prompt that gets put off, and a loan instalment put
+                // off is the one that earns a penalty.
+                //
+                // Saying it outright turns the line from a reminder into a
+                // decision: the money is there and this is five minutes, or
+                // it is not and that is the real problem.
+                suggestion: ($overdue
                     ? 'اگر پرداخت شده آن را ثبت کنید تا مانده‌ی وام درست بماند؛'
                         .' وگرنه پیش از جریمه پرداخت کنید.'
-                    : 'پیش از سررسید مطمئن شوید موجودی حساب کافی است.',
+                    : 'پیش از سررسید، پرداخت را برنامه‌ریزی کنید.')
+                    .$this->whetherTheMoneyIsThere($available, (float) $loan->instalment_amount),
                 url: '/admin/loans',
                 urlLabel: 'وام‌ها',
                 // Days late. A loan a month overdue is a different problem
@@ -983,6 +1025,30 @@ class IssueScanner
         }
 
         return $issues;
+    }
+
+    /**
+     * Whether the bank can cover an instalment, said rather than implied.
+     *
+     * Nothing at all when the shop has no bank the scan can name: a shop
+     * with two accounts and no default picked would otherwise be told a
+     * figure that is only one of them, and a wrong number about money is
+     * worse than no number.
+     */
+    private function whetherTheMoneyIsThere(?float $available, float $instalment): string
+    {
+        if ($available === null) {
+            return '';
+        }
+
+        $short = round($instalment - $available, 2);
+
+        if ($short > 0) {
+            return ' موجودی حساب سفید '.Money::format($available)
+                .' است — '.Money::format($short).' کم دارید.';
+        }
+
+        return ' موجودی حساب سفید '.Money::format($available).' است و کفایت می‌کند.';
     }
 
     /**
