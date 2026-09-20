@@ -156,7 +156,12 @@ class SupplierPaymentController extends Controller
             return BankAccount::cashBox()?->id;
         }
 
-        return BankAccount::defaultAccount()?->id;
+        // و «نقدی نبود» هم یعنی بانک، نه هر حسابی که اولْ ساخته شده.
+        // defaultAccount() می‌توانست خودِ صندوق را برگرداند — چه وقتی
+        // تیکِ «پیش‌فرض» رویش باشد و چه وقتی هیچ حسابی پیش‌فرض نباشد و
+        // اولین فعال برداشته شود. حواله‌ای که به کارخانه زده شده بود از
+        // کشو بیرون می‌رفت.
+        return BankAccount::mainBank()?->id;
     }
 
     private function payload(SupplierPayment $payment): array

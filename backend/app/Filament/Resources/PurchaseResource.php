@@ -146,7 +146,7 @@ class PurchaseResource extends Resource
                     Forms\Components\Select::make('bank_account_id')
                         ->label('از حساب')
                         ->options(fn () => BankAccount::active()->pluck('title', 'id'))
-                        ->default(fn () => BankAccount::defaultAccount()?->id)
+                        ->default(fn () => BankAccount::mainBank()?->id)
                         ->searchable()
                         ->native(false)
                         ->placeholder('پرداخت نقدی')
