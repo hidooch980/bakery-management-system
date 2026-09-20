@@ -16,6 +16,7 @@ use App\Models\LoanPayment;
 use App\Models\Purchase;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
+use App\Models\ShareSettlement;
 use App\Models\StaffAdvance;
 use App\Models\SupplierPayment;
 use App\Models\User;
@@ -140,6 +141,13 @@ class IssueScanner
             // حسابی ندارد، پولی است که دفتر ندیده بیرون برود» — and
             // nothing was reading it.
             'قسط وام' => [LoanPayment::query(), 'amount'],
+            // What was handed over at the door, not the invoice total —
+            // the rest of a lorry is a debt to the mill, not a payment.
+            'خرید' => [Purchase::query()->where('paid_amount', '>', 0), 'paid_amount'],
+            // Dormant in this shop — «برداشت شرکا اصلا وجود ندارد» — and
+            // listed anyway: the day one is written is exactly the day
+            // nobody is watching for it.
+            'سهم شرکا' => [ShareSettlement::query()->whereNotNull('paid_on'), 'amount'],
         ];
 
         $counts = [];

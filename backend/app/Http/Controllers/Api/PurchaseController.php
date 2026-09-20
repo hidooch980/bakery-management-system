@@ -353,12 +353,22 @@ class PurchaseController extends Controller
     }
 
     /**
-     * Which account the money left, or null when it came out of the till.
+     * Which account the money handed over at the door came out of.
      *
-     * The same rule as an expense: the shop's own account is the
-     * assumption, naming one overrides it, saying it was cash clears it.
-     * An invoice paid nothing at the door names no account either, so a
-     * zero payment posts nothing whichever way this answers.
+     * It used to say «or null when it came out of the till», and that is
+     * what it did: a lorry paid for in notes moved no account at all. The
+     * mill's debt shrank, the drawer stayed where it was, and the shop
+     * read as richer by the price of forty sacks. Proved with a run
+     * before it was fixed: 30,000,000 in cash, no posting, both balances
+     * untouched.
+     *
+     * The comment also claimed «the same rule as an expense», and the
+     * expense rule had been corrected months earlier — «از صندوق یک جواب
+     * است، نه جوابِ نداده». So the sentence that was supposed to keep the
+     * two in step is the one that hid the difference.
+     *
+     * An invoice paid nothing at the door names no account either way:
+     * a zero payment posts nothing, whichever answer this gives.
      *
      * @param  array<string, mixed>  $data
      */
@@ -369,10 +379,14 @@ class PurchaseController extends Controller
         }
 
         if (filter_var($data['paid_in_cash'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-            return null;
+            return BankAccount::cashBox()?->id;
         }
 
-        return BankAccount::defaultAccount()?->id;
+        // `mainBank` rather than whichever account carries the «پیش‌فرض»
+        // tick: that tick can be on the drawer, and a lorry paid from the
+        // bank would then be booked as notes out of the till — the same
+        // way the wage form came to promise the drawer.
+        return BankAccount::mainBank()?->id;
     }
 
     private function payload(Purchase $purchase): array

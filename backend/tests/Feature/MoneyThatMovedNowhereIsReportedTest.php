@@ -7,8 +7,10 @@ use App\Models\BankAccount;
 use App\Models\Expense;
 use App\Models\Loan;
 use App\Models\LoanPayment;
+use App\Models\Purchase;
 use App\Models\SalaryPayment;
 use App\Models\StaffAdvance;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Support\IssueScanner;
 use App\Support\Money;
@@ -62,6 +64,11 @@ class MoneyThatMovedNowhereIsReportedTest extends TestCase
     {
         return (new IssueScanner)->scan()
             ->firstWhere('key', 'money-that-moved-nowhere');
+    }
+
+    private function mill(): Supplier
+    {
+        return Supplier::firstOrCreate(['name' => 'آسیاب مرکزی']);
     }
 
     private function advance(float $amount): StaffAdvance
@@ -217,5 +224,45 @@ class MoneyThatMovedNowhereIsReportedTest extends TestCase
         $this->assertNotNull($issue, 'قسط جامانده گزارش نشد.');
         $this->assertEqualsWithDelta(4_000_000, $issue->magnitude, 0.01);
         $this->assertStringContainsString('قسط وام', $issue->detail);
+    }
+
+    public function test_a_lorry_that_posted_nowhere_is_reported(): void
+    {
+        // A purchase names its account through the controller now, so
+        // this is the row written before that was true — and the flour
+        // lorry is the largest single thing this shop buys.
+        $purchase = Purchase::create([
+            'user_id' => $this->baker->id,
+            'supplier_id' => $this->mill()->id,
+            'purchased_on' => now(),
+            'amount' => 60_000_000,
+            'paid_amount' => 30_000_000,
+        ]);
+
+        $issue = $this->issue();
+
+        $this->assertNotNull($issue, 'خریدِ جامانده گزارش نشد.');
+
+        // What was handed over at the door, not the invoice total: the
+        // other thirty million is a debt to the mill, not a payment that
+        // went missing.
+        $this->assertEqualsWithDelta(30_000_000, $issue->magnitude, 0.01);
+        $this->assertStringContainsString('خرید', $issue->detail);
+        $this->assertNotNull($purchase->fresh());
+    }
+
+    public function test_an_invoice_paid_nothing_at_the_door_is_not_a_gap(): void
+    {
+        // Entirely on the mill's account. No money moved, so no account
+        // should be lighter and there is nothing to report.
+        Purchase::create([
+            'user_id' => $this->baker->id,
+            'supplier_id' => $this->mill()->id,
+            'purchased_on' => now(),
+            'amount' => 60_000_000,
+            'paid_amount' => 0,
+        ]);
+
+        $this->assertNull($this->issue());
     }
 }
