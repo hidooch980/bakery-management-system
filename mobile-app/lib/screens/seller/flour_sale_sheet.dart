@@ -30,7 +30,11 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
   final _noteController = TextEditingController();
 
   FlourUnit _unit = FlourUnit.kg;
-  PaymentType _paymentType = PaymentType.cash;
+  // Cash came off what a seller may put on a sale, so the sheet opens on
+  // the first type that is still offered rather than on a value the
+  // dropdown no longer holds — a DropdownButtonFormField whose value is
+  // absent from its items throws on build.
+  PaymentType _paymentType = PaymentType.saleChoices.first;
   Customer? _customer;
 
   FlourSaleOptions? _options;
@@ -280,11 +284,11 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
                       prefixIcon: Icon(Icons.payments_rounded),
                     ),
                     items: [
-                      for (final type in PaymentType.choices)
+                      for (final type in PaymentType.saleChoices)
                         DropdownMenuItem(value: type, child: Text(type.label)),
                     ],
                     onChanged: (value) => setState(
-                      () => _paymentType = value ?? PaymentType.cash,
+                      () => _paymentType = value ?? PaymentType.saleChoices.first,
                     ),
                   ),
 

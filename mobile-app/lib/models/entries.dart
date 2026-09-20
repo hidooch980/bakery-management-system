@@ -127,6 +127,21 @@ enum PaymentType {
         PaymentType.charity,
       ];
 
+  /// What a seller may put on a sale.
+  ///
+  /// **`cash` came off this list on 1405/06/29, at the owner's word** —
+  /// «در نوع پرداخت توسط فروشنده در ثبت نقدی هم حذف بشه». A sale is now
+  /// recorded by naming where the bread actually went; loaves nobody
+  /// names stay on the seller's own account as a shortfall, which is
+  /// what the server has always derived them as.
+  ///
+  /// Kept apart from [choices] rather than taken out of it, because that
+  /// list also drives the settlement split — where cash is the whole
+  /// point. A seller handing over the day's notes has to be able to say
+  /// so, and removing it there would leave them no way to.
+  static List<PaymentType> get saleChoices =>
+      choices.where((type) => type != PaymentType.cash).toList();
+
   /// Types the shop must know the buyer for before it can record the sale.
   bool get needsCustomer =>
       this == PaymentType.credit || this == PaymentType.schools;

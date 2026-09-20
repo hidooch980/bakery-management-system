@@ -36,7 +36,23 @@ class SaleController extends Controller
      * older installation, and the queries that exclude them must keep
      * excluding them.
      */
-    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'charity', 'waste'];
+    /**
+     * What a sale may be recorded under.
+     *
+     * `shortfall` joined the list on 1405/06/29. It was already understood
+     * everywhere else — {@see Sale::SHORTFALL_TYPES}, and the recorder
+     * reads a named shortfall line and charges exactly those loaves to the
+     * seller — but the validator refused it, so nothing could ever send
+     * one.
+     *
+     * It matters now because cash came off what a seller may put on a
+     * sale: «فقط در تسویه حساب فروشنده باشد». A day that went entirely
+     * over the counter leaves the seller with nothing to name, and a
+     * batch nobody can name is a batch that stays open for ever. He says
+     * «all of it is on me» instead, and settles it with the notes in his
+     * pocket.
+     */
+    public const PAYMENT_TYPES = ['cash', 'card', 'credit', 'home', 'schools', 'charity', 'waste', 'shortfall'];
 
     /**
      * Seller records the sale of a pending chane batch.
