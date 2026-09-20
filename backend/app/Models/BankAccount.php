@@ -8,6 +8,7 @@ use App\Support\Money;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Collection;
 
 /**
  * A bank or cash account. The balance is derived from the opening figure
@@ -208,7 +209,27 @@ class BankAccount extends Model
      */
     public static function mainBank(): ?self
     {
-        $default = static::active()->where('is_default', true)->first();
+        return static::mainBankAmong(static::active()->get());
+    }
+
+    /**
+     * The same rule, applied to accounts already in hand.
+     *
+     * A caller that has loaded the accounts for another reason should not
+     * query again to ask which one is the bank — and must not re-implement
+     * the rule to avoid it, because two copies of a rule about where money
+     * goes is how every one of this shop's money bugs started.
+     *
+     * `mainBank()` is this function with a query in front of it, so the
+     * rule has one home and the answer cannot differ between callers.
+     *
+     * @param  Collection<int, self>  $accounts
+     */
+    public static function mainBankAmong($accounts): ?self
+    {
+        $active = $accounts->where('is_active', true);
+
+        $default = $active->firstWhere('is_default', true);
 
         if ($default && ! $default->is_cash_box) {
             return $default;
@@ -219,7 +240,7 @@ class BankAccount extends Model
         // stops: picking the lowest id would be a guess, and a guess about
         // which account took the money is worse than a gap somebody can
         // still go and look for.
-        $banks = static::active()->where('is_cash_box', false)->limit(2)->get();
+        $banks = $active->where('is_cash_box', false)->values();
 
         return $banks->count() === 1 ? $banks->first() : null;
     }
