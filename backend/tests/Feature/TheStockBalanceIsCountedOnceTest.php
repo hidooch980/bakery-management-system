@@ -153,8 +153,13 @@ class TheStockBalanceIsCountedOnceTest extends TestCase
         // behind it costs the page the same four reads as an empty one.
         // 86 with the loan instalment joining that check: a fifth table,
         // and the one the shop pays in the largest single lumps.
+        // 88 with the lorry and the partner share joining it: seven
+        // tables now, one aggregate each. Every kind of payment this shop
+        // can make is in that check, which was the point — it was written
+        // with four and the three it was missing were the three that had
+        // just been found wrong.
         $this->assertLessThan(
-            88,
+            90,
             $queries,
             "the answer page took {$queries} queries",
         );
