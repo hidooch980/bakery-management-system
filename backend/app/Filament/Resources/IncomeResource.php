@@ -82,13 +82,21 @@ class IncomeResource extends Resource
                         // depending on which screen recorded it.
                         ->default(fn () => BankAccount::cashBox()?->id
                             ?? BankAccount::defaultAccount()?->id)
-                        ->helperText('پیش‌فرض صندوق است. اگر کارتخوانی بود،'
-                            .' حساب بانکی را انتخاب کنید.')
+                        // One call, not two. helperText() is a plain
+                        // assignment in Filament, so a second call throws
+                        // the first away — and this field had two. The
+                        // sentence that survived was the general one, and
+                        // the one nobody ever saw was the one that says
+                        // «اگر کارتخوانی بود حساب بانکی را انتخاب کنید»:
+                        // exactly the mistake that put card takings in the
+                        // drawer, written down and then silently dropped.
+                        ->helperText('پیش‌فرض صندوق است — اگر کارتخوانی بود،'
+                            .' حساب بانکی را انتخاب کنید.'
+                            .' مبلغ به گردش همان حسابی که انتخاب شود اضافه می‌شود.')
                         ->searchable()
                         ->preload()
                         ->native(false)
-                        ->placeholder('بدون حساب')
-                        ->helperText('اگر انتخاب شود، مبلغ به گردش همان حساب اضافه می‌شود'),
+                        ->placeholder('بدون حساب'),
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')
