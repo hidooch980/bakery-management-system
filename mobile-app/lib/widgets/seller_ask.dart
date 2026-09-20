@@ -33,21 +33,17 @@ class SellerAsk extends StatelessWidget {
     super.key,
     required this.chane,
     required this.bakery,
-    required this.onAllCash,
     required this.onSplit,
-    this.saving = false,
   });
 
   final ChaneEntry chane;
   final Bakery? bakery;
 
   /// Confirming the assumption: the whole batch, cash.
-  final VoidCallback onAllCash;
 
   /// Saying otherwise, which opens the full sheet.
   final VoidCallback onSplit;
 
-  final bool saving;
 
   @override
   Widget build(BuildContext context) {
@@ -62,8 +58,10 @@ class SellerAsk extends StatelessWidget {
       children: [
         const SizedBox(height: 12),
 
+        // Was «همه‌اش نقدی بود؟» — a question whose easy answer no longer
+        // exists. The screen states what there is to account for instead.
         Text(
-          'همه‌اش نقدی بود؟',
+          'این چانه کجا رفت؟',
           textAlign: TextAlign.center,
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w600,
@@ -97,10 +95,17 @@ class SellerAsk extends StatelessWidget {
 
         const SizedBox(height: 26),
 
-        // The one yellow thing on the screen, and it is the answer the day
-        // almost always has.
+        // Was a yellow «بله — همه نقدی» that posted the whole batch as
+        // cash in one tap, with «نه، فرق داشت» under it. Cash came off
+        // the sale sheet at the owner's word on 1405/06/29, and a
+        // one-tap shortcut for it would have been the largest cash path
+        // of all — left standing, it would have made the removal
+        // cosmetic.
+        //
+        // So the question is gone and the sheet is the answer: the
+        // seller says where the bread went.
         FilledButton(
-          onPressed: saving ? null : onAllCash,
+          onPressed: onSplit,
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 17),
             backgroundColor: AppColors.signalFor(theme.brightness),
@@ -109,29 +114,13 @@ class SellerAsk extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          child: saving
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('بله — همه نقدی'),
-        ),
-
-        const SizedBox(height: 10),
-
-        OutlinedButton(
-          onPressed: saving ? null : onSplit,
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-          ),
-          child: const Text('نه، فرق داشت'),
+          child: const Text('ثبت فروش'),
         ),
 
         const SizedBox(height: 8),
 
         Text(
-          'کارتخوان، مدارس، منزل، خیرات یا کسری',
+          'کارتخوان، مدارس، منزل یا خیرات — و هرچه نام نبرید، کسری شماست',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall?.copyWith(color: muted),
         ),

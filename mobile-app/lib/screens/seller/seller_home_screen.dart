@@ -119,7 +119,6 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
 
   /// Set while the one-button answer is in flight, so the button cannot be
   /// pressed twice into two sales.
-  bool _confirming = false;
 
   void _reload() => setState(() { _data = _load(); });
 
@@ -135,48 +134,6 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     );
 
     if (saved == true) _reload();
-  }
-
-  /// The whole batch, cash — the answer nearly every day has, and the one
-  /// the old sheet pre-filled and then made the seller scroll past five
-  /// more fields to agree with.
-  ///
-  /// It posts through `recordSplitSale` like the sheet does, with one line
-  /// instead of six. Anything else — a shortfall, a school, bread taken
-  /// home — is a real division and goes through the sheet, unchanged.
-  Future<void> _recordAllCash(ChaneEntry chane) async {
-    setState(() => _confirming = true);
-
-    final price = _bakery?.breadPrice ?? 0;
-
-    try {
-      final queued = await widget.api.recordSplitSale(
-        chaneEntryId: chane.id,
-        payments: [
-          SalePaymentLine(
-            paymentType: PaymentType.cash,
-            breadCount: chane.chaneCount,
-            amount: chane.chaneCount * price,
-          ),
-        ],
-      );
-
-      if (!mounted) return;
-
-      showMessage(
-        context,
-        queued
-            ? 'اینترنت وصل نیست؛ فروش ذخیره شد و با اتصال بعدی ارسال می‌شود.'
-            : 'فروش ثبت شد.',
-      );
-
-      _reload();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      showMessage(context, e.message, isError: true);
-    } finally {
-      if (mounted) setState(() => _confirming = false);
-    }
   }
 
   Future<void> _openFlourSaleSheet() async {
@@ -368,8 +325,6 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         SellerAsk(
           chane: pending.single,
           bakery: _bakery,
-          saving: _confirming,
-          onAllCash: () => _recordAllCash(pending.single),
           onSplit: () => _openSaleSheet(pending.single),
         )
       else
@@ -584,7 +539,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   /// One field per payment type. A sale can run to hundreds of loaves,
   /// so the count is typed rather than stepped.
   final Map<PaymentType, TextEditingController> _fields = {
-    for (final type in PaymentType.choices) type: TextEditingController(),
+    for (final type in PaymentType.saleChoices) type: TextEditingController(),
   };
 
   /// Buyer per payment type, needed for نسیه and مدارس.
@@ -602,9 +557,14 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   void initState() {
     super.initState();
 
-    // The common case is the whole batch paid in cash, so start there and
-    // let the seller move loaves onto other rows as needed.
-    _fields[PaymentType.cash]!.text = '${widget.chane.chaneCount}';
+    // Nothing is pre-filled. Cash came off the sheet at the owner's word,
+    // and it was the row that used to open holding the whole batch — so
+    // the sheet now starts empty and every loaf has to be named.
+    //
+    // What nobody names stays on the seller's account. That is not new:
+    // the server has always derived a shortfall from the batch less what
+    // was accounted for. What is new is that it is the resting state
+    // rather than the exception.
 
     // Every keystroke moves the running total and the banner above it.
     for (final field in _fields.values) {
@@ -647,7 +607,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
   Currency get _unit => widget.bakery?.currency ?? Currency.toman;
 
-  int get _totalCount => PaymentType.choices
+  int get _totalCount => PaymentType.saleChoices
       .fold(0, (sum, type) => sum + _countFor(type));
 
   /// In Toman, the unit everything is stored in. MoneyFormat converts
@@ -674,11 +634,21 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
   /// Payment types actually used, so the summary names only what was paid.
   Iterable<PaymentType> get _usedTypes =>
-      PaymentType.choices.where((type) => _countFor(type) > 0);
+      PaymentType.saleChoices.where((type) => _countFor(type) > 0);
 
   String? _blockingProblem() {
-    if (_totalCount == 0) return 'برای حداقل یک نوع پرداخت تعداد نان وارد کنید.';
-
+    // An empty sheet used to be refused, and it had to be: cash was a row
+    // here, so a seller with nothing to enter had simply not started.
+    //
+    // Cash now lives only on the settlement — «فقط در تسویه حساب فروشنده
+    // باشد» — so an empty sheet is the commonest day there is: the whole
+    // batch went over the counter and the seller is holding the notes.
+    // Refusing it would leave that batch open for ever and the shop
+    // unable to record its ordinary day.
+    //
+    // It is confirmed rather than waved through: the whole batch landing
+    // on somebody's own account is not a thing to do by brushing a
+    // button.
     if (_totalCount > widget.chane.chaneCount) {
       return 'مجموع تعداد نان از ${widget.chane.chaneCount} عدد این چانه بیشتر است.';
     }
@@ -692,6 +662,42 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     return null;
   }
 
+  /// Says out loud what the seller is taking on, when anything is.
+  ///
+  /// Every loaf not named here stays on his own account until he settles
+  /// — that is the whole shape of the day now. It is his money either
+  /// way, but he should read the figure before it becomes his to answer
+  /// for, not find it on the accounts page a week later.
+  Future<bool> _confirmedWhatStaysOnHisAccount() async {
+    if (_unassigned <= 0) return true;
+
+    final worth = _unassigned * _unitPrice;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تأیید ثبت'),
+        content: Text(
+          '$_unassigned نان نام برده نشده.'
+          '${worth > 0 ? '\n${MoneyFormat.format(worth, currency: _unit)}' : ''}'
+          '\n\nتا تسویه روی حساب شما می‌ماند.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('برگرد'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ثبت کن'),
+          ),
+        ],
+      ),
+    );
+
+    return ok == true;
+  }
+
   Future<void> _save() async {
     final problem = _blockingProblem();
 
@@ -700,11 +706,19 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
       return;
     }
 
+    if (!await _confirmedWhatStaysOnHisAccount()) return;
+
     setState(() => _saving = true);
 
     try {
-      final payments = _usedTypes
-          .map((type) => SalePaymentLine(
+      // Everything the seller did not name is his until he settles, and
+      // it is said out loud rather than left for the server to infer.
+      //
+      // It has to be said: a sheet with no lines at all is refused, and
+      // with cash off the sheet an ordinary day has nothing else on it.
+      // That batch would have stayed open for ever.
+      final payments = [
+        ..._usedTypes.map((type) => SalePaymentLine(
                 paymentType: type,
                 breadCount: _countFor(type),
                 // The API always stores Toman, whatever the shop displays,
@@ -718,8 +732,13 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                 // somebody for bread they gave away.
                 consumedByUserId:
                     type == PaymentType.home ? _consumedBy : null,
-              ))
-          .toList();
+              )),
+        if (_unassigned > 0)
+          SalePaymentLine(
+            paymentType: PaymentType.shortfall,
+            breadCount: _unassigned,
+          ),
+      ];
 
       final queued = await widget.api.recordSplitSale(
         chaneEntryId: widget.chane.id,
@@ -799,7 +818,7 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
               ),
               const SizedBox(height: 10),
 
-              for (final type in PaymentType.choices)
+              for (final type in PaymentType.saleChoices)
                 _PaymentRow(
                   key: ValueKey(type),
                   type: type,

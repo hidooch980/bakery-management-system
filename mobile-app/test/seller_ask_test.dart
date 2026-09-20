@@ -3,18 +3,17 @@ import 'package:bakery_app/widgets/seller_ask.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The seller's «یک کار» asks the question the day almost always answers.
+/// The seller's «یک کار» names the batch and sends him to account for it.
 ///
-/// The seller's job is not «how many did you sell» — my first drawing of
-/// this screen was that, and it was wrong. What the shop needs is how one
-/// batch *divided*: cash, card, schools, home, charity, and whatever is
+/// The seller's job is not «how many did you sell». What the shop needs is
+/// how one batch *divided*: card, schools, home, charity, and whatever is
 /// left as a shortfall on his own account. One number cannot say that.
 ///
-/// It is very nearly always all cash, though, and the old sheet already
-/// assumed so — it pre-filled cash with the whole batch and then asked the
-/// seller to scroll past five more fields to agree. So the screen states
-/// the assumption and offers two answers, and the second one opens the
-/// same sheet as before.
+/// This screen used to answer it in one tap — «بله — همه نقدی» posted the
+/// whole batch as cash. Cash came off what a seller may put on a sale on
+/// 1405/06/29, at the owner's word, and a one-tap shortcut for it would
+/// have made that removal cosmetic. So the question is gone and the sheet
+/// is the only way through.
 void main() {
   ChaneEntry batch({int count = 755}) => ChaneEntry(
         id: 1,
@@ -28,9 +27,7 @@ void main() {
 
   Future<void> pump(
     WidgetTester tester, {
-    required VoidCallback onAllCash,
     required VoidCallback onSplit,
-    bool saving = false,
     ChaneEntry? chane,
   }) {
     return tester.pumpWidget(
@@ -39,8 +36,6 @@ void main() {
           body: SellerAsk(
             chane: chane ?? batch(),
             bakery: null,
-            saving: saving,
-            onAllCash: onAllCash,
             onSplit: onSplit,
           ),
         ),
@@ -48,21 +43,22 @@ void main() {
     );
   }
 
-  testWidgets('it states the assumption rather than asking for a number',
+  testWidgets('it names the batch rather than asking for a number',
       (tester) async {
-    await pump(tester, onAllCash: () {}, onSplit: () {});
+    await pump(tester, onSplit: () {});
 
-    expect(find.text('همه‌اش نقدی بود؟'), findsOneWidget);
+    expect(find.text('این چانه کجا رفت؟'), findsOneWidget);
     expect(find.text('755'), findsOneWidget);
   });
 
-  testWidgets('the yellow button answers the common day', (tester) async {
-    var confirmed = 0;
+  testWidgets('there is no one-tap way to call the batch cash',
+      (tester) async {
+    // The whole of the change in one assertion. A button that posted the
+    // batch as cash would have left the removal cosmetic.
+    await pump(tester, onSplit: () {});
 
-    await pump(tester, onAllCash: () => confirmed++, onSplit: () {});
-    await tester.tap(find.text('بله — همه نقدی'));
-
-    expect(confirmed, 1);
+    expect(find.text('بله — همه نقدی'), findsNothing);
+    expect(find.textContaining('نقدی'), findsNothing);
   });
 
   /// The exception path must stay one tap away. A shortfall lands on the
@@ -71,38 +67,17 @@ void main() {
   testWidgets('saying otherwise opens the full sheet', (tester) async {
     var split = 0;
 
-    await pump(tester, onAllCash: () {}, onSplit: () => split++);
-    await tester.tap(find.text('نه، فرق داشت'));
+    await pump(tester, onSplit: () => split++);
+    await tester.tap(find.text('ثبت فروش'));
 
     expect(split, 1);
   });
 
-  testWidgets('it names what the other path is for', (tester) async {
-    await pump(tester, onAllCash: () {}, onSplit: () {});
+  testWidgets('it names what the sheet is for', (tester) async {
+    await pump(tester, onSplit: () {});
 
     expect(find.textContaining('کارتخوان'), findsOneWidget);
     expect(find.textContaining('کسری'), findsOneWidget);
-  });
-
-  /// Two taps on a slow connection would be two sales for one batch, and
-  /// the second would be a duplicate the shop has to unpick by hand.
-  testWidgets('neither button answers twice while a sale is in flight',
-      (tester) async {
-    var confirmed = 0;
-    var split = 0;
-
-    await pump(
-      tester,
-      saving: true,
-      onAllCash: () => confirmed++,
-      onSplit: () => split++,
-    );
-
-    await tester.tap(find.byType(FilledButton));
-    await tester.tap(find.byType(OutlinedButton));
-
-    expect(confirmed, 0);
-    expect(split, 0);
   });
 
   testWidgets('it reads the batch it was given, not a remembered one',
@@ -110,7 +85,6 @@ void main() {
     await pump(
       tester,
       chane: batch(count: 412),
-      onAllCash: () {},
       onSplit: () {},
     );
 

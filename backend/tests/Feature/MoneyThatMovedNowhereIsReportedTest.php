@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\Bakery;
 use App\Models\BankAccount;
 use App\Models\Expense;
+use App\Models\Loan;
+use App\Models\LoanPayment;
 use App\Models\SalaryPayment;
 use App\Models\StaffAdvance;
 use App\Models\User;
@@ -187,5 +189,33 @@ class MoneyThatMovedNowhereIsReportedTest extends TestCase
         $this->assertStringContainsString('off-the-till', $issue->suggestion);
         $this->assertNotSame('/admin/bank-accounts', $issue->url);
         $this->assertNotNull($bank->fresh());
+    }
+
+    public function test_a_loan_instalment_that_posted_nowhere_is_reported(): void
+    {
+        // The largest single sums this shop pays out, and the kind the
+        // check was written without. Its own test had the gap written
+        // down and nothing was reading it.
+        $loan = Loan::create([
+            'title' => 'وام بانک صادرات',
+            'lender' => 'بانک صادرات',
+            'principal' => 500_000_000,
+            'instalment_amount' => 4_000_000,
+            'instalment_count' => 36,
+            'first_due_on' => now()->subMonths(2),
+        ]);
+
+        LoanPayment::create([
+            'loan_id' => $loan->id,
+            'user_id' => $this->baker->id,
+            'amount' => 4_000_000,
+            'paid_on' => now(),
+        ]);
+
+        $issue = $this->issue();
+
+        $this->assertNotNull($issue, 'قسط جامانده گزارش نشد.');
+        $this->assertEqualsWithDelta(4_000_000, $issue->magnitude, 0.01);
+        $this->assertStringContainsString('قسط وام', $issue->detail);
     }
 }

@@ -151,8 +151,10 @@ class TheStockBalanceIsCountedOnceTest extends TestCase
         // than reading the rows. Four, not one, because they are four
         // tables; fixed all the same, so a shop with a year of wages
         // behind it costs the page the same four reads as an empty one.
+        // 86 with the loan instalment joining that check: a fifth table,
+        // and the one the shop pays in the largest single lumps.
         $this->assertLessThan(
-            87,
+            88,
             $queries,
             "the answer page took {$queries} queries",
         );
