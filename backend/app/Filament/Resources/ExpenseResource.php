@@ -75,7 +75,7 @@ class ExpenseResource extends Resource
                         ->label('حساب بانکی')
                         ->options(fn () => BankAccount::active()
                             ->pluck('title', 'id'))
-                        ->default(fn () => BankAccount::defaultAccount()?->id)
+                        ->default(fn () => BankAccount::mainBank()?->id)
                         ->searchable()
                         ->preload()
                         ->native(false)

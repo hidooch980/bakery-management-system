@@ -60,7 +60,7 @@ class PaymentsRelationManager extends RelationManager
             Forms\Components\Select::make('bank_account_id')
                 ->label('از حساب')
                 ->options(fn () => BankAccount::active()->pluck('title', 'id'))
-                ->default(fn () => BankAccount::defaultAccount()?->id)
+                ->default(fn () => BankAccount::mainBank()?->id)
                 ->native(false)
                 ->searchable()
                 ->placeholder('پرداخت نقدی')

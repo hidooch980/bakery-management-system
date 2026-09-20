@@ -176,7 +176,18 @@ class ExpenseController extends Controller
             return BankAccount::cashBox()?->id;
         }
 
-        return BankAccount::defaultAccount()?->id;
+        // mainBank() و نه defaultAccount(): تیکِ «پیش‌فرض» می‌تواند روی
+        // خودِ صندوق بنشیند، و آن‌وقت هزینه‌ای که با کارت پرداخت شده از
+        // کشو بیرون می‌رود. کشو به اندازهٔ همان هزینه کم می‌خواند و بانک
+        // دست‌نخورده می‌ماند — و تنها راه پیدا شدنش شمردنِ اسکناس‌هاست.
+        //
+        // بدتر از آن: defaultAccount() وقتی هیچ حسابی «پیش‌فرض» نباشد
+        // اولین حسابِ فعال را برمی‌دارد، که معمولاً همان صندوق است چون
+        // اول از همه ساخته می‌شود.
+        //
+        // همان چیزی که فرمِ حقوق را وادار کرد کشو را وعده بدهد، و همان
+        // چیزی که خریدِ تریلی را اصلاح کرد.
+        return BankAccount::mainBank()?->id;
     }
 
     private function payload(Expense $expense): array
