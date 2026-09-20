@@ -111,42 +111,56 @@ class ALoanPaymentAlwaysMovesAnAccountTest extends TestCase
         $this->assertEqualsWithDelta($after - 4_500_000, $this->balance(), 0.01);
     }
 
-    public function test_a_payment_with_no_account_never_had_a_posting_to_lose(): void
+    public function test_a_payment_with_no_account_named_comes_out_of_the_bank(): void
     {
         $before = $this->balance();
 
-        $payment = LoanPayment::create([
+        LoanPayment::create([
             'loan_id' => $this->loan->id,
             'user_id' => $this->admin->id,
             'amount' => 500_000,
             'paid_on' => now(),
         ]);
 
-        // Nothing moved, which is consistent — but it is also the shape
-        // that bit: a payment recorded against no account is money the
-        // ledger has not seen leave.
-        $this->assertEqualsWithDelta($before, $this->balance(), 0.01);
-        $this->assertSame(0, $this->postingsFor($payment));
+        // This used to move nothing at all, and the comment here said so:
+        // «a payment recorded against no account is money the ledger has
+        // not seen leave». It was written down as a known hole and left,
+        // and nothing read it — not even the issues page.
+        //
+        // «حساب سفید», asked and answered, the same as for advances and
+        // wages. An instalment paid in notes out of the drawer names the
+        // till on its own row.
+        $this->assertEqualsWithDelta($before - 500_000, $this->balance(), 0.01);
     }
 
-    public function test_naming_an_account_on_an_old_payment_writes_the_withdrawal(): void
+    public function test_moving_a_payment_to_another_account_moves_the_money_with_it(): void
     {
+        $till = BankAccount::create([
+            'title' => 'صندوق نقد',
+            'opening_balance' => 50_000_000,
+            'is_active' => true,
+            'is_cash_box' => true,
+        ]);
+
+        // Recorded against the bank, then corrected: this one really was
+        // paid in notes. The money has to leave the drawer and go back to
+        // the bank, not sit on both.
         $payment = LoanPayment::create([
             'loan_id' => $this->loan->id,
             'user_id' => $this->admin->id,
             'amount' => 5_000_000,
             'paid_on' => now(),
+            'bank_account_id' => $this->account->id,
         ]);
 
-        $before = $this->balance();
+        $bankAfterFirst = $this->balance();
 
-        // The repair: say which account it came out of, and saving does
-        // the rest.
-        $payment->bank_account_id = $this->account->id;
+        $payment->bank_account_id = $till->id;
         $payment->save();
 
         $this->assertSame(1, $this->postingsFor($payment));
-        $this->assertEqualsWithDelta($before - 5_000_000, $this->balance(), 0.01);
+        $this->assertEqualsWithDelta($bankAfterFirst + 5_000_000, $this->balance(), 0.01);
+        $this->assertEqualsWithDelta(45_000_000, (float) $till->fresh()->balance, 0.01);
     }
 
     public function test_the_posting_is_a_withdrawal_and_says_it_is_a_loan(): void
