@@ -8,6 +8,8 @@ use App\Support\IssueScanner;
 use App\Support\ShopHealth;
 use App\Support\SystemIssue;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
+use Symfony\Component\Console\Terminal;
 
 /**
  * One command that asks the whole shop whether it adds up.
@@ -39,7 +41,9 @@ use Illuminate\Console\Command;
  */
 class CheckTheShopIsHealthy extends Command
 {
-    protected $signature = 'shop:health {--quiet-when-clean : Print nothing unless something is wrong}';
+    protected $signature = 'shop:health
+        {--quiet-when-clean : Print nothing unless something is wrong}
+        {--issues : List the issue centre\'s open items instead of only counting them}';
 
     protected $description = 'Checks every cycle in the shop against itself';
 
@@ -112,6 +116,10 @@ class CheckTheShopIsHealthy extends Command
             ));
         }
 
+        if ($this->option('issues')) {
+            $this->listIssues($open);
+        }
+
         if ($health->isSpotless()) {
             $this->newLine();
             $this->info('  همه‌ی چرخه‌ها با خودشان می‌خوانند.');
@@ -132,5 +140,89 @@ class CheckTheShopIsHealthy extends Command
         // A warning is something to look at; a failure is something wrong
         // with the system itself, and only that fails the command.
         return $health->isSound() ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * The open items themselves, for a reader with no browser.
+     *
+     * The count above names a screen — and on a shop run from a phone over
+     * SSH, that screen is not reachable while the terminal is. «۱۱ مورد
+     * باز (۲ بحرانی)» then says something is wrong and refuses to say
+     * what, which is worse than saying nothing: the owner knows there is a
+     * problem and has no way to find out which.
+     *
+     * Critical first, because a list read on a small screen is read from
+     * the top and often no further.
+     *
+     * @param  Collection<int, SystemIssue>  $open
+     */
+    private function listIssues(Collection $open): void
+    {
+        if ($open->isEmpty()) {
+            $this->newLine();
+            $this->info('  هیچ مورد بازی در صفحهٔ مشکلات نیست.');
+
+            return;
+        }
+
+        $order = [
+            SystemIssue::CRITICAL => 0,
+            SystemIssue::WARNING => 1,
+            SystemIssue::INFO => 2,
+        ];
+
+        $sorted = $open->sortBy(fn (SystemIssue $issue) => $order[$issue->severity] ?? 3)->values();
+
+        foreach ($sorted as $number => $issue) {
+            $this->newLine();
+
+            $this->line(sprintf(
+                '  <fg=%s>%s</> <options=bold>%d. %s</>',
+                $this->terminalColour($issue->severity),
+                $issue->severityLabel(),
+                $number + 1,
+                $issue->title,
+            ));
+
+            // Wrapped rather than printed raw: a detail line is a sentence
+            // written for a page, and an 80-column terminal cuts it in the
+            // middle of a number otherwise.
+            foreach ([$issue->detail, $issue->cause] as $paragraph) {
+                if (trim((string) $paragraph) !== '') {
+                    $this->line($this->indent($paragraph));
+                }
+            }
+
+            if (trim($issue->suggestion) !== '') {
+                $this->line($this->indent('← '.$issue->suggestion));
+            }
+        }
+
+        $this->newLine();
+    }
+
+    /**
+     * The severity as a terminal colour.
+     *
+     * `SystemIssue::color()` and `icon()` answer for Filament — «danger»
+     * and a heroicon name — and Symfony refuses both. The first run of
+     * this flag died on «Invalid "danger" color», which is the sort of
+     * thing only running it finds.
+     */
+    private function terminalColour(string $severity): string
+    {
+        return match ($severity) {
+            SystemIssue::CRITICAL => 'red',
+            SystemIssue::WARNING => 'yellow',
+            default => 'cyan',
+        };
+    }
+
+    /** Wraps a sentence to the terminal and indents it under its heading. */
+    private function indent(string $text): string
+    {
+        $width = max(40, (int) (new Terminal)->getWidth() - 8);
+
+        return '     '.str_replace("\n", "\n     ", wordwrap(trim($text), $width, "\n", false));
     }
 }
