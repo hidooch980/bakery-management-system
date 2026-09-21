@@ -7,6 +7,7 @@ use App\Models\ConsignmentFlour;
 use App\Models\Customer;
 use App\Models\InventoryItem;
 use App\Models\IssueAcknowledgement;
+use App\Models\Loan;
 use App\Models\User;
 use App\Support\IssueScanner;
 use App\Support\Money;
@@ -15,6 +16,7 @@ use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -168,6 +170,105 @@ class TheOpenIssuesCanBeReadWithoutABrowserTest extends TestCase
         $issue = $this->anOpenIssue('نانوایی هیدوچ', 56);
 
         $this->assertStringContainsString($issue->severityLabel(), $this->listing());
+    }
+
+    /**
+     * An issue with no page at all.
+     *
+     * A token idle past the prune window says the nightly job is not
+     * running — a server condition, with nothing in the panel to click.
+     */
+    private function aTokenNobodyPruned(): void
+    {
+        DB::table('personal_access_tokens')->insert([
+            'tokenable_type' => User::class,
+            'tokenable_id' => $this->admin->id,
+            'name' => 'گوشیِ فراموش‌شده',
+            'token' => hash('sha256', 'stale-'.uniqid()),
+            'abilities' => '["*"]',
+            'created_at' => now()->subDays(90),
+            'updated_at' => now()->subDays(90),
+            'last_used_at' => now()->subDays(90),
+        ]);
+    }
+
+    /** An issue that carries the page which fixes it. */
+    private function anIssueWithAPage(): SystemIssue
+    {
+        Loan::create([
+            'title' => 'وام خرید دستگاه',
+            'principal' => 307_668_800,
+            'instalment_amount' => 4_000_000,
+            'instalment_count' => 77,
+            'first_due_on' => now()->subMonth(),
+        ]);
+
+        $issue = (new IssueScanner)->scan()
+            ->first(fn ($i) => str_starts_with($i->key, 'loan-due-'));
+
+        $this->assertNotNull($issue);
+        $this->assertNotNull($issue->url, 'این مورد باید آدرس داشته باشد.');
+
+        return $issue;
+    }
+
+    public function test_it_says_where_to_go_and_fix_it(): void
+    {
+        // The listing printed what was wrong, why, and what to do — and
+        // not the one thing that says where. That is the same fault it was
+        // built to fix one level up: the summary said something was wrong
+        // and would not say what; this said what and would not say where.
+        //
+        // Proved by running it: the loan issue carries /admin/loans and
+        // the output contained no address at all.
+        $issue = $this->anIssueWithAPage();
+
+        $this->assertStringContainsString($issue->url, $this->listing());
+    }
+
+    public function test_the_page_is_named_as_well_as_addressed(): void
+    {
+        // «/admin/loans» alone is a path. «وام‌ها» alone is a screen
+        // somebody has to go and find. Both is an instruction.
+        $issue = $this->anIssueWithAPage();
+
+        $this->assertStringContainsString($issue->urlLabel, $this->listing());
+    }
+
+    public function test_only_the_issues_that_have_a_page_get_an_arrow(): void
+    {
+        // Not every issue has somewhere to go — the server-health ones
+        // carry no page at all. A bare «→» under one of those would read
+        // as a line that failed to render.
+        //
+        // Both kinds have to be present or this proves nothing: with
+        // every open issue carrying a page, the count matches whether the
+        // `url !== null` guard is there or not. Checked by removing the
+        // guard — the assertion stayed green until a url-less issue was
+        // put in front of it.
+        $this->anIssueWithAPage();
+        $this->aTokenNobodyPruned();
+
+        $listing = $this->listing();
+
+        $expected = (new IssueScanner)->scan()
+            ->filter(fn (SystemIssue $issue) => $issue->url !== null)
+            ->count();
+
+        $this->assertSame($expected, substr_count($listing, '→'));
+
+        // And no stray line where the address would have been. The arrow
+        // is trimmed away on its own, so removing the guard leaves not a
+        // bare «→» but a line of spaces under every url-less issue —
+        // which is what the guard is actually for, and what a sabotage
+        // run showed when the arrow count stayed right and two blank
+        // lines appeared.
+        foreach (explode("\n", $listing) as $line) {
+            $this->assertFalse(
+                $line !== '' && trim($line) === '',
+                'خطی که فقط فاصله است، جای آدرسِ نبوده را گرفته.'
+            );
+        }
     }
 
     public function test_the_listing_never_costs_the_command_its_exit_code(): void

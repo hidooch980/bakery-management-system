@@ -196,6 +196,23 @@ class CheckTheShopIsHealthy extends Command
             if (trim($issue->suggestion) !== '') {
                 $this->line($this->indent('← '.$issue->suggestion));
             }
+
+            // Where to go and do it.
+            //
+            // Every issue carries the page that fixes it, and this listing
+            // printed everything except that — which is the same fault the
+            // listing itself was built to fix one level up: the summary
+            // said something was wrong and would not say what, and this
+            // said what was wrong and would not say where.
+            //
+            // The panel's own address, so it can be typed into a phone that
+            // is already signed in. The label alone would not be enough —
+            // «وام‌ها» is a screen somebody has to go and find.
+            if ($issue->url !== null) {
+                $this->line($this->indent(
+                    '   '.trim(($issue->urlLabel ?? '').' → '.$issue->url, ' →')
+                ));
+            }
         }
 
         $this->newLine();
