@@ -427,6 +427,10 @@ Route::prefix('v1')->group(function () {
 
             // --- Seller accounts: what each seller still owes ---
             Route::get('/seller-accounts', [SellerAccountController::class, 'index']);
+            // Where the figure came from, day by day. «معلوم نیست عدد از
+            // کجا آمده» — the page showed one number per seller and
+            // nothing behind it.
+            Route::get('/seller-accounts/{seller}/breakdown', [SellerAccountController::class, 'breakdown']);
             Route::post('/seller-accounts/{seller}/settle', [SellerAccountController::class, 'settle']);
             Route::post('/seller-accounts/{seller}/settle-loaves', [SellerAccountController::class, 'settleLoaves']);
             Route::post('/settlement-requests/{settlement}/confirm', [SellerAccountController::class, 'confirm']);
