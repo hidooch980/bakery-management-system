@@ -99,6 +99,87 @@ class SellerAccountController extends Controller
     }
 
     /**
+     * Where the number came from.
+     *
+     * The seller-accounts page has always shown one figure per person and
+     * nothing behind it. «معلوم نیست عدد از کجا آمده» — and neither the
+     * owner nor the seller could check it: the only way to see which sales
+     * made up a debt was the panel's sales table, filtered by hand.
+     *
+     * So the figure is taken apart by day, which is the unit the shop
+     * actually works in — a seller hands over the day's takings, and a
+     * disagreement is nearly always about one particular day.
+     *
+     * Credit is listed apart from the rest, and said to be apart. It is
+     * money still with the customer, so it is not the seller's to hand
+     * over; put in the same column it makes the seller look as though they
+     * are short by money they never collected.
+     */
+    public function breakdown(User $seller): JsonResponse
+    {
+        $seller = SameBakery::or404($seller);
+
+        $sales = SellerSettlement::outstandingSales($seller)
+            ->with('chaneEntry:id,chane_count')
+            ->get();
+
+        $days = $sales
+            // Grouped on the shop's own date, not the Gregorian one, so a
+            // day on this page is the day the seller worked.
+            ->groupBy(fn ($sale) => $sale->created_at->toDateString())
+            ->map(function ($ofDay, string $date) {
+                $cash = round($ofDay->sum(fn ($s) => $s->cash_held), 2);
+                $difference = round($ofDay->sum(fn ($s) => $s->open_difference), 2);
+                $shortfall = round($ofDay->sum(fn ($s) => $s->open_shortfall), 2);
+                $credit = round($ofDay->sum(fn ($s) => $s->open_credit), 2);
+                $total = round($cash + $shortfall - $difference, 2);
+
+                return [
+                    'date' => $date,
+                    'date_label' => AppCalendar::date($ofDay->first()->created_at),
+                    'sale_count' => $ofDay->count(),
+                    'bread_count' => (int) $ofDay->sum('bread_count'),
+                    'cash' => Money::convert($cash),
+                    'cash_formatted' => Money::format($cash),
+                    'difference' => Money::convert($difference),
+                    'difference_formatted' => Money::format($difference),
+                    'shortfall' => Money::convert($shortfall),
+                    'shortfall_formatted' => Money::format($shortfall),
+                    'credit' => Money::convert($credit),
+                    'credit_formatted' => Money::format($credit),
+                    'total' => Money::convert($total),
+                    'total_formatted' => Money::format($total),
+                    // What «تسویهٔ این روز» settles, named rather than
+                    // re-derived on the phone: the day is the unit the
+                    // owner picks, and the sales are what actually close.
+                    'sale_ids' => $ofDay->pluck('id')->values()->all(),
+                ];
+            })
+            ->values()
+            // Newest first: a disagreement is nearly always about
+            // yesterday, not last month.
+            ->sortByDesc('date')
+            ->values();
+
+        $owed = SellerSettlement::outstandingFor($seller);
+
+        return $this->success([
+            'seller' => ['id' => $seller->id, 'name' => $seller->name],
+            'days' => $days,
+            'total' => Money::convert($owed['total']),
+            'total_formatted' => Money::format($owed['total']),
+            'credit' => Money::convert($owed['credit']),
+            'credit_formatted' => Money::format($owed['credit']),
+            // The arithmetic, written out, because the subtraction is the
+            // part people query: a gap in what was handed over counts
+            // *against* the seller elsewhere and *for* them here.
+            'rule' => 'نقد نزد فروشنده + نان تسویه‌نشده − اختلاف صندوق = مبلغ قابل تسویه.'
+                .' نسیهٔ مشتری‌ها جداست: آن پول هنوز دست مشتری است و'
+                .' فروشنده آن را در دست ندارد که تحویل بدهد.',
+        ]);
+    }
+
+    /**
      * Confirms a seller's request. The card share has already reached the
      * bank on its own, so it is posted to the account rather than counted
      * as cash the admin took by hand.
@@ -206,17 +287,44 @@ class SellerAccountController extends Controller
     {
         $seller = SameBakery::or404($seller);
 
-        $owed = SellerSettlement::outstandingFor($seller);
-
-        if ($owed['total'] <= 0) {
-            return $this->error('مبلغی برای تسویه وجود ندارد.', 422);
-        }
-
         $data = $request->validate([
             'paid_cash' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'paid_card' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'bank_account_id' => ['sometimes', 'nullable', 'exists:bank_accounts,id'],
+            // Several days at once, which is how the shop actually
+            // settles: a seller away for a week hands over the week, and
+            // the owner had either to close the whole account or to
+            // settle each day as a separate handover and count the money
+            // as many times.
+            'days' => ['sometimes', 'array', 'min:1'],
+            'days.*' => ['date_format:Y-m-d'],
         ]);
+
+        $chosen = $data['days'] ?? null;
+
+        // The ids are resolved from the seller's own open sales, so naming
+        // a day does not reach anybody else's rows — and a day with
+        // nothing open in it is a mistake worth saying out loud rather
+        // than a handover that silently settles nothing.
+        $saleIds = null;
+
+        if ($chosen !== null) {
+            $saleIds = SellerSettlement::outstandingSales($seller)
+                ->get()
+                ->filter(fn ($sale) => in_array($sale->created_at->toDateString(), $chosen, true))
+                ->pluck('id')
+                ->all();
+
+            if ($saleIds === []) {
+                return $this->error('در روزهای انتخاب‌شده چیزی برای تسویه نیست.', 422);
+            }
+        }
+
+        $owed = SellerSettlement::outstandingFor($seller, $saleIds);
+
+        if ($owed['total'] <= 0) {
+            return $this->error('مبلغی برای تسویه وجود ندارد.', 422);
+        }
 
         // This used to close the account and move no money whatever — the
         // seller handed over the day's takings, the row went green, and no
@@ -252,9 +360,30 @@ class SellerAccountController extends Controller
         // handing over less money made the debt smaller than the money.
         $partial = round($cash + $card, 2) < round($owed['total'], 2) - 0.01;
 
+        // A part payment spreads oldest debt first across the whole
+        // account, which is the right thing when nobody named a day — and
+        // the wrong thing when somebody did: the owner picks three days,
+        // hands over less than they come to, and the money lands on a
+        // fourth day they did not pick. Said rather than silently done.
+        if ($partial && $chosen !== null) {
+            return $this->error(
+                'برای روزهای انتخاب‌شده مبلغ کامل لازم است: '
+                    .Money::format($owed['total']).'.'
+                    .' برای پرداخت جزئی، روزها را انتخاب نکنید.',
+                422,
+            );
+        }
+
         $account = $partial
             ? SellerSettlement::payWithMethod($seller, $request->user(), $cash, $card, $named)
-            : SellerSettlement::settleWithMethod($seller, $request->user(), $cash, $card, $named);
+            : SellerSettlement::settleWithMethod(
+                $seller,
+                $request->user(),
+                $cash,
+                $card,
+                $named,
+                saleIds: $saleIds,
+            );
 
         return $this->success([
             'settled' => ! $partial,
@@ -266,6 +395,8 @@ class SellerAccountController extends Controller
             'account' => $account?->title,
         ], $partial
             ? Money::format(round($cash + $card, 2)).' به حساب '.$seller->name.' واریز شد.'
-            : 'حساب '.$seller->name.' تسویه شد.');
+            : ($chosen === null
+                ? 'حساب '.$seller->name.' تسویه شد.'
+                : count($chosen).' روز از حساب '.$seller->name.' تسویه شد.'));
     }
 }

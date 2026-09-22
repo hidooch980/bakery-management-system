@@ -97,6 +97,7 @@ GET api/v1/sales/payment-types                              (any signed-in)
 GET api/v1/sales/staff                                      admin, seller
 GET api/v1/sales/today                                      admin, seller
 GET api/v1/seller-accounts                                  admin
+GET api/v1/seller-accounts/{seller}/breakdown               admin
 GET api/v1/settlement-requests                              admin, seller
 GET api/v1/settlement-requests/account                      admin, seller
 GET api/v1/settlement-requests/settleable                   admin, seller
