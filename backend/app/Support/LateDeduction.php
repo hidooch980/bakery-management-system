@@ -45,45 +45,76 @@ class LateDeduction
     {
         [$from, $until] = Jalali::monthRangeFor($anyDayInMonth->copy());
 
-        // Across shops on purpose, then narrowed by the person: this runs
-        // from a model event and from the console, and the console has no
-        // current bakery to scope to. `user_id` is the narrower filter
-        // anyway — a person works at one shop — and the row that gets
-        // written takes its `bakery_id` from the records below rather
-        // than from whatever ambient state happens to be set.
-        $existing = StaffAdjustment::acrossBakeries()
+        // Across shops on purpose, then grouped by shop: this runs from a
+        // model event and from the console, and the console has no current
+        // bakery to scope to.
+        //
+        // One group per shop, because a person can work at more than one.
+        // Summed together they made one row for the month — proved by
+        // running it: 100,000 late at one shop and 250,000 at another
+        // became a single 350,000 deduction on the first shop's payslip,
+        // with nothing at all on the second's. Harmless while a shop is
+        // the only shop; money on the wrong books the day it is not.
+        $lateByShop = WorkStart::acrossBakeries()
+            ->where('user_id', $userId)
+            ->where('is_late', true)
+            ->whereBetween('date', [$from->toDateString(), $until->toDateString()])
+            ->get(['bakery_id', 'penalty_amount'])
+            ->groupBy('bakery_id');
+
+        $existingByShop = StaffAdjustment::acrossBakeries()
             ->where('user_id', $userId)
             ->where('source', self::SOURCE)
             ->whereBetween('occurred_on', [$from->toDateString(), $until->toDateString()])
-            ->first();
+            ->get()
+            ->groupBy('bakery_id');
 
+        // Both sides: a shop whose lateness has gone to nothing still has
+        // a row to clear, and it would be missed by walking the late days
+        // alone.
+        $shopIds = $lateByShop->keys()
+            ->merge($existingByShop->keys())
+            ->unique();
+
+        foreach ($shopIds as $shopId) {
+            self::syncOneShop(
+                $userId,
+                $shopId === '' ? null : (int) $shopId,
+                (float) ($lateByShop->get($shopId)?->sum('penalty_amount') ?? 0),
+                $existingByShop->get($shopId)?->first(),
+                $from,
+                $until,
+            );
+        }
+    }
+
+    /**
+     * One person's month at one shop.
+     *
+     * @param  float  $total  What the tariff says they owe that shop
+     */
+    private static function syncOneShop(
+        int $userId,
+        ?int $shopId,
+        float $total,
+        ?StaffAdjustment $existing,
+        Carbon $from,
+        Carbon $until,
+    ): void {
         // A settled month is history. The payslip has been written and
-        // this figure is part of a net somebody was paid; moving it now
-        // would change a document after the fact and the person holding
-        // it would have no way to know.
+        // handed over, and moving the figure now would make the paper in
+        // somebody's pocket disagree with the books.
         if ($existing?->salary_payment_id !== null) {
             return;
         }
 
-        // And a waived one is a decision. The tariff works out what is
-        // owed; whether to take it is the owner's, and a rule that
-        // recomputes over that answer is not one the shop is running.
-        // Restoring the waiver hands the row back to this method.
+        // Forgiven on purpose. The owner decided, and a nightly job is not
+        // the thing that overrules them.
         if ($existing?->isWaived()) {
             return;
         }
 
-        $records = WorkStart::acrossBakeries()
-            ->where('user_id', $userId)
-            ->where('is_late', true)
-            ->whereBetween('date', [$from->toDateString(), $until->toDateString()])
-            ->get(['bakery_id', 'penalty_amount']);
-
-        $total = (float) $records->sum('penalty_amount');
-
         if ($total <= 0) {
-            // Nothing owed. The row goes rather than sitting at zero: a
-            // «کسر: ۰» on a payslip reads as a judgement about somebody.
             $existing?->delete();
 
             return;
@@ -95,8 +126,6 @@ class LateDeduction
             'source' => self::SOURCE,
             'amount' => $total,
             'days' => null,
-            // The last day of the month it belongs to, so the payslip for
-            // that month claims it wherever in the month the lateness was.
             'occurred_on' => $until->toDateString(),
             'reason' => 'کسر تأخیر طبق تعرفه — '.AppCalendar::monthLabel($from),
         ];
@@ -116,7 +145,7 @@ class LateDeduction
         // From the days being charged for, not from the ambient current
         // bakery: run from the console there is none, and a row with a
         // null shop is a row that shows up on every shop's pay sheet.
-        $adjustment->bakery_id = $records->first()?->bakery_id;
+        $adjustment->bakery_id = $shopId;
         $adjustment->save();
     }
 
