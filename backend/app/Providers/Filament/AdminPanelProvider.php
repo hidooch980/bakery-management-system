@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\PicksTheBakeryInThePanel;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -61,6 +62,14 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::TOPBAR_END,
                 fn (): string => view('filament.topbar-clock')->render(),
             )
+            // An owner who holds more than one shop had no way in the
+            // panel to look at the second one — the phone names the shop
+            // in a header and a browser sends none. Absent for everybody
+            // who holds one shop, which is nearly everybody.
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_END,
+                fn (): string => view('filament.topbar-shop')->render(),
+            )
             ->darkMode(true)
             // Fully, not to a strip of icons. Collapsed to icons the menu
             // still holds its column and the reports beside it still wrap;
@@ -102,6 +111,10 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                // After Authenticate, because it reads the signed-in
+                // person to decide whether they may reach the shop the
+                // session names.
+                PicksTheBakeryInThePanel::class,
             ]);
     }
 }
