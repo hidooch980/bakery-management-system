@@ -185,6 +185,42 @@ class FlourAllocation extends Model
         ));
     }
 
+    /**
+     * The month whose quota covers a day — «۵ تا ۴ ماه بعد».
+     *
+     * The shop's month is not the calendar's. Periods run 5–14, 15–24 and
+     * 25 to the 4th of the month after, so the first four days of a
+     * Jalali month still belong to the previous month's third period.
+     *
+     * Asking for «this month's allocation» on the 1st and getting the
+     * month that has not started yet is how two test fixtures came to
+     * build a quota with no period covering today — and they only broke
+     * on the one day of the month when that is true, a year after they
+     * were written. The rule was in `PERIODS` and in `periodRange`, and
+     * nowhere that anybody could call.
+     *
+     * Returns the first day of that Jalali month, which is what
+     * `month_start` holds: `periodRange` reads only its year and month.
+     */
+    public static function monthStartFor(Carbon $date): Carbon
+    {
+        [$year, $month, $day] = array_map(
+            'intval',
+            explode('/', Jalali::format($date, 'Y/m/d'))
+        );
+
+        if ($day < self::PERIODS[1]['from']) {
+            $month--;
+
+            if ($month === 0) {
+                $month = 12;
+                $year--;
+            }
+        }
+
+        return Jalali::parse(sprintf('%04d/%02d/01', $year, $month));
+    }
+
     public static function forDate(Carbon $date): ?self
     {
         return static::with('periods')->get()

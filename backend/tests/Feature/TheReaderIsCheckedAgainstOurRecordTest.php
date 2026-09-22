@@ -49,7 +49,12 @@ class TheReaderIsCheckedAgainstOurRecordTest extends TestCase
         $this->actingAs($admin);
 
         $this->allocation = FlourAllocation::create([
-            'month_start' => Jalali::currentMonthRange()[0],
+            // The shop's month, not the calendar's: on the first four
+            // days of a Jalali month the quota that covers today is the
+            // previous month's. Asking for «this month» here built a
+            // quota with no period containing today, and the whole file
+            // failed on the one day of the month when that is true.
+            'month_start' => FlourAllocation::monthStartFor(now()),
             'month_label' => 'تست',
             'total_bags' => 75,
         ]);

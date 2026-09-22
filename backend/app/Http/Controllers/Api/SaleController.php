@@ -202,7 +202,11 @@ class SaleController extends Controller
     public function staff(): JsonResponse
     {
         return $this->success(
-            User::where('is_active', true)
+            // This shop's people — the picker for «who took the
+            // bread» offered every active person in the database.
+            User::query()
+                ->ofCurrentBakery()
+                ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name'])
         );

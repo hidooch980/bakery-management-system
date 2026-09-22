@@ -68,7 +68,14 @@ class StaffAdvanceController extends Controller
     /** What each employee still owes, for the payroll screen. */
     public function outstanding(): JsonResponse
     {
-        $rows = User::where('is_active', true)
+        // Scoped like the rest. It did not leak a name as it stands,
+        // because the amounts come from a model that is scoped and
+        // everyone else's came back zero and was filtered away — safety
+        // by accident, one deleted filter from being a list of another
+        // shop's staff.
+        $rows = User::query()
+            ->ofCurrentBakery()
+            ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(function (User $u) {
