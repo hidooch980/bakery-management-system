@@ -431,7 +431,12 @@ Route::prefix('v1')->group(function () {
             // کجا آمده» — the page showed one number per seller and
             // nothing behind it.
             Route::get('/seller-accounts/{seller}/breakdown', [SellerAccountController::class, 'breakdown']);
+            // «سابقهٔ تسویه‌های فروشنده» — there was no list: the owner
+            // settling somebody at the counter left only a bank movement.
+            Route::get('/seller-accounts/{seller}/history', [SellerAccountController::class, 'history']);
             Route::post('/seller-accounts/{seller}/settle', [SellerAccountController::class, 'settle']);
+            // «اصلاح تسویهٔ اشتباه» — the wrong seller, amount or day.
+            Route::post('/seller-settlements/{record}/reverse', [SellerAccountController::class, 'reverse']);
             Route::post('/seller-accounts/{seller}/settle-loaves', [SellerAccountController::class, 'settleLoaves']);
             Route::post('/settlement-requests/{settlement}/confirm', [SellerAccountController::class, 'confirm']);
             Route::post('/settlement-requests/{settlement}/reject', [SellerAccountController::class, 'reject']);

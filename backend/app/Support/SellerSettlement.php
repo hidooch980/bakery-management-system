@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\BankAccount;
 use App\Models\Sale;
 use App\Models\SellerAccountCredit;
+use App\Models\SellerSettlementRecord;
 use App\Models\SettlementRequest;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -138,9 +139,17 @@ class SellerSettlement
      * @param  array<int>|null  $saleIds  Only these sales are closed, for a
      *                                    partial handover. Null closes all.
      */
-    public static function settle(User $seller, ?array $saleIds = null): void
+    /**
+     * @return array<int> The ids actually closed, so a record of the
+     *                    handover can name them. Re-deriving them later
+     *                    from «the sales that look settled around then»
+     *                    would catch a second handover made the same
+     *                    afternoon, which is exactly what a reversal
+     *                    must not do.
+     */
+    public static function settle(User $seller, ?array $saleIds = null): array
     {
-        DB::transaction(function () use ($seller, $saleIds) {
+        return DB::transaction(function () use ($seller, $saleIds) {
             $cash = Sale::query()
                 ->where('user_id', $seller->id)
                 ->whereNull('cash_settled_on')
@@ -159,8 +168,17 @@ class SellerSettlement
                 $shortfall->whereIn('id', $saleIds);
             }
 
+            // Read before the update, or they no longer match.
+            $closed = $cash->pluck('id')
+                ->concat($shortfall->pluck('id'))
+                ->unique()
+                ->values()
+                ->all();
+
             $cash->update(['cash_settled_on' => now()]);
             $shortfall->update(['shortfall_settled_on' => now()]);
+
+            return $closed;
         });
     }
 
@@ -203,9 +221,13 @@ class SellerSettlement
         ?array $saleIds = null,
     ): ?BankAccount {
         return DB::transaction(function () use ($seller, $admin, $cash, $card, $account, $source, $saleIds) {
-            self::settle($seller, $saleIds);
+            $closed = self::settle($seller, $saleIds);
 
-            return self::bankTheHandover($seller, $admin, $cash, $card, $account, $source);
+            $named = self::bankTheHandover($seller, $admin, $cash, $card, $account, $source);
+
+            self::record($seller, $admin, 'settlement', $cash, $card, $named, $source, $closed);
+
+            return $named;
         });
     }
 
@@ -231,9 +253,137 @@ class SellerSettlement
         ?SettlementRequest $request = null,
     ): ?BankAccount {
         return DB::transaction(function () use ($seller, $admin, $cash, $card, $account, $request) {
-            self::applyPayment($seller, round($cash + $card, 2), $request);
+            $applied = self::applyPayment($seller, round($cash + $card, 2), $request);
 
-            return self::bankTheHandover($seller, $admin, $cash, $card, $account, $request);
+            $named = self::bankTheHandover($seller, $admin, $cash, $card, $account, $request);
+
+            self::record(
+                $seller,
+                $admin,
+                'payment',
+                $cash,
+                $card,
+                $named,
+                $request,
+                $applied['settled'],
+                $applied['credit_ids'],
+            );
+
+            return $named;
+        });
+    }
+
+    /**
+     * Writes down that this handover happened, and what it closed.
+     *
+     * Two of the owner's questions had no answer without this row:
+     * «سابقهٔ تسویه‌های فروشنده», because there was no list; and «اصلاح
+     * تسویهٔ اشتباه», because nothing recorded what a settlement had
+     * done, so nothing could put it back.
+     *
+     * @param  array<int>  $saleIds  What actually closed.
+     * @param  array<int>  $creditIds  Credit rows this handover created.
+     */
+    private static function record(
+        User $seller,
+        User $admin,
+        string $kind,
+        float $cash,
+        float $card,
+        ?BankAccount $named,
+        mixed $source,
+        array $saleIds,
+        array $creditIds = [],
+    ): SellerSettlementRecord {
+        return SellerSettlementRecord::create([
+            'user_id' => $seller->id,
+            'settled_by' => $admin->id,
+            'settlement_request_id' => $source instanceof SettlementRequest
+                ? $source->id
+                : null,
+            'kind' => $kind,
+            'paid_cash' => $cash,
+            'paid_card' => $card,
+            'amount' => round($cash + $card, 2),
+            'bank_account_id' => $named?->id,
+            'sale_ids' => $saleIds,
+            'credit_ids' => $creditIds,
+        ]);
+    }
+
+    /**
+     * Puts a handover back.
+     *
+     * «اصلاح تسویهٔ اشتباه» — the wrong seller, the wrong amount, the
+     * wrong day. Until now the only remedy was the panel's sales table
+     * and a guess about which rows to reopen.
+     *
+     * Everything the handover did is undone from what it wrote down, not
+     * re-derived: the sales it closed reopen, the credit it left is taken
+     * back off, and the money goes back out of the accounts it went into.
+     * A re-derivation would catch a second handover made the same
+     * afternoon and reopen that too.
+     *
+     * The row is marked rather than deleted. A settlement that was wrong
+     * is still part of what happened, and the owner asking «why did this
+     * change» should find an answer rather than a gap.
+     */
+    public static function reverse(
+        SellerSettlementRecord $record,
+        User $admin,
+        string $reason,
+    ): void {
+        DB::transaction(function () use ($record, $admin, $reason) {
+            $saleIds = $record->sale_ids ?? [];
+
+            if ($saleIds !== []) {
+                Sale::query()
+                    ->whereIn('id', $saleIds)
+                    ->update([
+                        'cash_settled_on' => null,
+                        'shortfall_settled_on' => null,
+                    ]);
+            }
+
+            // Credit this handover left on the account goes with it.
+            foreach ($record->credit_ids ?? [] as $creditId) {
+                SellerAccountCredit::query()->whereKey($creditId)->delete();
+            }
+
+            // The money leaves by the door it came in. The card share is
+            // taken back out of the account it reached; the cash out of
+            // the drawer — never one out of the other, which would leave
+            // the till short by exactly what the reader took.
+            $card = (float) $record->paid_card;
+            $cash = (float) $record->paid_cash;
+
+            if ($card > 0 && $account = ($record->bankAccount ?? BankAccount::cardAccount())) {
+                $account->record(
+                    'out',
+                    $card,
+                    'adjustment',
+                    $admin->id,
+                    $record,
+                    'اصلاح تسویه کارتخوان — '.$record->seller?->name,
+                );
+            }
+
+            if ($cash > 0 && $till = BankAccount::cashBox()) {
+                $till->record(
+                    'out',
+                    $cash,
+                    'adjustment',
+                    $admin->id,
+                    $record,
+                    'اصلاح تسویه نقدی — '.$record->seller?->name,
+                );
+            }
+
+            $record->update([
+                'reversed_at' => now(),
+                'reversed_by' => $admin->id,
+                'reversal_reason' => $reason,
+            ]);
         });
     }
 
@@ -435,13 +585,15 @@ class SellerSettlement
             // would be counting the same debt twice.
             $available = round($amount + SellerAccountCredit::balanceFor($seller->id), 2);
 
+            $creditIds = [];
+
             if ($available > 0 && SellerAccountCredit::balanceFor($seller->id) > 0) {
-                SellerAccountCredit::create([
+                $creditIds[] = SellerAccountCredit::create([
                     'user_id' => $seller->id,
                     'amount' => -SellerAccountCredit::balanceFor($seller->id),
                     'settlement_request_id' => $request?->id,
                     'note' => 'اعتبار قبلی، خرج تسویه شد',
-                ]);
+                ])->id;
             }
 
             $settled = [];
@@ -465,15 +617,22 @@ class SellerSettlement
             }
 
             if ($available > 0.01) {
-                SellerAccountCredit::create([
+                $creditIds[] = SellerAccountCredit::create([
                     'user_id' => $seller->id,
                     'amount' => $available,
                     'settlement_request_id' => $request?->id,
                     'note' => 'باقی‌مانده تسویه',
-                ]);
+                ])->id;
             }
 
-            return ['settled' => $settled, 'credit_left' => max(0, $available)];
+            return [
+                'settled' => $settled,
+                'credit_left' => max(0, $available),
+                // Named so a reversal can take them back out. A credit
+                // left standing after its handover was undone is money
+                // the shop believes it owes the seller twice.
+                'credit_ids' => $creditIds,
+            ];
         });
     }
 }

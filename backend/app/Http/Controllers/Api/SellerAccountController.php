@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\SellerAccountCredit;
+use App\Models\SellerSettlementRecord;
 use App\Models\SettlementRequest;
 use App\Models\User;
 use App\Support\AppCalendar;
@@ -177,6 +178,67 @@ class SellerAccountController extends Controller
                 .' نسیهٔ مشتری‌ها جداست: آن پول هنوز دست مشتری است و'
                 .' فروشنده آن را در دست ندارد که تحویل بدهد.',
         ]);
+    }
+
+    /**
+     * Every time this seller handed money over.
+     *
+     * «سابقهٔ تسویه‌های فروشنده» — there was no list to show. A seller's
+     * own request left a row; the owner settling somebody at the counter
+     * left nothing but a bank movement with a note, which is the common
+     * case and the one people argue about.
+     *
+     * Reversed handovers stay in the list, marked. A history that quietly
+     * drops what was undone answers «what happened» with a tidier story
+     * than the truth.
+     */
+    public function history(User $seller): JsonResponse
+    {
+        $seller = SameBakery::or404($seller);
+
+        $records = SellerSettlementRecord::query()
+            ->where('user_id', $seller->id)
+            ->with(['settledBy:id,name', 'reversedBy:id,name', 'bankAccount:id,title', 'seller:id,name'])
+            ->latest('created_at')
+            ->latest('id')
+            ->paginate(30)
+            ->through(fn (SellerSettlementRecord $r) => $r->payload());
+
+        return $this->success($records);
+    }
+
+    /**
+     * Puts a handover back — the wrong seller, the wrong amount, the
+     * wrong day.
+     *
+     * «اصلاح تسویهٔ اشتباه». Until now the only remedy was the panel's
+     * sales table and a guess about which rows to reopen, which is not a
+     * remedy so much as a second chance to get it wrong.
+     */
+    public function reverse(Request $request, SellerSettlementRecord $record): JsonResponse
+    {
+        $data = $request->validate([
+            // Required, and kept. A correction with no reason on it is
+            // the thing that makes the next person distrust the books.
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        // Two admins undoing the same handover a moment apart would both
+        // see it standing and both take the money back out — the till
+        // short by exactly twice what the seller handed over.
+        Exclusively::claim(
+            $record,
+            fn (SellerSettlementRecord $r) => $r->is_reversed
+                ? 'این تسویه قبلاً اصلاح شده است.'
+                : null,
+            fn (SellerSettlementRecord $r) => SellerSettlement::reverse(
+                $r,
+                $request->user(),
+                $data['reason'],
+            ),
+        );
+
+        return $this->success(null, 'تسویه اصلاح شد و بدهی دوباره باز شد.');
     }
 
     /**
