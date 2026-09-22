@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Middleware\PicksTheBakeryInThePanel;
 use App\Models\Bakery;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -19,3 +21,29 @@ Route::get('/', function () {
 
     return view('welcome', ['bakery' => $bakery]);
 })->name('home');
+
+/*
+ * Switching shop, from the panel's topbar.
+ *
+ * An owner who holds more than one bakery had no way to look at the
+ * second one in the panel: the phone names the shop in a header, and a
+ * browser sends no such thing. The choice is kept in the session by
+ * [PicksTheBakeryInThePanel]; this is the one place it is set.
+ *
+ * A POST rather than a link, so CSRF covers it and so a shop is never
+ * switched by something merely *fetching* a URL.
+ */
+Route::post('/panel/shop', function (Request $request) {
+    $asked = (int) $request->input('bakery_id');
+
+    abort_unless($request->user()?->canReachBakery($asked), 403);
+
+    $request->session()->put(PicksTheBakeryInThePanel::KEY, $asked);
+
+    // Back to where they were standing. A switch that always landed on
+    // the dashboard would make comparing the same screen across two
+    // shops a matter of navigating there again every time.
+    return back();
+})
+    ->middleware(['web', 'auth'])
+    ->name('panel.shop.switch');
