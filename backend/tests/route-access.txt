@@ -85,7 +85,9 @@ GET api/v1/reports/profit-and-loss                          admin
 GET api/v1/reports/sales                                    admin
 GET api/v1/reports/sellers                                  admin
 GET api/v1/reports/sellers/{seller}                         admin
+GET api/v1/reports/staff                                    admin
 GET api/v1/reports/staff-yield                              admin
+GET api/v1/reports/staff/{person}                           admin
 GET api/v1/salaries                                         admin
 GET api/v1/salaries/employees                               admin
 GET api/v1/salaries/mine                                    (any signed-in)

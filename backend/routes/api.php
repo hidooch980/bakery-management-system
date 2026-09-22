@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\StaffAdjustmentController;
 use App\Http\Controllers\Api\StaffAdvanceController;
 use App\Http\Controllers\Api\StaffAdvanceRequestController;
+use App\Http\Controllers\Api\StaffReportController;
 use App\Http\Controllers\Api\StockCountController;
 use App\Http\Controllers\Api\SupplierController;
 use App\Http\Controllers\Api\SupplierPaymentController;
@@ -479,6 +480,12 @@ Route::prefix('v1')->group(function () {
             Route::get('/reports/financial', [ReportController::class, 'financial']);
             Route::get('/reports/financial-trend', [ReportController::class, 'financialTrend']);
             Route::get('/reports/payroll', [ReportController::class, 'payroll']);
+            // The staff read as people rather than as rows in four
+            // separate reports: one row each to compare them, and one
+            // page each to talk to them. Behind the financial permission
+            // because what a person costs is somebody's pay.
+            Route::get('/reports/staff', [StaffReportController::class, 'index']);
+            Route::get('/reports/staff/{person}', [StaffReportController::class, 'show']);
             Route::get('/reports/debts', [ReportController::class, 'debts']);
             // What the shop owns against what it owes, as of now.
             Route::get('/reports/balance-sheet', [BalanceSheetController::class, 'show']);
