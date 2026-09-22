@@ -7,23 +7,22 @@ return [
     | More than one shop
     |--------------------------------------------------------------------------
     |
-    | Off. The owner asked on 2026-08-17 for the other bakeries to stay shut
-    | until the app has been through a final test on real handsets — «فعلاً
-    | نانوایی‌های دیگر غیرفعال بشه».
+    | On, since 1405/07/01. It was shut on 2026-08-17 — «فعلاً نانوایی‌های
+    | دیگر غیرفعال بشه» — until the app had been through a final test on
+    | real handsets. That has happened, and the owner has since asked for
+    | «نانوایی جدید / شعبه جدید»: a branch is a bakery of its own, with its
+    | own quota, store, till, staff and books.
     |
-    | Everything for it is built and tested: the OpenBakery page, the
-    | `bakery:create --like=` command that copies a shop's formula and
-    | weights, and the BelongsToBakery scope that keeps one shop's takings
-    | out of another's screens. This switch only decides whether the panel
-    | offers to open one.
-    |
-    | Turning it on is this line and nothing else. The console command is
-    | left reachable on purpose — it takes a deliberate ssh session and a
-    | typed password, which is not something anyone does by accident.
+    | What this decides is only whether the panel offers the «نانوایی
+    | جدید» page. Everything behind it was built and tested throughout:
+    | the `bakery:create --like=` command that copies a shop's formula and
+    | weights, the BelongsToBakery scope that keeps one shop's takings out
+    | of another's screens, and the topbar switcher that lets an owner
+    | holding two of them look at the second.
     |
     */
 
-    'multi_shop' => env('BAKERY_MULTI_SHOP', false),
+    'multi_shop' => env('BAKERY_MULTI_SHOP', true),
 
     /*
     |--------------------------------------------------------------------------

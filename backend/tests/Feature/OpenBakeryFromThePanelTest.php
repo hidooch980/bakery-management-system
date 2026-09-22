@@ -258,12 +258,13 @@ class OpenBakeryFromThePanelTest extends TestCase
     }
 
     /**
-     * The switch, which is off.
+     * The switch, whichever way it is set.
      *
-     * The owner asked on 2026-08-17 for the other bakeries to stay shut
-     * until the app has been through a final test on real handsets. Nothing
-     * behind the page was removed — this decides only whether the panel
-     * offers to open a shop, so turning it back on is one line in config.
+     * It shipped off from 2026-08-17 until 1405/07/01, while the app was
+     * being tested on real handsets, and is on now that the owner has
+     * asked for branches. The switch itself is what is worth keeping
+     * either way: the page must be genuinely gone when it is off, not
+     * merely missing from a menu.
      */
     public function test_the_page_is_gone_while_the_switch_is_off(): void
     {
@@ -280,17 +281,22 @@ class OpenBakeryFromThePanelTest extends TestCase
         $this->get(OpenBakery::getUrl())->assertForbidden();
     }
 
-    public function test_the_switch_ships_off(): void
+    public function test_the_switch_ships_on(): void
     {
-        // The file itself, not the live config — setUp turns it on for
-        // every other test here, and the thing worth holding down is what
+        // The file itself, not the live config — setUp sets it for every
+        // other test here, and the thing worth holding down is what
         // arrives on the server when nobody has said anything.
+        //
+        // It shipped off while the app was being tested on handsets. It
+        // ships on now the owner has asked for branches, and this is the
+        // line that says so out loud rather than leaving a server to be
+        // configured by hand before «نانوایی جدید» appears at all.
         //
         // «Nobody has said anything» has to be arranged rather than
         // assumed. The file reads env(), so a machine with
         // BAKERY_MULTI_SHOP set answers for the default instead of it —
         // one did, and this failed there while the shipped default was
-        // perfectly fine. Pinning the variable to false in phpunit.xml
+        // perfectly fine. Pinning the variable in phpunit.xml
         // would have quietened it and tested nothing: the point is what
         // happens when it is *unset*.
         $said = getenv('BAKERY_MULTI_SHOP');
@@ -308,9 +314,9 @@ class OpenBakeryFromThePanelTest extends TestCase
             }
         }
 
-        $this->assertFalse(
+        $this->assertTrue(
             $shipped['multi_shop'],
-            'config/bakery.php should ship with multi_shop off',
+            'config/bakery.php should ship with multi_shop on',
         );
     }
 }
