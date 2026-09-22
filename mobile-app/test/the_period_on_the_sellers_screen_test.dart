@@ -54,6 +54,7 @@ Map<String, Object?> _allocation({
   required int allocated,
   required int sold,
   String label = 'دوره سوم',
+  bool withWholePeriod = true,
 }) =>
     {
       'periods': [
@@ -74,6 +75,17 @@ Map<String, Object?> _allocation({
           'bread_remainder': allocated - sold,
         },
       ],
+      // Shaped like a period, because the server sums it off those very
+      // periods and the app draws it with the same card.
+      if (withWholePeriod)
+        'whole_period': {
+          'number': 0,
+          'label': 'کل دوره (۵ تا ۴ ماه بعد)',
+          'is_current': false,
+          'allocated_bread_count': 23295,
+          'card_bread_count': 19781,
+          'bread_remainder': 3514,
+        },
     };
 
 void main() {
@@ -112,12 +124,16 @@ void main() {
   testWidgets('the four figures are on the seller\'s page', (tester) async {
     await pump(tester, _allocation(allocated: 24000, sold: 19600));
 
+    // One heading, and the three labels once per card — the running
+    // period and the three added up.
     expect(find.text('سهمیه دوره'), findsOneWidget);
-    expect(find.text('نان دوره'), findsOneWidget);
+    expect(find.text('نان دوره'), findsNWidgets(2));
+    expect(find.text('فروش کارتخوان'), findsNWidgets(2));
+    expect(find.text('باقی‌مانده'), findsNWidgets(2));
+
+    // The running period's own figures.
     expect(find.text('24000'), findsOneWidget);
-    expect(find.text('فروش کارتخوان'), findsOneWidget);
     expect(find.text('19600'), findsOneWidget);
-    expect(find.text('باقی‌مانده'), findsOneWidget);
     expect(find.text('4400 نان'), findsOneWidget);
   });
 
@@ -137,9 +153,12 @@ void main() {
 
     // «-۴۰۰ نان باقی‌مانده» is a sentence nobody can act on.
     expect(find.text('بیش از سهمیه'), findsOneWidget);
-    expect(find.text('باقی‌مانده'), findsNothing);
     expect(find.text('400 نان'), findsOneWidget);
     expect(find.textContaining('-'), findsNothing);
+
+    // The card below is a different sum and is not over: the two cards
+    // answer for themselves rather than sharing one verdict.
+    expect(find.text('باقی‌مانده'), findsOneWidget);
   });
 
   testWidgets('a shop with no quota recorded shows nothing, not an error',
@@ -149,6 +168,51 @@ void main() {
     // A red box above the day's work would be read as something being
     // wrong, when nothing is.
     expect(find.text('سهمیه دوره'), findsNothing);
+  });
+
+  testWidgets('the whole period is on the page too', (tester) async {
+    // «برای فروشنده دوباره کل دوره نمایش بده». The owner has had this on
+    // their screen for a while; the seller had to add it up off three
+    // numbers nobody showed them.
+    await pump(tester, _allocation(allocated: 24000, sold: 19600));
+
+    expect(find.text('کل دوره (۵ تا ۴ ماه بعد)'), findsOneWidget);
+    expect(find.text('23295'), findsOneWidget);
+    expect(find.text('19781'), findsOneWidget);
+    expect(find.text('3514 نان'), findsOneWidget);
+  });
+
+  testWidgets('the total is told apart from the period above it',
+      (tester) async {
+    // Two cards in a column read as two periods — or worse, as the
+    // second correcting the first — unless something between them says
+    // what the second one is.
+    await pump(tester, _allocation(allocated: 24000, sold: 19600));
+
+    final rule = find.text('کل دوره (۵ تا ۴ ماه بعد)');
+    final running = find.text('دوره سوم');
+
+    expect(rule, findsOneWidget);
+    expect(
+      tester.getCenter(rule).dy,
+      greaterThan(tester.getCenter(running).dy),
+      reason: 'جمعِ سه دوره باید زیر دورهٔ جاری بیاید، نه بالایش.',
+    );
+  });
+
+  testWidgets('a quota with no total yet shows the period alone',
+      (tester) async {
+    // A shop whose allocation has no periods gets no total back. The
+    // running card must still stand on its own rather than the section
+    // disappearing with it.
+    await pump(
+      tester,
+      _allocation(allocated: 24000, sold: 19600, withWholePeriod: false),
+    );
+
+    expect(find.text('سهمیه دوره'), findsOneWidget);
+    expect(find.text('نان دوره'), findsOneWidget);
+    expect(find.text('کل دوره (۵ تا ۴ ماه بعد)'), findsNothing);
   });
 
   testWidgets('the period label is shown so the figures are dateable',
