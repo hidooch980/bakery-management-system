@@ -68,7 +68,14 @@ class PeriodBreadReconciliationTest extends TestCase
         // days either side of it. It is the fourth time in this project
         // that a Gregorian month start has been used where the shop means
         // a Shamsi one.
-        [$monthStart] = Jalali::currentMonthRange();
+        //
+        // The Shamsi month was not enough either. On the first four days
+        // of one, the quota covering today is the *previous* month's —
+        // periods run 25th to the 4th — so «this month» built a quota
+        // with no period containing today, and the file failed again on
+        // the one day of the month when that is true. The rule now has a
+        // name of its own rather than a fifth restatement here.
+        $monthStart = FlourAllocation::monthStartFor(now());
 
         $allocation = FlourAllocation::create([
             'month_start' => $monthStart,

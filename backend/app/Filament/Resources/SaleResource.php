@@ -152,6 +152,7 @@ class SaleResource extends Resource
                             Forms\Components\Select::make('consumed_by_user_id')
                                 ->label('چه کسی برد')
                                 ->options(fn () => User::query()
+                                    ->ofCurrentBakery()
                                     ->where('is_active', true)
                                     ->orderBy('name')
                                     ->pluck('name', 'id'))

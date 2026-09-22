@@ -49,6 +49,11 @@ class AttendanceController extends Controller
         $today = now()->toDateString();
 
         $staff = User::query()
+            // This shop's people. Without it the roster listed every
+            // active person in the database, so one shop's owner read
+            // another shop's staff by name — found by sweeping every GET
+            // route with two shops on the books.
+            ->ofCurrentBakery()
             ->where('is_active', true)
             ->whereKeyNot($request->user()->id)
             ->orderBy('name')
