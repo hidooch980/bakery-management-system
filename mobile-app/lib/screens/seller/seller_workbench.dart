@@ -833,6 +833,7 @@ class _QuotaSection extends StatefulWidget {
 
 class _QuotaSectionState extends State<_QuotaSection> {
   Map<String, dynamic>? _period;
+  Map<String, dynamic>? _whole;
   String? _label;
   bool _done = false;
 
@@ -851,9 +852,14 @@ class _QuotaSectionState extends State<_QuotaSection> {
           .where((p) => p['is_current'] == true)
           .firstOrNull;
 
+      final whole = allocation?['whole_period'];
+
       if (!mounted) return;
       setState(() {
         _period = current;
+        // Already in the same payload — the seller has been fetching it
+        // all along and nothing on their screen read it.
+        _whole = whole is Map<String, dynamic> ? whole : null;
         _label = current?['label'] as String?;
         _done = true;
       });
@@ -869,11 +875,6 @@ class _QuotaSectionState extends State<_QuotaSection> {
     if (!_done || _period == null) return const SizedBox.shrink();
 
     final scheme = Theme.of(context).colorScheme;
-    final period = _period!;
-    final allocated = (period['allocated_bread_count'] as num?)?.toInt() ?? 0;
-    final sold = (period['card_bread_count'] as num?)?.toInt() ?? 0;
-    final left = (period['bread_remainder'] as num?)?.toInt() ?? 0;
-    final over = left < 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -890,65 +891,135 @@ class _QuotaSectionState extends State<_QuotaSection> {
                       ),
                 ),
         ),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-            child: Column(
+        _QuotaCard(period: _period!),
+
+        // The three periods added up — the shop's own month, 5th to 4th.
+        //
+        // The card above answers «چقدر از این هفته مانده». This answers
+        // «ماه چطور رفت», which the owner has had on their screen for a
+        // while and the seller had to add up off three numbers nobody
+        // showed them.
+        //
+        // Summed by the server off those same periods, so it can never
+        // disagree with the card above it.
+        if (_whole != null) ...[
+          _WholePeriodRule(label: _whole!['label'] as String?),
+          _QuotaCard(period: _whole!),
+        ],
+      ],
+    );
+  }
+}
+
+/// «جمع هر سه دوره» — a rule and a word.
+///
+/// Without it a second card under the first reads as a second period, or
+/// worse as a correction of the one above it.
+class _WholePeriodRule extends StatelessWidget {
+  const _WholePeriodRule({required this.label});
+
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 10),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: scheme.outlineVariant)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              label ?? 'جمع هر سه دوره',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+          Expanded(child: Divider(color: scheme.outlineVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+/// The three bread figures for one period, or for all three added up.
+///
+/// One widget for both so the total reads as the same kind of thing as
+/// the period above it — the owner's screen makes the same choice, and
+/// two different-looking cards would invite the question of why.
+class _QuotaCard extends StatelessWidget {
+  const _QuotaCard({required this.period});
+
+  final Map<String, dynamic> period;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final allocated = (period['allocated_bread_count'] as num?)?.toInt() ?? 0;
+    final sold = (period['card_bread_count'] as num?)?.toInt() ?? 0;
+    final left = (period['bread_remainder'] as num?)?.toInt() ?? 0;
+    final over = left < 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        child: Column(
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _QuotaFigure(
-                        label: 'نان دوره',
-                        value: allocated,
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                    Expanded(
-                      child: _QuotaFigure(
-                        label: 'فروش کارتخوان',
-                        value: sold,
-                        color: AppColors.moneyIn,
-                      ),
-                    ),
-                  ],
+                Expanded(
+                  child: _QuotaFigure(
+                    label: 'نان دوره',
+                    value: allocated,
+                    color: scheme.onSurface,
+                  ),
                 ),
-                const Divider(height: 26),
-                Row(
-                  children: [
-                    Icon(
-                      over
-                          ? Icons.error_outline_rounded
-                          : Icons.trending_flat_rounded,
-                      size: IconSize.row,
-                      color: over ? AppColors.moneyOut : scheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      over ? 'بیش از سهمیه' : 'باقی‌مانده',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      // The absolute value with a word beside it, never a
-                      // minus sign: «-۴۰۰ نان باقی‌مانده» is a sentence
-                      // nobody can act on.
-                      '${left.abs()} نان',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color:
-                                over ? AppColors.moneyOut : AppColors.moneyIn,
-                          ),
-                    ),
-                  ],
+                Expanded(
+                  child: _QuotaFigure(
+                    label: 'فروش کارتخوان',
+                    value: sold,
+                    color: AppColors.moneyIn,
+                  ),
                 ),
               ],
             ),
-          ),
+            const Divider(height: 26),
+            Row(
+              children: [
+                Icon(
+                  over
+                      ? Icons.error_outline_rounded
+                      : Icons.trending_flat_rounded,
+                  size: IconSize.row,
+                  color: over ? AppColors.moneyOut : scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  over ? 'بیش از سهمیه' : 'باقی‌مانده',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+                const Spacer(),
+                Text(
+                  // The absolute value with a word beside it, never a
+                  // minus sign: «-۴۰۰ نان باقی‌مانده» is a sentence
+                  // nobody can act on.
+                  '${left.abs()} نان',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: over ? AppColors.moneyOut : AppColors.moneyIn,
+                      ),
+                ),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
