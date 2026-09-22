@@ -41,6 +41,13 @@ class EveryWriteCanSurviveBeingSentTwiceTest extends TestCase
         'POST api/v1/login' => 'no user yet — that is what it is for',
         'POST api/v1/forgot-password' => 'rate-limited per phone number instead',
         'POST api/v1/reset-password' => 'rate-limited, and carries a one-use token',
+        // No user yet, by definition — this is somebody who is not on
+        // the system asking to be. A repeat is handled where it can be
+        // handled honestly: a pending application from the same phone
+        // is answered with the one already on file rather than a second
+        // row, which is the same protection the guard gives, decided on
+        // the field this shop's world actually identifies people by.
+        'POST api/v1/bakery-applications' => 'no user yet; a repeat returns the application already on file',
     ];
 
     /**

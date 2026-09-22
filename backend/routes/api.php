@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackupController;
+use App\Http\Controllers\Api\BakeryApplicationController;
 use App\Http\Controllers\Api\BakeryController;
 use App\Http\Controllers\Api\BakeryShareController;
 use App\Http\Controllers\Api\BalanceSheetController;
@@ -66,6 +67,16 @@ Route::prefix('v1')->group(function () {
     // actually log in here: five staff, once a day each, on phones that
     // keep them signed in. Anything faster than five is not this shop.
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+
+    // A bakery asking to use this. Unauthenticated on purpose and dull
+    // on purpose: it writes a row saying somebody asked, and creates no
+    // shop, no login and no entitlement. The owner opens the shop
+    // afterwards, signed in, from the other half of this controller.
+    //
+    // Throttled harder than login. There is no account behind this to
+    // lock, so the rate is the only wall there is.
+    Route::post('/bakery-applications', [BakeryApplicationController::class, 'store'])
+        ->middleware('throttle:3,10');
 
     // Forgotten passwords, by text. Both answer the same way whether the
     // number is registered or not, so neither can be used to find out who
@@ -425,6 +436,13 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:manage-finance')->group(function () {
             Route::get('/incomes/categories', [IncomeController::class, 'categories']);
             Route::apiResource('incomes', IncomeController::class)->except(['show']);
+
+            // --- Who has asked to use this system ---
+            // Guarded again inside the controller: only the head shop,
+            // never an admin of a shop that was itself opened this way.
+            Route::get('/bakery-applications', [BakeryApplicationController::class, 'index']);
+            Route::post('/bakery-applications/{application}/approve', [BakeryApplicationController::class, 'approve']);
+            Route::post('/bakery-applications/{application}/reject', [BakeryApplicationController::class, 'reject']);
 
             // --- Seller accounts: what each seller still owes ---
             Route::get('/seller-accounts', [SellerAccountController::class, 'index']);

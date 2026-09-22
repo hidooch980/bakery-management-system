@@ -51,6 +51,12 @@ class EveryRouteIsBehindTheRightDoorTest extends TestCase
         'POST api/v1/forgot-password' => 'for somebody who cannot sign in',
         'POST api/v1/reset-password' => 'the other half of that',
         'GET api/v1/health' => 'read by the phone to tell «no signal» from «server down»',
+        // A bakery that is not on the system yet has no account to sign
+        // in with, so the door it knocks on cannot be behind a sign-in.
+        // Safe to leave open only because of what it does not do: it
+        // writes a row saying somebody asked, and creates no shop, no
+        // login and no entitlement. The owner opens the shop afterwards.
+        'POST api/v1/bakery-applications' => 'somebody who is not on the system asking to be',
     ];
 
     protected function setUp(): void
