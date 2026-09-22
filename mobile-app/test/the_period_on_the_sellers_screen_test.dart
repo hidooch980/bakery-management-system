@@ -88,6 +88,50 @@ Map<String, Object?> _allocation({
         },
     };
 
+/// The server's answer changes between calls, the way it does once the
+/// seller has been selling.
+class _Moving implements HttpClientAdapter {
+  int calls = 0;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    Object? data = const <String, Object?>{};
+
+    if (options.path.contains('/flour-allocations/current')) {
+      calls++;
+      final sold = calls == 1 ? 19600 : 19900;
+
+      data = {
+        'periods': [
+          {
+            'number': 3,
+            'label': 'دوره سوم',
+            'is_current': true,
+            'allocated_bread_count': 24000,
+            'card_bread_count': sold,
+            'bread_remainder': 24000 - sold,
+          },
+        ],
+      };
+    }
+
+    return ResponseBody.fromString(
+      jsonEncode({'success': true, 'data': data}),
+      200,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -213,6 +257,101 @@ void main() {
     expect(find.text('سهمیه دوره'), findsOneWidget);
     expect(find.text('نان دوره'), findsOneWidget);
     expect(find.text('کل دوره (۵ تا ۴ ماه بعد)'), findsNothing);
+  });
+
+  /// Mounts the workbench under something that can bump the revision the
+  /// way `_SellerHomeScreen._reload` does after a sale is saved.
+  Future<int Function()> pumpSelling(WidgetTester tester) async {
+    final client = ApiClient(baseUrl: 'http://server.test/api/v1');
+    final transport = _Moving();
+    client.transport = transport;
+
+    var revision = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => SingleChildScrollView(
+              child: Column(
+                children: [
+                  TextButton(
+                    onPressed: () => setState(() => revision++),
+                    child: const Text('یک فروش ثبت شد'),
+                  ),
+                  TextButton(
+                    // A rebuild of the page above that is not a save —
+                    // a keystroke, an animation frame, a tab badge.
+                    onPressed: () => setState(() {}),
+                    child: const Text('فقط دوباره ساخته شد'),
+                  ),
+                  SellerWorkbench(
+                    api: BakeryApi(client),
+                    onChanged: () {},
+                    revision: revision,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    return () => transport.calls;
+  }
+
+  testWidgets('a sale moves the card reader figure on the quota card',
+      (tester) async {
+    // The seller watches the reader all day, which is the whole reason
+    // they were given this card. It read the server once when the tab
+    // opened and showed that figure until the app was restarted — so the
+    // one number on it that moves every hour was the one that never did.
+    //
+    // Proved by running it: the server said 19,900 and the card said
+    // 19,600.
+    await pumpSelling(tester);
+
+    expect(find.text('19600'), findsOneWidget);
+
+    await tester.tap(find.text('یک فروش ثبت شد'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('19900'), findsOneWidget);
+    expect(find.text('19600'), findsNothing);
+  });
+
+  testWidgets('the remainder moves with it', (tester) async {
+    // «باقی‌مانده» is the figure the seller acts on. A fresh reader count
+    // above a stale remainder would be worse than both being old.
+    await pumpSelling(tester);
+
+    expect(find.text('4400 نان'), findsOneWidget);
+
+    await tester.tap(find.text('یک فروش ثبت شد'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('4100 نان'), findsOneWidget);
+  });
+
+  testWidgets('an unchanged revision asks the server nothing', (tester) async {
+    // The page above rebuilds for its own reasons — a keystroke, an
+    // animation. Reloading on every rebuild would be a request per frame.
+    //
+    // It has to be a real rebuild with the revision unchanged: pumping a
+    // still frame rebuilds nothing, so the first version of this test
+    // stayed green with the guard removed.
+    final calls = await pumpSelling(tester);
+
+    final before = calls();
+
+    await tester.tap(find.text('فقط دوباره ساخته شد'));
+    await tester.pumpAndSettle();
+
+    expect(calls(), before);
+    expect(find.text('19600'), findsOneWidget);
   });
 
   testWidgets('the period label is shown so the figures are dateable',

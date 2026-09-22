@@ -120,7 +120,15 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
   /// Set while the one-button answer is in flight, so the button cannot be
   /// pressed twice into two sales.
 
-  void _reload() => setState(() { _data = _load(); });
+  /// Counts the reloads, so sections that cannot see a sale being saved
+  /// still hear that one happened. The quota card is the one that needs
+  /// it: it moves with the card reader and is refreshed by nothing else.
+  int _revision = 0;
+
+  void _reload() => setState(() {
+        _revision++;
+        _data = _load();
+      });
 
   Future<void> _openSaleSheet(ChaneEntry chane) async {
     final saved = await showModalBottomSheet<bool>(
@@ -305,6 +313,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         api: widget.api,
         bakery: _bakery,
         onChanged: _reload,
+        revision: _revision,
       ),
       const SizedBox(height: 22),
       _SectionHeader(

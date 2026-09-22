@@ -26,6 +26,7 @@ class SellerWorkbench extends StatefulWidget {
     required this.api,
     required this.onChanged,
     this.bakery,
+    this.revision = 0,
   });
 
   final BakeryApi api;
@@ -33,6 +34,16 @@ class SellerWorkbench extends StatefulWidget {
 
   /// Called after anything is recorded, so the page above reloads.
   final VoidCallback onChanged;
+
+  /// Bumped by the page above every time it reloads its own figures.
+  ///
+  /// The sections that own their data reload themselves when they save.
+  /// The quota does not: it moves when a sale is recorded on the page
+  /// above, in a sheet this widget never sees. Without a way to be told,
+  /// it read the server once when the tab opened and showed that all day
+  /// — and the one number on it that moves every hour is the card reader,
+  /// which is the whole reason the seller was given this card.
+  final int revision;
 
   @override
   State<SellerWorkbench> createState() => _SellerWorkbenchState();
@@ -55,7 +66,7 @@ class _SellerWorkbenchState extends State<SellerWorkbench> {
         // computed on the server and drawn only in the panel and the
         // manager's app; the seller, who is the one watching the card
         // reader all day, could not see it.
-        _QuotaSection(api: widget.api),
+        _QuotaSection(api: widget.api, revision: widget.revision),
         const SizedBox(height: 22),
         _FlourSection(
           api: widget.api,
@@ -823,9 +834,12 @@ class _Round extends StatelessWidget {
 /// Chane counts move with the day's shaping and settle nothing, so they
 /// are deliberately not what is shown here.
 class _QuotaSection extends StatefulWidget {
-  const _QuotaSection({required this.api});
+  const _QuotaSection({required this.api, this.revision = 0});
 
   final BakeryApi api;
+
+  /// Changes when the page above has reloaded — see `SellerWorkbench`.
+  final int revision;
 
   @override
   State<_QuotaSection> createState() => _QuotaSectionState();
@@ -841,6 +855,16 @@ class _QuotaSectionState extends State<_QuotaSection> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(_QuotaSection old) {
+    super.didUpdateWidget(old);
+
+    // Only on a new revision, never on any rebuild: the page above
+    // rebuilds for its own reasons, and asking the server each time would
+    // be a request per frame of an animation.
+    if (old.revision != widget.revision) _load();
   }
 
   Future<void> _load() async {
