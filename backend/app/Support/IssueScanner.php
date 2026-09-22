@@ -18,6 +18,7 @@ use App\Models\SalaryPayment;
 use App\Models\Sale;
 use App\Models\ShareSettlement;
 use App\Models\StaffAdvance;
+use App\Models\Subscription;
 use App\Models\SupplierPayment;
 use App\Models\User;
 use Carbon\Carbon;
@@ -87,6 +88,7 @@ class IssueScanner
             ...$this->noCashBox(),
             ...$this->noCardAccount(),
             ...$this->certificateRunningOut(),
+            ...$this->subscriptionRunningOut(),
             ...$this->purchasesFiledTwice(),
             ...$this->drawerNotCounted(),
             ...$this->debtsGoingStale(),
@@ -949,6 +951,67 @@ class IssueScanner
      * Warned about a week out rather than on the day, because the money
      * has to be in the account before the transfer, not after.
      */
+    /**
+     * The shop's own subscription, before it lapses rather than after.
+     *
+     * A bakery that pays for this should be told it is running out while
+     * there is still time to pay — not on the morning it stops. The
+     * certificate check is the same shape and for the same reason.
+     *
+     * A shop with no subscription row at all gets nothing: that is every
+     * shop that was here before any of this was sold, starting with the
+     * one this was built for, and telling its owner he owes somebody
+     * money would be both wrong and alarming.
+     */
+    private function subscriptionRunningOut(): array
+    {
+        $bakeryId = CurrentBakery::id();
+
+        if ($bakeryId === null) {
+            return [];
+        }
+
+        $term = Subscription::currentFor($bakeryId);
+
+        if ($term === null) {
+            return [];
+        }
+
+        $left = $term->days_left;
+
+        // Three weeks, the same warning the certificate gets: long
+        // enough to pay without hurrying, short enough that the notice
+        // is still about this month.
+        if ($left > 21) {
+            return [];
+        }
+
+        $lapsed = $left < 0;
+        $days = abs($left);
+
+        return [new SystemIssue(
+            key: 'subscription-running-out',
+            severity: $lapsed ? SystemIssue::CRITICAL : SystemIssue::WARNING,
+            title: $lapsed
+                ? 'اشتراک این نانوایی تمام شده است'
+                : 'اشتراک این نانوایی رو به پایان است',
+            detail: 'اشتراک تا '.AppCalendar::date($term->ends_on)
+                .match (true) {
+                    $lapsed => " اعتبار داشت — {$days} روز گذشته.",
+                    $left === 0 => ' اعتبار دارد — امروز آخرین روز است.',
+                    default => " اعتبار دارد — {$days} روز مانده.",
+                },
+            cause: $lapsed
+                ? 'دورهٔ پرداخت‌شده به پایان رسیده و دورهٔ تازه‌ای ثبت نشده است.'
+                : 'دورهٔ پرداخت‌شده رو به پایان است.',
+            suggestion: 'برای تمدید با فروشندهٔ سامانه تماس بگیرید.'
+                // Said out loud, because the question anybody reads this
+                // asking is «does the shop stop tomorrow», and leaving
+                // it unanswered is how a warning becomes a panic.
+                .' تا وقتی دورهٔ تازه ثبت نشده، کار مغازه متوقف نمی‌شود.',
+        )];
+    }
+
     private function loanInstalmentDue(): array
     {
         $issues = [];
