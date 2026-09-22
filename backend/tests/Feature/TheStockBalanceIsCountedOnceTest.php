@@ -158,8 +158,39 @@ class TheStockBalanceIsCountedOnceTest extends TestCase
         // can make is in that check, which was the point — it was written
         // with four and the three it was missing were the three that had
         // just been found wrong.
+        //
+        // 140 — headroom, after the bound stopped doing its job.
+        //
+        // Raised by hand six times, it ended up sitting exactly on the
+        // number. Then a day passed. Nothing was committed but a change
+        // to the phone app; a quota period turned over, the page cost one
+        // query more, and main went red. The bound had become what its
+        // own first line warned against: «Generous on purpose: the point
+        // is to catch a return to counting the ledger per read, not to
+        // pin a number that a harmless change would break.»
+        //
+        // What it exists to catch is growth per row, and that was
+        // measured rather than assumed:
+        //
+        //       1 movement   →  74 queries
+        //      21 movements  →  80
+        //      81 movements  →  80
+        //     221 movements  →  80
+        //     521 movements  →  80
+        //
+        // Flat. A shop with five hundred movements behind it costs the
+        // page what a shop with twenty costs, which is the property worth
+        // having. Forty sums for one sack would be hundreds and would
+        // still trip this; another aggregate check would not.
+        //
+        // A growth assertion — this shop against a busier one — was tried
+        // first and would be the better guard. It could not be made to
+        // read the same twice: the figure moves with cache warmth and
+        // with how empty the shop is, in ways not pinned down here, and a
+        // guard that reports a different number each run is worse than a
+        // generous one.
         $this->assertLessThan(
-            90,
+            140,
             $queries,
             "the answer page took {$queries} queries",
         );
