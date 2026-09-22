@@ -98,6 +98,7 @@ GET api/v1/sales/staff                                      admin, seller
 GET api/v1/sales/today                                      admin, seller
 GET api/v1/seller-accounts                                  admin
 GET api/v1/seller-accounts/{seller}/breakdown               admin
+GET api/v1/seller-accounts/{seller}/history                 admin
 GET api/v1/settlement-requests                              admin, seller
 GET api/v1/settlement-requests/account                      admin, seller
 GET api/v1/settlement-requests/settleable                   admin, seller
@@ -173,6 +174,7 @@ POST api/v1/salary-requests                                 (any signed-in)
 POST api/v1/sales                                           admin, seller
 POST api/v1/seller-accounts/{seller}/settle                 admin
 POST api/v1/seller-accounts/{seller}/settle-loaves          admin
+POST api/v1/seller-settlements/{record}/reverse             admin
 POST api/v1/settlement-requests                             admin, seller
 POST api/v1/settlement-requests/{settlement}/confirm        admin
 POST api/v1/settlement-requests/{settlement}/reject         admin
