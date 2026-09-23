@@ -28,7 +28,10 @@ dependencies:
   open_filex: ^4.5.0
 
   # UI
-  cupertino_icons: ^1.0.8
+  # cupertino_icons برداشته شد: هیچ‌جای اپ import نشده بود و فونت
+  # آیکون‌های iOS را (۲۵۷ کیلوبایت) بی‌کار در APK می‌گذاشت. تنها
+  # جایش همین یک خط در pubspec بود که فلاتر آن را به هر پروژهٔ تازه
+  # اضافه می‌کند.
   shimmer: ^3.0.0
   fl_chart: ^0.69.2
   intl: ^0.20.2

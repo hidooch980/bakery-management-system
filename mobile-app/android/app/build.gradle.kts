@@ -87,8 +87,25 @@ android {
                 signingConfigs.getByName("debug")
             }
 
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // اندازهٔ فایل نصب، که فروشنده‌ها با اینترنت همراه دانلودش
+            // می‌کنند و روی گوشی ارزان جا برایش تنگ است.
+            //
+            // خاموش بود. دو فایل dex در APK بود — یعنی بیش از ۶۵۵۳۶ متد،
+            // که برای اپی به این اندازه یعنی بیشترش کدِ کتابخانه‌هایی است
+            // که هیچ‌وقت صدا زده نمی‌شوند.
+            //
+            // اندازه‌گیری شد، نه فرض: همین بیلد با همین دستور، قبل و بعد.
+            // بقیهٔ حجم کتابخانهٔ native است (libflutter، libapp و
+            // SQLCipher برای دو معماری) و R8 به آن کاری ندارد.
+            //
+            // `proguard-rules.pro` کنارِ این فایل است و می‌گوید چه چیزی
+            // را نباید پاک کند. فایلِ پیش‌فرضِ خودِ فلاتر هم آورده می‌شود.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
