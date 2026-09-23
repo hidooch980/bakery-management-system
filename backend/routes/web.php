@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\BakeryApplicationController;
 use App\Http\Middleware\PicksTheBakeryInThePanel;
 use App\Models\Bakery;
 use Illuminate\Http\Request;
@@ -21,6 +22,30 @@ Route::get('/', function () {
 
     return view('welcome', ['bakery' => $bakery]);
 })->name('home');
+
+/*
+ * درخواستِ نانوایی تازه — فرم، و فرستادنش.
+ *
+ * پشتش از قبل ساخته شده بود (BakeryApplicationController) ولی هیچ
+ * صفحه‌ای نداشت، یعنی عملاً وجود نداشت: تنها راهِ فرستادنِ درخواست
+ * یک تماسِ API بود، که نانوایِ سیستانی نمی‌گیردش.
+ *
+ * همان کنترلر را صدا می‌زند نه اینکه منطق را دوباره بنویسد. دو راهِ
+ * ساختنِ یک درخواست، همان چیزی است که روزی دو جور رفتار می‌کند.
+ */
+Route::get('/signup', fn () => view('signup'))->name('signup');
+
+Route::post('/signup', function (Request $request) {
+    $response = app(BakeryApplicationController::class)
+        ->store($request);
+
+    // ۲۰۱ یعنی تازه ثبت شد، ۲۰۰ یعنی همین شماره از قبل درخواستی
+    // در انتظار داشت. هر دو برای کسی که فرم را پر کرده یک چیز
+    // می‌گویند: پیامت رسید، دوباره نفرست.
+    return back()->with('sent', $response->getStatusCode() < 300);
+})
+    ->middleware('throttle:3,10')
+    ->name('signup.store');
 
 /*
  * Switching shop, from the panel's topbar.
