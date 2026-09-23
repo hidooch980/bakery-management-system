@@ -5,52 +5,52 @@ namespace App\Support;
 use App\Models\Bakery;
 
 /**
- * Which bakery the request is about.
+ * اینکه این درخواست دربارهٔ کدام نانوایی است.
  *
- * The system ran one shop for its whole life, so everything simply read
- * "the" bakery and every figure in it belonged to that one. Now a user
- * belongs to a bakery and reads only theirs — but the answer still has to
- * be available in the same places it always was: inside the dough formula,
- * the currency, the calendar, a Filament table, an artisan command.
+ * سیستم تمام عمرش یک مغازه را گردانده، پس همه‌جا فقط «آن» نانوایی
+ * خوانده می‌شد و هر رقمی در آن مالِ همان بود. حالا هر کاربر به یک
+ * نانوایی تعلق دارد و فقط مالِ خودش را می‌خواند — ولی جواب باید هنوز
+ * در همان جاهایی در دسترس باشد که همیشه بود: داخل فرمول خمیر، واحد
+ * پول، تقویم، یک جدولِ Filament، یک دستورِ artisan.
  *
- * Resolved from whoever is signed in, held for the request, and settable by
- * hand for the console — where nobody is signed in and the caller has to say
- * which shop it means.
+ * از روی کسی که وارد شده پیدا می‌شود، تا آخر درخواست نگه داشته
+ * می‌شود، و برای کنسول دستی گذاشتنی است — جایی که کسی وارد نشده و
+ * خودِ صداکننده باید بگوید کدام نانوایی را می‌گوید.
  */
 class CurrentBakery
 {
-    /** Resolved shops, by id — one lookup each, however often asked. */
+    /** نانوایی‌های پیداشده، با شناسه — هر کدام یک بار، هر چند بار که پرسیده شود. */
     private static array $cached = [];
 
     /**
-     * The shop nobody is signed in to — the console, the scheduler, a
-     * queued job, every test that never logs in. Looked up once too: left
-     * unremembered it was the single most-run query in the system, asked
-     * two hundred times by one scan of the issue list, because every
-     * global scope on every model goes through here.
+     * نانوایی‌ای که کسی واردش نشده — کنسول، زمان‌بند، کارِ صف‌شده، و هر
+     * آزمونی که هرگز وارد نمی‌شود. این هم یک بار خوانده می‌شود: بدون
+     * به‌خاطرسپردن، پرتکرارترین کوئریِ کل سیستم بود — یک بار اسکنِ
+     * فهرست مشکلات دویست بار می‌پرسیدش — چون محدودیتِ سراسریِ هر مدلی
+     * از همین‌جا رد می‌شود.
      */
     private static ?Bakery $fallback = null;
 
     private static ?int $forcedId = null;
 
     /**
-     * The signed-in user's bakery.
+     * نانوایی کاربری که وارد شده.
      *
-     * Falls back to the only bakery there is, which keeps every existing
-     * install, seeder and test working unchanged — a shop that never had a
-     * second bakery cannot be reading the wrong one.
+     * اگر نبود، به تنها نانوایی‌ای که وجود دارد برمی‌گردد، و همین است
+     * که هر نصب و seeder و آزمونِ موجود را بی‌تغییر نگه می‌دارد —
+     * مغازه‌ای که هرگز نانوایی دومی نداشته، نمی‌تواند اشتباهی را
+     * بخواند.
      */
     public static function get(): ?Bakery
     {
-        // The id is worked out afresh every time rather than remembered:
-        // within one request a different user can be acted as, and holding
-        // the first answer would quietly serve one person another's shop.
+        // شناسه هر بار از نو حساب می‌شود نه اینکه به خاطر سپرده شود:
+        // در یک درخواست می‌شود به‌جای کاربر دیگری عمل کرد، و نگه‌داشتنِ
+        // اولین جواب یعنی بی‌صدا نانوایی یکی را به آن یکی نشان دادن.
         $bakeryId = self::$forcedId ?? auth()->user()?->bakery_id;
 
         if ($bakeryId === null) {
-            // A missing shop is not remembered: a seeder or an install
-            // command creates it a moment later and must then be able to
-            // find it.
+            // نبودنِ نانوایی به خاطر سپرده نمی‌شود: seeder یا دستورِ
+            // نصب یک لحظه بعد می‌سازدش و باید بتواند پیدایش کند.
             return self::$fallback ??= Bakery::query()->oldest('id')->first();
         }
 
@@ -63,11 +63,12 @@ class CurrentBakery
     }
 
     /**
-     * Works a block against a named bakery, whoever is signed in.
+     * یک بلوک را روی نانوایی نام‌برده اجرا می‌کند، هر کس که وارد شده
+     * باشد.
      *
-     * For the console and for anything that legitimately crosses shops —
-     * a nightly job, a command creating a new bakery — where there is no
-     * user to read the answer from.
+     * برای کنسول و هر چیزی که به‌حق از نانوایی‌ها رد می‌شود — کارِ
+     * شبانه، دستوری که نانوایی تازه می‌سازد — جایی که کاربری نیست که
+     * جواب از او خوانده شود.
      */
     public static function for(int $bakeryId, callable $callback): mixed
     {
@@ -82,25 +83,24 @@ class CurrentBakery
     }
 
     /**
-     * Acts as this shop for the rest of the request.
+     * تا آخر درخواست، به‌جای این نانوایی عمل می‌کند.
      *
-     * Unlike [for], which wraps a block and puts the previous answer
-     * back, this holds until the request ends — it is how a switch made
-     * by an owner with several shops takes effect everywhere at once,
-     * including inside every global scope.
+     * برخلاف [for] که یک بلوک را می‌پیچد و جواب قبلی را برمی‌گرداند،
+     * این تا پایان درخواست می‌ماند — و همین است که جابه‌جاییِ صاحبی که
+     * چند نانوایی دارد را یکجا همه‌جا اعمال می‌کند، از جمله داخل هر
+     * محدودیتِ سراسری.
      *
-     * The caller is responsible for having checked that the signed-in
-     * person may reach this shop. Nothing here can check it: this class
-     * is what the permission check itself is asked through, and having
-     * it consult the user would be the same circle `User::bakery()`
-     * documents.
+     * بررسیِ اینکه شخصِ واردشده اجازهٔ این نانوایی را دارد، با
+     * صداکننده است. هیچ‌چیزِ اینجا نمی‌تواند بررسی‌اش کند: خودِ بررسیِ
+     * دسترسی از همین کلاس می‌پرسد، و مشورت‌کردنش با کاربر همان دوری
+     * می‌شود که `User::bakery()` توضیحش داده.
      */
     public static function actAs(?int $bakeryId): void
     {
         self::$forcedId = $bakeryId;
     }
 
-    /** Cleared between requests and tests, so one never answers for another. */
+    /** بین درخواست‌ها و آزمون‌ها پاک می‌شود، تا یکی به‌جای آن یکی جواب ندهد. */
     public static function forget(): void
     {
         self::$cached = [];

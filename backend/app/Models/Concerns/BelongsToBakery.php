@@ -7,16 +7,17 @@ use App\Support\CurrentBakery;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Ties a record to the shop it belongs to, and keeps it there.
+ * هر ردیف را به نانوایی خودش گره می‌زند و همان‌جا نگهش می‌دارد.
  *
- * Every query is narrowed to the signed-in user's bakery and every new
- * record is stamped with it, so no screen, report or export has to remember
- * to filter — forgetting once would show one shop another's takings.
+ * هر کوئری به نانوایی کسی که وارد شده محدود می‌شود و هر ردیف تازه با
+ * همان مهر می‌خورد، تا هیچ صفحه و گزارش و خروجی‌ای لازم نباشد یادش
+ * بماند فیلتر بگذارد — یک بار یادنرفتن یعنی نشان‌دادنِ درآمد یک
+ * نانوایی به آن یکی.
  *
- * The scope stands down when there is no bakery to scope to: a fresh
- * install, a console command that has not said which shop it means, or the
- * seeder building the first one. A shop that has only ever had one bakery
- * therefore behaves exactly as it did before any of this existed.
+ * وقتی نانوایی‌ای برای محدودکردن نیست، کنار می‌کشد: نصبِ تازه، دستورِ
+ * کنسولی که نگفته کدام نانوایی را می‌گوید، یا seeder ی که دارد
+ * اولینش را می‌سازد. پس مغازه‌ای که همیشه یک نانوایی داشته، دقیقاً
+ * همان‌طور کار می‌کند که پیش از وجود این همه کار می‌کرد.
  */
 trait BelongsToBakery
 {
@@ -40,7 +41,7 @@ trait BelongsToBakery
         return $this->belongsTo(Bakery::class);
     }
 
-    /** Deliberately crosses shops — for the console and for reports that own the choice. */
+    /** عمداً از نانوایی‌ها رد می‌شود — برای کنسول و گزارش‌هایی که خودشان این تصمیم را دارند. */
     public function scopeAcrossBakeries(Builder $query): Builder
     {
         return $query->withoutGlobalScope('bakery');
