@@ -16,6 +16,7 @@ import 'screens/admin/admin_home_screen.dart';
 import 'screens/shater/shater_home_screen.dart';
 import 'services/api_client.dart';
 import 'services/app_version.dart';
+import 'services/device_os.dart';
 import 'services/bakery_api.dart';
 import 'services/connection_status.dart';
 import 'services/server_directory.dart';
@@ -77,6 +78,7 @@ void main() async {
   // call and a platform channel that does not answer cannot hold up a
   // request. Not awaited: sign-in must not wait on a diagnostic.
   unawaited(AppVersion.warmUp());
+  unawaited(DeviceOs.warmUp());
 
   final client = ApiClient();
 

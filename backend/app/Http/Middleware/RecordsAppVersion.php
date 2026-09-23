@@ -8,55 +8,83 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Notes which build of the app a session is running, when it changes.
+ * ثبت می‌کند یک نشست روی کدام بیلدِ اپ و کدام اندروید کار می‌کند، هر
+ * وقت که یکی از این دو عوض شود.
  *
- * Recorded at every request rather than only at sign-in, because nobody
- * signs in again after updating — the token outlives the install. A field
- * that says 5.1.0 while the phone runs 5.2.0 is worse than an empty one:
- * it is wrong with the confidence of a fact, and it would be read as one
- * on the day somebody is trying to work out why a screen is blank.
+ * در هر درخواست، نه فقط موقع ورود — چون بعد از آپدیت کسی دوباره وارد
+ * نمی‌شود و توکن از نصب عمر بیشتری دارد. فیلدی که بگوید ۵.۱.۰ در حالی
+ * که گوشی روی ۵.۲.۰ است، از فیلد خالی بدتر است: با اطمینانِ یک
+ * واقعیت غلط است، و درست همان روزی خوانده می‌شود که کسی دارد می‌فهمد
+ * چرا یک صفحه خالی است.
  *
- * The write happens only when the value differs, so the ordinary case is
- * a string comparison against a column already loaded with the token.
+ * نوشتن فقط وقتی اتفاق می‌افتد که مقدار فرق کرده باشد، پس حالت
+ * معمولی فقط مقایسهٔ دو رشته است روی ستونی که همراه توکن بارگذاری شده.
  *
- * Nothing here can refuse a request. The version is a convenience for
- * whoever is diagnosing a problem; a phone that sends a malformed header,
- * or none at all, still sells bread.
+ * هیچ‌چیزِ اینجا نمی‌تواند جلوی یک درخواست را بگیرد. این اعداد برای
+ * کسی است که دارد مشکلی را ریشه‌یابی می‌کند؛ گوشی‌ای که هدرِ خراب
+ * بفرستد، یا اصلاً نفرستد، هنوز نان می‌فروشد.
  */
 class RecordsAppVersion
 {
-    /** Long enough for a semantic version and the build metadata. */
+    /** به‌اندازهٔ یک نسخهٔ معنایی و متادیتای بیلد. */
     private const MAX = 20;
 
     public function handle(Request $request, Closure $next): Response
     {
         $token = $request->user()?->currentAccessToken();
 
-        // `currentAccessToken` answers with a TransientToken for a
-        // session-guard request — the panel — and that is a plain object,
-        // not a model: it has no row, no column, and no `exists` either.
-        // Asking it for one is a fatal error on every panel request, which
-        // is how this arrived: `! $token->exists` looked like the careful
-        // version of the check and was the one that broke the desk.
+        // ‏`currentAccessToken` برای درخواستی که با نگهبانِ نشست می‌آید
+        // — یعنی پنل — یک TransientToken می‌دهد، و آن یک شیء ساده است
+        // نه مدل: نه ردیفی دارد، نه ستونی، نه `exists`. پرسیدنش از او
+        // روی هر درخواستِ پنل خطای مرگبار است، و همین‌طور هم پیش آمد:
+        // ‏`! $token->exists` شکلِ محتاطانهٔ این بررسی به نظر می‌رسید و
+        // همانی بود که میزِ کار را از کار انداخت.
         if (! $token instanceof Model) {
             return $next($request);
         }
 
-        $sent = $this->clean($request->header('X-App-Version'));
+        // قبل از هر نوشتنی جمع می‌شود، تا یک ذخیره هر چه عوض شده را
+        // با خود ببرد، نه اینکه دو ذخیره روی یک ردیف مسابقه بدهند.
+        $changed = [];
 
-        if ($sent !== null && $sent !== $token->app_version) {
-            $token->forceFill(['app_version' => $sent])->save();
+        $version = $this->clean($request->header('X-App-Version'));
+
+        if ($version !== null && $version !== $token->app_version) {
+            $changed['app_version'] = $version;
+        }
+
+        // «Android 7.0». به همان شکل و به همان دلیل خوانده می‌شود:
+        // گوشی‌ای که نسخهٔ تازه رویش نصب نمی‌شود تقریباً همیشه گوشیِ
+        // زیادی قدیمی است، و هیچ صفحه‌ای این را نمی‌گفت.
+        $os = $this->cleanOs($request->header('X-Device-OS'));
+
+        if ($os !== null && $os !== $token->os_version) {
+            $changed['os_version'] = $os;
+        }
+
+        // عددی که بیلد واقعاً با آن مقایسه می‌شود. کنار نام نگه داشته
+        // می‌شود نه اینکه از رویش درآورده شود: درآوردنِ یکی از روی آن
+        // یکی، هر جا لازم شود، همان راهی است که این دو به اختلاف
+        // می‌رسند.
+        $sdk = $this->cleanSdk($request->header('X-Device-SDK'));
+
+        if ($sdk !== null && $sdk !== $token->sdk_int) {
+            $changed['sdk_int'] = $sdk;
+        }
+
+        if ($changed !== []) {
+            $token->forceFill($changed)->save();
         }
 
         return $next($request);
     }
 
     /**
-     * Keeps what looks like a version and discards the rest.
+     * چیزی را که شکلِ یک نسخه دارد نگه می‌دارد و بقیه را دور می‌ریزد.
      *
-     * This string is written into a column that is read back and shown to
-     * the owner, and it arrives from the network. Anything that is not
-     * digits, dots, dashes and letters is not a version number.
+     * این رشته در ستونی نوشته می‌شود که بعداً خوانده و به صاحب نشان
+     * داده می‌شود، و از شبکه می‌آید. هر چه رقم و نقطه و خط‌تیره و حرف
+     * نباشد، شمارهٔ نسخه نیست.
      */
     private function clean(?string $raw): ?string
     {
@@ -67,5 +95,43 @@ class RecordsAppVersion
         }
 
         return $value;
+    }
+
+    /**
+     * نام یک سیستم‌عامل، محدود به آنچه نام سیستم‌عامل می‌تواند باشد.
+     *
+     * بازتر از شمارهٔ نسخه — «Android 7.0» فاصله و یک کلمه دارد — و باز
+     * هم هیچ‌چیزی جز حرف و رقم و نقطه و فاصله و خط‌تیره. در ستونی
+     * نوشته می‌شود که صاحب می‌خواندش، و از شبکه می‌آید.
+     */
+    private function cleanOs(?string $raw): ?string
+    {
+        $value = trim($raw ?? '');
+
+        if ($value === '' || ! preg_match('/^[0-9A-Za-z. -]{1,30}$/', $value)) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    /**
+     * سطحِ API، یا null.
+     *
+     * از هر دو طرف محدود: زیر ۱ سطح نیست، و ستون یک عدد کوچکِ بدون
+     * علامت است، پس عددی بیرون از دامنه‌اش نوشتنی است که شکست می‌خورد،
+     * نه فیلدی که خالی می‌ماند.
+     */
+    private function cleanSdk(?string $raw): ?int
+    {
+        $value = trim($raw ?? '');
+
+        if (! preg_match('/^[0-9]{1,3}$/', $value)) {
+            return null;
+        }
+
+        $level = (int) $value;
+
+        return $level >= 1 ? $level : null;
     }
 }

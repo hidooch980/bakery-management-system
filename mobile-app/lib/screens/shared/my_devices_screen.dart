@@ -167,10 +167,30 @@ class _MyDevicesScreenState extends State<MyDevicesScreen> {
                             color: device.isCurrent ? scheme.primary : null,
                           ),
                           title: Text(device.name),
-                          subtitle: Text(
-                            device.isCurrent
-                                ? 'همین گوشی · ${device.versionLabel}\n${device.when}'
-                                : '${device.versionLabel}\n${device.when}',
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                device.isCurrent
+                                    ? 'همین گوشی · ${device.osLabel}'
+                                      ' · ${device.versionLabel}'
+                                    : '${device.osLabel}'
+                                      ' · ${device.versionLabel}',
+                              ),
+                              Text(device.when),
+                              // Only on a handset that genuinely cannot
+                              // take a release. The phone goes on working
+                              // on the build it already has, which is
+                              // exactly why this is invisible otherwise.
+                              if (device.strandedReason != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    device.strandedReason!,
+                                    style: TextStyle(color: scheme.error),
+                                  ),
+                                ),
+                            ],
                           ),
                           isThreeLine: true,
                           trailing: TextButton(

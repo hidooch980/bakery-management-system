@@ -23,6 +23,20 @@ class AuthController extends Controller
      */
     private const MAX_SESSIONS = 3;
 
+    /**
+     * قدیمی‌ترین اندرویدی که یک APK منتشرشده رویش نصب می‌شود.
+     *
+     * همان `minSdk` در `mobile-app/android/app/build.gradle.kts`،
+     * اینجا دوباره نوشته شده چون سرور است که باید جواب «چرا روی آن
+     * گوشی نصب نمی‌شود» را بدهد — سؤالی که تا وقتی گوشی‌ها سطحشان را
+     * گزارش نمی‌کردند، از هیچ صفحه‌ای جواب نداشت.
+     *
+     * ‏۲۴ یعنی اندروید ۷.۰. در ماه‌های اول اپ ۲۳ و پیش از آن ۲۱ بود،
+     * پس گوشیِ پایین‌تر از این ممکن است بیلدِ قدیمی را کاملاً سالم
+     * اجرا کند: اندروید این را موقع نصب بررسی می‌کند، نه بعدش.
+     */
+    private const MIN_ANDROID_SDK = 24;
+
     use ApiResponse;
 
     /**
@@ -299,6 +313,18 @@ class AuthController extends Controller
                 // older app never sends one, and «نامشخص» on the screen
                 // is itself the answer: that phone has not been updated.
                 'app_version' => $token->app_version,
+                // گوشی روی کدام اندروید است. آن یک‌سومِ گمشدهٔ سؤال:
+                // گوشی‌ای که نسخه رویش نصب نمی‌شود تقریباً همیشه گوشیِ
+                // زیادی قدیمی است، و تا وقتی این ثبت نمی‌شد هیچ صفحه‌ای
+                // نمی‌توانست بگوید.
+                'os_version' => $token->os_version,
+                'sdk_int' => $token->sdk_int,
+                // اینجا گفته می‌شود نه روی گوشی حساب شود، تا پنل و اپ
+                // سر اینکه کدام دستگاه‌ها جا مانده‌اند اختلاف پیدا
+                // نکنند. اگر سطح هرگز گزارش نشده باشد، خالی است.
+                'can_install_updates' => $token->sdk_int === null
+                    ? null
+                    : $token->sdk_int >= self::MIN_ANDROID_SDK,
                 // The phone in your hand, so the list can say so rather
                 // than inviting somebody to sign themselves out by accident
                 // while standing at the till.

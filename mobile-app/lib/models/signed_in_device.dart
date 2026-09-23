@@ -1,4 +1,5 @@
-/// One handset holding a session, as the device list shows it.
+/// یک گوشی که نشستی روی آن باز است، همان‌طور که فهرست دستگاه‌ها
+/// نشانش می‌دهد.
 class SignedInDevice {
   const SignedInDevice({
     required this.id,
@@ -7,27 +8,48 @@ class SignedInDevice {
     this.lastUsedAt,
     this.createdAt,
     this.appVersion,
+    this.osVersion,
+    this.sdkInt,
+    this.canInstallUpdates,
   });
 
   final int id;
   final String name;
 
-  /// The phone this list is being read on.
+  /// گوشی‌ای که این فهرست روی آن خوانده می‌شود.
   ///
-  /// Carried rather than worked out here: the app cannot tell which of
-  /// several sessions is its own from the rows alone, and guessing wrong
-  /// means offering to close the wrong one.
+  /// آورده می‌شود نه اینجا حساب: اپ از روی خودِ ردیف‌ها نمی‌تواند
+  /// بفهمد کدام نشست مالِ خودش است، و حدسِ غلط یعنی پیشنهادِ بستنِ
+  /// نشستِ اشتباه.
   final bool isCurrent;
 
-  /// Already Jalali, formatted by the server. Null when the session has
-  /// been opened but nothing has been asked of it yet.
+  /// از قبل شمسی، به دست سرور قالب‌بندی شده. وقتی نشست باز شده ولی
+  /// هنوز چیزی از آن خواسته نشده، خالی است.
   final String? lastUsedAt;
   final String? createdAt;
 
-  /// Which build is on that handset, once it has made a request carrying
-  /// the header. Null for a session opened by an app old enough not to
-  /// send one — and that is itself the answer: it has not been updated.
+  /// کدام بیلد روی آن گوشی است، بعد از اینکه یک درخواست با آن هدر
+  /// فرستاده باشد. برای نشستی که اپِ قدیمی‌تر بازش کرده خالی است — و
+  /// همین خودش جواب است: آن گوشی به‌روز نشده.
   final String? appVersion;
+
+  /// گوشی روی کدام اندروید است — «Android 7.0».
+  ///
+  /// آن یک‌سومِ گمشدهٔ سؤال. فروشنده‌ای که می‌گوید APK تازه نصب
+  /// نمی‌شود، تقریباً همیشه گوشی‌ای در دست دارد که زیادی قدیمی است، و
+  /// تا وقتی این ثبت نمی‌شد هیچ صفحه‌ای نمی‌توانست بگوید.
+  final String? osVersion;
+
+  /// سطحِ API، که بیلد واقعاً با آن مقایسه می‌شود. کنار نام نگه داشته
+  /// می‌شود نه اینکه دوباره از رویش درآورده شود.
+  final int? sdkInt;
+
+  /// اینکه اصلاً یک نسخه روی این گوشی نصب می‌شود یا نه.
+  ///
+  /// سرور تصمیم می‌گیرد، نه اینجا، تا پنل و اپ سر اینکه کدام گوشی‌ها
+  /// جا مانده‌اند اختلاف پیدا نکنند. اگر سطح هرگز گزارش نشده باشد،
+  /// خالی است.
+  final bool? canInstallUpdates;
 
   factory SignedInDevice.fromJson(Map<String, dynamic> json) {
     return SignedInDevice(
@@ -41,13 +63,18 @@ class SignedInDevice {
       appVersion: (json['app_version'] as String?)?.trim().isEmpty == true
           ? null
           : json['app_version'] as String?,
+      osVersion: (json['os_version'] as String?)?.trim().isEmpty == true
+          ? null
+          : json['os_version'] as String?,
+      sdkInt: (json['sdk_int'] as num?)?.toInt(),
+      canInstallUpdates: json['can_install_updates'] as bool?,
     );
   }
 
-  /// What to put under the name.
+  /// چیزی که زیر نام نوشته می‌شود.
   ///
-  /// «هرگز» would be wrong for a session opened a minute ago and not yet
-  /// used, and it is the row somebody is most likely to be looking at.
+  /// «هرگز» برای نشستی که یک دقیقه پیش باز شده و هنوز استفاده نشده غلط
+  /// است، و همان ردیفی است که آدم بیشتر از همه نگاهش می‌کند.
   String get when {
     if (lastUsedAt != null) return 'آخرین استفاده: $lastUsedAt';
     if (createdAt != null) return 'ورود: $createdAt';
@@ -55,12 +82,33 @@ class SignedInDevice {
     return 'بدون سابقهٔ استفاده';
   }
 
-  /// The build, said plainly, or that nobody knows.
+  /// بیلد، ساده گفته‌شده، یا اینکه کسی نمی‌داند.
   ///
-  /// «نامشخص» rather than nothing: a blank where a version belongs reads
-  /// as a bug in the list, where the actual fact — this phone has not
-  /// spoken to the server since it was updated to a build that reports —
-  /// is worth seeing.
+  /// «نامشخص» به‌جای هیچ: جای خالی آنجا که نسخه باید باشد، مثل یک
+  /// ایرادِ فهرست خوانده می‌شود، در حالی که واقعیتش — این گوشی از وقتی
+  /// به بیلدی که گزارش می‌دهد به‌روز شده با سرور حرف نزده — دیدنی
+  /// است.
   String get versionLabel =>
       appVersion == null ? 'نسخه نامشخص' : 'نسخهٔ $appVersion';
+
+  /// اندروید، ساده گفته‌شده، یا اینکه کسی نمی‌داند.
+  String get osLabel => osVersion ?? 'اندروید نامشخص';
+
+  /// چرا این گوشی هرگز به‌روزرسانی نمی‌گیرد، وقتی نمی‌گیرد.
+  ///
+  /// وقتی می‌گیرد خالی است، و وقتی کسی نمی‌داند هم خالی است — هشدار
+  /// روی گوشی‌ای که فقط گزارش نداده، کسی را می‌فرستد گوشیِ کاملاً سالم
+  /// عوض کند.
+  ///
+  /// روی خودِ ردیف صریح گفته می‌شود، نه اینکه کسی دو عدد را با هم
+  /// مقایسه کند: گوشی روی بیلدی که دارد به کار خودش ادامه می‌دهد، و
+  /// دقیقاً همین است که مسئله را نامرئی می‌کند.
+  String? get strandedReason {
+    if (canInstallUpdates != false) return null;
+
+    final on = osVersion ?? 'این اندروید';
+
+    return 'نسخهٔ تازه روی $on نصب نمی‌شود — اپ فعلی کار می‌کند،'
+        ' ولی به‌روزرسانی نمی‌گیرد.';
+  }
 }
