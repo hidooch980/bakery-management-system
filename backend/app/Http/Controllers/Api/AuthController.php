@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PasswordResetCode;
 use App\Models\User;
 use App\Rules\NotAGuessablePassword;
+use App\Support\Handsets;
 use App\Support\Jalali;
 use App\Support\Sms;
 use App\Traits\ApiResponse;
@@ -22,20 +23,6 @@ class AuthController extends Controller
      * watching.
      */
     private const MAX_SESSIONS = 3;
-
-    /**
-     * قدیمی‌ترین اندرویدی که یک APK منتشرشده رویش نصب می‌شود.
-     *
-     * همان `minSdk` در `mobile-app/android/app/build.gradle.kts`،
-     * اینجا دوباره نوشته شده چون سرور است که باید جواب «چرا روی آن
-     * گوشی نصب نمی‌شود» را بدهد — سؤالی که تا وقتی گوشی‌ها سطحشان را
-     * گزارش نمی‌کردند، از هیچ صفحه‌ای جواب نداشت.
-     *
-     * ‏۲۴ یعنی اندروید ۷.۰. در ماه‌های اول اپ ۲۳ و پیش از آن ۲۱ بود،
-     * پس گوشیِ پایین‌تر از این ممکن است بیلدِ قدیمی را کاملاً سالم
-     * اجرا کند: اندروید این را موقع نصب بررسی می‌کند، نه بعدش.
-     */
-    private const MIN_ANDROID_SDK = 24;
 
     use ApiResponse;
 
@@ -322,9 +309,7 @@ class AuthController extends Controller
                 // اینجا گفته می‌شود نه روی گوشی حساب شود، تا پنل و اپ
                 // سر اینکه کدام دستگاه‌ها جا مانده‌اند اختلاف پیدا
                 // نکنند. اگر سطح هرگز گزارش نشده باشد، خالی است.
-                'can_install_updates' => $token->sdk_int === null
-                    ? null
-                    : $token->sdk_int >= self::MIN_ANDROID_SDK,
+                'can_install_updates' => Handsets::canInstallUpdates($token->sdk_int),
                 // The phone in your hand, so the list can say so rather
                 // than inviting somebody to sign themselves out by accident
                 // while standing at the till.
