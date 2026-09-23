@@ -39,7 +39,19 @@ class SellerAccountsTable extends BaseWidget
 
         return $table
             ->query(
-                User::query()->whereHas('sales', fn ($q) => $q->sellerAccountOutstanding())
+                // مثل بقیهٔ جاها محدود به همین نانوایی. تا امروز درست
+                // درمی‌آمد ولی نه به‌خاطر فیلترِ خودش: فروشنده‌ای از
+                // نانوایی دیگر فقط وقتی اینجا می‌آمد که در فروش‌های
+                // *ما* بدهی داشته باشد، و آن هم به‌خاطر scope روی
+                // sales غیرممکن است.
+                //
+                // یعنی امنیتش را از یک رابطه قرض گرفته بود — یک فیلترِ
+                // پاک‌شده فاصله داشت تا فهرستِ فروشنده‌های نانوایی
+                // دیگر. همین شکلِ «تصادفاً امن» را یک بار در
+                // StaffAdvanceController هم دیدیم و همان‌جا هم صریح شد.
+                User::query()
+                    ->ofCurrentBakery()
+                    ->whereHas('sales', fn ($q) => $q->sellerAccountOutstanding())
             )
             ->columns([
                 Tables\Columns\TextColumn::make('name')
