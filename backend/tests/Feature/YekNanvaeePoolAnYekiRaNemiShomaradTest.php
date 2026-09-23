@@ -143,23 +143,61 @@ class YekNanvaeePoolAnYekiRaNemiShomaradTest extends TestCase
      * فیلترش `inventory_item_id` است نه نانوایی. امن است چون انبارِ
      * هر نانوایی ردیف‌های خودش را دارد — ولی این را کسی تا امروز
      * نسنجیده بود.
+     *
+     * هر دو نانوایی آرد می‌خرند، با قیمت‌های متفاوت. ترازنامهٔ ما باید
+     * فقط مالِ خودمان را بشمارد.
+     *
+     * دو نوشتهٔ قبلیِ این آزمون پوچ بودند و با خراب‌کردن معلوم شد:
+     * اولی `assets` را نقشه فرض کرد در حالی که فهرست است، پس همیشه
+     * صفر می‌خواند؛ دومی سراغ ردیفی رفت که برای انبارِ خالی اصلاً
+     * ساخته نمی‌شود، پس «نبودنش» هم چیزی ثابت نمی‌کرد.
      */
     public function test_ترازنامهٔ_ما_انبار_آن_یکی_را_قیمت_نمی‌گذارد(): void
     {
+        // ما اول می‌خریم، ارزان: ۱۰۰ کیلو، هر کیلو ۱۰٬۰۰۰.
+        CurrentBakery::for($this->ours->id, function () {
+            $supplier = Supplier::create(['name' => 'آسیابِ ما']);
+
+            $purchase = Purchase::create([
+                'supplier_id' => $supplier->id,
+                'user_id' => $this->ourOwner->id,
+                'purchased_on' => now(),
+            ]);
+
+            PurchaseItem::create([
+                'purchase_id' => $purchase->id,
+                'inventory_item_id' => InventoryItem::ofKey(InventoryItem::FLOUR)->id,
+                'quantity' => 100,
+                'unit_price' => 10_000,
+                'amount' => 1_000_000,
+            ]);
+
+            // خطِ فاکتور قیمت را می‌گوید؛ آنچه انبار را پر می‌کند
+            // حرکتِ انبار است. بدون این، ترازنامه ردیفِ انبار را
+            // اصلاً نمی‌سازد و آزمون روی «نبودن» تکیه می‌کرد — که
+            // خودش پوچ است.
+            InventoryItem::ofKey(InventoryItem::FLOUR)->move('in', 100, 'purchase');
+        });
+
+        // و آن یکی **بعد** از ما می‌خرد، گران: هر کیلو ۴۰٬۰۰۰.
+        //
+        // ترتیب عمدی است. قیمت با `latest('id')` برداشته می‌شود، پس
+        // اگر آن یکی زودتر بخرد، خطِ ما به‌هرحال برنده است و آزمون
+        // حتی با فیلترِ خراب هم سبز می‌ماند — اولین نوشته‌اش همین بود
+        // و با خراب‌کردن عمدی معلوم شد. حالا خطِ آن یکی تازه‌تر است،
+        // پس اگر فیلتر نانوایی را نگیرد، قیمتِ او خوانده می‌شود و
+        // انبارِ ما چهار برابر قیمت می‌خورد.
         $this->buyFlourInTheOtherShop(40_000_000);
 
-        $sheet = CurrentBakery::for(
-            $this->ours->id,
-            fn () => BalanceSheet::build(),
-        );
+        $sheet = CurrentBakery::for($this->ours->id, fn () => BalanceSheet::build());
 
-        $this->assertIsArray($sheet);
+        $stock = collect($sheet['assets'])->firstWhere('key', 'stock');
 
-        // انبارِ ما خالی است. هر عددی جز صفر یعنی کیسه‌های آن یکی
-        // را دارایی ما حساب کرده.
-        $stock = data_get($sheet, 'assets.stock.amount', data_get($sheet, 'stock', 0));
+        $this->assertNotNull($stock, 'ردیف انبار در ترازنامه نبود.');
 
-        $this->assertEqualsWithDelta(0.0, (float) $stock, 0.01);
+        // ۱۰۰ کیلو در انبارِ ما، به قیمتِ خودمان. اگر قیمتِ آن یکی
+        // خوانده می‌شد، این عدد چهار برابر می‌شد.
+        $this->assertEqualsWithDelta(1_000_000.0, (float) $stock['amount'], 0.01);
     }
 
     // ------------------------------------------------------ کمک‌کننده‌ها
