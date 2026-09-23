@@ -6,36 +6,35 @@ use App\Models\User;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * That the person named in a route works at the shop doing the asking.
+ * اینکه کسی که در یک مسیر نامش آمده، در همان نانوایی‌ای کار می‌کند که
+ * دارد می‌پرسد.
  *
- * Every other model carries a global bakery scope, so a query for one
- * shop's rows cannot return another's. [User] deliberately does not, and
- * the reason is sound: resolving the signed-in user is how the current
- * bakery is worked out in the first place, so scoping users by it would
- * ask the question to answer the question.
+ * هر مدل دیگری محدودیتِ سراسریِ نانوایی دارد، پس کوئریِ ردیف‌های یک
+ * نانوایی نمی‌تواند ردیفِ آن یکی را برگرداند. [User] عمداً ندارد، و
+ * دلیلش درست است: خودِ پیداکردنِ کاربرِ واردشده همان راهی است که
+ * نانوایی جاری از آن به دست می‌آید، پس محدودکردنِ کاربرها به آن یعنی
+ * پرسیدنِ همان سؤالی که می‌خواهیم جوابش را بدهیم.
  *
- * The cost of that exemption is that route model binding on a User is
- * unguarded, and six endpoints took one straight from the URL without
- * checking. Two of them delete and update; two settle a seller's account.
- * With one shop on the box there is nothing to cross, which is exactly
- * why it went unnoticed — and the owner has four more shops built and
- * waiting on «فعلاً فعال نشده، بعد از تست نهایی». The day those open,
- * these six stop being harmless in silence.
+ * بهای این استثنا این است که بستنِ User از روی مسیر بی‌نگهبان است، و
+ * شش نقطه بدون هیچ بررسی‌ای مستقیم از URL می‌گرفتندش. دو تایشان حذف
+ * و ویرایش می‌کنند؛ دو تا حساب فروشنده را تسویه می‌کنند. با یک
+ * نانوایی روی دستگاه، چیزی برای ردشدن نیست — و دقیقاً به همین دلیل
+ * دیده نشد.
  *
- * **404 and not 403.** A refusal that says «you may not touch that»
- * confirms the id exists and names a real person at another shop. Not
- * found is the honest answer to a question that, from where the caller
- * stands, has no subject.
+ * **۴۰۴ نه ۴۰۳.** ردی که بگوید «اجازهٔ دست‌زدن نداری» تأیید می‌کند که
+ * آن شناسه وجود دارد و به آدمِ واقعی در نانوایی دیگری اشاره می‌کند.
+ * «پیدا نشد» جوابِ صادقانهٔ سؤالی است که از جایی که پرسنده ایستاده،
+ * اصلاً موضوعی ندارد.
  */
 final class SameBakery
 {
     /**
-     * Returns $user when they belong to the current shop, and 404s when
-     * they do not.
+     * اگر این شخص مالِ نانوایی جاری باشد خودش را برمی‌گرداند، وگرنه
+     * ۴۰۴ می‌دهد.
      *
-     * With no current bakery resolved — the console, a test that has not
-     * seeded one — nothing is enforced, matching what the global scope on
-     * every other model does in the same situation.
+     * وقتی نانوایی جاری معلوم نیست — کنسول، یا آزمونی که هیچ‌کدام را
+     * نساخته — چیزی اعمال نمی‌شود، دقیقاً مثل کاری که محدودیتِ سراسریِ
+     * هر مدل دیگری در همان وضعیت می‌کند.
      */
     public static function or404(User $user): User
     {
