@@ -1,4 +1,5 @@
-/// One handset holding a session, as the device list shows it.
+/// یک گوشی که نشستی روی آن باز است، همان‌طور که فهرست دستگاه‌ها
+/// نشانش می‌دهد.
 class SignedInDevice {
   const SignedInDevice({
     required this.id,
@@ -15,39 +16,39 @@ class SignedInDevice {
   final int id;
   final String name;
 
-  /// The phone this list is being read on.
+  /// گوشی‌ای که این فهرست روی آن خوانده می‌شود.
   ///
-  /// Carried rather than worked out here: the app cannot tell which of
-  /// several sessions is its own from the rows alone, and guessing wrong
-  /// means offering to close the wrong one.
+  /// آورده می‌شود نه اینجا حساب: اپ از روی خودِ ردیف‌ها نمی‌تواند
+  /// بفهمد کدام نشست مالِ خودش است، و حدسِ غلط یعنی پیشنهادِ بستنِ
+  /// نشستِ اشتباه.
   final bool isCurrent;
 
-  /// Already Jalali, formatted by the server. Null when the session has
-  /// been opened but nothing has been asked of it yet.
+  /// از قبل شمسی، به دست سرور قالب‌بندی شده. وقتی نشست باز شده ولی
+  /// هنوز چیزی از آن خواسته نشده، خالی است.
   final String? lastUsedAt;
   final String? createdAt;
 
-  /// Which build is on that handset, once it has made a request carrying
-  /// the header. Null for a session opened by an app old enough not to
-  /// send one — and that is itself the answer: it has not been updated.
+  /// کدام بیلد روی آن گوشی است، بعد از اینکه یک درخواست با آن هدر
+  /// فرستاده باشد. برای نشستی که اپِ قدیمی‌تر بازش کرده خالی است — و
+  /// همین خودش جواب است: آن گوشی به‌روز نشده.
   final String? appVersion;
 
-  /// Which Android the handset is on — «Android 7.0».
+  /// گوشی روی کدام اندروید است — «Android 7.0».
   ///
-  /// The missing third of the question. A seller reporting that the new
-  /// APK will not install is nearly always holding a phone too old to
-  /// take it, and until this was recorded no screen could say so.
+  /// آن یک‌سومِ گمشدهٔ سؤال. فروشنده‌ای که می‌گوید APK تازه نصب
+  /// نمی‌شود، تقریباً همیشه گوشی‌ای در دست دارد که زیادی قدیمی است، و
+  /// تا وقتی این ثبت نمی‌شد هیچ صفحه‌ای نمی‌توانست بگوید.
   final String? osVersion;
 
-  /// The API level, which is what the build is actually compared
-  /// against. Kept beside the name rather than parsed back out of it.
+  /// سطحِ API، که بیلد واقعاً با آن مقایسه می‌شود. کنار نام نگه داشته
+  /// می‌شود نه اینکه دوباره از رویش درآورده شود.
   final int? sdkInt;
 
-  /// Whether a release can be installed on this handset at all.
+  /// اینکه اصلاً یک نسخه روی این گوشی نصب می‌شود یا نه.
   ///
-  /// Decided by the server, not here, so the panel and the app cannot
-  /// disagree about which phones are stranded. Null when the level was
-  /// never reported.
+  /// سرور تصمیم می‌گیرد، نه اینجا، تا پنل و اپ سر اینکه کدام گوشی‌ها
+  /// جا مانده‌اند اختلاف پیدا نکنند. اگر سطح هرگز گزارش نشده باشد،
+  /// خالی است.
   final bool? canInstallUpdates;
 
   factory SignedInDevice.fromJson(Map<String, dynamic> json) {
@@ -70,10 +71,10 @@ class SignedInDevice {
     );
   }
 
-  /// What to put under the name.
+  /// چیزی که زیر نام نوشته می‌شود.
   ///
-  /// «هرگز» would be wrong for a session opened a minute ago and not yet
-  /// used, and it is the row somebody is most likely to be looking at.
+  /// «هرگز» برای نشستی که یک دقیقه پیش باز شده و هنوز استفاده نشده غلط
+  /// است، و همان ردیفی است که آدم بیشتر از همه نگاهش می‌کند.
   String get when {
     if (lastUsedAt != null) return 'آخرین استفاده: $lastUsedAt';
     if (createdAt != null) return 'ورود: $createdAt';
@@ -81,27 +82,27 @@ class SignedInDevice {
     return 'بدون سابقهٔ استفاده';
   }
 
-  /// The build, said plainly, or that nobody knows.
+  /// بیلد، ساده گفته‌شده، یا اینکه کسی نمی‌داند.
   ///
-  /// «نامشخص» rather than nothing: a blank where a version belongs reads
-  /// as a bug in the list, where the actual fact — this phone has not
-  /// spoken to the server since it was updated to a build that reports —
-  /// is worth seeing.
+  /// «نامشخص» به‌جای هیچ: جای خالی آنجا که نسخه باید باشد، مثل یک
+  /// ایرادِ فهرست خوانده می‌شود، در حالی که واقعیتش — این گوشی از وقتی
+  /// به بیلدی که گزارش می‌دهد به‌روز شده با سرور حرف نزده — دیدنی
+  /// است.
   String get versionLabel =>
       appVersion == null ? 'نسخه نامشخص' : 'نسخهٔ $appVersion';
 
-  /// The Android, said plainly, or that nobody knows.
+  /// اندروید، ساده گفته‌شده، یا اینکه کسی نمی‌داند.
   String get osLabel => osVersion ?? 'اندروید نامشخص';
 
-  /// Why this handset can never take an update, when it cannot.
+  /// چرا این گوشی هرگز به‌روزرسانی نمی‌گیرد، وقتی نمی‌گیرد.
   ///
-  /// Null when it can, and null when nobody knows — a warning shown on a
-  /// phone that is merely unreported would send somebody to replace a
-  /// handset that is perfectly fine.
+  /// وقتی می‌گیرد خالی است، و وقتی کسی نمی‌داند هم خالی است — هشدار
+  /// روی گوشی‌ای که فقط گزارش نداده، کسی را می‌فرستد گوشیِ کاملاً سالم
+  /// عوض کند.
   ///
-  /// Worth saying out loud on the row rather than leaving somebody to
-  /// compare two numbers: the phone goes on working on the build it
-  /// already has, which is exactly why the problem is invisible.
+  /// روی خودِ ردیف صریح گفته می‌شود، نه اینکه کسی دو عدد را با هم
+  /// مقایسه کند: گوشی روی بیلدی که دارد به کار خودش ادامه می‌دهد، و
+  /// دقیقاً همین است که مسئله را نامرئی می‌کند.
   String? get strandedReason {
     if (canInstallUpdates != false) return null;
 

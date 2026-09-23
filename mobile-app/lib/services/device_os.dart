@@ -2,38 +2,37 @@ import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 
-/// Which Android — or iOS — this handset is running.
+/// این گوشی روی کدام اندروید — یا iOS — کار می‌کند.
 ///
-/// The device list has named the phone and the build for a while, and
-/// that turned out to be the two thirds of the question that do not
-/// answer it. A seller reported the new APK would not install; the list
-/// said «Samsung SM-J250F» and an app version three releases old, and
-/// neither said the thing that mattered — the phone was on an Android
-/// older than the one the app has required since its seventh change, so
-/// no release since could ever have installed on it, and nobody could
-/// have known that from any screen.
+/// فهرست دستگاه‌ها مدتی است نام گوشی و بیلد را می‌گوید، و معلوم شد آن
+/// دو سوم از سؤال است که جواب نمی‌دهد. فروشنده گفت APK تازه نصب
+/// نمی‌شود؛ فهرست می‌گفت «Samsung SM-J250F» و نسخه‌ای سه انتشار
+/// عقب‌تر، و هیچ‌کدام آن چیزی را نمی‌گفت که اهمیت داشت — گوشی روی
+/// اندرویدی قدیمی‌تر از آنی بود که اپ از هفتمین تغییرش به بعد لازم
+/// دارد، پس هیچ نسخه‌ای از آن موقع تا حالا نمی‌توانسته رویش نصب شود،
+/// و هیچ‌کس نمی‌توانست این را از هیچ صفحه‌ای بفهمد.
 ///
-/// Two values, not one. [name] is what a person recognises («Android
-/// 7.0») and [sdkInt] is the number the build is actually compared
-/// against. Working one out from the other wherever it happens to be
-/// needed is how the two come to disagree.
+/// دو مقدار، نه یکی. [name] چیزی است که آدم می‌شناسد («Android 7.0») و
+/// [sdkInt] عددی است که بیلد واقعاً با آن مقایسه می‌شود. درآوردنِ یکی
+/// از روی آن یکی، هر جا که لازم شود، همان راهی است که این دو به اختلاف
+/// می‌رسند.
 ///
-/// Read once and kept, and read *off* the request path, for the same
-/// reason [AppVersion] is: a platform channel in front of every request
-/// is a channel that never answers under `flutter test`, and a header
-/// this is only a convenience for must never hold up a sale.
+/// یک بار خوانده و نگه داشته می‌شود، و *بیرون* از مسیر درخواست — به
+/// همان دلیلی که [AppVersion] این‌طور است: کانالِ پلتفرم جلوی هر
+/// درخواست، همان کانالی است که زیر `flutter test` هرگز جواب نمی‌دهد، و
+/// هدری که فقط یک راحتی است هرگز نباید جلوی فروش نان را بگیرد.
 class DeviceOs {
   static String? _name;
 
   static int? _sdkInt;
 
-  /// What to put in the header, without waiting for anything.
+  /// چیزی که در هدر می‌رود، بدون منتظرماندن برای هیچ چیز.
   static String? get cachedName => _name;
 
-  /// The API level, or null on iOS and anywhere it was not reported.
+  /// سطحِ API، یا خالی روی iOS و هر جا که گزارش نشده باشد.
   static int? get cachedSdkInt => _sdkInt;
 
-  /// Reads it once, at startup. Never throws and never hangs.
+  /// یک بار، موقع راه‌اندازی. هرگز خطا نمی‌اندازد و هرگز گیر نمی‌کند.
   static Future<void> warmUp() async {
     if (_name != null) return;
 
@@ -56,13 +55,13 @@ class DeviceOs {
         _name = _tidy('iOS ${ios.systemVersion}');
       }
     } on Object {
-      // A phone that cannot report its version still sells bread.
+      // گوشی‌ای که نتواند نسخه‌اش را بگوید، هنوز نان می‌فروشد.
     }
   }
 
-  /// Keeps it inside the thirty characters the server stores, and strips
-  /// anything the server would refuse — so a manufacturer's odd string
-  /// arrives shortened rather than being dropped in full.
+  /// در سی کاراکتری که سرور ذخیره می‌کند نگهش می‌دارد، و هر چه را
+  /// سرور رد می‌کند می‌تراشد — تا رشتهٔ عجیبِ یک سازنده کوتاه‌شده
+  /// برسد، نه اینکه یکسره دور ریخته شود.
   static String? _tidy(String raw) {
     final value = raw
         .replaceAll(RegExp(r'[^0-9A-Za-z. -]'), '')
@@ -74,8 +73,8 @@ class DeviceOs {
     return value.length <= 30 ? value : value.substring(0, 30);
   }
 
-  /// Testing seam. The platform channel is not available under
-  /// `flutter test`, so a test that needs known values sets them.
+  /// درزِ آزمون. کانالِ پلتفرم زیر `flutter test` در دسترس نیست، پس
+  /// آزمونی که به مقادیر معلوم نیاز دارد خودش می‌گذاردشان.
   static void setForTesting({String? name, int? sdkInt}) {
     _name = name;
     _sdkInt = sdkInt;

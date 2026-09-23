@@ -24,17 +24,16 @@ class AuthController extends Controller
     private const MAX_SESSIONS = 3;
 
     /**
-     * The oldest Android a released APK can be installed on.
+     * قدیمی‌ترین اندرویدی که یک APK منتشرشده رویش نصب می‌شود.
      *
-     * `minSdk` in `mobile-app/android/app/build.gradle.kts`, restated
-     * here because the server is what has to answer «why will it not
-     * install on that phone» — a question nobody could answer from any
-     * screen until the handsets started reporting their level.
+     * همان `minSdk` در `mobile-app/android/app/build.gradle.kts`،
+     * اینجا دوباره نوشته شده چون سرور است که باید جواب «چرا روی آن
+     * گوشی نصب نمی‌شود» را بدهد — سؤالی که تا وقتی گوشی‌ها سطحشان را
+     * گزارش نمی‌کردند، از هیچ صفحه‌ای جواب نداشت.
      *
-     * 24 is Android 7.0. It was 23 and then 21 in the app's first
-     * months, so a phone below it may well be running an old build
-     * perfectly happily: Android checks this when installing, not
-     * afterwards.
+     * ‏۲۴ یعنی اندروید ۷.۰. در ماه‌های اول اپ ۲۳ و پیش از آن ۲۱ بود،
+     * پس گوشیِ پایین‌تر از این ممکن است بیلدِ قدیمی را کاملاً سالم
+     * اجرا کند: اندروید این را موقع نصب بررسی می‌کند، نه بعدش.
      */
     private const MIN_ANDROID_SDK = 24;
 
@@ -314,15 +313,15 @@ class AuthController extends Controller
                 // older app never sends one, and «نامشخص» on the screen
                 // is itself the answer: that phone has not been updated.
                 'app_version' => $token->app_version,
-                // Which Android the handset is on. The missing third of
-                // the question: the phone that cannot install a release
-                // is nearly always the phone too old to, and until this
-                // was recorded no screen could say so.
+                // گوشی روی کدام اندروید است. آن یک‌سومِ گمشدهٔ سؤال:
+                // گوشی‌ای که نسخه رویش نصب نمی‌شود تقریباً همیشه گوشیِ
+                // زیادی قدیمی است، و تا وقتی این ثبت نمی‌شد هیچ صفحه‌ای
+                // نمی‌توانست بگوید.
                 'os_version' => $token->os_version,
                 'sdk_int' => $token->sdk_int,
-                // Said here rather than worked out on the phone, so the
-                // panel and the app cannot disagree about which handsets
-                // are stranded. Null when the level was never reported.
+                // اینجا گفته می‌شود نه روی گوشی حساب شود، تا پنل و اپ
+                // سر اینکه کدام دستگاه‌ها جا مانده‌اند اختلاف پیدا
+                // نکنند. اگر سطح هرگز گزارش نشده باشد، خالی است.
                 'can_install_updates' => $token->sdk_int === null
                     ? null
                     : $token->sdk_int >= self::MIN_ANDROID_SDK,
