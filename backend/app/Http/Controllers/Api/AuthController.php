@@ -23,6 +23,21 @@ class AuthController extends Controller
      */
     private const MAX_SESSIONS = 3;
 
+    /**
+     * The oldest Android a released APK can be installed on.
+     *
+     * `minSdk` in `mobile-app/android/app/build.gradle.kts`, restated
+     * here because the server is what has to answer «why will it not
+     * install on that phone» — a question nobody could answer from any
+     * screen until the handsets started reporting their level.
+     *
+     * 24 is Android 7.0. It was 23 and then 21 in the app's first
+     * months, so a phone below it may well be running an old build
+     * perfectly happily: Android checks this when installing, not
+     * afterwards.
+     */
+    private const MIN_ANDROID_SDK = 24;
+
     use ApiResponse;
 
     /**
@@ -299,6 +314,18 @@ class AuthController extends Controller
                 // older app never sends one, and «نامشخص» on the screen
                 // is itself the answer: that phone has not been updated.
                 'app_version' => $token->app_version,
+                // Which Android the handset is on. The missing third of
+                // the question: the phone that cannot install a release
+                // is nearly always the phone too old to, and until this
+                // was recorded no screen could say so.
+                'os_version' => $token->os_version,
+                'sdk_int' => $token->sdk_int,
+                // Said here rather than worked out on the phone, so the
+                // panel and the app cannot disagree about which handsets
+                // are stranded. Null when the level was never reported.
+                'can_install_updates' => $token->sdk_int === null
+                    ? null
+                    : $token->sdk_int >= self::MIN_ANDROID_SDK,
                 // The phone in your hand, so the list can say so rather
                 // than inviting somebody to sign themselves out by accident
                 // while standing at the till.

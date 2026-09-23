@@ -7,6 +7,9 @@ class SignedInDevice {
     this.lastUsedAt,
     this.createdAt,
     this.appVersion,
+    this.osVersion,
+    this.sdkInt,
+    this.canInstallUpdates,
   });
 
   final int id;
@@ -29,6 +32,24 @@ class SignedInDevice {
   /// send one — and that is itself the answer: it has not been updated.
   final String? appVersion;
 
+  /// Which Android the handset is on — «Android 7.0».
+  ///
+  /// The missing third of the question. A seller reporting that the new
+  /// APK will not install is nearly always holding a phone too old to
+  /// take it, and until this was recorded no screen could say so.
+  final String? osVersion;
+
+  /// The API level, which is what the build is actually compared
+  /// against. Kept beside the name rather than parsed back out of it.
+  final int? sdkInt;
+
+  /// Whether a release can be installed on this handset at all.
+  ///
+  /// Decided by the server, not here, so the panel and the app cannot
+  /// disagree about which phones are stranded. Null when the level was
+  /// never reported.
+  final bool? canInstallUpdates;
+
   factory SignedInDevice.fromJson(Map<String, dynamic> json) {
     return SignedInDevice(
       id: (json['id'] as num).toInt(),
@@ -41,6 +62,11 @@ class SignedInDevice {
       appVersion: (json['app_version'] as String?)?.trim().isEmpty == true
           ? null
           : json['app_version'] as String?,
+      osVersion: (json['os_version'] as String?)?.trim().isEmpty == true
+          ? null
+          : json['os_version'] as String?,
+      sdkInt: (json['sdk_int'] as num?)?.toInt(),
+      canInstallUpdates: json['can_install_updates'] as bool?,
     );
   }
 
@@ -63,4 +89,25 @@ class SignedInDevice {
   /// is worth seeing.
   String get versionLabel =>
       appVersion == null ? 'نسخه نامشخص' : 'نسخهٔ $appVersion';
+
+  /// The Android, said plainly, or that nobody knows.
+  String get osLabel => osVersion ?? 'اندروید نامشخص';
+
+  /// Why this handset can never take an update, when it cannot.
+  ///
+  /// Null when it can, and null when nobody knows — a warning shown on a
+  /// phone that is merely unreported would send somebody to replace a
+  /// handset that is perfectly fine.
+  ///
+  /// Worth saying out loud on the row rather than leaving somebody to
+  /// compare two numbers: the phone goes on working on the build it
+  /// already has, which is exactly why the problem is invisible.
+  String? get strandedReason {
+    if (canInstallUpdates != false) return null;
+
+    final on = osVersion ?? 'این اندروید';
+
+    return 'نسخهٔ تازه روی $on نصب نمی‌شود — اپ فعلی کار می‌کند،'
+        ' ولی به‌روزرسانی نمی‌گیرد.';
+  }
 }

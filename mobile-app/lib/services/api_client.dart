@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_version.dart';
+import 'device_os.dart';
 import 'offline_queue.dart';
 import 'response_cache.dart';
 
@@ -76,6 +77,20 @@ class ApiClient {
           final version = AppVersion.cached;
           if (version != null) {
             options.headers['X-App-Version'] = version;
+          }
+
+          // Which Android this handset is on, read the same way and for
+          // the same reason. The phone that cannot install a release is
+          // nearly always the phone too old to, and until this was sent
+          // no screen could say so.
+          final os = DeviceOs.cachedName;
+          if (os != null) {
+            options.headers['X-Device-OS'] = os;
+          }
+
+          final sdk = DeviceOs.cachedSdkInt;
+          if (sdk != null) {
+            options.headers['X-Device-SDK'] = '$sdk';
           }
 
           // سرور خودش بررسی می‌کند که این شخص حق این مغازه را دارد یا نه
