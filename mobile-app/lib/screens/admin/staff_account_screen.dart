@@ -137,7 +137,7 @@ class _StaffAccountScreenState extends State<StaffAccountScreen> {
                           trailing: const Icon(Icons.open_in_new),
                           onTap: () {
                             Navigator.pop(dialogContext);
-                            _linked('salary', id as int);
+                            _linked('salary', id);
                           }),
                     if (row['editable'] != true)
                       const Text(
