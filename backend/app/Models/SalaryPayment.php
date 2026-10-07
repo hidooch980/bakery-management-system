@@ -102,7 +102,9 @@ class SalaryPayment extends Model
      */
     public function advanceToRecover(): float
     {
-        if (!$this->recover_advances) return 0.0;
+        if (! $this->recover_advances) {
+            return 0.0;
+        }
         if (! $this->user_id) {
             return 0.0;
         }
@@ -178,7 +180,9 @@ class SalaryPayment extends Model
      */
     public function breadToRecover(): float
     {
-        if (!$this->recover_bread) return 0.0;
+        if (! $this->recover_bread) {
+            return 0.0;
+        }
         if (! $this->user_id) {
             return 0.0;
         }

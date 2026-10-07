@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Bakery;
 use App\Models\SalaryPayment;
-use App\Models\StaffAdvance;
 use App\Models\StaffAdjustment;
+use App\Models\StaffAdvance;
 use App\Models\User;
 use App\Support\Money;
 use Database\Seeders\BakerySeeder;
@@ -16,7 +16,9 @@ use Tests\TestCase;
 class StaffAccountTest extends TestCase
 {
     use RefreshDatabase;
+
     private User $admin;
+
     private User $worker;
 
     protected function setUp(): void

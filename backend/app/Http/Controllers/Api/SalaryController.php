@@ -14,11 +14,12 @@ use App\Models\User;
 use App\Support\AppCalendar;
 use App\Support\Jalali;
 use App\Support\Money;
+use App\Support\SameBakery;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SalaryController extends Controller
 {
@@ -53,7 +54,7 @@ class SalaryController extends Controller
         ]);
 
         $this->validateGross($data);
-        \App\Support\SameBakery::or404(User::findOrFail($data['user_id']));
+        SameBakery::or404(User::findOrFail($data['user_id']));
         $periodStart = Jalali::parseFlexible($data['period_start']);
 
         if ($periodStart === null) {
