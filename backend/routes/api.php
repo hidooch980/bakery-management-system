@@ -412,6 +412,9 @@ Route::prefix('v1')->group(function () {
             Route::patch('/staff-adjustments/{adjustment}/waive', [StaffAdjustmentController::class, 'waive']);
             Route::patch('/staff-adjustments/{adjustment}/restore', [StaffAdjustmentController::class, 'restore']);
 
+            // پرونده مالی و اصلاح رکورد اصلی فقط برای مدیر امور مالی.
+            Route::get('/staff-accounts/{person}', [\App\Http\Controllers\Api\StaffAccountController::class, 'show']);
+            Route::patch('/staff-account-entries/{kind}/{id}', [\App\Http\Controllers\Api\StaffAccountController::class, 'update']);
             Route::get('/salaries/employees', [SalaryController::class, 'employees']);
             Route::patch('/salaries/{salary}/mark-paid', [SalaryController::class, 'markPaid']);
             Route::apiResource('salaries', SalaryController::class)->except(['show']);

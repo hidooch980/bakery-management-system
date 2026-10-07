@@ -18,6 +18,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 class SalaryController extends Controller
 {
@@ -47,8 +48,12 @@ class SalaryController extends Controller
             'paid_on' => ['nullable', 'string', 'max:20'],
             'bank_account_id' => ['nullable', 'exists:bank_accounts,id'],
             'note' => ['nullable', 'string', 'max:500'],
+            'recover_advances' => ['sometimes', 'boolean'],
+            'recover_bread' => ['sometimes', 'boolean'],
         ]);
 
+        $this->validateGross($data);
+        \App\Support\SameBakery::or404(User::findOrFail($data['user_id']));
         $periodStart = Jalali::parseFlexible($data['period_start']);
 
         if ($periodStart === null) {
@@ -66,7 +71,7 @@ class SalaryController extends Controller
             return $this->error('برای این کارمند در این دوره قبلاً حقوق ثبت شده است.', 409);
         }
 
-        $payment = SalaryPayment::create([
+        $payment = DB::transaction(fn () => SalaryPayment::create([
             'user_id' => $data['user_id'],
             'period_start' => $periodStart,
             'period_label' => Jalali::monthLabel($periodStart),
@@ -84,7 +89,9 @@ class SalaryController extends Controller
             // the field never existing.
             'bank_account_id' => $data['bank_account_id'] ?? null,
             'note' => $data['note'] ?? null,
-        ]);
+            'recover_advances' => $data['recover_advances'] ?? true,
+            'recover_bread' => $data['recover_bread'] ?? true,
+        ]));
 
         return $this->success($this->payload($payment), 'حقوق ثبت شد.', 201);
     }
@@ -98,8 +105,11 @@ class SalaryController extends Controller
             'paid_on' => ['sometimes', 'nullable', 'string', 'max:20'],
             'bank_account_id' => ['sometimes', 'nullable', 'exists:bank_accounts,id'],
             'note' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'recover_advances' => ['sometimes', 'boolean'],
+            'recover_bread' => ['sometimes', 'boolean'],
         ]);
 
+        $this->validateGross($data, $salary);
         if (array_key_exists('paid_on', $data)) {
             $data['paid_on'] = Jalali::parseFlexible($data['paid_on']);
         }
@@ -110,7 +120,7 @@ class SalaryController extends Controller
             }
         }
 
-        $salary->update($data);
+        DB::transaction(fn () => $salary->update($data));
 
         return $this->success($this->payload($salary->fresh()), 'حقوق به‌روزرسانی شد.');
     }
@@ -371,7 +381,18 @@ class SalaryController extends Controller
             ->value('bank_account_id');
     }
 
-    private function payload(SalaryPayment $payment): array
+    /** کسورات دستی نباید فیش منفی بسازند. */
+    private function validateGross(array $data, ?SalaryPayment $salary = null): void
+    {
+        $base = $data['base_amount'] ?? Money::convert($salary?->base_amount ?? 0);
+        $bonus = $data['bonus'] ?? Money::convert($salary?->bonus ?? 0);
+        $deduction = $data['deduction'] ?? Money::convert($salary?->deduction ?? 0);
+        if ((float) $deduction > (float) $base + (float) $bonus) {
+            throw ValidationException::withMessages(['deduction' => ['کسورات از حقوق و پاداش بیشتر است.']]);
+        }
+    }
+
+    public function payload(SalaryPayment $payment): array
     {
         return [
             'id' => $payment->id,
@@ -394,6 +415,8 @@ class SalaryController extends Controller
             'advance_deduction_formatted' => Money::format($payment->advance_deduction),
             'bread_deduction' => Money::convert($payment->bread_deduction),
             'bread_deduction_formatted' => Money::format($payment->bread_deduction),
+            'recover_advances' => $payment->recover_advances,
+            'recover_bread' => $payment->recover_bread,
             'net_amount' => Money::convert($payment->net_amount),
             'net_amount_formatted' => Money::format($payment->net_amount),
             'bank_account_id' => $payment->bank_account_id,

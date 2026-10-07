@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import 'adjustment_sheet.dart';
+import 'staff_account_screen.dart';
 import 'admin_home_screen.dart';
 
 /// Paying wages, from the phone.
@@ -68,7 +69,9 @@ class _PayrollSectionState extends State<PayrollSection> {
     );
   }
 
-  void _reload() => setState(() { _data = _load(); });
+  void _reload() => setState(() {
+        _data = _load();
+      });
 
   /// Writing one down as it happens, rather than recalling it at payday.
   Future<void> _addAdjustment(List<Employee> staff) async {
@@ -106,7 +109,8 @@ class _PayrollSectionState extends State<PayrollSection> {
     // قصد، خودِ فیش است: همان کارگر، همان ماه، همان عددها. اگر مالک
     // بعداً عدد دیگری بزند، کار دیگری است و نام دیگری می‌گیرد.
     final intent = 'salary-${person.id}-$_thisPeriod'
-        '-${result.base}-${result.bonus}-${result.deduction}';
+        '-${result.base}-${result.bonus}-${result.deduction}'
+        '-${result.recoverAdvances}-${result.recoverBread}-${result.accountId}';
 
     try {
       await widget.api.recordSalary(
@@ -115,6 +119,8 @@ class _PayrollSectionState extends State<PayrollSection> {
         baseAmount: result.base,
         bonus: result.bonus,
         deduction: result.deduction,
+        recoverAdvances: result.recoverAdvances,
+        recoverBread: result.recoverBread,
         attemptKey: _writes.nameFor(intent),
         // Recorded as handed over, because that is what pressing «پرداخت
         // شد» means. A slip prepared before payday is a different action
@@ -246,6 +252,20 @@ class _PayrollSectionState extends State<PayrollSection> {
               const AdminRow(label: 'کارمندی ثبت نشده', value: '—')
             else
               for (final person in staff) ...[
+                AdminRow(
+                  label: 'پرونده و ریز حساب ${person.displayName}',
+                  value: 'حقوق و بدهی‌ها',
+                  icon: Icons.account_balance_wallet_outlined,
+                  onTap: () async {
+                    await Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => StaffAccountScreen(
+                              api: widget.api, person: person),
+                        ));
+                    if (mounted) _reload();
+                  },
+                ),
                 if (paidThisPeriod.contains(person.id))
                   AdminRow(
                     label: person.displayName,
@@ -273,14 +293,16 @@ class _PayrollSectionState extends State<PayrollSection> {
                 // screen that is about somebody waiting.
                 if (person.hasRequested && !paidThisPeriod.contains(person.id))
                   Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 4, bottom: Gap.tight),
+                    padding: const EdgeInsetsDirectional.only(
+                        start: 4, bottom: Gap.tight),
                     child: Row(
                       children: [
                         const Icon(Icons.event_available_rounded,
                             size: IconSize.inline, color: AppColors.attention),
                         const SizedBox(width: Gap.tight),
                         Text(
-                          person.requestedDaysAgo == null || person.requestedDaysAgo == 0
+                          person.requestedDaysAgo == null ||
+                                  person.requestedDaysAgo == 0
                               ? 'امروز درخواست پرداخت داد'
                               : '${person.requestedDaysAgo} روز پیش درخواست پرداخت داد',
                           style: Theme.of(context)
@@ -298,7 +320,8 @@ class _PayrollSectionState extends State<PayrollSection> {
                 if ((person.owesAdvance || person.owesBread) &&
                     !paidThisPeriod.contains(person.id))
                   Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 4, bottom: Gap.tight),
+                    padding: const EdgeInsetsDirectional.only(
+                        start: 4, bottom: Gap.tight),
                     child: Row(
                       children: [
                         const Icon(Icons.remove_circle_outline_rounded,
@@ -349,6 +372,8 @@ typedef _PayInput = ({
   double base,
   double bonus,
   double deduction,
+  bool recoverAdvances,
+  bool recoverBread,
   int? accountId,
   String? note,
 });
@@ -365,6 +390,8 @@ class _PaySheet extends StatefulWidget {
 }
 
 class _PaySheetState extends State<_PaySheet> {
+  bool _recoverAdvances = true;
+  bool _recoverBread = true;
   late final TextEditingController _base;
   late final TextEditingController _bonus;
   late final TextEditingController _deduction;
@@ -434,6 +461,7 @@ class _PaySheetState extends State<_PaySheet> {
   /// How much of the outstanding advance this payslip absorbs — never more
   /// than the pay itself, which is the same rule the server applies.
   double get _advance {
+    if (!_recoverAdvances) return 0;
     if (_gross <= 0) return 0;
 
     final owed = widget.person.advanceOutstanding;
@@ -446,6 +474,7 @@ class _PaySheetState extends State<_PaySheet> {
   /// one about to be stored is the bug this shop spent 2026-08-17 finding
   /// in the panel's own preview.
   double get _bread {
+    if (!_recoverBread) return 0;
     final left = _gross - _advance;
 
     if (left <= 0) return 0;
@@ -467,7 +496,8 @@ class _PaySheetState extends State<_PaySheet> {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -477,14 +507,35 @@ class _PaySheetState extends State<_PaySheet> {
             children: [
               Text(
                 'حقوق ${widget.person.displayName}',
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 20),
-              _Field(controller: _base, label: 'حقوق پایه', onChanged: _refresh),
+              _Field(
+                  controller: _base, label: 'حقوق پایه', onChanged: _refresh),
               const SizedBox(height: 12),
               _Field(controller: _bonus, label: 'تشویقی', onChanged: _refresh),
               const SizedBox(height: 12),
-              _Field(controller: _deduction, label: 'تنبیهی و کسورات', onChanged: _refresh),
+              _Field(
+                  controller: _deduction,
+                  label: 'تنبیهی و کسورات',
+                  onChanged: _refresh),
+              if (widget.person.owesAdvance)
+                CheckboxListTile(
+                  title: const Text('کسر مساعده از این حقوق'),
+                  subtitle: Text(widget.person.advanceOutstandingFormatted),
+                  value: _recoverAdvances,
+                  onChanged: (value) =>
+                      setState(() => _recoverAdvances = value ?? false),
+                ),
+              if (widget.person.owesBread)
+                CheckboxListTile(
+                  title: const Text('کسر بدهی نان از این حقوق'),
+                  subtitle: Text(widget.person.breadOutstandingFormatted),
+                  value: _recoverBread,
+                  onChanged: (value) =>
+                      setState(() => _recoverBread = value ?? false),
+                ),
               // A box that fills itself is a box the owner has to be able
               // to account for, or he will not trust the total under it.
               if (widget.person.hasAdjustments) ...[
@@ -518,8 +569,10 @@ class _PaySheetState extends State<_PaySheet> {
                     for (final account in widget.accounts)
                       ChoiceChip(
                         selected: _accountId == account.id,
-                        onSelected: (_) => setState(() => _accountId = account.id),
-                        label: Text('${account.title}  ${account.balanceFormatted}'),
+                        onSelected: (_) =>
+                            setState(() => _accountId = account.id),
+                        label: Text(
+                            '${account.title}  ${account.balanceFormatted}'),
                       ),
                   ],
                 ),
@@ -607,14 +660,19 @@ class _PaySheetState extends State<_PaySheet> {
                           base: _read(_base),
                           bonus: _read(_bonus),
                           deduction: _read(_deduction),
+                          recoverAdvances: _recoverAdvances,
+                          recoverBread: _recoverBread,
                           accountId: _accountId,
-                          note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+                          note: _note.text.trim().isEmpty
+                              ? null
+                              : _note.text.trim(),
                         )),
                 icon: const Icon(Icons.check_rounded),
                 label: Text(_net <= 0 && _advance > 0
                     ? 'تسویه با علی‌الحساب'
                     : 'پرداخت شد'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52)),
               ),
             ],
           ),
@@ -643,7 +701,8 @@ class _SumLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final style = strong ? theme.textTheme.titleMedium : theme.textTheme.bodyMedium;
+    final style =
+        strong ? theme.textTheme.titleMedium : theme.textTheme.bodyMedium;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -666,7 +725,8 @@ class _SumLine extends StatelessWidget {
 }
 
 class _Field extends StatelessWidget {
-  const _Field({required this.controller, required this.label, required this.onChanged});
+  const _Field(
+      {required this.controller, required this.label, required this.onChanged});
 
   final TextEditingController controller;
   final String label;
@@ -749,9 +809,8 @@ class _HandOverSheetState extends State<_HandOverSheet> {
             ),
           const SizedBox(height: 12),
           FilledButton(
-            onPressed: () => Navigator.pop(context, (
-              accountId: _accountId == _fromTill ? null : _accountId,
-            )),
+            onPressed: () => Navigator.pop(context,
+                (accountId: _accountId == _fromTill ? null : _accountId,)),
             child: const Text('پرداخت شد'),
           ),
           TextButton(

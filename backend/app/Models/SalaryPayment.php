@@ -26,7 +26,11 @@ class SalaryPayment extends Model
         'paid_on',
         'bank_account_id',
         'note',
+        'recover_advances',
+        'recover_bread',
     ];
+
+    protected $attributes = ['recover_advances' => true, 'recover_bread' => true];
 
     protected function casts(): array
     {
@@ -39,6 +43,8 @@ class SalaryPayment extends Model
             'advance_deduction' => 'decimal:2',
             'bread_deduction' => 'decimal:2',
             'net_amount' => 'decimal:2',
+            'recover_advances' => 'boolean',
+            'recover_bread' => 'boolean',
         ];
     }
 
@@ -96,6 +102,7 @@ class SalaryPayment extends Model
      */
     public function advanceToRecover(): float
     {
+        if (!$this->recover_advances) return 0.0;
         if (! $this->user_id) {
             return 0.0;
         }
@@ -171,6 +178,7 @@ class SalaryPayment extends Model
      */
     public function breadToRecover(): float
     {
+        if (!$this->recover_bread) return 0.0;
         if (! $this->user_id) {
             return 0.0;
         }
