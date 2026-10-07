@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../utils/formatters.dart';
+
 import 'package:provider/provider.dart';
 
 import '../../models/bakery.dart';
@@ -95,10 +96,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
           int count,
           double totalWeightKg,
           String totalFormatted,
-        })?>(
-      (f) => f,
-      onError: (_) => null,
-    );
+        })?>((f) => f, onError: (_) => null);
 
     return (
       pending: await pendingCall,
@@ -134,11 +132,8 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _RecordSaleSheet(
-        api: widget.api,
-        chane: chane,
-        bakery: _bakery,
-      ),
+      builder: (_) =>
+          RecordSaleSheet(api: widget.api, chane: chane, bakery: _bakery),
     );
 
     if (saved == true) _reload();
@@ -506,16 +501,20 @@ class _SaleTile extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         leading: CircleAvatar(
           backgroundColor: scheme.primary.withValues(alpha: 0.14),
-          child: Icon(Icons.sell_rounded, color: scheme.primary, size: IconSize.button),
+          child: Icon(
+            Icons.sell_rounded,
+            color: scheme.primary,
+            size: IconSize.button,
+          ),
         ),
         title: Text(
           sale.amount != null
               ? MoneyFormat.format(sale.amount, currency: unit)
               : 'بدون مبلغ',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
         ),
         subtitle: Text(JalaliFormat.time(sale.createdAt)),
         trailing: Chip(
@@ -527,22 +526,19 @@ class _SaleTile extends StatelessWidget {
   }
 }
 
-class _RecordSaleSheet extends StatefulWidget {
-  const _RecordSaleSheet({
-    required this.api,
-    required this.chane,
-    this.bakery,
-  });
+class RecordSaleSheet extends StatefulWidget {
+  const RecordSaleSheet(
+      {super.key, required this.api, required this.chane, this.bakery});
 
   final BakeryApi api;
   final ChaneEntry chane;
   final Bakery? bakery;
 
   @override
-  State<_RecordSaleSheet> createState() => _RecordSaleSheetState();
+  State<RecordSaleSheet> createState() => _RecordSaleSheetState();
 }
 
-class _RecordSaleSheetState extends State<_RecordSaleSheet> {
+class _RecordSaleSheetState extends State<RecordSaleSheet> {
   final _note = TextEditingController();
 
   /// One field per payment type. A sale can run to hundreds of loaves,
@@ -557,6 +553,22 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   /// Who took the bread, for the «منزل» row. Left empty it behaves as it
   /// always has — bread owed by nobody — so an older habit still works.
   int? _consumedBy;
+
+  // هر کارمند اضافه، تعداد مستقل و یک ردیف منزل جدا دارد.
+  final List<_HomeBreadDraft> _extraHome = [];
+
+  void _addHome() {
+    final row = _HomeBreadDraft();
+    row.count.addListener(() {
+      if (mounted) setState(() {});
+    });
+    setState(() => _extraHome.add(row));
+  }
+
+  void _removeHome(_HomeBreadDraft row) {
+    setState(() => _extraHome.remove(row));
+    row.count.dispose();
+  }
 
   List<Customer> _customerOptions = const [];
   List<StaffName> _staff = const [];
@@ -608,6 +620,9 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     for (final field in _fields.values) {
       field.dispose();
     }
+    for (final row in _extraHome) {
+      row.count.dispose();
+    }
     _note.dispose();
     super.dispose();
   }
@@ -616,8 +631,8 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
 
   Currency get _unit => widget.bakery?.currency ?? Currency.toman;
 
-  int get _totalCount => PaymentType.saleChoices
-      .fold(0, (sum, type) => sum + _countFor(type));
+  int get _totalCount =>
+      PaymentType.saleChoices.fold(0, (sum, type) => sum + _countFor(type));
 
   /// In Toman, the unit everything is stored in. MoneyFormat converts
   /// to the shop's display unit when it renders — doing it here too
@@ -630,15 +645,21 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
   /// temporary debt against the seller, so it is worth showing plainly.
   int get _unassigned => widget.chane.chaneCount - _totalCount;
 
+  int _readCount(TextEditingController field) =>
+      int.tryParse(latinDigits(field.text.trim())) ?? 0;
+
   int _countFor(PaymentType type) =>
-      int.tryParse(_fields[type]!.text.trim()) ?? 0;
+      _readCount(_fields[type]!) +
+      (type == PaymentType.home
+          ? _extraHome.fold<int>(0, (sum, row) => sum + _readCount(row.count))
+          : 0);
 
   /// Puts every loaf still unassigned onto this row — the usual gesture
   /// when one payment type covers the rest of the batch.
   void _fill(PaymentType type) {
     if (_unassigned <= 0) return;
 
-    _fields[type]!.text = '${_countFor(type) + _unassigned}';
+    _fields[type]!.text = '${_readCount(_fields[type]!) + _unassigned}';
   }
 
   /// Payment types actually used, so the summary names only what was paid.
@@ -646,6 +667,29 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
       PaymentType.saleChoices.where((type) => _countFor(type) > 0);
 
   String? _blockingProblem() {
+    for (final field in [
+      ..._fields.values,
+      ..._extraHome.map((r) => r.count),
+    ]) {
+      final text = latinDigits(field.text.trim());
+      if (text.isNotEmpty &&
+          (int.tryParse(text) == null || int.parse(text) < 0)) {
+        return 'تعداد نان باید عدد صحیح و نامنفی باشد.';
+      }
+    }
+    final selected = <int>{};
+    if (_readCount(_fields[PaymentType.home]!) > 0 && _consumedBy != null) {
+      selected.add(_consumedBy!);
+    }
+    for (final row in _extraHome) {
+      if (_readCount(row.count) == 0) continue;
+      if (row.userId == null) {
+        return 'برای ردیف نان کارکنان، کارمند را انتخاب کنید.';
+      }
+      if (!selected.add(row.userId!)) {
+        return 'هر کارمند را فقط در یک ردیف انتخاب کنید.';
+      }
+    }
     // An empty sheet used to be refused, and it had to be: cash was a row
     // here, so a seller with nothing to enter had simply not started.
     //
@@ -727,21 +771,36 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
       // with cash off the sheet an ordinary day has nothing else on it.
       // That batch would have stayed open for ever.
       final payments = [
-        ..._usedTypes.map((type) => SalePaymentLine(
+        ..._usedTypes.where((type) => type != PaymentType.home).map(
+              (type) => SalePaymentLine(
                 paymentType: type,
                 breadCount: _countFor(type),
                 // The API always stores Toman, whatever the shop displays,
                 // and the bread price is already in it. Bread given away
                 // is sent with no amount rather than a zero, which would
                 // read as money that went missing.
-                amount: type.expectsNoAmount ? null : _countFor(type) * _unitPrice,
+                amount:
+                    type.expectsNoAmount ? null : _countFor(type) * _unitPrice,
                 customerId: _customers[type],
                 // Only «منزل» carries a person. Charity is a gift and is
                 // owed by nobody, so naming one there would charge
                 // somebody for bread they gave away.
-                consumedByUserId:
-                    type == PaymentType.home ? _consumedBy : null,
-              )),
+                consumedByUserId: type == PaymentType.home ? _consumedBy : null,
+              ),
+            ),
+        if (_readCount(_fields[PaymentType.home]!) > 0)
+          SalePaymentLine(
+            paymentType: PaymentType.home,
+            breadCount: _readCount(_fields[PaymentType.home]!),
+            consumedByUserId: _consumedBy,
+          ),
+        for (final row in _extraHome)
+          if (_readCount(row.count) > 0)
+            SalePaymentLine(
+              paymentType: PaymentType.home,
+              breadCount: _readCount(row.count),
+              consumedByUserId: row.userId,
+            ),
         if (_unassigned > 0)
           SalePaymentLine(
             paymentType: PaymentType.shortfall,
@@ -776,7 +835,9 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
     final scheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -810,13 +871,11 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                     .bodyMedium
                     ?.copyWith(color: scheme.onSurfaceVariant),
               ),
-
               const SizedBox(height: 18),
               _RemainingBanner(
                 unassigned: _unassigned,
                 batchCount: widget.chane.chaneCount,
               ),
-
               const SizedBox(height: 18),
               Text(
                 'تعداد نان به تفکیک نوع پرداخت',
@@ -826,13 +885,12 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
-
               for (final type in PaymentType.saleChoices)
                 _PaymentRow(
                   key: ValueKey(type),
                   type: type,
                   controller: _fields[type]!,
-                  count: _countFor(type),
+                  count: _readCount(_fields[type]!),
                   unitPrice: _unitPrice,
                   unit: _unit,
                   customers: _customerOptions,
@@ -845,7 +903,41 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                   selectedConsumer: _consumedBy,
                   onConsumerChanged: (id) => setState(() => _consumedBy = id),
                 ),
-
+              for (final row in _extraHome)
+                Column(
+                  key: ObjectKey(row),
+                  children: [
+                    _PaymentRow(
+                      type: PaymentType.home,
+                      controller: row.count,
+                      count: _readCount(row.count),
+                      unitPrice: _unitPrice,
+                      unit: _unit,
+                      customers: const [],
+                      selectedCustomer: null,
+                      canFill: _unassigned > 0,
+                      onFill: () {
+                        row.count.text =
+                            '${_readCount(row.count) + _unassigned}';
+                      },
+                      onCustomerChanged: (_) {},
+                      staff: _staff,
+                      selectedConsumer: row.userId,
+                      onConsumerChanged: (id) =>
+                          setState(() => row.userId = id),
+                    ),
+                    TextButton.icon(
+                      onPressed: _saving ? null : () => _removeHome(row),
+                      icon: const Icon(Icons.remove_circle_outline),
+                      label: const Text('حذف ردیف کارمند'),
+                    ),
+                  ],
+                ),
+              OutlinedButton.icon(
+                onPressed: _saving || _staff.isEmpty ? null : _addHome,
+                icon: const Icon(Icons.person_add_alt_1),
+                label: const Text('افزودن کارمند برای نان منزل'),
+              ),
               const SizedBox(height: 16),
               _TotalRow(
                 count: _totalCount,
@@ -853,7 +945,6 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                 unit: _unit,
                 hasPrice: _unitPrice > 0,
               ),
-
               const SizedBox(height: 16),
               TextFormField(
                 controller: _note,
@@ -863,7 +954,6 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                   prefixIcon: Icon(Icons.notes_rounded),
                 ),
               ),
-
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: _saving ? null : _save,
@@ -872,7 +962,9 @@ class _RecordSaleSheetState extends State<_RecordSaleSheet> {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
                       )
                     : const Icon(Icons.check_rounded),
                 label: Text(_saving ? 'در حال ثبت…' : 'ثبت فروش'),
@@ -927,10 +1019,10 @@ class _RemainingBanner extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: color, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -946,6 +1038,11 @@ class _RemainingBanner extends StatelessWidget {
 /// to. A sale can run to hundreds of loaves, so the count is entered
 /// rather than stepped; the button beside it sweeps up whatever is left of
 /// the batch, which is the usual case.
+class _HomeBreadDraft {
+  final count = TextEditingController();
+  int? userId;
+}
+
 class _PaymentRow extends StatelessWidget {
   const _PaymentRow({
     super.key,
@@ -996,7 +1093,9 @@ class _PaymentRow extends StatelessWidget {
             : scheme.surfaceContainerHighest.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(Corner.control),
         border: Border.all(
-          color: active ? scheme.primary.withValues(alpha: 0.4) : Colors.transparent,
+          color: active
+              ? scheme.primary.withValues(alpha: 0.4)
+              : Colors.transparent,
         ),
       ),
       child: Column(
@@ -1010,23 +1109,26 @@ class _PaymentRow extends StatelessWidget {
                   children: [
                     Text(
                       type.label,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     if (active && type.expectsNoAmount)
                       Text(
                         'بدون دریافت وجه',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       )
                     else if (active && unitPrice > 0)
                       Text(
                         MoneyFormat.format(amount, currency: unit),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                   ],
                 ),
@@ -1046,7 +1148,7 @@ class _PaymentRow extends StatelessWidget {
                     final text = value?.trim() ?? '';
                     if (text.isEmpty) return null;
 
-                    final parsed = int.tryParse(text);
+                    final parsed = int.tryParse(latinDigits(text));
                     if (parsed == null || parsed < 0) return 'عدد';
                     return null;
                   },
@@ -1071,7 +1173,10 @@ class _PaymentRow extends StatelessWidget {
                 decoration: const InputDecoration(
                   labelText: 'مشتری',
                   isDense: true,
-                  prefixIcon: Icon(Icons.account_balance_rounded, size: IconSize.button),
+                  prefixIcon: Icon(
+                    Icons.account_balance_rounded,
+                    size: IconSize.button,
+                  ),
                 ),
                 items: [
                   for (final customer in customers)
@@ -1087,7 +1192,7 @@ class _PaymentRow extends StatelessWidget {
           // «منزل» only, and only once used. Optional on purpose: leaving
           // it empty records what the shop has always recorded — bread
           // owed by nobody. Naming somebody charges their payslip.
-          if (active && type == PaymentType.home && staff.isNotEmpty)
+          if (type == PaymentType.home && staff.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 4),
               child: DropdownButtonFormField<int>(
@@ -1146,26 +1251,26 @@ class _TotalRow extends StatelessWidget {
           Expanded(
             child: Text(
               'جمع کل — $count نان',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
           Text(
             hasPrice
                 ? MoneyFormat.format(amount, currency: unit)
                 : 'قیمت نان ثبت نشده',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: scheme.primary,
-                ),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w800, color: scheme.primary),
           ),
         ],
       ),
     );
   }
 }
-
 
 /// One flour sale in the day's list.
 class _FlourSaleTile extends StatelessWidget {
@@ -1209,9 +1314,10 @@ class _FlourSaleTile extends StatelessWidget {
                     sale.paymentType.label,
                     if (sale.customerName != null) sale.customerName!,
                   ].join('  •  '),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ],
             ),
