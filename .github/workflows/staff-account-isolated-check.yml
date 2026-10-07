@@ -47,7 +47,7 @@ jobs:
           DB_DATABASE: bakery_db_test
           DB_USERNAME: root
           DB_PASSWORD: root
-        run: php artisan test --filter='StaffAccountTest|BreadTakenHomeIsSettledAtMonthEndTest' --log-junit=/tmp/staff-result.xml
+        run: php artisan test --log-junit=/tmp/staff-result.xml
       - name: نتیجه کوتاه آزمون بدون نگهداری گزارش خام
         if: always()
         shell: bash
