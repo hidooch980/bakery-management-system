@@ -266,7 +266,9 @@ class ShopHealth
 
         foreach (ChaneEntry::with('sales')->where('status', 'sold')->get() as $batch) {
             $sold = (int) $batch->sales->sum('bread_count');
-            $shortfall = (int) $batch->sales->sum('shortfall_count');
+            $shortfall = (int) $batch->sales
+                ->reject(fn (Sale $sale) => in_array($sale->payment_type, Sale::SHORTFALL_TYPES, true))
+                ->sum('shortfall_count');
 
             if ($sold + $shortfall > (int) $batch->chane_count) {
                 $overSold++;
