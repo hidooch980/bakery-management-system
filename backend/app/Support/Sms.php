@@ -54,7 +54,7 @@ class Sms
     }
 
     /** True if the message was handed over. Never throws. */
-    public static function send(string $phone, string $message): bool
+    public static function send(string $phone, string $message, ?string $code = null): bool
     {
         $phone = self::normalise($phone);
 
@@ -71,6 +71,7 @@ class Sms
         return match (config('sms.driver')) {
             'kavenegar' => self::viaKavenegar($phone, $message),
             'ghasedak' => self::viaGhasedak($phone, $message),
+            'smsir' => self::viaSmsIr($phone, $code),
             default => self::viaLog($phone, $message),
         };
     }
@@ -184,5 +185,46 @@ class Sms
 
             return false;
         }
+    }
+
+    /** ارسال کد با قالب تأییدشدهٔ پنل اس‌ام‌اس‌آی‌آر؛ کد در گزارش ذخیره نمی‌شود. */
+    private static function viaSmsIr(string $phone, ?string $code): bool
+    {
+        $key = config('sms.smsir.key');
+        $template = (int) config('sms.smsir.template_id');
+        $parameter = trim((string) config('sms.smsir.parameter', 'CODE'));
+
+        if (blank($key) || $template <= 0 || $parameter === ''
+            || $code === null || ! preg_match('/^\d{6}$/', $code)) {
+            Log::warning('تنظیمات ارسال کد با اس‌ام‌اس‌آی‌آر کامل نیست.');
+
+            return false;
+        }
+
+        try {
+            $response = Http::timeout(10)
+                ->withHeaders(['X-API-KEY' => $key])
+                ->acceptJson()
+                ->post('https://api.sms.ir/v1/send/verify', [
+                    'Mobile' => $phone,
+                    'TemplateId' => $template,
+                    'Parameters' => [['Name' => $parameter, 'Value' => $code]],
+                ]);
+
+            // پاسخ HTTP موفق به‌تنهایی به معنی پذیرفته‌شدن پیامک نیست.
+            if ($response->successful() && (int) $response->json('status') === 1) {
+                return true;
+            }
+
+            Log::warning('سرویس اس‌ام‌اس‌آی‌آر درخواست را نپذیرفت.', [
+                'http_status' => $response->status(),
+                'provider_status' => $response->json('status'),
+            ]);
+        } catch (\Throwable $e) {
+            // متن استثنا ممکن است کلید یا کد را داشته باشد؛ فقط نوعش ثبت می‌شود.
+            Log::error('ارتباط با اس‌ام‌اس‌آی‌آر ناموفق بود.', ['type' => $e::class]);
+        }
+
+        return false;
     }
 }

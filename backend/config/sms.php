@@ -14,7 +14,7 @@
  */
 return [
 
-    // log | kavenegar | ghasedak
+    // سرویس‌های قابل انتخاب: log | kavenegar | ghasedak | smsir
     'driver' => env('SMS_DRIVER', 'log'),
 
     // The number or name the message appears to come from. Iranian
@@ -26,6 +26,12 @@ return [
         'url' => 'https://api.kavenegar.com/v1',
     ],
 
+    // قالب باید در پنل پیامک تأیید شده باشد؛ نام پارامتر با همان قالب یکسان است.
+    'smsir' => [
+        'key' => env('SMSIR_API_KEY'),
+        'template_id' => env('SMSIR_TEMPLATE_ID'),
+        'parameter' => env('SMSIR_CODE_PARAMETER', 'CODE'),
+    ],
     'ghasedak' => [
         'key' => env('GHASEDAK_API_KEY'),
         'url' => 'https://api.ghasedak.me/v2',

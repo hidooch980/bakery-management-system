@@ -172,7 +172,7 @@ class AuthController extends Controller
         ]);
 
         Sms::send($phone, 'کد بازیابی رمز خبازی ملازهی: '.$code
-            .' — تا '.(int) config('sms.code.minutes', 5).' دقیقه معتبر است.');
+            .' — تا '.(int) config('sms.code.minutes', 5).' دقیقه معتبر است.', $code);
 
         return $answer;
     }
