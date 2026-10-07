@@ -131,7 +131,7 @@ class _StaffAccountScreenState extends State<StaffAccountScreen> {
                       Text(row['kind'] == 'reward' ? 'تشویقی' : 'کسورات'),
                     if (row['waived'] == true)
                       const Text('بخشیده شده؛ در حقوق محاسبه نمی‌شود'),
-                    for (final id in (row['salary_ids'] as List? ?? []))
+                    for (final id in _salaryIds(row['salary_ids']))
                       ListTile(
                           title: Text('فیش مرتبط #$id'),
                           trailing: const Icon(Icons.open_in_new),
@@ -252,6 +252,16 @@ class _StaffAccountScreenState extends State<StaffAccountScreen> {
                   ));
             }),
       );
+}
+
+// فهرست شناسه‌ها بدون cast شکننده، حتی اگر سرور مجموعهٔ کلیددار بدهد.
+List<int> _salaryIds(dynamic value) {
+  final values = value is List
+      ? value
+      : value is Map
+          ? value.values
+          : const [];
+  return values.whereType<num>().map((id) => id.toInt()).toList();
 }
 
 double _number(dynamic value) => double.tryParse('$value') ?? 0;

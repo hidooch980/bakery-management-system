@@ -29,6 +29,8 @@ void main() {
   /// Both are the same kind of thing: an answer whose whole value is that
   /// it is current, where a stale «yes» is worse than an honest error.
   const mustAskTheServer = <String, String>{
+    r'/staff-accounts/$id':
+        'پیش‌نمایش اصلاح فیش و تسویه بدهی باید از ماندهٔ تازهٔ حساب محاسبه شود؛ نسخهٔ ذخیره‌شده برای تصمیم مالی کافی نیست.',
     '/me': 'confirms the session is still live — a cached «yes» would '
         'outlive a session the owner had revoked',
     '/devices': 'the screen is opened because something just changed, so '
