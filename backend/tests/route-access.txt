@@ -108,6 +108,7 @@ GET api/v1/settlement-requests/settleable                   admin, seller
 GET api/v1/shares                                           admin
 GET api/v1/shares/settlements                               admin
 GET api/v1/shares/split                                     admin
+GET api/v1/staff-accounts/{person}                          admin
 GET api/v1/staff-adjustments                                admin
 GET api/v1/staff-adjustments/period                         admin
 GET api/v1/staff-advances                                   admin
@@ -138,6 +139,7 @@ PATCH api/v1/salaries/{salary}                              admin
 PATCH api/v1/salaries/{salary}/mark-paid                    admin
 PATCH api/v1/salary-requests/{salaryRequest}/reject         admin
 PATCH api/v1/shares/{share}                                 admin
+PATCH api/v1/staff-account-entries/{kind}/{id}              admin
 PATCH api/v1/staff-adjustments/{adjustment}/restore         admin
 PATCH api/v1/staff-adjustments/{adjustment}/waive           admin
 PATCH api/v1/users/{user}                                   admin
