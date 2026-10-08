@@ -127,14 +127,14 @@ class AdminSection extends StatelessWidget {
             children: [
               Icon(icon, size: IconSize.row, color: scheme.primary),
               const SizedBox(width: 8),
-              Text(
+              Expanded(
+                  child: Text(
                 title,
                 style: Theme.of(context)
                     .textTheme
                     .titleSmall
                     ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const Spacer(),
+              )),
               if (trailing != null) trailing!,
             ],
           ),
@@ -172,36 +172,51 @@ class AdminRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final accent = color ?? scheme.onSurface;
 
+    final labelStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: scheme.onSurface,
+        );
+    final valueStyle = (emphasise
+            ? Theme.of(context).textTheme.titleMedium
+            : Theme.of(context).textTheme.bodyLarge)
+        ?.copyWith(fontWeight: FontWeight.w700, color: accent);
     final row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      child: Row(
-        children: [
+      child: LayoutBuilder(builder: (context, constraints) {
+        final measure = TextPainter(
+            text: TextSpan(text: value, style: valueStyle),
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context))
+          ..layout();
+        // مبلغ بلند نباید تمام عرض را بگیرد و نام کارمند را محو کند.
+        final stacked = measure.width > constraints.maxWidth * 0.45;
+        measure.dispose();
+        return Row(children: [
           if (icon != null) ...[
-            Icon(icon, size: IconSize.button, color: color ?? scheme.onSurfaceVariant),
+            Icon(icon,
+                size: IconSize.button, color: color ?? scheme.onSurfaceVariant),
             const SizedBox(width: 12),
           ],
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-            ),
-          ),
-          Text(
-            value,
-            style: (emphasise
-                    ? Theme.of(context).textTheme.titleMedium
-                    : Theme.of(context).textTheme.bodyLarge)
-                ?.copyWith(fontWeight: FontWeight.w700, color: accent),
-          ),
+          if (stacked)
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  Text(label, style: labelStyle),
+                  const SizedBox(height: 4),
+                  Text(value, style: valueStyle),
+                ]))
+          else ...[
+            Expanded(child: Text(label, style: labelStyle)),
+            const SizedBox(width: 8),
+            Text(value, style: valueStyle),
+          ],
           if (onTap != null) ...[
             const SizedBox(width: 6),
             Icon(Icons.chevron_left_rounded,
                 size: IconSize.button, color: scheme.onSurfaceVariant),
           ],
-        ],
-      ),
+        ]);
+      }),
     );
 
     if (onTap == null) {
@@ -214,5 +229,6 @@ class AdminRow extends StatelessWidget {
 
 /// Formats a stored Toman amount using the shop's configured unit.
 String adminMoney(Bakery? bakery, num? toman) {
-  return MoneyFormat.format(toman, currency: bakery?.currency ?? Currency.toman);
+  return MoneyFormat.format(toman,
+      currency: bakery?.currency ?? Currency.toman);
 }
