@@ -7,6 +7,7 @@ import '../../widgets/jalali_date_range.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
+import '../../widgets/admin_detail_group.dart';
 import 'admin_home_screen.dart';
 import 'balance_sheet_section.dart';
 import 'bank_balances_section.dart';
@@ -24,7 +25,7 @@ import 'seller_debts_section.dart';
 import 'seller_performance_section.dart';
 import 'supplier_debts_section.dart';
 
-/// Income against expenses, with the resulting profit, for a chosen range.
+/// درآمد، هزینه و سود در بازه انتخاب‌شده.
 class AdminFinanceTab extends StatefulWidget {
   const AdminFinanceTab({super.key, required this.api, this.bakery});
 
@@ -39,9 +40,7 @@ enum _Range {
   today('امروز'),
   week('۷ روز اخیر'),
   month('۳۰ روز اخیر'),
-  // «گزارش تاریخ تا تاریخ». The three presets answer «how is it going»;
-  // this answers a question with a date in it — a delivery period, the
-  // days before a payroll, the fortnight somebody is arguing about.
+  // بازه دلخواه برای گزارش یک دوره مشخص، در کنار بازه‌های آماده.
   custom('بازهٔ دلخواه');
 
   const _Range(this.label);
@@ -53,9 +52,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
   _Range _range = _Range.today;
   late Future<Map<String, dynamic>> _report;
 
-  /// Only set while [_Range.custom] is chosen. Kept when the person
-  /// switches to a preset and back, so picking two dates again to correct
-  /// one of them is not the price of a glance at the week.
+  /// تاریخ‌های دلخواه هنگام تغییر بازه حفظ می‌شوند تا انتخاب دوباره لازم نباشد.
   DateTime? _customFrom;
   DateTime? _customTo;
 
@@ -77,20 +74,15 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
 
     final to = _range == _Range.custom ? (_customTo ?? now) : now;
 
-    // Sent as Gregorian; the API takes either calendar and tells them apart
-    // by the year, so no conversion is needed on this side.
+    // تاریخ میلادی ارسال می‌شود؛ سرور تقویم را از سال تشخیص می‌دهد.
     return widget.api.financialReport(
       from: _toApiDate(from),
       to: _toApiDate(to),
     );
   }
 
-  /// Exactly the range the report above is showing.
-  ///
-  /// Not [_apiRange], which widens «امروز» to the week around it so the
-  /// chart has more than one bar to draw. The sections below are figures
-  /// rather than a trend, and a «تولید» total covering a different week
-  /// from the «درآمد» above it would be read as disagreeing with it.
+  /// بازه دقیق گزارش؛ جمع تولید و فروش با همین بازه محاسبه می‌شود.
+  /// نمودار برای نمایش روند می‌تواند بازه گسترده‌تری داشته باشد.
   ({String from, String to}) _reportRange() {
     final now = DateTime.now();
 
@@ -107,12 +99,12 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
     );
   }
 
-  /// The range the report is showing, as the API takes it.
+  /// بازه نمودار در قالب مورد انتظار سرور.
   ({String from, String to, String granularity}) _apiRange() {
     final now = DateTime.now();
 
     return switch (_range) {
-      // A day has one bar, which says nothing; the week around it does.
+      // برای روند امروز، هفته اخیر نمایش داده می‌شود تا نمودار تنها یک ستون نباشد.
       _Range.today => (
           from: _toApiDate(now.subtract(const Duration(days: 6))),
           to: _toApiDate(now),
@@ -131,8 +123,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
       _Range.custom => (
           from: _toApiDate(_customFrom ?? now),
           to: _toApiDate(_customTo ?? now),
-          // A day per bar reads on a fortnight and turns to noise on a
-          // year, so long spans are grouped by month.
+          // بازه‌های بلند به‌صورت ماهانه نمایش داده می‌شوند تا نمودار خوانا بماند.
           granularity:
               (_customTo ?? now).difference(_customFrom ?? now).inDays > 92
                   ? 'month'
@@ -148,11 +139,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
         _report = _load();
       });
 
-  /// Asks for the two ends of the span, «از» then «تا».
-  ///
-  /// Returns false if the person backed out of either dialog, so the
-  /// segmented button can stay where it was rather than land on a custom
-  /// range that was never chosen.
+  /// ابتدا تاریخ شروع و سپس پایان پرسیده می‌شود. لغو هر مرحله بازه فعلی را حفظ می‌کند.
   Future<bool> _askForDates() async {
     final now = DateTime.now();
 
@@ -169,8 +156,7 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
       context,
       title: 'تا تاریخ',
       initial: _customTo != null && _customTo!.isAfter(from) ? _customTo! : now,
-      // Not before the day already chosen, so the range cannot come out
-      // backwards and quietly report nothing.
+      // پایان نمی‌تواند پیش از شروع باشد.
       first: from,
       last: now,
     );
@@ -195,28 +181,26 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
             children: [
-              SegmentedButton<_Range>(
-                segments: [
-                  for (final range in _Range.values)
-                    ButtonSegment(value: range, label: Text(range.label)),
-                ],
-                selected: {_range},
-                onSelectionChanged: (selection) async {
-                  final chosen = selection.first;
-
-                  if (chosen == _Range.custom) {
-                    if (!await _askForDates()) return;
-                  }
-
-                  if (!mounted) return;
-                  setState(() => _range = chosen);
-                  _reload();
-                },
-                showSelectedIcon: false,
-              ),
-              // Which days these figures are about. Without it the custom
-              // range is four numbers concerning an unknown fortnight —
-              // and the preset labels say it for themselves.
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final range in _Range.values)
+                  ChoiceChip(
+                      label: Text(range.label),
+                      selected: _range == range,
+                      onSelected: (selected) async {
+                        if (!selected || range == _range) {
+                          return;
+                        }
+                        if (range == _Range.custom && !await _askForDates()) {
+                          return;
+                        }
+                        if (!mounted) {
+                          return;
+                        }
+                        setState(() => _range = range);
+                        _reload();
+                      }),
+              ]),
+              // بازه دلخواه کنار ارقام نمایش داده می‌شود تا زمان گزارش روشن باشد.
               if (_range == _Range.custom && _customFrom != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
@@ -262,158 +246,107 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
               else
                 ..._buildReport(context, snapshot.data!),
 
-              // Two figures do not show a week carrying a bad day; a pair
-              // of bars a day does.
-              const SizedBox(height: 22),
-              () {
-                final range = _apiRange();
-
-                return IncomeExpenseChart(
-                  api: widget.api,
-                  from: range.from,
-                  to: range.to,
-                  granularity: range.granularity,
-                );
-              }(),
-
-              // How the takings were paid for. «فروش ۱۲٬۰۰۰٬۰۰۰» is one
-              // figure covering two facts: cash in the drawer and credit
-              // owed. Read as one, it says the shop has money it has not
-              // been given.
-              const SizedBox(height: 22),
-              () {
-                final range = _reportRange();
-
-                return SalesBreakdownSection(
-                  api: widget.api,
-                  from: range.from,
-                  to: range.to,
-                  currency: widget.bakery?.currency ?? Currency.toman,
-                );
-              }(),
-
-              // What the shop actually made. Every figure on this page was
-              // money and none of it said how many sacks were kneaded or
-              // how much bread came off the oven — in a bakery.
-              const SizedBox(height: 22),
-              () {
-                final range = _reportRange();
-
-                return ProductionReportSection(
-                  api: widget.api,
-                  from: range.from,
-                  to: range.to,
-                );
-              }(),
-
-              // Where the flour went. Baked and sold-on are the two halves
-              // the quota is judged on, and a single «مصرف» figure hides
-              // which is which.
-              const SizedBox(height: 22),
-              () {
-                final range = _apiRange();
-
-                return ConsumptionReportSection(
-                  api: widget.api,
-                  from: range.from,
-                  to: range.to,
-                  granularity: range.granularity,
-                );
-              }(),
-
-              // What the shop has actually collected, before what it is
-              // still owed — the money that is really in hand.
-              const SizedBox(height: 22),
-              BankBalancesSection(api: widget.api),
-              OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute<void>(
-                          builder: (_) => BankLoansScreen(api: widget.api))),
-                  icon: const Icon(Icons.account_balance),
-                  label: const Text('اقساط وام بانکی و ثبت پرداخت')),
-
-              // And whether that figure is true. The ledger cannot find
-              // its own errors: change given from the drawer, a sale typed
-              // at the wrong price, a handover half remembered — each
-              // leaves both sides agreeing about something that is not
-              // what is in the till. Only counting finds those, and only
-              // counting soon enough that somebody still remembers the day.
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final counted = await showCashCountSheet(context, widget.api);
-
-                  // The count may have corrected the books, so the
-                  // balances above are stale the moment it returns.
-                  if (counted == true && mounted) setState(() {});
-                },
-                icon: const Icon(Icons.calculate_rounded),
-                label: const Text('شمارش صندوق'),
-              ),
-
-              // What each seller sold, before what any of them owes. The
-              // debts list drops anybody at zero, so on its own it said
-              // that sellers are people who owe money — the one who sells
-              // all day and settles the same evening was not on any screen
-              // in this app.
-              const SizedBox(height: 22),
-              SellerPerformanceSection(api: widget.api),
-
-              // What the sellers still hold sits under the report: it is
-              // money the shop has earned but not yet taken in.
-              const SizedBox(height: 22),
-              SellerDebtsSection(api: widget.api),
-
-              // Money the shop has earned but the buyer has not paid yet.
-              const SizedBox(height: 22),
-              CustomerDebtsSection(api: widget.api),
-
-              // The other side of the same question. What the schools owe
-              // the shop has always been on this page; what the shop owes
-              // the mill has never been anywhere.
-              const SizedBox(height: 22),
-              SupplierDebtsSection(api: widget.api),
-
-              // Who has to be called today, and about what.
-              const SizedBox(height: 22),
-              FollowUpsSection(api: widget.api),
-
-              // How the period's profit divides, and paying it out. Next
-              // to the statement because it is the same money one step
-              // further on: the profit above, and whose it is below.
-              const SizedBox(height: 22),
-              () {
-                final range = _reportRange();
-
-                return ShareSplitSection(
-                  api: widget.api,
-                  from: range.from,
-                  to: range.to,
-                );
-              }(),
-
-              // The statement, over the same range as everything above it.
-              // The halves have been on this page for a while — income in
-              // one card, expenses in another — and never the sum. Two
-              // screens each showing half a sum is how a 164,640,000 Rial
-              // disagreement about profit survived once.
-              const SizedBox(height: 22),
-              () {
-                final range = _reportRange();
-
-                return ProfitAndLossSection(
-                  api: widget.api,
-                  from: range.from,
-                  to: range.to,
-                );
-              }(),
-
-              // Last, because it answers the widest question: everything
-              // above is this month's movement, this is where the shop
-              // stands.
-              const SizedBox(height: 22),
-              BalanceSheetSection(api: widget.api),
+              const SizedBox(height: 16),
+              AdminDetailGroup(
+                  title: 'حساب‌ها و پرداخت‌ها',
+                  subtitle: 'حساب بانکی، صندوق و اقساط وام',
+                  icon: Icons.account_balance_wallet_outlined,
+                  builder: (_) => Column(children: [
+                        BankBalancesSection(api: widget.api),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                            onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        BankLoansScreen(api: widget.api))),
+                            icon: const Icon(Icons.account_balance),
+                            label: const Text('اقساط وام بانکی و ثبت پرداخت')),
+                        OutlinedButton.icon(
+                            onPressed: () async {
+                              if (await showCashCountSheet(
+                                          context, widget.api) ==
+                                      true &&
+                                  mounted) {
+                                setState(() {});
+                              }
+                            },
+                            icon: const Icon(Icons.calculate_outlined),
+                            label: const Text('شمارش صندوق')),
+                      ])),
+              AdminDetailGroup(
+                  title: 'روند درآمد و هزینه',
+                  subtitle: 'نمودار تغییرات در بازه انتخاب‌شده',
+                  icon: Icons.show_chart,
+                  builder: (_) {
+                    final range = _apiRange();
+                    return IncomeExpenseChart(
+                        api: widget.api,
+                        from: range.from,
+                        to: range.to,
+                        granularity: range.granularity);
+                  }),
+              AdminDetailGroup(
+                  title: 'فروش و تولید',
+                  subtitle: 'تفکیک فروش، تولید نان و مصرف آرد',
+                  icon: Icons.bakery_dining_outlined,
+                  builder: (_) {
+                    final range = _reportRange();
+                    final chartRange = _apiRange();
+                    return Column(children: [
+                      SalesBreakdownSection(
+                          api: widget.api,
+                          from: range.from,
+                          to: range.to,
+                          currency: widget.bakery?.currency ?? Currency.toman),
+                      const SizedBox(height: 16),
+                      ProductionReportSection(
+                          api: widget.api, from: range.from, to: range.to),
+                      const SizedBox(height: 16),
+                      ConsumptionReportSection(
+                          api: widget.api,
+                          from: chartRange.from,
+                          to: chartRange.to,
+                          granularity: chartRange.granularity),
+                    ]);
+                  }),
+              AdminDetailGroup(
+                  title: 'بدهی‌ها و پیگیری',
+                  subtitle: 'فروشندگان، مشتریان و تأمین‌کنندگان',
+                  icon: Icons.assignment_outlined,
+                  builder: (_) => Column(children: [
+                        SellerDebtsSection(api: widget.api),
+                        const SizedBox(height: 16),
+                        CustomerDebtsSection(api: widget.api),
+                        const SizedBox(height: 16),
+                        SupplierDebtsSection(api: widget.api),
+                        const SizedBox(height: 16),
+                        FollowUpsSection(api: widget.api)
+                      ])),
+              AdminDetailGroup(
+                  title: 'عملکرد فروشندگان',
+                  subtitle: 'فروش و تسویه هر فروشنده',
+                  icon: Icons.storefront_outlined,
+                  builder: (_) => SellerPerformanceSection(api: widget.api)),
+              AdminDetailGroup(
+                  title: 'سود و سهم شرکا',
+                  subtitle: 'صورت سود و زیان و پرداخت سهم',
+                  icon: Icons.pie_chart_outline,
+                  builder: (_) {
+                    final range = _reportRange();
+                    return Column(children: [
+                      ProfitAndLossSection(
+                          api: widget.api, from: range.from, to: range.to),
+                      const SizedBox(height: 16),
+                      ShareSplitSection(
+                          api: widget.api, from: range.from, to: range.to)
+                    ]);
+                  }),
+              AdminDetailGroup(
+                  title: 'تراز مالی',
+                  subtitle: 'دارایی‌ها، بدهی‌ها و سرمایه نانوایی',
+                  icon: Icons.balance,
+                  builder: (_) => BalanceSheetSection(api: widget.api)),
             ],
           );
         },
@@ -427,8 +360,6 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
     final profit = keyedGroup(data['profit']);
     final outstanding = keyedGroup(data['outstanding_salaries']);
     final byCategory = rowList(expenses['by_category']);
-    final split = keyedGroup(data['profit_split']);
-    final holders = rowList(split['holders']);
 
     final isPositive = profit['is_positive'] == true;
     final profitColor = isPositive ? AppColors.moneyIn : AppColors.moneyOut;
@@ -465,132 +396,106 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
           ),
         ),
       ),
-      const SizedBox(height: 22),
-
-      AdminSection(
-        title: 'درآمد',
-        icon: Icons.trending_up_rounded,
-        children: [
-          AdminRow(
-            label: 'مجموع درآمد',
+      const SizedBox(height: 12),
+      Card(
+          child: Column(children: [
+        AdminRow(
+            label: 'درآمد',
             value:
                 '${income['total_formatted'] ?? income['sales_formatted'] ?? '—'}',
-            icon: Icons.payments_rounded,
-            color: AppColors.moneyIn,
-            emphasise: true,
-          ),
-          const Divider(height: 1),
-          AdminRow(
-            label: 'فروش نان',
-            value: '${income['bread_formatted'] ?? '—'}',
-            icon: Icons.bakery_dining_rounded,
-          ),
-          const Divider(height: 1),
-          AdminRow(
-            label: 'فروش آرد',
-            value: '${income['flour_formatted'] ?? '—'}',
-            icon: Icons.inventory_2_rounded,
-          ),
-          const Divider(height: 1),
-          AdminRow(
-            label: 'درآمد متفرقه',
-            value: '${income['other_formatted'] ?? '—'}',
-            icon: Icons.account_balance_wallet_rounded,
-          ),
-          const Divider(height: 1),
-          AdminRow(
-            label: 'تعداد فروش',
-            value: '${income['sales_count'] ?? 0} نان  •  '
-                '${income['flour_sales_count'] ?? 0} آرد',
-            icon: Icons.receipt_long_rounded,
-          ),
-        ],
-      ),
-      const SizedBox(height: 22),
-
-      AdminSection(
-        title: 'هزینه‌ها',
-        icon: Icons.trending_down_rounded,
-        children: [
-          AdminRow(
-            label: 'مجموع هزینه‌ها',
+            icon: Icons.trending_up,
+            color: AppColors.moneyIn),
+        const Divider(height: 1),
+        AdminRow(
+            label: 'هزینه',
             value: '${expenses['total_formatted'] ?? '—'}',
-            icon: Icons.receipt_long_rounded,
-            color: AppColors.moneyOut,
-            emphasise: true,
-          ),
-          const Divider(height: 1),
-          AdminRow(
-            label: 'هزینه‌های ثبت‌شده',
-            value: '${expenses['recorded_formatted'] ?? '—'}',
-            icon: Icons.shopping_cart_rounded,
-          ),
-          const Divider(height: 1),
-          AdminRow(
-            label: 'حقوق پرداخت‌شده',
-            value: '${expenses['salaries_paid_formatted'] ?? '—'}',
-            icon: Icons.badge_rounded,
-          ),
-        ],
-      ),
-
-      if (byCategory.isNotEmpty) ...[
-        const SizedBox(height: 22),
-        AdminSection(
-          title: 'تفکیک هزینه',
-          icon: Icons.pie_chart_rounded,
-          children: [
-            for (var i = 0; i < byCategory.length; i++) ...[
-              if (i > 0) const Divider(height: 1),
-              AdminRow(
-                label: '${byCategory[i]['label']}',
-                value: '${byCategory[i]['amount_formatted']}',
-              ),
-            ],
-          ],
-        ),
-      ],
-
-      // Only shown once partners have been registered, so a single-owner
-      // bakery is not given an empty section.
-      if (holders.isNotEmpty) ...[
-        const SizedBox(height: 22),
-        AdminSection(
-          title: 'تقسیم سود بین شرکا (دانگ)',
-          icon: Icons.groups_rounded,
-          children: [
-            for (var i = 0; i < holders.length; i++) ...[
-              if (i > 0) const Divider(height: 1),
-              AdminRow(
-                label: '${holders[i]['name']}'
-                    '  •  ${holders[i]['dang_label']}',
-                value: '${holders[i]['amount_formatted']}',
-                icon: Icons.person_rounded,
-              ),
-              if ('${holders[i]['paid']}' != '0')
-                AdminRow(
-                  label: 'پرداخت‌شده / مانده',
-                  value: '${holders[i]['paid_formatted']}'
-                      '  •  ${holders[i]['remaining_formatted']}',
+            icon: Icons.trending_down,
+            color: AppColors.moneyOut),
+      ])),
+      AdminDetailGroup(
+          title: 'ریز درآمد، هزینه و حقوق',
+          subtitle: 'جزئیات گزارش بازه انتخاب‌شده',
+          icon: Icons.receipt_long_outlined,
+          builder: (_) => Column(children: [
+                const SizedBox(height: 22),
+                AdminSection(
+                  title: 'درآمد',
+                  icon: Icons.trending_up_rounded,
+                  children: [
+                    AdminRow(
+                      label: 'فروش نان',
+                      value: '${income['bread_formatted'] ?? '—'}',
+                      icon: Icons.bakery_dining_rounded,
+                    ),
+                    const Divider(height: 1),
+                    AdminRow(
+                      label: 'فروش آرد',
+                      value: '${income['flour_formatted'] ?? '—'}',
+                      icon: Icons.inventory_2_rounded,
+                    ),
+                    const Divider(height: 1),
+                    AdminRow(
+                      label: 'درآمد متفرقه',
+                      value: '${income['other_formatted'] ?? '—'}',
+                      icon: Icons.account_balance_wallet_rounded,
+                    ),
+                    const Divider(height: 1),
+                    AdminRow(
+                      label: 'تعداد فروش',
+                      value: '${income['sales_count'] ?? 0} نان  •  '
+                          '${income['flour_sales_count'] ?? 0} آرد',
+                      icon: Icons.receipt_long_rounded,
+                    ),
+                  ],
                 ),
-            ],
-          ],
-        ),
-      ],
-
-      const SizedBox(height: 22),
-      AdminSection(
-        title: 'حقوق پرداخت‌نشده',
-        icon: Icons.pending_actions_rounded,
-        children: [
-          AdminRow(
-            label: '${outstanding['count'] ?? 0} مورد در انتظار',
-            value: '${outstanding['formatted'] ?? '—'}',
-            icon: Icons.schedule_rounded,
-            color: AppColors.attention,
-          ),
-        ],
-      ),
+                const SizedBox(height: 22),
+                AdminSection(
+                  title: 'هزینه‌ها',
+                  icon: Icons.trending_down_rounded,
+                  children: [
+                    AdminRow(
+                      label: 'هزینه‌های ثبت‌شده',
+                      value: '${expenses['recorded_formatted'] ?? '—'}',
+                      icon: Icons.shopping_cart_rounded,
+                    ),
+                    const Divider(height: 1),
+                    AdminRow(
+                      label: 'حقوق پرداخت‌شده',
+                      value: '${expenses['salaries_paid_formatted'] ?? '—'}',
+                      icon: Icons.badge_rounded,
+                    ),
+                  ],
+                ),
+                if (byCategory.isNotEmpty) ...[
+                  const SizedBox(height: 22),
+                  AdminSection(
+                    title: 'تفکیک هزینه',
+                    icon: Icons.pie_chart_rounded,
+                    children: [
+                      for (var i = 0; i < byCategory.length; i++) ...[
+                        if (i > 0) const Divider(height: 1),
+                        AdminRow(
+                          label: '${byCategory[i]['label']}',
+                          value: '${byCategory[i]['amount_formatted']}',
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 22),
+                AdminSection(
+                  title: 'حقوق پرداخت‌نشده',
+                  icon: Icons.pending_actions_rounded,
+                  children: [
+                    AdminRow(
+                      label: '${outstanding['count'] ?? 0} مورد در انتظار',
+                      value: '${outstanding['formatted'] ?? '—'}',
+                      icon: Icons.schedule_rounded,
+                      color: AppColors.attention,
+                    ),
+                  ],
+                ),
+              ])),
     ];
   }
 }
