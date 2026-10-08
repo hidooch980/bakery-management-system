@@ -6,6 +6,7 @@ import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
+import '../../widgets/admin_detail_group.dart';
 import '../shared/purchase_sheet.dart';
 import 'admin_home_screen.dart';
 import 'diesel_section.dart';
@@ -25,8 +26,7 @@ typedef _WarehouseData = ({
   _FlourSalesToday? flour,
 });
 
-/// Stock levels, today's flour sales, and the quota for the current period.
-/// A figure without a pointless trailing zero: «۴٬۶۰۰», not «۴٬۶۰۰٫۰۰».
+/// موجودی، فروش امروز آرد و سهمیه دوره جاری؛ عددها بدون صفر اعشاری غیرضروری نمایش داده می‌شوند.
 String _fmt(dynamic value) {
   final number = value is num ? value : (num.tryParse('$value') ?? 0);
 
@@ -85,7 +85,9 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
     }
   }
 
-  void _reload() => setState(() { _data = _load(); });
+  void _reload() => setState(() {
+        _data = _load();
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +103,9 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
           if (snapshot.hasError) {
             return ListView(
               padding: const EdgeInsets.all(20),
-              children: [ErrorBox(message: '${snapshot.error}', onRetry: _reload)],
+              children: [
+                ErrorBox(message: '${snapshot.error}', onRetry: _reload)
+              ],
             );
           }
 
@@ -112,9 +116,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
             children: [
-              // The delivery is written down where the stock is read, so
-              // the sacks that just arrived and the balance they change
-              // are one screen apart rather than one menu apart.
+              // ثبت محموله کنار موجودی قرار دارد تا ورود کیسه و تغییر موجودی در یک بخش باشد.
               Row(
                 children: [
                   Expanded(
@@ -149,7 +151,11 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                 ],
               ),
               const SizedBox(height: 16),
-              DieselSection(api: widget.api),
+              AdminDetailGroup(
+                  title: 'سوخت و گازوئیل',
+                  subtitle: 'موجودی و خرید سوخت',
+                  icon: Icons.local_gas_station_outlined,
+                  builder: (_) => DieselSection(api: widget.api)),
               const SizedBox(height: 12),
               AdminSection(
                 title: 'موجودی انبار',
@@ -161,16 +167,12 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                       label: '${items[i]['name']}',
                       value: _balanceLabel(items[i]),
                       icon: _iconFor('${items[i]['key']}'),
-                      // A low balance is the one thing worth colouring.
+                      // فقط موجودی کم با رنگ هشدار مشخص می‌شود.
                       color: items[i]['is_low'] == true
                           ? AppColors.moneyOut
                           : null,
                       emphasise: true,
-                      // «۱۰۶ کیسه» invites exactly one question, and until
-                      // now answering it meant scrolling past this card to
-                      // the journey below and opening a day. The balance is
-                      // where the question is asked, so it is where the
-                      // entries open.
+                      // با لمس موجودی، گردش همان کالا باز می‌شود تا علت مقدار موجود قابل بررسی باشد.
                       onTap: () => showInventoryEntries(
                         context,
                         api: widget.api,
@@ -222,7 +224,13 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                   subtitle: 'سهمیه ماهانه آرد را از پنل مدیریت ثبت کنید.',
                 )
               else
-                ..._buildQuota(context, quota),
+                AdminDetailGroup(
+                    title: 'سهمیه آرد',
+                    subtitle:
+                        '${quota['month_label'] ?? 'دوره جاری'} — ریز سهمیه و مانده',
+                    icon: Icons.calendar_month_outlined,
+                    builder: (_) =>
+                        Column(children: _buildQuota(context, quota))),
             ],
           );
         },
@@ -244,9 +252,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
             icon: Icons.scale_rounded,
             emphasise: true,
           ),
-          // What the shop may actually still take. Quota rolls forward —
-          // period after period, month after month — so this is the
-          // figure to plan against, not any one period's leftover below.
+          // مانده قابل دریافت با انتقال سهمیه بین دوره‌ها محاسبه می‌شود؛ مبنای برنامه‌ریزی همین عدد است.
           if (quota['carried_balance'] is Map<String, dynamic>)
             AdminRow(
               label: 'ماندهٔ سهمیه — منتقل می‌شود',
@@ -264,12 +270,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
           padding: const EdgeInsets.only(bottom: 12),
           child: _PeriodCard(period: period),
         ),
-      // The three added up: the shop's own month, 5th to 4th. The three
-      // above answer «may I draw more this week»; this answers «how did
-      // the month go», which until now had to be added up in someone's
-      // head off three cards. Drawn with the same card so it reads as the
-      // same kind of thing, and summed by the server off those very
-      // periods so it can never disagree with them.
+      // جمع سه دوره برای ماه نانوایی از پنجم تا چهارم، با محاسبه سرور نمایش داده می‌شود.
       if (quota['whole_period'] is Map<String, dynamic>)
         _PeriodCard(
           period: keyedGroup(quota['whole_period']),
@@ -278,8 +279,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
     ];
   }
 
-  /// «N کیسه · M کیلوگرم», or just the kilos when no sack size is
-  /// known — sacks are what the shop counts flour in.
+  /// تعداد کیسه و وزن؛ اگر اندازه کیسه مشخص نباشد فقط وزن نمایش داده می‌شود.
   static String _carriedBalance(Map<String, dynamic> balance) {
     final kg = _fmt(balance['remaining_kg']);
     final bags = balance['remaining_bags'];
@@ -296,15 +296,8 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
         _ => Icons.inventory_rounded,
       };
 
-
-  /// "۴ کیسه" — sacks alone, where the item has a sack.
-  ///
-  /// «کیلو در انبار معنی نداره، فقط کیسه بیاد». The shop counts flour in
-  /// sacks, orders it in sacks and lends it in sacks; the weight beside
-  /// the count was the same fact in a unit nobody uses at the door.
-  ///
-  /// Salt and yeast arrive in no fixed sack, so the server sends no bag
-  /// count for them and their weight is all there is to say.
+  /// آرد فقط با تعداد کیسه نمایش داده می‌شود، چون واحد شمارش و سفارش مغازه است.
+  /// نمک و خمیرمایه کیسه ثابت ندارند و با وزن نمایش داده می‌شوند.
   static String _balanceLabel(Map<String, dynamic> item) {
     final bags = item['balance_bags'];
 
@@ -314,29 +307,24 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
   }
 }
 
-/// One of the three delivery periods, with a usage bar — or all three
-/// added together, which is drawn the same way with a rule above it.
+/// کارت سهمیه یکی از سه دوره یا جمع کل آن‌ها با نوار مصرف.
 class _PeriodCard extends StatelessWidget {
   const _PeriodCard({required this.period, this.isTotal = false});
 
-  /// The whole 5th-to-4th window rather than a slice of it. It never
-  /// carries the «current period» outline, because it is not the slice the
-  /// shop is drawing from today — it is all of them.
+  /// جمع ماه پنجم تا چهارم، دوره جاری نیست و کادر دوره جاری را نمی‌گیرد.
   final bool isTotal;
 
   final Map<String, dynamic> period;
 
-
-  /// A sack count reads better without a trailing zero: «۱۱۵ کیسه», not
-  /// «۱۱۵٫۰».
+  /// تعداد کیسه بدون صفر اعشاری غیرضروری نمایش داده می‌شود.
   static String _bags(dynamic value) {
-    final bags = value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+    final bags =
+        value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
 
     return bags % 1 == 0 ? bags.toStringAsFixed(0) : bags.toStringAsFixed(1);
   }
 
-  /// The server sends sacks for the allocation; for what was used and what
-  /// is left, they are the same weight over the same sack size.
+  /// مصرف و مانده با وزن کیسه سهمیه به تعداد کیسه تبدیل می‌شوند.
   static double _bagsFromKg(Map<String, dynamic> period, String key) {
     final kg = (period[key] as num?)?.toDouble() ?? 0;
     final allocatedKg = (period['allocated_kg'] as num?)?.toDouble() ?? 0;
@@ -355,25 +343,18 @@ class _PeriodCard extends StatelessWidget {
     final isCurrent = period['is_current'] == true;
     final isOver = period['is_over'] == true;
 
-    // The same reading as the diesel meter, so the two are read the same
-    // way: how far along the period is *is* how hot the bar runs. Three
-    // steps could only say "fine / nearly / over", and the useful question
-    // in the middle of a period is how far along, not which bucket.
-    // Over-quota leaves the ramp — past the end of a scale is a different
-    // kind of fact, not a hotter shade of the same one.
+    // رنگ پیوسته نوار میزان مصرف را نشان می‌دهد؛ عبور از سهمیه رنگ هشدار جدا دارد.
     final color = isOver
         ? Theme.of(context).colorScheme.error
         : AppColors.emberAt((percent / 100).clamp(0.0, 1.0));
 
-    // Same rule as the diesel meter: the ramp draws the bar, never the
-    // words. A ramp runs dark to light, so one end of it always vanishes
-    // into one of the two grounds.
+    // رنگ طیفی فقط برای نوار است؛ متن باید در هر دو پوسته خوانا بماند.
     final wordsColour = isOver
         ? Theme.of(context).colorScheme.error
         : (percent >= 80 ? AppColors.attention : null);
 
     final card = Card(
-      // The period in progress is the one that matters most.
+      // دوره جاری با کادر مشخص می‌شود.
       shape: isCurrent
           ? RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(Corner.card),
@@ -419,15 +400,12 @@ class _PeriodCard extends StatelessWidget {
                 value: (percent / 100).clamp(0.0, 1.0),
                 minHeight: 10,
                 color: color,
-                backgroundColor: Theme.of(context)
-                    .dividerColor
-                    .withValues(alpha: 0.4),
+                backgroundColor:
+                    Theme.of(context).dividerColor.withValues(alpha: 0.4),
               ),
             ),
             const SizedBox(height: 12),
-            // Sacks, because sacks are what the shop counts flour in — the
-            // kilos follow in brackets for the books. «هر آرد ورودی کیسه
-            // است نه ریال», and the same goes for what goes out.
+            // تعداد کیسه واحد اصلی است و وزن برای اطلاعات حسابداری در پرانتز می‌آید.
             _FlourRow(
               label: 'سهمیه دوره',
               bags: _bags(period['allocated_bags']),
@@ -435,15 +413,15 @@ class _PeriodCard extends StatelessWidget {
             ),
             _FlourRow(
               label: 'مصرف شده',
-              bags: _bags(period['used_bags'] ?? _bagsFromKg(period, 'used_kg')),
+              bags:
+                  _bags(period['used_bags'] ?? _bagsFromKg(period, 'used_kg')),
               kg: period['used_kg'],
             ),
             _FlourRow(
-              // «دوره» said out loud, because this is what the period
-              // itself has left — not what the shop may still take. That
-              // total is on the card above and does not expire.
+              // مانده دوره با مانده کل قابل دریافت تفاوت دارد و عنوان آن این تفاوت را روشن می‌کند.
               label: isOver ? 'بیش از سهمیهٔ دوره' : 'باقی‌ماندهٔ دوره',
-              bags: _bags(period['remaining_bags'] ?? _bagsFromKg(period, 'remaining_kg')),
+              bags: _bags(period['remaining_bags'] ??
+                  _bagsFromKg(period, 'remaining_kg')),
               kg: period['remaining_kg'],
               colour: wordsColour,
               emphasise: true,
@@ -456,8 +434,7 @@ class _PeriodCard extends StatelessWidget {
 
     if (!isTotal) return card;
 
-    // A rule and a word, because a fourth card in a row of three reads as
-    // a fourth period unless something says otherwise.
+    // جمع ماه با جداکننده مشخص می‌شود تا دوره چهارم برداشت نشود.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -486,10 +463,7 @@ class _PeriodCard extends StatelessWidget {
   }
 }
 
-/// «سهمیه دوره        ۱۱۵ کیسه · ۴٬۶۰۰ کگ»
-///
-/// Sacks lead because that is the unit the shop trades, counts and argues
-/// in; the weight follows quietly for the books.
+/// کیسه واحد اصلی سهمیه است و وزن اطلاعات تکمیلی حسابداری است.
 class _FlourRow extends StatelessWidget {
   const _FlourRow({
     required this.label,
@@ -550,11 +524,8 @@ class _FlourRow extends StatelessWidget {
   }
 }
 
-/// The period's flour restated as loaves, against what the card reader sold.
-///
-/// Nanino is the measure because the reader is wired into it, so its loaf is
-/// the one counted outside the shop — 115 sacks at 64 loaves a sack is 7,360
-/// loaves for the period, whatever shape they were actually baked in.
+/// سهمیه آرد به تعداد نان نانینو تبدیل و با فروش کارت‌خوان مقایسه می‌شود.
+/// وزن نان نانینو مبنای مقایسه است، چون شمارش مستقل فروش بر اساس همان انجام می‌شود.
 class _BreadReconciliation extends StatelessWidget {
   const _BreadReconciliation({required this.period});
 
@@ -571,13 +542,12 @@ class _BreadReconciliation extends StatelessWidget {
     final sold = _int(period['card_bread_count']);
     final remainder = _int(period['bread_remainder']);
 
-    // Nothing to say until the nanino loaf weight is configured.
+    // بدون وزن نان نانینو، امکان محاسبه وجود ندارد.
     if (quota == 0) return const SizedBox.shrink();
 
-    // More sold than the quota allows is the figure worth noticing.
-    final remainderColor = remainder < 0
-        ? AppColors.moneyOut
-        : scheme.onSurfaceVariant;
+    // فروش بیش از ظرفیت سهمیه باید با هشدار مشخص شود.
+    final remainderColor =
+        remainder < 0 ? AppColors.moneyOut : scheme.onSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.only(top: 14),
@@ -588,7 +558,8 @@ class _BreadReconciliation extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(Icons.bakery_dining_rounded, size: IconSize.inline, color: scheme.primary),
+              Icon(Icons.bakery_dining_rounded,
+                  size: IconSize.inline, color: scheme.primary),
               const SizedBox(width: 6),
               Text(
                 'نان دوره',

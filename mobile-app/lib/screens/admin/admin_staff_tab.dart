@@ -1,167 +1,205 @@
 import 'package:flutter/material.dart';
-import '../../utils/json.dart';
-
+import '../../models/payroll.dart';
 import '../../services/bakery_api.dart';
 import '../../utils/formatters.dart';
+import '../../utils/json.dart';
 import '../../widgets/common.dart';
+import '../../widgets/admin_detail_group.dart';
 import 'advance_requests_section.dart';
 import 'lateness_report_section.dart';
 import 'salary_requests_section.dart';
 import 'payroll_section.dart';
 import 'staff_report_section.dart';
 import 'staff_yield_section.dart';
-import '../../theme/app_theme.dart';
+import 'staff_account_screen.dart';
 
-/// Who checked in today, and at what time.
+/// فهرست کارکنان مستقل از گزارش حضور، با دسترسی روشن به حقوق و جزئیات.
 class AdminStaffTab extends StatefulWidget {
   const AdminStaffTab({super.key, required this.api});
-
   final BakeryApi api;
-
   @override
   State<AdminStaffTab> createState() => _AdminStaffTabState();
 }
 
-/// The last thirty days, as the API takes them.
-///
-/// Computed once rather than in `build`: a section that takes its range
-/// as a parameter reloads when the parameter changes, and a fresh
-/// `DateTime.now()` on every frame would change it on every frame.
-final String _today = _apiDate(DateTime.now());
-final String _thirtyDaysAgo =
-    _apiDate(DateTime.now().subtract(const Duration(days: 29)));
-
-String _apiDate(DateTime value) =>
-    '${value.year}-${value.month.toString().padLeft(2, '0')}'
-    '-${value.day.toString().padLeft(2, '0')}';
-
 class _AdminStaffTabState extends State<AdminStaffTab> {
-  late Future<List<Map<String, dynamic>>> _attendance;
-
+  late Future<List<Employee>> _people;
+  int _generation = 0;
   @override
   void initState() {
     super.initState();
-    _attendance = widget.api.adminAttendanceToday();
+    _load();
   }
 
-  void _reload() =>
-      setState(() => _attendance = widget.api.adminAttendanceToday());
+  void _load() {
+    _people = widget.api.payrollEmployees();
+  }
+
+  void _reload() => setState(() {
+        _generation++;
+        _load();
+      });
+  String _date(DateTime value) =>
+      '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+  Future<void> _openPayroll() async {
+    await Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+            builder: (_) => Scaffold(
+                appBar: AppBar(title: const Text('حقوق و پرداخت کارکنان')),
+                body: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [PayrollSection(api: widget.api)]))));
+    if (mounted) _reload();
+  }
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return RefreshIndicator(
-      onRefresh: () async => _reload(),
-      child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _attendance,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return ListView(
-              padding: const EdgeInsets.all(20),
-              children: [ErrorBox(message: '${snapshot.error}', onRetry: _reload)],
-            );
-          }
-
-          final records = snapshot.data ?? const <Map<String, dynamic>>[];
-
-          if (records.isEmpty) {
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-              children: [
-                PayrollSection(api: widget.api),
-                const SizedBox(height: 12),
-                AdvanceRequestsSection(api: widget.api),
-                const SizedBox(height: 12),
-                StaffReportSection(api: widget.api),
-                const SizedBox(height: 22),
-                // What each bench got out of a sack. The same thirty days
-                // the report above covers, so the two are read together.
-                StaffYieldSection(
-                  api: widget.api,
-                  from: _thirtyDaysAgo,
-                  to: _today,
-                ),
-                const SizedBox(height: 40),
-                const EmptyState(
-                  icon: Icons.how_to_reg_rounded,
-                  title: 'هنوز کسی تیک حضور نزده',
-                  subtitle: 'ساعت ورود کارکنان اینجا نمایش داده می‌شود.',
-                ),
-              ],
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-            // One more than the records: the month's report sits above
-            // today's list, which answers a different question.
-            itemCount: records.length + 1,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    children: [
-                      PayrollSection(api: widget.api),
-                      const SizedBox(height: 12),
-                      AdvanceRequestsSection(api: widget.api),
-                      const SizedBox(height: 12),
-                      SalaryRequestsSection(api: widget.api),
-                      const SizedBox(height: 12),
-                      LatenessReportSection(api: widget.api),
-                      const SizedBox(height: 12),
-                      StaffReportSection(api: widget.api),
-                const SizedBox(height: 22),
-                // What each bench got out of a sack. The same thirty days
-                // the report above covers, so the two are read together.
-                StaffYieldSection(
-                  api: widget.api,
-                  from: _thirtyDaysAgo,
-                  to: _today,
-                ),
-                    ],
-                  ),
-                );
-              }
-
-              final record = records[index - 1];
-              final user = keyedGroup(record['user']);
-              final checkedInAt = DateTime.tryParse('${record['checked_in_at']}');
-
-              return Card(
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  leading: CircleAvatar(
-                    backgroundColor: scheme.primary.withValues(alpha: 0.14),
-                    child: Icon(Icons.person_rounded, color: scheme.primary),
-                  ),
-                  title: Text(
-                    personName(user, fallbackId: record['user_id']),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  subtitle: Text(JalaliFormat.date(checkedInAt)),
-                  trailing: Chip(
-                    label: Text(JalaliFormat.time(checkedInAt)),
-                    avatar: const Icon(Icons.schedule_rounded, size: IconSize.inline),
-                    backgroundColor:
-                        AppColors.moneyIn.withValues(alpha: 0.15),
-                  ),
-                ),
-              );
-            },
-          );
+  Widget build(BuildContext context) => RefreshIndicator(
+        onRefresh: () async {
+          _reload();
+          try {
+            await _people;
+          } catch (_) {/* خطا در کارت فهرست نمایش داده می‌شود. */}
         },
-      ),
-    );
+        child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              Text('کارکنان و پرداخت‌ها',
+                  style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              const Text(
+                  'برای ریز حقوق، بدهی‌ها و ثبت علی‌الحساب، پرونده هر کارمند را باز کنید.'),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                  onPressed: _openPayroll,
+                  icon: const Icon(Icons.payments_outlined),
+                  label: const Text('حقوق و پرداخت کارکنان')),
+              const SizedBox(height: 12),
+              FutureBuilder<List<Employee>>(
+                  future: _people,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Center(child: CircularProgressIndicator()));
+                    }
+                    if (snapshot.hasError) {
+                      return ErrorBox(
+                          message: '${snapshot.error}', onRetry: _reload);
+                    }
+                    final people = snapshot.data ?? [];
+                    if (people.isEmpty) {
+                      return const Card(
+                          child: ListTile(title: Text('کارمندی ثبت نشده')));
+                    }
+                    return Card(
+                        child: Column(children: [
+                      for (var i = 0; i < people.length; i++) ...[
+                        if (i > 0) const Divider(height: 1),
+                        ListTile(
+                            leading: CircleAvatar(
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .primaryContainer,
+                                child: Icon(Icons.person_outline,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer)),
+                            title: Text(people[i].displayName,
+                                style: Theme.of(context).textTheme.titleSmall),
+                            subtitle: Text(
+                                'حقوق ماهانه: ${people[i].monthlySalaryFormatted}'),
+                            trailing: const Icon(Icons.chevron_left),
+                            onTap: () async {
+                              await Navigator.push(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                      builder: (_) => StaffAccountScreen(
+                                          api: widget.api, person: people[i])));
+                              if (mounted) _reload();
+                            }),
+                      ],
+                    ]));
+                  }),
+              const SizedBox(height: 12),
+              AdminDetailGroup(
+                  title: 'درخواست‌های پرداخت',
+                  subtitle: 'علی‌الحساب و حقوق در انتظار بررسی',
+                  icon: Icons.pending_actions,
+                  builder: (_) => Column(children: [
+                        AdvanceRequestsSection(api: widget.api),
+                        const SizedBox(height: 16),
+                        SalaryRequestsSection(api: widget.api)
+                      ])),
+              AdminDetailGroup(
+                  title: 'حضور امروز',
+                  subtitle: 'نام کارکنان و ساعت ورود',
+                  icon: Icons.how_to_reg,
+                  builder: (_) => _TodayAttendance(
+                      key: ValueKey(_generation), api: widget.api)),
+              AdminDetailGroup(
+                  title: 'گزارش حضور و تأخیر',
+                  subtitle: 'عملکرد ماهانه و ریز تأخیرها',
+                  icon: Icons.schedule,
+                  builder: (_) => Column(children: [
+                        StaffReportSection(api: widget.api),
+                        const SizedBox(height: 16),
+                        LatenessReportSection(api: widget.api)
+                      ])),
+              AdminDetailGroup(
+                  title: 'بازده کارکنان',
+                  subtitle: 'گزارش تولید در ۳۰ روز اخیر',
+                  icon: Icons.bakery_dining,
+                  builder: (_) => StaffYieldSection(
+                      api: widget.api,
+                      from: _date(
+                          DateTime.now().subtract(const Duration(days: 29))),
+                      to: _date(DateTime.now()))),
+            ]),
+      );
+}
+
+/// حضور هنگام باز شدن بخش خوانده می‌شود و خطای آن روی فهرست کارکنان اثر ندارد.
+class _TodayAttendance extends StatefulWidget {
+  const _TodayAttendance({super.key, required this.api});
+  final BakeryApi api;
+  @override
+  State<_TodayAttendance> createState() => _TodayAttendanceState();
+}
+
+class _TodayAttendanceState extends State<_TodayAttendance> {
+  late Future<List<Map<String, dynamic>>> _future;
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.api.adminAttendanceToday();
   }
+
+  void _reload() => setState(() => _future = widget.api.adminAttendanceToday());
+  @override
+  Widget build(BuildContext context) =>
+      FutureBuilder<List<Map<String, dynamic>>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return ErrorBox(message: '${snapshot.error}', onRetry: _reload);
+            }
+            final records = snapshot.data ?? [];
+            if (records.isEmpty) {
+              return const ListTile(title: Text('هنوز کسی تیک حضور نزده'));
+            }
+            return Column(children: [
+              for (final record in records)
+                ListTile(
+                    title: Text(personName(keyedGroup(record['user']),
+                        fallbackId: record['user_id'])),
+                    subtitle: Text(
+                        'ورود: ${JalaliFormat.time(DateTime.tryParse('${record['checked_in_at']}'))}'))
+            ]);
+          });
 }
