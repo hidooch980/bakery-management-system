@@ -10,6 +10,7 @@ import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import 'balance_sheet_section.dart';
 import 'bank_balances_section.dart';
+import 'bank_loans_screen.dart';
 import 'cash_count_sheet.dart';
 import 'consumption_report_section.dart';
 import 'customer_debts_section.dart';
@@ -143,7 +144,9 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
   String _toApiDate(DateTime value) =>
       '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
-  void _reload() => setState(() { _report = _load(); });
+  void _reload() => setState(() {
+        _report = _load();
+      });
 
   /// Asks for the two ends of the span, «از» then «تا».
   ///
@@ -322,6 +325,13 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
               // still owed — the money that is really in hand.
               const SizedBox(height: 22),
               BankBalancesSection(api: widget.api),
+              OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                          builder: (_) => BankLoansScreen(api: widget.api))),
+                  icon: const Icon(Icons.account_balance),
+                  label: const Text('اقساط وام بانکی و ثبت پرداخت')),
 
               // And whether that figure is true. The ledger cannot find
               // its own errors: change given from the drawer, a sale typed
@@ -463,7 +473,8 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
         children: [
           AdminRow(
             label: 'مجموع درآمد',
-            value: '${income['total_formatted'] ?? income['sales_formatted'] ?? '—'}',
+            value:
+                '${income['total_formatted'] ?? income['sales_formatted'] ?? '—'}',
             icon: Icons.payments_rounded,
             color: AppColors.moneyIn,
             emphasise: true,

@@ -61,6 +61,7 @@ GET api/v1/incomes                                          admin
 GET api/v1/incomes/categories                               admin
 GET api/v1/inventory                                        admin, seller
 GET api/v1/inventory/movements                              admin, seller
+GET api/v1/loans                                            admin
 GET api/v1/me                                               (any signed-in)
 GET api/v1/my-collections                                   admin, seller
 GET api/v1/purchases                                        admin
@@ -172,6 +173,7 @@ POST api/v1/holidays                                        admin
 POST api/v1/incomes                                         admin
 POST api/v1/interactions/{interaction}/complete             admin
 POST api/v1/inventory/movements                             admin, seller
+POST api/v1/loans/{loan}/payments                           admin
 POST api/v1/login                                           (public)
 POST api/v1/logout                                          (any signed-in)
 POST api/v1/my-collections/{customer}/collect               admin, seller

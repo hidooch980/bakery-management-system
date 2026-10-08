@@ -6,6 +6,7 @@ import '../../utils/formatters.dart';
 import '../../utils/json.dart';
 import '../../widgets/common.dart';
 import 'adjustment_sheet.dart';
+import 'financial_payment_sheet.dart';
 
 /// پروندهٔ مالی کارمند با دسترسی به رکورد اصلی و فیش‌های مرتبط.
 class StaffAccountScreen extends StatefulWidget {
@@ -30,6 +31,27 @@ class _StaffAccountScreenState extends State<StaffAccountScreen> {
 
   void _reload() =>
       setState(() => _future = widget.api.staffAccount(widget.person.id));
+
+  Future<void> _addAdvance() async {
+    try {
+      final balances = await widget.api.bankBalances();
+      if (!mounted) return;
+      final saved = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => FinancialPaymentSheet(
+              api: widget.api,
+              title: 'ثبت علی‌الحساب ${widget.person.displayName}',
+              employeeId: widget.person.id,
+              accounts: balances.accounts.where((a) => a.isActive).toList()));
+      if (saved == true && mounted) {
+        showMessage(context, 'علی‌الحساب و گردش حساب ثبت شد.');
+        _reload();
+      }
+    } catch (e) {
+      if (mounted) showMessage(context, '$e', isError: true);
+    }
+  }
 
   String _label(String kind) => switch (kind) {
         'salary' => 'فیش حقوق',
@@ -207,6 +229,10 @@ class _StaffAccountScreenState extends State<StaffAccountScreen> {
                                       'مانده بدهی با حقوق پرداخت‌نشده یکی نیست؛ بدهی فقط طبق انتخاب مدیر در فیش کسر می‌شود.'),
                                 ],
                               ))),
+                      FilledButton.icon(
+                          onPressed: _addAdvance,
+                          icon: const Icon(Icons.payments_outlined),
+                          label: const Text('ثبت علی‌الحساب توسط مدیر')),
                       OutlinedButton.icon(
                           onPressed: () async {
                             final saved = await showModalBottomSheet<bool>(

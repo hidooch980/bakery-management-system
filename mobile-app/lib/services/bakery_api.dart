@@ -1604,6 +1604,22 @@ class BakeryApi {
         if (note != null && note.isNotEmpty) 'note': note,
       });
 
+  /// پرداخت مستقیم مدیر با نام تلاش ثابت برای جلوگیری از پرداخت دوباره.
+  Future<void> recordStaffAdvance(
+      Map<String, dynamic> data, String attemptKey) async {
+    await _client.post('/staff-advances', data, attemptKey);
+  }
+
+  Future<List<Map<String, dynamic>>> bankLoans() async {
+    final body = await _client.getCached('/loans');
+    return rowList(body['data']);
+  }
+
+  Future<void> payBankLoan(
+      int id, Map<String, dynamic> data, String attemptKey) async {
+    await _client.post('/loans/$id/payments', data, attemptKey);
+  }
+
   // --------------------------------------------- advances on pay
 
   /// What this person has drawn against their pay, and what next month

@@ -1,0 +1,79 @@
+name: بررسی موقت آزمون‌های مالی کارکنان
+on:
+  push:
+    branches: [codex/staff-payroll-account]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: bakery_db_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, bcmath, curl, zip, gd, intl, pdo_mysql
+          coverage: none
+      - uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+      - name: آماده‌سازی وابستگی‌ها
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: قالب‌بندی فقط کد تغییرکرده
+        working-directory: backend
+        run: |
+          ./vendor/bin/pint app/Http/Controllers/Api/LoanController.php app/Http/Controllers/Api/StaffAdvanceController.php app/Models/LoanPayment.php tests/Feature/ManagerPaymentsTest.php routes/api.php
+          git diff --binary > /tmp/manager-format.patch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: formatted-source-patch
+          path: /tmp/manager-format.patch
+          retention-days: 1
+      - name: آماده‌سازی محیط آزمایشی
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      - name: آزمون مالی با داده‌های مصنوعی
+        continue-on-error: true
+        working-directory: backend
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: bakery_db_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: php artisan test --filter='ManagerPaymentsTest|StaffAccountTest|EveryRouteIsBehindTheRightDoorTest' --log-junit=/tmp/staff-result.xml
+      - name: نتیجه کوتاه آزمون بدون نگهداری گزارش خام
+        if: always()
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import pathlib, xml.etree.ElementTree as ET
+          p=pathlib.Path('/tmp/staff-result.xml')
+          if p.exists():
+              root=ET.parse(p).getroot()
+              for case in root.iter('testcase'):
+                  failure=case.find('failure')
+                  if failure is None: failure=case.find('error')
+                  if failure is None: continue
+                  # فقط تشخیص آزمون همین پرونده با دادهٔ مصنوعی؛ گزارش خام ذخیره نمی‌شود.
+                  lines=[line for line in (failure.text or '').splitlines() if line.strip()]
+                  msg=' | '.join(lines[:8])[:1200]
+                  msg=msg.replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+                  print('::error title='+case.get('name','آزمون')+'::'+msg)
+          PY

@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SellerCollectionController;
 use App\Http\Controllers\Api\SellerPerformanceController;
 use App\Http\Controllers\Api\SettlementRequestController;
+use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\StaffAccountController;
 use App\Http\Controllers\Api\StaffAdjustmentController;
 use App\Http\Controllers\Api\StaffAdvanceController;
@@ -414,6 +415,8 @@ Route::prefix('v1')->group(function () {
             Route::patch('/staff-adjustments/{adjustment}/restore', [StaffAdjustmentController::class, 'restore']);
 
             // پرونده مالی و اصلاح رکورد اصلی فقط برای مدیر امور مالی.
+            Route::get('/loans', [LoanController::class, 'index']);
+            Route::post('/loans/{loan}/payments', [LoanController::class, 'pay']);
             Route::get('/staff-accounts/{person}', [StaffAccountController::class, 'show']);
             Route::patch('/staff-account-entries/{kind}/{id}', [StaffAccountController::class, 'update']);
             Route::get('/salaries/employees', [SalaryController::class, 'employees']);
