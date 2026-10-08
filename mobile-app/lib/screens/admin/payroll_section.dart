@@ -300,7 +300,8 @@ class _PayrollSectionState extends State<PayrollSection> {
                         const Icon(Icons.event_available_rounded,
                             size: IconSize.inline, color: AppColors.attention),
                         const SizedBox(width: Gap.tight),
-                        Text(
+                        Expanded(
+                            child: Text(
                           person.requestedDaysAgo == null ||
                                   person.requestedDaysAgo == 0
                               ? 'امروز درخواست پرداخت داد'
@@ -309,7 +310,7 @@ class _PayrollSectionState extends State<PayrollSection> {
                               .textTheme
                               .bodySmall
                               ?.copyWith(color: AppColors.attention),
-                        ),
+                        )),
                       ],
                     ),
                   ),
@@ -327,7 +328,8 @@ class _PayrollSectionState extends State<PayrollSection> {
                         const Icon(Icons.remove_circle_outline_rounded,
                             size: IconSize.inline, color: AppColors.moneyOut),
                         const SizedBox(width: Gap.tight),
-                        Text(
+                        Expanded(
+                            child: Text(
                           person.owesAdvance && person.owesBread
                               ? 'علی‌الحساب ${person.advanceOutstandingFormatted}'
                                   '  •  نان ${person.breadOutstandingFormatted}'
@@ -338,7 +340,7 @@ class _PayrollSectionState extends State<PayrollSection> {
                               .textTheme
                               .bodySmall
                               ?.copyWith(color: AppColors.moneyOut),
-                        ),
+                        )),
                       ],
                     ),
                   ),
