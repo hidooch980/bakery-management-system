@@ -5,8 +5,6 @@ namespace Tests\Feature;
 use App\Models\Bakery;
 use App\Models\BankAccount;
 use App\Models\Loan;
-use App\Models\SalaryPayment;
-use App\Models\StaffAdjustment;
 use App\Models\StaffAdvance;
 use App\Models\User;
 use App\Support\Money;
@@ -62,7 +60,7 @@ class ManagerPaymentsTest extends TestCase
         $account = $this->account();
         $loan = $this->loan();
         $data = ['amount' => 100, 'paid_on' => today()->toDateString(), 'bank_account_id' => $account->id];
-        $headers = ['Idempotency-Key' => 'وام-آزمایشی-پرداخت-اول'];
+        $headers = ['Idempotency-Key' => 'e52972d4-f871-4ce4-8e1c-273771552210'];
         $this->postJson('/api/v1/loans/'.$loan->id.'/payments', $data, $headers)->assertCreated();
         $this->postJson('/api/v1/loans/'.$loan->id.'/payments', $data, $headers)->assertCreated();
         $this->assertEquals(900, $loan->fresh()->remaining);
