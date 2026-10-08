@@ -50,6 +50,11 @@ class LoanPayment extends Model
         ];
     }
 
+    public function bankAccount()
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
     public function loan()
     {
         return $this->belongsTo(Loan::class);

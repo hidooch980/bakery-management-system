@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BankAccount;
 use App\Models\StaffAdvance;
 use App\Models\User;
 use App\Support\AppCalendar;
 use App\Support\Jalali;
 use App\Support\Money;
+use App\Support\SameBakery;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -107,6 +109,11 @@ class StaffAdvanceController extends Controller
             'bank_account_id' => ['nullable', 'exists:bank_accounts,id'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
+
+        SameBakery::or404(User::findOrFail($data['user_id']));
+        if (! empty($data['bank_account_id'])) {
+            BankAccount::where('is_active', true)->findOrFail($data['bank_account_id']);
+        }
 
         $paidOn = array_key_exists('paid_on', $data) && $data['paid_on'] !== null
             ? Jalali::parseFlexible($data['paid_on'])

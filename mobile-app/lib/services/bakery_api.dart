@@ -301,15 +301,18 @@ class BakeryApi {
     String? occurredOn,
     String? attemptKey,
   }) async {
-    final body = await _client.post('/staff-adjustments', {
-      'user_id': userId,
-      'kind': kind,
-      'basis': basis,
-      'reason': reason,
-      if (amount != null) 'amount': amount,
-      if (days != null) 'days': days,
-      if (occurredOn != null) 'occurred_on': occurredOn,
-    }, attemptKey);
+    final body = await _client.post(
+        '/staff-adjustments',
+        {
+          'user_id': userId,
+          'kind': kind,
+          'basis': basis,
+          'reason': reason,
+          if (amount != null) 'amount': amount,
+          if (days != null) 'days': days,
+          if (occurredOn != null) 'occurred_on': occurredOn,
+        },
+        attemptKey);
 
     return StaffAdjustment.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -323,7 +326,8 @@ class BakeryApi {
     return AdjustmentPeriod.fromJson(body['data'] as Map<String, dynamic>);
   }
 
-  Future<void> deleteAdjustment(int id) => _client.delete('/staff-adjustments/$id');
+  Future<void> deleteAdjustment(int id) =>
+      _client.delete('/staff-adjustments/$id');
 
   // --------------------------------------------------------------- payroll
 
@@ -359,6 +363,19 @@ class BakeryApi {
   /// [attemptKey] نام همین یک نوشتن، ثابت در هر تلاش دوباره. یک timeout
   /// یعنی درخواست احتمالاً اجرا شده و فقط جوابش گم شده؛ بدون نام، تلاش
   /// دوم یک نوشتن تازه دیده می‌شود و پول دو بار جابه‌جا می‌شود.
+  // پرونده از سرور تازه خوانده می‌شود تا اصلاح‌ها فوراً دیده شوند.
+  Future<Map<String, dynamic>> staffAccount(int id) async {
+    final body = await _client.get('/staff-accounts/$id');
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<void> updateStaffEntry(
+          String kind, int id, Map<String, dynamic> data) =>
+      _client.patch('/staff-account-entries/$kind/$id', data);
+
+  Future<void> updatePayslip(int id, Map<String, dynamic> data) =>
+      _client.patch('/salaries/$id', data);
+
   Future<Payslip> recordSalary({
     required int userId,
     required String periodStart,
@@ -369,20 +386,27 @@ class BakeryApi {
     int? bankAccountId,
     String? note,
     String? attemptKey,
+    bool recoverAdvances = true,
+    bool recoverBread = true,
   }) async {
-    final body = await _client.post('/salaries', {
-      'user_id': userId,
-      'period_start': periodStart,
-      'base_amount': baseAmount,
-      'bonus': bonus,
-      'deduction': deduction,
-      if (paidOn != null) 'paid_on': paidOn,
-      // Null when it came out of the till, which is a real answer. Sent
-      // either way: without it the payslip records the cost and moves no
-      // account, so the wage is paid and the balance never falls.
-      'bank_account_id': bankAccountId,
-      if (note != null && note.isNotEmpty) 'note': note,
-    }, attemptKey);
+    final body = await _client.post(
+        '/salaries',
+        {
+          'user_id': userId,
+          'period_start': periodStart,
+          'base_amount': baseAmount,
+          'bonus': bonus,
+          'deduction': deduction,
+          'recover_advances': recoverAdvances,
+          'recover_bread': recoverBread,
+          if (paidOn != null) 'paid_on': paidOn,
+          // Null when it came out of the till, which is a real answer. Sent
+          // either way: without it the payslip records the cost and moves no
+          // account, so the wage is paid and the balance never falls.
+          'bank_account_id': bankAccountId,
+          if (note != null && note.isNotEmpty) 'note': note,
+        },
+        attemptKey);
 
     return Payslip.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -733,12 +757,15 @@ class BakeryApi {
     String? attemptKey,
     int? accountId,
   }) async {
-    final body = await _client.post('/cash-counts', {
-      'counted_amount': countedAmount,
-      if (adjust) 'adjust': true,
-      if (note != null && note.isNotEmpty) 'note': note,
-      if (accountId != null) 'account_id': accountId,
-    }, attemptKey);
+    final body = await _client.post(
+        '/cash-counts',
+        {
+          'counted_amount': countedAmount,
+          if (adjust) 'adjust': true,
+          if (note != null && note.isNotEmpty) 'note': note,
+          if (accountId != null) 'account_id': accountId,
+        },
+        attemptKey);
 
     return CashCount.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -776,19 +803,23 @@ class BakeryApi {
     String? note,
     String? attemptKey,
   }) async {
-    final body = await _client.post('/stock-counts', {
-      'item': item,
-      'counted': counted,
-      if (adjust) 'adjust': true,
-      if (note != null && note.isNotEmpty) 'note': note,
-    }, attemptKey);
+    final body = await _client.post(
+        '/stock-counts',
+        {
+          'item': item,
+          'counted': counted,
+          if (adjust) 'adjust': true,
+          if (note != null && note.isNotEmpty) 'note': note,
+        },
+        attemptKey);
 
     return StockCount.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   /// How the shop was staffed over a stretch: working days, who was
   /// expected and who actually turned up.
-  Future<Map<String, dynamic>> attendanceSummary({String? from, String? to}) async {
+  Future<Map<String, dynamic>> attendanceSummary(
+      {String? from, String? to}) async {
     final body = await _client.getCached('/reports/attendance-summary', query: {
       if (from != null) 'from': from,
       if (to != null) 'to': to,
@@ -813,7 +844,8 @@ class BakeryApi {
   /// hides anybody at zero. This one answers "who is carrying the shop",
   /// so a seller who settles the same evening is present rather than
   /// absent.
-  Future<Map<String, dynamic>> sellerPerformance({String? from, String? to}) async {
+  Future<Map<String, dynamic>> sellerPerformance(
+      {String? from, String? to}) async {
     final body = await _client.getCached('/reports/sellers', query: {
       if (from != null) 'from': from,
       if (to != null) 'to': to,
@@ -884,8 +916,10 @@ class BakeryApi {
   ///
   /// Not cached: a statement is read to answer a question about a
   /// particular moment, and a stale one would answer it wrongly.
-  Future<BankStatement> bankStatement(int accountId, {String? from, String? until}) async {
-    final body = await _client.getCached('/bank-accounts/$accountId/transactions', query: {
+  Future<BankStatement> bankStatement(int accountId,
+      {String? from, String? until}) async {
+    final body = await _client
+        .getCached('/bank-accounts/$accountId/transactions', query: {
       if (from != null) 'from': from,
       if (until != null) 'until': until,
     });
@@ -921,8 +955,12 @@ class BakeryApi {
   // -------------------------------------- admin: school and office debts
 
   /// What each school or office still owes, longest-waiting first.
-  Future<({List<Map<String, dynamic>> customers, String totalFormatted, int overdueCount})>
-      customerDebts() async {
+  Future<
+      ({
+        List<Map<String, dynamic>> customers,
+        String totalFormatted,
+        int overdueCount
+      })> customerDebts() async {
     final body = await _client.getCached('/customer-debts');
     final data = body['data'] as Map<String, dynamic>;
 
@@ -1061,8 +1099,7 @@ class BakeryApi {
     return (
       sales: rowList(data['sales']).map(FlourSale.fromJson).toList(),
       count: (summary['count'] as num?)?.toInt() ?? 0,
-      totalWeightKg:
-          double.tryParse('${summary['total_weight_kg']}') ?? 0,
+      totalWeightKg: double.tryParse('${summary['total_weight_kg']}') ?? 0,
       totalFormatted: summary['total_amount_formatted'] as String? ?? '',
     );
   }
@@ -1111,7 +1148,8 @@ class BakeryApi {
   Future<void> restoreAdjustment(int id) =>
       _client.patch('/staff-adjustments/$id/restore', const {});
 
-  Future<Map<String, dynamic>> workStartLateReport({String? from, String? to}) async {
+  Future<Map<String, dynamic>> workStartLateReport(
+      {String? from, String? to}) async {
     final body = await _client.getCached('/work-starts/late-report', query: {
       if (from != null) 'from': from,
       if (to != null) 'until': to,
@@ -1156,7 +1194,6 @@ class BakeryApi {
 
     return body['data'] as Map<String, dynamic>;
   }
-
 
   // ----------------------------------------------- admin: money and stock
 
@@ -1340,8 +1377,7 @@ class BakeryApi {
   Future<List<Map<String, dynamic>>> consignmentPartners() async {
     final body = await _client.getCached('/consignment-flour/partners');
 
-    return ((body['data'] as List?) ?? const [])
-        .cast<Map<String, dynamic>>();
+    return ((body['data'] as List?) ?? const []).cast<Map<String, dynamic>>();
   }
 
   /// The net position: sacks lent out, sacks borrowed, and the difference.
@@ -1357,7 +1393,8 @@ class BakeryApi {
   }
 
   /// Income against expenses, with profit, for a date range.
-  Future<Map<String, dynamic>> financialReport({String? from, String? to}) async {
+  Future<Map<String, dynamic>> financialReport(
+      {String? from, String? to}) async {
     final body = await _client.getCached('/reports/financial', query: {
       if (from != null) 'from': from,
       if (to != null) 'to': to,
@@ -1366,7 +1403,8 @@ class BakeryApi {
     return body['data'] as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> productionReport({String? from, String? to}) async {
+  Future<Map<String, dynamic>> productionReport(
+      {String? from, String? to}) async {
     final body = await _client.getCached('/reports/production', query: {
       if (from != null) 'from': from,
       if (to != null) 'to': to,
@@ -1547,8 +1585,8 @@ class BakeryApi {
       if (totalLitres != null) 'total_litres': totalLitres,
     });
 
-    final allocation =
-        (body['data'] as Map<String, dynamic>)['allocation'] as Map<String, dynamic>?;
+    final allocation = (body['data'] as Map<String, dynamic>)['allocation']
+        as Map<String, dynamic>?;
 
     return allocation == null ? null : DieselQuota.fromJson(allocation);
   }
@@ -1565,6 +1603,22 @@ class BakeryApi {
         if (carryoverBags != null) 'carryover_bags': carryoverBags,
         if (note != null && note.isNotEmpty) 'note': note,
       });
+
+  /// پرداخت مستقیم مدیر با نام تلاش ثابت برای جلوگیری از پرداخت دوباره.
+  Future<void> recordStaffAdvance(
+      Map<String, dynamic> data, String attemptKey) async {
+    await _client.post('/staff-advances', data, attemptKey);
+  }
+
+  Future<List<Map<String, dynamic>>> bankLoans() async {
+    final body = await _client.getCached('/loans');
+    return rowList(body['data']);
+  }
+
+  Future<void> payBankLoan(
+      int id, Map<String, dynamic> data, String attemptKey) async {
+    await _client.post('/loans/$id/payments', data, attemptKey);
+  }
 
   // --------------------------------------------- advances on pay
 
@@ -1796,14 +1850,17 @@ class BakeryApi {
     String? note,
     String? attemptKey,
   }) =>
-      _client.post('/supplier-payments', {
-        'supplier_id': supplierId,
-        'amount': amount,
-        if (purchaseId != null) 'purchase_id': purchaseId,
-        if (bankAccountId != null) 'bank_account_id': bankAccountId,
-        if (paidInCash) 'paid_in_cash': true,
-        if (note != null && note.isNotEmpty) 'note': note,
-      }, attemptKey);
+      _client.post(
+          '/supplier-payments',
+          {
+            'supplier_id': supplierId,
+            'amount': amount,
+            if (purchaseId != null) 'purchase_id': purchaseId,
+            if (bankAccountId != null) 'bank_account_id': bankAccountId,
+            if (paidInCash) 'paid_in_cash': true,
+            if (note != null && note.isNotEmpty) 'note': note,
+          },
+          attemptKey);
 
   List<Map<String, dynamic>> _paginated(Map<String, dynamic> body) {
     final data = body['data'];

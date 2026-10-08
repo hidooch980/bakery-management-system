@@ -384,4 +384,22 @@ class BreadTakenHomeIsSettledAtMonthEndTest extends TestCase
             0.01,
         );
     }
+
+    public function test_بدهی_نان_با_انتخاب_مدیر_به_دوره_بعد_می‌ماند(): void
+    {
+        $sale = $this->tookHome(10);
+        $slip = SalaryPayment::create([
+            'user_id' => $this->worker->id,
+            'period_start' => now()->startOfMonth(),
+            'base_amount' => 5000000,
+            'recover_bread' => false,
+        ]);
+        $this->assertSame('0.00', $slip->bread_deduction);
+        $this->assertEquals(100000, $sale->fresh()->consumed_outstanding);
+        $slip->update(['recover_bread' => true]);
+        $this->assertSame('100000.00', $slip->fresh()->bread_deduction);
+        $this->assertEquals(0, $sale->fresh()->consumed_outstanding);
+        $slip->update(['recover_bread' => false]);
+        $this->assertEquals(100000, $sale->fresh()->consumed_outstanding);
+    }
 }
