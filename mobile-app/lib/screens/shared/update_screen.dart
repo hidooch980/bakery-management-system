@@ -71,6 +71,11 @@ class _UpdateScreenState extends State<UpdateScreen> {
 
       if (!mounted) return;
       showMessage(context, 'فایل نصب آماده شد. مراحل نصب را ادامه دهید.');
+    } on UpdateIntegrityException catch (e) {
+      // Not a permission problem: the file was broken or not ours. Sending
+      // the user to toggle a setting would not help.
+      if (!mounted) return;
+      showMessage(context, e.toString());
     } catch (e) {
       if (!mounted) return;
       // The usual cause is the missing install-unknown-apps consent, so offer

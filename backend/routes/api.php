@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AppReleaseController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BackupController;
@@ -64,6 +65,13 @@ Route::prefix('v1')->group(function () {
         'success' => true,
         'service' => 'bakery',
     ]));
+
+    // The newest APK published on this server, for the in-app updater.
+    // Public because it is asked before sign-in; it names a version and a
+    // file anyone can download. Every phone asks once a launch — thirty a
+    // minute per address is far above that and far below a scraper.
+    Route::get('/app/latest', [AppReleaseController::class, 'latest'])
+        ->middleware('throttle:30,1');
 
     // Five a minute. Ten was set when nobody had counted how many people
     // actually log in here: five staff, once a day each, on phones that
