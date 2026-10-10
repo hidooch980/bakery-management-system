@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common.dart';
 import 'partner_statement_screen.dart';
 
 /// Flour that is out with a partner bakery, or owed to one.
@@ -53,40 +52,6 @@ class _ConsignmentFlourScreenState extends State<ConsignmentFlourScreen> {
     await future;
   }
 
-  Future<void> _settle(Map<String, dynamic> record) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تسویه شد؟'),
-        content: Text(
-          '${record['quantity_label']} با ${record['partner_name']} تسویه شده است؟',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('نه'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('بله، تسویه شد'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    try {
-      await widget.api.settleConsignment(record['id'] as int);
-      if (!mounted) return;
-      showMessage(context, 'تسویه ثبت شد.');
-      await _refresh();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      showMessage(context, e.message, isError: true);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -128,39 +93,39 @@ class _ConsignmentFlourScreenState extends State<ConsignmentFlourScreen> {
                 // store the question is «چقدر دست کیست», and reading it
                 // off a list of individual entries is arithmetic done in
                 // the head, at the moment of deciding to lend more.
-                if (data.partners.isNotEmpty) ...[
-                  const _SectionTitle('به تفکیک همکار'),
-                  const SizedBox(height: 8),
-                  for (final partner in data.partners) ...[
-                    _PartnerTile(
-                      partner: partner,
-                      // نام همکار پروندهٔ او را باز می‌کند (گردش ریز به کیسه).
-                      onTap: partner['partner_id'] is int
-                          ? () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => PartnerStatementScreen(
-                                    api: widget.api,
-                                    partnerId: partner['partner_id'] as int,
-                                    partnerName: '${partner['partner_name']}',
-                                  ),
+                // «همه اسما باشه»: همهٔ همکاران، حتی آن‌که حسابش صاف است.
+                const _SectionTitle('به تفکیک همکار'),
+                const SizedBox(height: 8),
+                if (data.partners.isEmpty)
+                  const _Message(text: 'هنوز همکاری تعریف نشده است.'),
+                for (final partner in data.partners) ...[
+                  _PartnerTile(
+                    partner: partner,
+                    // نام همکار پروندهٔ او را باز می‌کند (گردش ریز به کیسه).
+                    onTap: partner['partner_id'] is int
+                        ? () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => PartnerStatementScreen(
+                                  api: widget.api,
+                                  partnerId: partner['partner_id'] as int,
+                                  partnerName: '${partner['partner_name']}',
                                 ),
-                              )
-                          : null,
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  const SizedBox(height: 14),
-                  const _SectionTitle('ثبت‌ها'),
+                              ),
+                            )
+                        : null,
+                  ),
                   const SizedBox(height: 8),
                 ],
+                const SizedBox(height: 14),
+                // هر ثبت فقط یک جابه‌جایی است. تسویه‌ای در کار نیست:
+                // ثبتِ طرف مقابل خودش از مانده کم می‌شود.
+                const _SectionTitle('ثبت‌ها'),
+                const SizedBox(height: 8),
                 if (data.records.isEmpty)
-                  const _Message(text: 'هیچ آرد امانی‌ای باز نیست.')
+                  const _Message(text: 'هنوز آرد امانی‌ای ثبت نشده است.')
                 else
                   for (final record in data.records) ...[
-                    _ConsignmentTile(
-                      record: record,
-                      onSettle: () => _settle(record),
-                    ),
+                    _ConsignmentTile(record: record),
                     const SizedBox(height: 10),
                   ],
               ],
@@ -307,7 +272,9 @@ class _PartnerTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final net = (partner['net_bags'] as num?)?.toDouble() ?? 0;
     final days = partner['days'] as int?;
-    final owed = net > 0;
+    final entries = (partner['entries'] as num?)?.toInt() ?? 0;
+    final owed = net > 0.001;
+    final square = net.abs() <= 0.001;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -333,11 +300,13 @@ class _PartnerTile extends StatelessWidget {
                       // Days, because that is how the shop talks about it —
                       // «۵۶ کیسه، ۲۳ روز» — and because a date makes the
                       // reader do the subtraction.
-                      days == null
-                          ? '${partner['entries']} ثبت'
-                          : days == 0
-                              ? 'از امروز'
-                              : '$days روز  •  ${partner['entries']} ثبت',
+                      entries == 0
+                          ? 'هنوز ثبتی ندارد'
+                          : days == null
+                              ? '$entries ثبت'
+                              : days == 0
+                                  ? 'از امروز  •  $entries ثبت'
+                                  : '$days روز  •  $entries ثبت',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
@@ -352,11 +321,19 @@ class _PartnerTile extends StatelessWidget {
                     _bags(net.abs()),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
-                          color: owed ? AppColors.moneyIn : AppColors.moneyOut,
+                          color: square
+                              ? scheme.onSurfaceVariant
+                              : owed
+                                  ? AppColors.moneyIn
+                                  : AppColors.moneyOut,
                         ),
                   ),
                   Text(
-                    owed ? 'دست ایشان' : 'بدهکاریم',
+                    square
+                        ? 'تسویه'
+                        : owed
+                            ? 'طلب ما'
+                            : 'بدهی ما',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -380,10 +357,9 @@ class _PartnerTile extends StatelessWidget {
 }
 
 class _ConsignmentTile extends StatelessWidget {
-  const _ConsignmentTile({required this.record, required this.onSettle});
+  const _ConsignmentTile({required this.record});
 
   final Map<String, dynamic> record;
-  final VoidCallback onSettle;
 
   @override
   Widget build(BuildContext context) {
@@ -393,7 +369,7 @@ class _ConsignmentTile extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -424,21 +400,12 @@ class _ConsignmentTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${record['direction_label']}  •  ${record['occurred_on_display']}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+            Text(
+              '${record['direction_label']}  •  ${record['occurred_on_display']}'
+              '${(record['note'] ?? '').toString().isNotEmpty ? '  •  ${record['note']}' : ''}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
                   ),
-                ),
-                TextButton(
-                  onPressed: onSettle,
-                  child: const Text('تسویه شد'),
-                ),
-              ],
             ),
           ],
         ),

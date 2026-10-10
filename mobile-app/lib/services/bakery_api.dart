@@ -1345,7 +1345,7 @@ class BakeryApi {
   /// and never once read back, so the only way to see who was holding the
   /// shop's flour was to open the panel.
   Future<List<Map<String, dynamic>>> consignmentFlour({
-    bool outstandingOnly = true,
+    bool outstandingOnly = false,
   }) async {
     final body = await _client.getCached('/consignment-flour', query: {
       if (outstandingOnly) 'outstanding_only': true,
@@ -1388,9 +1388,17 @@ class BakeryApi {
     return (body['data'] as Map).cast<String, dynamic>();
   }
 
-  /// Marks one consignment as returned.
-  Future<void> settleConsignment(int id) async {
-    await _client.patch('/consignment-flour/$id/settle', const {});
+  /// «گردش روزانه آرد»: موجودی اول روز، ورودی‌ها، خروجی‌ها، موجودی آخر
+  /// روز و ریز حرکت‌های همان روز — همه به کیسه. [day] خالی یعنی امروز.
+  Future<Map<String, dynamic>> flourDay({DateTime? day}) async {
+    final body = await _client.getCached('/inventory/flour/day', query: {
+      if (day != null)
+        'date': '${day.year.toString().padLeft(4, '0')}-'
+            '${day.month.toString().padLeft(2, '0')}-'
+            '${day.day.toString().padLeft(2, '0')}',
+    });
+
+    return (body['data'] as Map).cast<String, dynamic>();
   }
 
   /// پروندهٔ یک همکار: گردش ریز به کیسه، با ماندهٔ بعد از هر ردیف.

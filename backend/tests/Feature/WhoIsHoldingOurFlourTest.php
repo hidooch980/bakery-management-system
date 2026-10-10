@@ -94,24 +94,30 @@ class WhoIsHoldingOurFlourTest extends TestCase
         $this->assertSame(23, $this->report()[0]['days']);
     }
 
-    public function test_settled_flour_is_history_and_does_not_appear(): void
+    public function test_settled_flour_is_history_and_the_partner_shows_square(): void
     {
+        // «همه اسما باشه»: همکار می‌ماند، با ماندهٔ صفر.
         $this->lend('ممد زاکر', 20, 18, settled: now()->toDateString());
-
-        $this->assertSame([], $this->report());
-    }
-
-    public function test_a_partner_whose_account_is_square_drops_off_entirely(): void
-    {
-        // Everything they had is back. A line reading «۰ کیسه» is one more
-        // row to read past, for ever.
-        $this->lend('ممد زاکر', 20, 18, settled: now()->toDateString());
-        $this->lend('عبدالرئوف', 56, 23);
 
         $report = $this->report();
 
         $this->assertCount(1, $report);
-        $this->assertSame('عبدالرئوف', $report[0]['partner_name']);
+        $this->assertEqualsWithDelta(0.0, $report[0]['net_bags'], 0.01);
+        $this->assertTrue($report[0]['is_settled']);
+        $this->assertSame('تسویه', $report[0]['headline']['label']);
+        $this->assertNull($report[0]['days']);
+    }
+
+    public function test_every_partner_is_listed_square_or_not_owing_first(): void
+    {
+        $this->lend('ممد زاکر', 20, 18, settled: now()->toDateString());
+        $this->lend('عبدالرئوف', 56, 23);
+        Customer::create(['name' => 'الف بی‌ثبت', 'type' => Customer::PARTNER_TYPE, 'is_active' => true]);
+
+        $report = $this->report();
+
+        $this->assertSame(['عبدالرئوف', 'الف بی‌ثبت', 'ممد زاکر'], array_column($report, 'partner_name'));
+        $this->assertSame(0, $report[1]['entries']);
     }
 
     public function test_the_biggest_debt_is_first(): void
@@ -145,10 +151,10 @@ class WhoIsHoldingOurFlourTest extends TestCase
 
         $row = $this->report()[0];
 
-        // Netting them silently would report «۶ کیسه» and lose the fact
-        // that ten sacks of somebody else's flour are in this store.
-        $this->assertEqualsWithDelta(4.0, $row['lent_bags'], 0.01);
-        $this->assertEqualsWithDelta(10.0, $row['borrowed_bags'], 0.01);
+        // «همه چی اوتوماتیک»: چهار کیسهٔ دادیم از ده کیسهٔ گرفتیم کم شد؛
+        // شش کیسه بدهکاریم و ردیفی برای «تسویه» باز نمی‌ماند.
+        $this->assertEqualsWithDelta(0.0, $row['lent_bags'], 0.01);
+        $this->assertEqualsWithDelta(6.0, $row['borrowed_bags'], 0.01);
         $this->assertEqualsWithDelta(-6.0, $row['net_bags'], 0.01);
     }
 

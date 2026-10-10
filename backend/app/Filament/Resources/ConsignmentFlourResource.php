@@ -4,7 +4,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Resources\ConsignmentFlourResource\Pages;
-use App\Filament\Resources\PartnerResource\Pages\PartnerStatementPage;
 use App\Models\ConsignmentFlour;
 use App\Models\Customer;
 use App\Support\AppCalendar;
@@ -125,8 +124,9 @@ class ConsignmentFlourResource extends Resource
                         ->helperText('اگر آرد قبلاً رفته و روزش را نمی‌دانید، این را بزنید تا پیگیری‌اش عقب نیفتد.')
                         ->inline(false),
 
-                    JalaliDateInput::make('settled_on', 'تاریخ تسویه')
-                        ->helperText('خالی بگذارید تا در وضعیت «تسویه‌نشده» بماند.'),
+                    // «تسویه» دستی دیگر نیست: هر ثبتِ دادیم/گرفتیم خودش
+                    // از ماندهٔ طرف مقابل کم می‌شود (PartnerNetting).
+                    // settled_on قدیمی در پایگاه داده به‌عنوان تاریخچه می‌ماند.
 
                     Forms\Components\Textarea::make('note')
                         ->label('توضیحات')
@@ -171,66 +171,26 @@ class ConsignmentFlourResource extends Resource
                 // was counted at the door, the weight is for the books.
                 Tables\Columns\TextColumn::make('bags')
                     ->label('مقدار')
-                    // فقط کیسه؛ اگر بخشی برگشته، باقی‌مانده هم گفته می‌شود.
+                    // فقط کیسه. هر ردیف فقط یک جابه‌جایی است؛ مانده‌ها
+                    // خودکار و در پروندهٔ همکار دیده می‌شوند.
                     ->state(fn (ConsignmentFlour $record) => PartnerStatement::bags((float) $record->bags).' کیسه')
-                    ->description(function (ConsignmentFlour $record) {
-                        $returned = $record->returnedBags();
-
-                        return $returned > 0 && ! $record->is_settled
-                            ? 'برگشته '.PartnerStatement::bags($returned).' • مانده '.PartnerStatement::bags($record->outstandingBags())
-                            : null;
-                    })
                     ->sortable()
                     ->summarize(Tables\Columns\Summarizers\Sum::make()
                         ->label('جمع کیسه')
                         ->numeric(2)),
 
-                Tables\Columns\TextColumn::make('settled_on')
-                    ->label('وضعیت')
-                    ->badge()
-                    ->formatStateUsing(fn ($state) => $state
-                        ? 'تسویه شد: '.AppCalendar::date($state)
-                        : 'تسویه‌نشده')
-                    ->color(fn ($state) => $state ? 'success' : 'danger'),
+                Tables\Columns\TextColumn::make('note')
+                    ->label('توضیحات')
+                    ->limit(40)
+                    ->placeholder('—')
+                    ->toggleable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('direction')
                     ->label('نوع')
                     ->options(ConsignmentFlour::DIRECTIONS),
-
-                Tables\Filters\Filter::make('outstanding')
-                    ->label('فقط تسویه‌نشده‌ها')
-                    ->query(fn ($query) => $query->whereNull('settled_on'))
-                    ->toggle(),
             ])
             ->actions([
-                Tables\Actions\Action::make('recordReturn')
-                    ->label('ثبت برگشت')
-                    ->icon('heroicon-o-arrow-uturn-right')
-                    ->color('info')
-                    ->visible(fn (ConsignmentFlour $record) => ! $record->is_settled)
-                    ->form([
-                        Forms\Components\TextInput::make('bags')
-                            ->label('تعداد کیسهٔ برگشتی')
-                            ->numeric()
-                            ->minValue(0.01)
-                            ->required()
-                            ->suffix('کیسه')
-                            ->helperText(fn (ConsignmentFlour $record) => 'باقی‌مانده: '
-                                .PartnerStatement::bags($record->outstandingBags()).' کیسه'),
-                        JalaliDateInput::today('returned_on', 'تاریخ برگشت')->required(),
-                        Forms\Components\Textarea::make('note')->label('توضیحات')->rows(2),
-                    ])
-                    ->action(fn (ConsignmentFlour $record, array $data) => PartnerStatementPage::storeReturn($data, $record)),
-
-                Tables\Actions\Action::make('settle')
-                    ->label('ثبت تسویه')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->visible(fn (ConsignmentFlour $record) => ! $record->is_settled)
-                    ->action(fn (ConsignmentFlour $record) => $record->update(['settled_on' => now()])),
-
                 Tables\Actions\EditAction::make()->label('ویرایش'),
                 Tables\Actions\DeleteAction::make()->label('حذف'),
             ])
@@ -250,17 +210,5 @@ class ConsignmentFlourResource extends Resource
             'create' => Pages\CreateConsignmentFlour::route('/create'),
             'edit' => Pages\EditConsignmentFlour::route('/{record}/edit'),
         ];
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        $outstanding = static::getModel()::whereNull('settled_on')->count();
-
-        return $outstanding > 0 ? (string) $outstanding : null;
-    }
-
-    public static function getNavigationBadgeColor(): ?string
-    {
-        return 'warning';
     }
 }

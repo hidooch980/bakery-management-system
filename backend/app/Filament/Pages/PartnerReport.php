@@ -71,7 +71,8 @@ class PartnerReport extends Page
      */
     public function positions(): Collection
     {
-        return $this->cachedPositions ??= PartnerLedger::positions();
+        // همهٔ همکاران، حتی با ماندهٔ صفر («همه اسما باشه»).
+        return $this->cachedPositions ??= PartnerLedger::all();
     }
 
     /**
@@ -96,13 +97,13 @@ class PartnerReport extends Page
             ->get();
     }
 
-    /** Sacks out, before anything is set against them. */
+    /** کیسه‌های ما نزد همکاران، پس از خالص شدن خودکار با آنچه از همان‌ها گرفته‌ایم. */
     public function totalLent(): float
     {
         return round($this->positions()->sum(fn (PartnerPosition $p) => $p->bagsLent), 2);
     }
 
-    /** Sacks of other bakeries' flour sitting in this shop's store. */
+    /** کیسه‌های همکاران نزد ما، پس از خالص شدن خودکار. */
     public function totalBorrowed(): float
     {
         return round($this->positions()->sum(fn (PartnerPosition $p) => $p->bagsBorrowed), 2);

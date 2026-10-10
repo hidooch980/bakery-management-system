@@ -4,15 +4,18 @@ namespace Tests\Feature;
 
 use App\Filament\Pages\PartnerReport;
 use App\Filament\Resources\ConsignmentFlourResource;
+use App\Filament\Resources\ConsignmentFlourResource\Pages\ListConsignmentFlour;
 use App\Filament\Resources\PartnerResource;
 use App\Filament\Resources\PartnerResource\Pages\PartnerStatementPage;
 use App\Filament\Widgets\PartnerFlourSummary;
 use App\Models\Bakery;
 use App\Models\ConsignmentFlour;
+use App\Models\ConsignmentFlourReturn;
 use App\Models\Customer;
 use App\Models\InventoryItem;
 use App\Models\User;
 use App\Support\PartnerLedger;
+use App\Support\PartnerNetting;
 use App\Support\PartnerStatement;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -262,21 +265,86 @@ class EachPartnerHasAFileInSacksTest extends TestCase
             ->assertSee('بازه:');
     }
 
-    public function test_ثبت_برگشت_از_صفحهٔ_پرونده(): void
+    public function test_صفحهٔ_پرونده_و_فهرست_دکمهٔ_تسویه_یا_برگشت_ندارند(): void
+    {
+        // «قسمت تسویه نباشه، همه چی اوتوماتیک».
+        $p = $this->partner('نانوایی کرشان');
+        $this->record($p, 'lent', 10, '2026-10-08');
+
+        Livewire::test(PartnerStatementPage::class, ['record' => $p->getKey()])
+            ->assertActionDoesNotExist('recordReturn');
+
+        Livewire::test(ListConsignmentFlour::class)
+            ->assertTableActionDoesNotExist('settle')
+            ->assertTableActionDoesNotExist('recordReturn')
+            ->assertDontSee('تسویه‌نشده')
+            ->assertDontSee('تسویه شد');
+    }
+
+    public function test_ثبت_عادی_طرف_مقابل_خودکار_از_ماندهٔ_باز_کم_می‌شود(): void
+    {
+        $p = $this->partner('نانوایی کرشان');
+        $first = $this->record($p, 'lent', 10, '2026-10-01');
+        $second = $this->record($p, 'lent', 5, '2026-10-03');
+
+        // پس آوردنِ ۱۲ کیسه یک ثبتِ عادیِ «گرفتیم» است، نه دکمهٔ برگشت.
+        $back = $this->record($p, 'borrowed', 12, '2026-10-05');
+
+        $open = PartnerNetting::open(ConsignmentFlour::with('returns')->get());
+
+        // FIFO: اول ده‌تای قدیمی، بعد دوتا از پنج‌تا.
+        $this->assertSame(0.0, $open[$first->id]);
+        $this->assertSame(3.0, $open[$second->id]);
+        $this->assertSame(0.0, $open[$back->id]);
+
+        // انبار همان جابه‌جایی واقعی است: ۱۵ بیرون، ۱۲ برگشت.
+        $this->assertSame(8000.0 - 3 * 40, $this->stock());
+
+        // مانده و پرونده عوض نمی‌شوند؛ ردیفی هم «پس گرفتیم» دوبار شمرده نمی‌شود.
+        $this->assertSame(3.0, PartnerStatement::balanceOf($p));
+        $this->assertSame(0, ConsignmentFlourReturn::count());
+
+        $partners = $this->getJson('/api/v1/consignment-flour/partners')->assertOk()->json('data');
+        $row = collect($partners)->firstWhere('partner_id', $p->id);
+        $this->assertEqualsWithDelta(3.0, $row['net_bags'], 0.01);
+        $this->assertEqualsWithDelta(3.0, $row['lent_bags'], 0.01);
+        $this->assertEqualsWithDelta(0.0, $row['borrowed_bags'], 0.01);
+
+        // فهرست «باز»ها برای نسخه‌های قدیمی اپ فقط ردیف دوم را دارد.
+        $ids = collect($this->getJson('/api/v1/consignment-flour?outstanding_only=1')->json('data.data'))->pluck('id')->all();
+        $this->assertSame([$second->id], $ids);
+
+        $all = collect($this->getJson('/api/v1/consignment-flour')->json('data.data'));
+        $this->assertTrue($all->firstWhere('id', $first->id)['is_settled']);
+        $this->assertEqualsWithDelta(3.0, $all->firstWhere('id', $second->id)['outstanding_bags'], 0.01);
+
+        // حذف ثبتِ برگشت، همه‌چیز را خودکار باز می‌کند.
+        $back->delete();
+        $open = PartnerNetting::open(ConsignmentFlour::with('returns')->get());
+        $this->assertSame(10.0, $open[$first->id]);
+        $this->assertSame(8000.0 - 15 * 40, $this->stock());
+    }
+
+    public function test_بیشتر_از_طلب_پس_بیاید_باقی‌اش_بدهی_ما_می‌شود(): void
+    {
+        $p = $this->partner('نانوایی کرشان');
+        $this->record($p, 'lent', 4, '2026-10-01');
+        $over = $this->record($p, 'borrowed', 10, '2026-10-02');
+
+        $open = PartnerNetting::open(ConsignmentFlour::with('returns')->get());
+
+        $this->assertSame(6.0, $open[$over->id]);
+        $this->assertSame(-6.0, PartnerStatement::balanceOf($p));
+    }
+
+    public function test_api_قدیمی_تسویه_هنوز_جواب_می‌دهد(): void
     {
         $p = $this->partner('نانوایی کرشان');
         $r = $this->record($p, 'lent', 10, '2026-10-08');
 
-        Livewire::test(PartnerStatementPage::class, ['record' => $p->getKey()])
-            ->callAction('recordReturn', [
-                'consignment_flour_id' => $r->id,
-                'bags' => 2.5,
-                'returned_on' => '1405/07/18',
-            ])
-            ->assertHasNoActionErrors();
-
-        $this->assertSame(7.5, $r->fresh()->outstandingBags());
-        $this->assertSame(7700.0, $this->stock());
+        $this->patchJson("/api/v1/consignment-flour/{$r->id}/settle")->assertOk()
+            ->assertJsonPath('data.is_settled', true);
+        $this->assertSame(8000.0, $this->stock());
     }
 
     public function test_طرف‌حسابی_که_همکار_نیست_پرونده_ندارد(): void

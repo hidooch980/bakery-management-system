@@ -33,7 +33,22 @@ class PartnerPosition
         public readonly bool $dateIsApproximate,
         /** @var Collection<int, ConsignmentFlour> */
         public readonly Collection $records,
+        /** همهٔ ثبت‌های این همکار، باز و بسته. */
+        public readonly int $entries = 0,
+        /** @var array<int, float> کیسه‌های بازِ هر ردیف پس از خالص شدن */
+        public readonly array $openBags = [],
+        /** پیش از خالص شدن: همهٔ کیسه‌های برنگشتهٔ هر سمت، برای نشان دادن حساب. */
+        public readonly float $grossLent = 0.0,
+        public readonly float $grossBorrowed = 0.0,
     ) {}
+
+    /** قدیمی‌ترین ردیفی که هنوز باز است، به هر دو سمت. */
+    public function oldestOpenOn(): ?Carbon
+    {
+        $oldest = $this->records->min(fn (ConsignmentFlour $c) => $c->occurred_on);
+
+        return $oldest ? Carbon::parse($oldest) : null;
+    }
 
     /**
      * Sacks owed to the shop once what it borrowed is set against what it
@@ -112,14 +127,17 @@ class PartnerPosition
             .AppCalendar::date($this->oldestLentOn).')';
     }
 
-    /** What the netting did, said only when it actually changed the figure. */
+    /**
+     * What the netting did, said only when it actually changed the figure:
+     * «۲۰ کیسه تحویلی، منهای ۱۲ کیسه دریافتی از همین همکار».
+     */
     public function offsetLabel(): ?string
     {
-        if ($this->bagsBorrowed <= 0.001) {
+        if ($this->grossBorrowed <= 0.001 || $this->grossLent <= 0.001) {
             return null;
         }
 
-        return $this->lentLabel().' تحویلی، منهای '
-            .Qty::format($this->bagsBorrowed, 1).' کیسه دریافتی از همین همکار';
+        return Qty::format($this->grossLent, 1).' کیسه تحویلی، منهای '
+            .Qty::format($this->grossBorrowed, 1).' کیسه دریافتی از همین همکار';
     }
 }
