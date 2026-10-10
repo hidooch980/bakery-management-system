@@ -23,6 +23,18 @@ String latinDigits(String value) {
 
 /// Every date shown in the app goes through here, so the UI is Jalali
 /// end-to-end even though the API stores Gregorian timestamps.
+/// آرد همه‌جا فقط به کیسه: «13 کیسه»، «46.5 کیسه» — بی‌صفر اضافه.
+String flourBags(double bags) {
+  if (bags == bags.roundToDouble()) return '${bags.toStringAsFixed(0)} کیسه';
+
+  var text = bags.toStringAsFixed(2);
+  while (text.endsWith('0')) {
+    text = text.substring(0, text.length - 1);
+  }
+
+  return '$text کیسه';
+}
+
 class JalaliFormat {
   const JalaliFormat._();
 

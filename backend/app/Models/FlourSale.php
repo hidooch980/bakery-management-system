@@ -9,6 +9,7 @@ use App\Support\AppCalendar;
 use App\Support\CurrentBakery;
 use App\Support\DoughFormula;
 use App\Support\Money;
+use App\Support\Qty;
 use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
 
@@ -208,21 +209,19 @@ class FlourSale extends Model
         return self::UNITS[$this->unit] ?? $this->unit;
     }
 
-    /** e.g. "۳ کیسه (۱۳۵ کیلوگرم)" — the sack count with its kilo equivalent. */
+    /**
+     * «۳ کیسه»، «۰.۵ کیسه» — آرد همه‌جا فقط به کیسه دیده می‌شود، حتی اگر
+     * فروشنده آن را به کیلو وارد کرده باشد (کیلو فقط در فرم فروش پذیرفته
+     * می‌شود و در پایگاه داده weight_kg می‌ماند).
+     */
     public function getQuantityLabelAttribute(): string
     {
-        $quantity = rtrim(rtrim(number_format((float) $this->quantity, 2), '0'), '.');
-
-        if ($this->unit === self::BAG) {
-            return $quantity.' کیسه ('.$this->weight_label.')';
-        }
-
         return $this->weight_label;
     }
 
     public function getWeightLabelAttribute(): string
     {
-        return rtrim(rtrim(number_format((float) $this->weight_kg, 2), '0'), '.').' کیلوگرم';
+        return Qty::flourBags((float) $this->weight_kg);
     }
 
     public function getAmountFormattedAttribute(): string

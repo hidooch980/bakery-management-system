@@ -57,10 +57,9 @@ class FlourQuotaOverview extends BaseWidget
         }
 
         $balance = FlourQuota::balance();
-        $balanceBags = FlourQuota::remainingBags();
 
         return [
-            Stat::make($period->label, Qty::format((float) $period->allocated_kg, 0).' کیلوگرم')
+            Stat::make($period->label, Qty::flourBags((float) $period->allocated_kg))
                 ->description(AppCalendar::date($period->starts_on).' تا '.AppCalendar::date($period->ends_on))
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color('info'),
@@ -74,7 +73,7 @@ class FlourQuotaOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color($period->holiday_days > 0 ? 'warning' : 'gray'),
 
-            Stat::make('مصرف این دوره', Qty::format($period->used_kg, 0).' کیلوگرم')
+            Stat::make('مصرف این دوره', Qty::flourBags($period->used_kg))
                 ->description($period->usage_percent.'٪ از سهمیه دوره')
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color($period->usage_percent > 90 ? 'danger' : ($period->usage_percent > 70 ? 'warning' : 'success')),
@@ -84,10 +83,10 @@ class FlourQuotaOverview extends BaseWidget
             // started period's allocation less everything it has used —
             // showing one fortnight's remainder understated it and
             // implied a deadline that does not exist.
-            Stat::make('ماندهٔ سهمیه', Qty::format($balance['remaining'], 0).' کیلوگرم')
+            Stat::make('ماندهٔ سهمیه', Qty::flourBags($balance['remaining']))
                 ->description($balance['remaining'] < 0
                     ? 'بیش از سهمیه مصرف شده'
-                    : ($balanceBags !== null ? Qty::format($balanceBags, 1).' کیسه — منتقل می‌شود' : 'منتقل می‌شود'))
+                    : 'به دورهٔ بعد منتقل می‌شود')
                 ->descriptionIcon($balance['remaining'] < 0 ? 'heroicon-m-exclamation-circle' : 'heroicon-m-check-circle')
                 ->color($balance['remaining'] < 0 ? 'danger' : 'success'),
 
@@ -104,9 +103,9 @@ class FlourQuotaOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-credit-card')
                 ->color($period->bread_remainder < 0 ? 'danger' : 'info'),
 
-            Stat::make('سنوات', Qty::format((float) $allocation->carryover_kg, 0).' کیلوگرم')
-                ->description((float) $allocation->carryover_bags > 0
-                    ? Qty::format((float) $allocation->carryover_bags, 1).' کیسه مانده از قبل'
+            Stat::make('سنوات', Qty::flourBags((float) $allocation->carryover_kg))
+                ->description((float) $allocation->carryover_kg > 0
+                    ? 'مانده از قبل'
                     : 'مانده‌ای از قبل ثبت نشده')
                 ->descriptionIcon('heroicon-m-archive-box')
                 ->color((float) $allocation->carryover_kg > 0 ? 'info' : 'gray'),

@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import '../../utils/json.dart';
 import 'package:flutter/material.dart';
+import '../../utils/formatters.dart';
 
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
@@ -116,7 +117,7 @@ class _ProductionReportSectionState extends State<ProductionReportSection> {
             if (_double(data['total_spray_flour_kg']) > 0)
               AdminRow(
                 label: 'آرد پاشیدنی',
-                value: '${_num(data['total_spray_flour_kg'])} کیلوگرم',
+                value: flourBags(_double(data['total_spray_flour_bags'])),
               ),
 
             // The daily shape, where there is more than one day of it. One

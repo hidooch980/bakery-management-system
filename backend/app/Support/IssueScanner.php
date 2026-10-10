@@ -503,17 +503,14 @@ class IssueScanner
         }
 
         $over = abs($balance['remaining']);
-        $bag = DoughFormula::fromBakery()->bagWeightKg;
-        $inBags = $bag > 0 ? round($over / $bag, 1) : null;
 
         return [new SystemIssue(
             key: 'quota-over',
             severity: SystemIssue::WARNING,
             title: 'مصرف آرد از سهمیه گذشته است',
-            detail: number_format($balance['used'], 1).' کیلوگرم مصرف در برابر '
-                .number_format($balance['allocated'], 1).' کیلوگرم سهمیهٔ انباشته،'
-                .' یعنی '.number_format($over, 1).' کیلوگرم'
-                .($inBags !== null ? ' ('.$inBags.' کیسه)' : '').' بیشتر.',
+            detail: Qty::flourBags($balance['used']).' مصرف در برابر '
+                .Qty::flourBags($balance['allocated']).' سهمیهٔ انباشته،'
+                .' یعنی '.Qty::flourBags($over).' بیشتر.',
             cause: 'مصرف بیش از برنامه، یا آردی که خارج از تولید از انبار رفته.',
             suggestion: 'اگر آرد امانی یا سنوات دارید ثبت کنید تا تراز درست شود.',
             url: '/admin/flour-allocations',

@@ -37,7 +37,6 @@ class BakeryStatsOverview extends BaseWidget
         // negative. InventoryItem is the one ledger every module posts to.
         $flourItem = InventoryItem::ofKey(InventoryItem::FLOUR);
         $balance = $flourItem->balance;
-        $balanceBags = $flourItem->balance_bags ?? 0.0;
 
         // What-if: today's normal chane, expressed as nanino loaves.
         $naninoEquivalent = $formula->naninoEquivalentForNormalCount($chaneCount);
@@ -66,9 +65,10 @@ class BakeryStatsOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-clock')
                 ->color('primary'),
 
-            Stat::make('موجودی آرد', Qty::format($balanceBags, 1).' کیسه')
+            Stat::make('موجودی آرد', Qty::flourBags($balance))
+                // آرد فقط به کیسه دیده می‌شود.
                 ->description($balance > 0
-                    ? Qty::format($balance, 2).' کیلوگرم'
+                    ? 'موجودی انبار آرد'
                     : 'نیاز به تأمین')
                 ->descriptionIcon($balance > 0 ? 'heroicon-m-check-circle' : 'heroicon-m-exclamation-triangle')
                 ->color($balance > 0 ? 'success' : 'danger'),

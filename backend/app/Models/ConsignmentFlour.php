@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\RecordsAudit;
 use App\Support\DoughFormula;
+use App\Support\Qty;
 use App\Support\StockLedger;
 use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
@@ -286,15 +287,12 @@ class ConsignmentFlour extends Model
      */
     public function getQuantityLabelAttribute(): string
     {
-        $weight = rtrim(rtrim(number_format((float) $this->amount_kg, 1), '0'), '.').' کیلوگرم';
-
+        // آرد فقط به کیسه.
         if ($this->bags === null) {
-            return $weight;
+            return Qty::flourBags((float) $this->amount_kg);
         }
 
-        $bags = rtrim(rtrim(number_format((float) $this->bags, 2), '0'), '.');
-
-        return "{$bags} کیسه  •  {$weight}";
+        return rtrim(rtrim(number_format((float) $this->bags, 2), '0'), '.').' کیسه';
     }
 
     public function scopeOutstanding($query)

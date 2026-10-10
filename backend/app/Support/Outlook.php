@@ -224,11 +224,16 @@ class Outlook
         ]];
     }
 
-    /** «میانگین ۱۴ روز اخیر: ۱۱۲ کیلو در روز (۱۲ روز پخت)». */
+    /** «میانگین ۱۴ روز اخیر: ۲٫۸ کیسه در روز (۱۲ روز پخت)» — آرد فقط به کیسه. */
     private static function basis(array $burn): string
     {
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+        $perDay = $bagWeight > 0
+            ? rtrim(rtrim(number_format($burn['perDay'] / $bagWeight, 1, '.', ''), '0'), '.').' کیسه'
+            : number_format($burn['perDay'], 0).' کیلو';
+
         return 'میانگین '.TodayAnswer::digits(self::WINDOW_DAYS).' روز اخیر: '
-            .TodayAnswer::digits(number_format($burn['perDay'], 0)).' کیلو در روز ('
+            .TodayAnswer::digits($perDay).' در روز ('
             .TodayAnswer::digits($burn['activeDays']).' روز پخت).';
     }
 }

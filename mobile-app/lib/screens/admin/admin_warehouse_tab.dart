@@ -5,6 +5,7 @@ import '../../models/flour_sale.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import '../../widgets/admin_detail_group.dart';
 import '../shared/purchase_sheet.dart';
@@ -16,7 +17,7 @@ import 'stock_count_sheet.dart';
 typedef _FlourSalesToday = ({
   List<FlourSale> sales,
   int count,
-  double totalWeightKg,
+  double totalBags,
   String totalFormatted,
 });
 
@@ -195,7 +196,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                       label: 'مجموع فروش',
                       value: flour.count == 0
                           ? 'موردی ثبت نشده'
-                          : '${flour.totalWeightKg.toStringAsFixed(1)} کیلوگرم'
+                          : '${flourBags(flour.totalBags)}'
                               '  •  ${flour.totalFormatted}',
                       icon: Icons.inventory_2_rounded,
                       color: AppColors.stock,
@@ -248,7 +249,7 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
         children: [
           AdminRow(
             label: 'کل سهمیه ماه',
-            value: '${_fmt(quota['total_kg'])} کیلوگرم',
+            value: '${_fmt(quota['total_bags'])} کیسه',
             icon: Icons.scale_rounded,
             emphasise: true,
           ),
@@ -281,12 +282,11 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
 
   /// تعداد کیسه و وزن؛ اگر اندازه کیسه مشخص نباشد فقط وزن نمایش داده می‌شود.
   static String _carriedBalance(Map<String, dynamic> balance) {
-    final kg = _fmt(balance['remaining_kg']);
     final bags = balance['remaining_bags'];
 
-    if (bags == null) return '$kg کیلوگرم';
+    if (bags == null) return '${_fmt(balance['remaining_kg'])} کیلوگرم';
 
-    return '${_fmt(bags)} کیسه · $kg کیلوگرم';
+    return '${_fmt(bags)} کیسه';
   }
 
   static IconData _iconFor(String key) => switch (key) {
@@ -409,20 +409,17 @@ class _PeriodCard extends StatelessWidget {
             _FlourRow(
               label: 'سهمیه دوره',
               bags: _bags(period['allocated_bags']),
-              kg: period['allocated_kg'],
             ),
             _FlourRow(
               label: 'مصرف شده',
               bags:
                   _bags(period['used_bags'] ?? _bagsFromKg(period, 'used_kg')),
-              kg: period['used_kg'],
             ),
             _FlourRow(
               // مانده دوره با مانده کل قابل دریافت تفاوت دارد و عنوان آن این تفاوت را روشن می‌کند.
               label: isOver ? 'بیش از سهمیهٔ دوره' : 'باقی‌ماندهٔ دوره',
               bags: _bags(period['remaining_bags'] ??
                   _bagsFromKg(period, 'remaining_kg')),
-              kg: period['remaining_kg'],
               colour: wordsColour,
               emphasise: true,
             ),
@@ -463,19 +460,17 @@ class _PeriodCard extends StatelessWidget {
   }
 }
 
-/// کیسه واحد اصلی سهمیه است و وزن اطلاعات تکمیلی حسابداری است.
+/// سهمیه فقط به کیسه نمایش داده می‌شود؛ وزن کنارش نوشته نمی‌شود.
 class _FlourRow extends StatelessWidget {
   const _FlourRow({
     required this.label,
     required this.bags,
-    required this.kg,
     this.colour,
     this.emphasise = false,
   });
 
   final String label;
   final String bags;
-  final dynamic kg;
   final Color? colour;
   final bool emphasise;
 
@@ -506,13 +501,6 @@ class _FlourRow extends StatelessWidget {
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: emphasise ? FontWeight.w800 : FontWeight.w600,
                   color: colour ?? scheme.onSurface,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              Text(
-                '  ·  ${_fmt(kg)} کگ',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),

@@ -1081,7 +1081,7 @@ class BakeryApi {
       ({
         List<FlourSale> sales,
         int count,
-        double totalWeightKg,
+        double totalBags,
         String totalFormatted,
       })> todayFlourSales() async {
     final body = await _client.getCached('/flour-sales/today');
@@ -1099,7 +1099,8 @@ class BakeryApi {
     return (
       sales: rowList(data['sales']).map(FlourSale.fromJson).toList(),
       count: (summary['count'] as num?)?.toInt() ?? 0,
-      totalWeightKg: double.tryParse('${summary['total_weight_kg']}') ?? 0,
+      // آرد فقط به کیسه دیده می‌شود.
+      totalBags: double.tryParse('${summary['total_bags']}') ?? 0,
       totalFormatted: summary['total_amount_formatted'] as String? ?? '',
     );
   }
