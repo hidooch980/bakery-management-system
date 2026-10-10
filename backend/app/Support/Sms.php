@@ -236,6 +236,7 @@ class Sms
         $line = config('sms.from');
         if (blank($key) || blank($line) || trim($message) === '') {
             Log::warning('تنظیمات ارسال عادی پیامک کامل نیست.');
+
             return false;
         }
         try {
@@ -258,6 +259,7 @@ class Sms
         } catch (\Throwable $e) {
             Log::error('ارتباط ارسال عادی پیامک ناموفق بود.', ['type' => $e::class]);
         }
+
         return false;
     }
 }
