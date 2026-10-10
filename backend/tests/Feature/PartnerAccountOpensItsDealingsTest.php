@@ -106,8 +106,9 @@ class PartnerAccountOpensItsDealingsTest extends TestCase
 
         // 56 owed by هیدوچ plus 8 net owed by کنت.
         $this->assertEqualsWithDelta(64, $page->netOwedToShop(), 0.01);
-        $this->assertEqualsWithDelta(76, $page->totalLent(), 0.01);
-        $this->assertEqualsWithDelta(12, $page->totalBorrowed(), 0.01);
+        // کنت: ۱۲ کیسهٔ گرفتیم خودکار از ۲۰ کیسهٔ دادیم کم شد.
+        $this->assertEqualsWithDelta(64, $page->totalLent(), 0.01);
+        $this->assertEqualsWithDelta(0, $page->totalBorrowed(), 0.01);
         $this->assertEqualsWithDelta(0, $page->netOwedByShop(), 0.01);
     }
 

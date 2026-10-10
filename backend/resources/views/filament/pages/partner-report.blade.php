@@ -69,7 +69,7 @@
     @if ($positions->isEmpty())
         <x-filament::section>
             <div class="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                هیچ آرد امانی تسویه‌نشده‌ای وجود ندارد.
+                هنوز هیچ همکاری تعریف نشده است.
             </div>
         </x-filament::section>
     @endif
@@ -169,7 +169,6 @@
                                     <th class="py-2 pl-3 text-right font-medium">تاریخ تحویل</th>
                                     <th class="py-2 pl-3 text-right font-medium">نوع</th>
                                     <th class="py-2 pl-3 text-right font-medium">مقدار</th>
-                                    <th class="py-2 pl-3 text-right font-medium">وضعیت</th>
                                     <th class="py-2 text-right font-medium">توضیحات</th>
                                 </tr>
                             </thead>
@@ -191,15 +190,6 @@
                                         </td>
                                         <td class="py-2 pl-3 whitespace-nowrap align-top font-medium">
                                             {{ \App\Support\PartnerStatement::bags((float) $row->bags) }} کیسه
-                                        </td>
-                                        <td class="py-2 pl-3 whitespace-nowrap align-top">
-                                            @if ($row->is_settled)
-                                                <span class="text-emerald-600 dark:text-emerald-400">
-                                                    تسویه {{ $this->date($row->settled_on) }}
-                                                </span>
-                                            @else
-                                                <span class="text-rose-600 dark:text-rose-400">تسویه‌نشده</span>
-                                            @endif
                                         </td>
                                         <td class="py-2 align-top text-xs text-gray-500 dark:text-gray-400">
                                             {{ $row->note ?: '—' }}
@@ -223,7 +213,7 @@
                             href="{{ \App\Filament\Resources\ConsignmentFlourResource::getUrl('index') }}"
                             icon="heroicon-m-arrow-left-circle"
                             size="sm">
-                            ثبت یا تسویه در صفحهٔ آرد امانی
+                            ثبت در صفحهٔ آرد امانی
                         </x-filament::link>
                     </div>
                 </div>

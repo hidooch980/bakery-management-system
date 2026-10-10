@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\ConsignmentFlour;
+use App\Models\Customer;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -40,22 +41,61 @@ class PartnerLedger
     public const CHASE_AFTER_DAYS = 14;
 
     /**
-     * Every partner the shop has an open consignment with, net position
-     * first, largest debt to the shop at the top.
+     * Every partner the shop has an open balance with, largest debt to the
+     * shop at the top.
+     *
+     * «باز» بعد از خالص شدنِ خودکار (PartnerNetting): ثبتِ طرف مقابل از
+     * قدیمی‌ترین ماندهٔ باز کم می‌شود و دیگر دکمهٔ تسویه‌ای در کار نیست.
      *
      * @return Collection<int, PartnerPosition>
      */
     public static function positions(): Collection
     {
-        $open = ConsignmentFlour::query()
-            ->whereNull('settled_on')
-            ->with(['partner', 'returns'])
-            ->get();
+        return self::all()
+            ->filter(fn (PartnerPosition $p) => abs($p->netBags()) > 0.001)
+            ->values();
+    }
 
-        return $open
-            ->groupBy(fn (ConsignmentFlour $c) => $c->customer_id ?? $c->partner_name)
-            ->map(fn (Collection $records, $key) => self::position((string) $key, $records))
-            ->sortByDesc(fn (PartnerPosition $p) => $p->netBags())
+    /**
+     * «همه اسما باشه»: همهٔ همکاران تعریف‌شده — حتی با ماندهٔ صفر یا بی‌هیچ
+     * ثبتی — به‌اضافهٔ نام‌های آزادِ ردیف‌های قدیمی که هنوز مانده دارند.
+     * به ترتیب مانده (طلب ما بالا، بدهی ما پایین) و بعد نام.
+     *
+     * @return Collection<int, PartnerPosition>
+     */
+    public static function all(): Collection
+    {
+        $records = ConsignmentFlour::query()->with(['partner', 'returns'])->get();
+        $open = PartnerNetting::open($records);
+
+        $positions = $records
+            ->groupBy(fn (ConsignmentFlour $c) => PartnerNetting::keyOf($c))
+            ->map(fn (Collection $group, $key) => self::position((string) $key, $group, $open));
+
+        // نام آزادِ قدیمی که حسابش صاف است فقط تاریخچه است.
+        $positions = $positions->filter(fn (PartnerPosition $p) => $p->customerId !== null || abs($p->netBags()) > 0.001);
+
+        foreach (Customer::query()->partners()->get() as $partner) {
+            if (! $positions->has((string) $partner->id)) {
+                $positions->put((string) $partner->id, new PartnerPosition(
+                    key: (string) $partner->id,
+                    customerId: $partner->id,
+                    name: $partner->name,
+                    phone: $partner->phone,
+                    bagsLent: 0.0,
+                    bagsBorrowed: 0.0,
+                    lendingCount: 0,
+                    borrowingCount: 0,
+                    oldestLentOn: null,
+                    dateIsApproximate: false,
+                    records: collect(),
+                    entries: 0,
+                ));
+            }
+        }
+
+        return $positions
+            ->sort(fn (PartnerPosition $a, PartnerPosition $b) => [$b->netBags(), $a->name] <=> [$a->netBags(), $b->name])
             ->values();
     }
 
@@ -68,15 +108,16 @@ class PartnerLedger
     }
 
     /**
-     * @param  Collection<int, ConsignmentFlour>  $records
+     * @param  Collection<int, ConsignmentFlour>  $records  همهٔ ردیف‌های یک همکار
+     * @param  array<int, float>  $open  کیسه‌های باز پس از خالص شدن
      */
-    private static function position(string $key, Collection $records): PartnerPosition
+    private static function position(string $key, Collection $records, array $open): PartnerPosition
     {
-        $lent = $records->where('direction', 'lent');
-        $borrowed = $records->where('direction', 'borrowed');
+        $openOf = fn (ConsignmentFlour $c) => $open[$c->id] ?? 0.0;
+        $stillOpen = $records->filter(fn (ConsignmentFlour $c) => $openOf($c) > 0.001);
 
-        $bagsLent = round($lent->sum(fn (ConsignmentFlour $c) => $c->outstandingBags()), 2);
-        $bagsBorrowed = round($borrowed->sum(fn (ConsignmentFlour $c) => $c->outstandingBags()), 2);
+        $lent = $stillOpen->where('direction', 'lent');
+        $borrowed = $stillOpen->where('direction', 'borrowed');
 
         // Only the sacks that left the shop have an age worth chasing.
         // What the shop borrowed sits in its own store, where the balance
@@ -90,8 +131,8 @@ class PartnerLedger
             customerId: $first->customer_id,
             name: $first->partner_label ?: 'همکار بی‌نام',
             phone: $first->partner?->phone ?: $first->partner_phone,
-            bagsLent: $bagsLent,
-            bagsBorrowed: $bagsBorrowed,
+            bagsLent: round($lent->sum($openOf), 2),
+            bagsBorrowed: round($borrowed->sum($openOf), 2),
             lendingCount: $lent->count(),
             borrowingCount: $borrowed->count(),
             oldestLentOn: $oldestLent ? Carbon::parse($oldestLent) : null,
@@ -99,7 +140,11 @@ class PartnerLedger
             // partner's age a guess: the oldest sack may be one whose day
             // nobody knows.
             dateIsApproximate: $lent->contains(fn (ConsignmentFlour $c) => (bool) $c->date_is_approximate),
-            records: $records->sortBy('occurred_on')->values(),
+            records: $stillOpen->sortBy('occurred_on')->values(),
+            entries: $records->count(),
+            openBags: array_intersect_key($open, $records->keyBy('id')->all()),
+            grossLent: round($records->where('direction', 'lent')->sum(fn (ConsignmentFlour $c) => $c->outstandingBags()), 2),
+            grossBorrowed: round($records->where('direction', 'borrowed')->sum(fn (ConsignmentFlour $c) => $c->outstandingBags()), 2),
         );
     }
 }

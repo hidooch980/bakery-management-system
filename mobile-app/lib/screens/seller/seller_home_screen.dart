@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../utils/formatters.dart';
+import 'flour_day_screen.dart';
 
 import 'package:provider/provider.dart';
 
@@ -369,6 +370,20 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
           _FlourSaleTile(sale: sale),
         ],
       ],
+      const SizedBox(height: 10),
+      // «گردش روزانه آرد برای فروشنده»: فقط خواندنی، به کیسه.
+      ActionCard(
+        title: 'گردش روزانه آرد',
+        subtitle: 'موجودی اول و آخر روز، ورودی و خروجی، به کیسه',
+        icon: Icons.swap_vert_rounded,
+        color: AppColors.stock,
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => FlourDayScreen(api: widget.api),
+          ),
+        ),
+        trailing: const Icon(Icons.chevron_left_rounded),
+      ),
       const SizedBox(height: 16),
       _SectionHeader(
         title: 'فروش‌های امروز',

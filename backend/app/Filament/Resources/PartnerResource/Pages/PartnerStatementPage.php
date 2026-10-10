@@ -2,15 +2,12 @@
 
 namespace App\Filament\Resources\PartnerResource\Pages;
 
-use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Resources\PartnerResource;
 use App\Models\ConsignmentFlour;
 use App\Models\Customer;
-use App\Support\AppCalendar;
 use App\Support\Jalali;
 use App\Support\PartnerStatement;
 use Filament\Actions;
-use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
@@ -91,31 +88,6 @@ class PartnerStatementPage extends Page
                 ->color('gray')
                 ->action(fn () => $this->exportCsv()),
 
-            Actions\Action::make('recordReturn')
-                ->label('ثبت برگشت')
-                ->icon('heroicon-o-arrow-uturn-right')
-                ->visible(fn () => $this->openRecords()->isNotEmpty())
-                ->form([
-                    Forms\Components\Select::make('consignment_flour_id')
-                        ->label('کدام ردیف')
-                        ->options(fn () => $this->openRecords()->mapWithKeys(fn (ConsignmentFlour $c) => [
-                            $c->id => $c->direction_label.' — '.PartnerStatement::bags((float) $c->bags).' کیسه، '
-                                .AppCalendar::date($c->occurred_on).' (مانده '.PartnerStatement::bags($c->outstandingBags()).')',
-                        ]))
-                        ->required()
-                        ->native(false),
-                    Forms\Components\TextInput::make('bags')
-                        ->label('تعداد کیسهٔ برگشتی')
-                        ->numeric()
-                        ->minValue(0.01)
-                        ->required()
-                        ->suffix('کیسه'),
-                    JalaliDateInput::today('returned_on', 'تاریخ برگشت')->required(),
-                    Forms\Components\Textarea::make('note')->label('توضیحات')->rows(2),
-                ])
-                ->action(function (array $data) {
-                    self::storeReturn($data);
-                }),
         ];
     }
 

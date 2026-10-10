@@ -8,6 +8,9 @@ use App\Models\Customer;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
+use App\Support\PartnerLedger;
+use App\Support\PartnerNetting;
+use App\Support\PartnerPosition;
 use App\Support\PartnerStatement;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -20,12 +23,19 @@ class ConsignmentFlourController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $records = ConsignmentFlour::with(['user:id,name', 'partner:id,name'])
+        // «باز» یعنی بعد از خالص شدنِ خودکار با ثبت‌های طرف مقابل.
+        $open = PartnerNetting::open(ConsignmentFlour::query()->with('returns')->get());
+
+        $records = ConsignmentFlour::with(['user:id,name', 'partner:id,name', 'returns'])
             ->when($request->query('direction'), fn ($q, $d) => $q->where('direction', $d))
-            ->when($request->boolean('outstanding_only'), fn ($q) => $q->outstanding())
+            ->when($request->boolean('outstanding_only'), fn ($q) => $q->whereIn(
+                'id',
+                array_keys(array_filter($open, fn (float $bags) => $bags > 0.001)) ?: [0],
+            ))
             ->latest('occurred_on')
+            ->latest('id')
             ->paginate(20)
-            ->through(fn (ConsignmentFlour $c) => $this->payload($c));
+            ->through(fn (ConsignmentFlour $c) => $this->payload($c, $open[$c->id] ?? 0.0));
 
         return $this->success($records);
     }
@@ -33,60 +43,40 @@ class ConsignmentFlourController extends Controller
     /**
      * The same flour, gathered by the person holding it.
      *
-     * The list answers «what happened»; this answers the question actually
-     * asked in the store — «who has our sacks, how many, and since when».
-     * The owner already thinks in these terms, down to the days: «۵۶ کیسه
-     * دست عبدالرئوف، ۲۳ روز». Until now that had to be worked out by
-     * reading the rows.
-     *
-     * Only outstanding flour is counted. Settled rows are history, and a
-     * partner whose account is square should not appear at all — a list
-     * that grows for ever stops being read.
+     * «همه اسما باشه»: همهٔ همکاران، حتی آن‌که حسابش صاف است یا هنوز ثبتی
+     * ندارد — به ترتیب مانده (طلب ما بالا) و بعد نام. مانده‌ها خودکارند:
+     * هر ثبتِ طرف مقابل از قدیمی‌ترین ماندهٔ باز کم می‌شود (PartnerNetting).
      */
     public function partners(): JsonResponse
     {
         $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
-        $inBags = fn (float $kg) => $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
 
-        $rows = ConsignmentFlour::outstanding()
-            ->with(['partner:id,name', 'returns'])
-            ->get()
-            ->groupBy(fn (ConsignmentFlour $c) => $c->partner_label)
-            ->map(function ($group, $name) use ($inBags) {
-                // برگشت‌های بخشی کم می‌شوند: فقط آنچه هنوز برنگشته.
-                $lent = (float) $group->where('direction', 'lent')->sum(fn (ConsignmentFlour $c) => $c->outstandingKg());
-                $borrowed = (float) $group->where('direction', 'borrowed')->sum(fn (ConsignmentFlour $c) => $c->outstandingKg());
+        $rows = PartnerLedger::all()->map(function (PartnerPosition $p) use ($bagWeight) {
+            // The oldest still-open row is the one worth chasing, so the
+            // age of the account is the age of that row and not an
+            // average.
+            $oldest = $p->oldestOpenOn();
 
-                // The oldest unsettled row is the one worth chasing, so the
-                // age of the account is the age of that row and not an
-                // average, which would flatter a partner sitting on sacks
-                // from two months ago behind one from yesterday.
-                $oldest = $group->min('occurred_on');
-
-                return [
-                    // تا اپ بتواند پروندهٔ همین همکار را باز کند.
-                    'partner_id' => $group->first()->customer_id,
-                    'partner_name' => $name,
-                    'lent_kg' => round($lent, 3),
-                    'borrowed_kg' => round($borrowed, 3),
-                    'net_kg' => round($lent - $borrowed, 3),
-                    'lent_bags' => $inBags($lent),
-                    'borrowed_bags' => $inBags($borrowed),
-                    'net_bags' => $inBags($lent - $borrowed),
-                    'entries' => $group->count(),
-                    'since' => $oldest?->toDateString(),
-                    'since_display' => AppCalendar::date($oldest),
-                    // Whole days, so «امروز» is 0 rather than a fraction.
-                    'days' => $oldest
-                        ? (int) $oldest->copy()->startOfDay()->diffInDays(now()->startOfDay())
-                        : null,
-                ];
-            })
-            ->values()
-            // Most out first: that is the order somebody chasing sacks
-            // wants to read them in.
-            ->sortByDesc(fn (array $row) => abs($row['net_bags']))
-            ->values();
+            return [
+                'partner_id' => $p->customerId,
+                'partner_name' => $p->name,
+                'lent_kg' => round($p->bagsLent * $bagWeight, 3),
+                'borrowed_kg' => round($p->bagsBorrowed * $bagWeight, 3),
+                'net_kg' => round($p->netBags() * $bagWeight, 3),
+                'lent_bags' => $p->bagsLent,
+                'borrowed_bags' => $p->bagsBorrowed,
+                'net_bags' => $p->netBags(),
+                'headline' => PartnerStatement::headline($p->netBags()),
+                'is_settled' => abs($p->netBags()) <= 0.001,
+                'entries' => $p->entries,
+                'since' => $oldest?->toDateString(),
+                'since_display' => $oldest ? AppCalendar::date($oldest) : null,
+                // Whole days, so «امروز» is 0 rather than a fraction.
+                'days' => $oldest
+                    ? (int) $oldest->copy()->startOfDay()->diffInDays(now()->startOfDay())
+                    : null,
+            ];
+        })->values();
 
         return $this->success($rows);
     }
@@ -94,21 +84,20 @@ class ConsignmentFlourController extends Controller
     /** Net position: how much flour we owe partners, and they owe us. */
     public function balance(): JsonResponse
     {
-        $open = ConsignmentFlour::outstanding()->with('returns')->get();
-        $borrowed = (float) $open->where('direction', 'borrowed')->sum(fn (ConsignmentFlour $c) => $c->outstandingKg());
-        $lent = (float) $open->where('direction', 'lent')->sum(fn (ConsignmentFlour $c) => $c->outstandingKg());
+        $positions = PartnerLedger::all();
+        $lentBags = round((float) $positions->sum(fn (PartnerPosition $p) => $p->bagsLent), 2);
+        $borrowedBags = round((float) $positions->sum(fn (PartnerPosition $p) => $p->bagsBorrowed), 2);
 
         $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
-        $inBags = fn (float $kg) => $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
 
         return $this->success([
-            'borrowed_kg' => round($borrowed, 3),
-            'lent_kg' => round($lent, 3),
+            'borrowed_kg' => round($borrowedBags * $bagWeight, 3),
+            'lent_kg' => round($lentBags * $bagWeight, 3),
             // Positive means partners owe us; negative means we owe them.
-            'net_kg' => round($lent - $borrowed, 3),
-            'borrowed_bags' => $inBags($borrowed),
-            'lent_bags' => $inBags($lent),
-            'net_bags' => $inBags($lent - $borrowed),
+            'net_kg' => round(($lentBags - $borrowedBags) * $bagWeight, 3),
+            'borrowed_bags' => $borrowedBags,
+            'lent_bags' => $lentBags,
+            'net_bags' => round($lentBags - $borrowedBags, 2),
             'bag_weight_kg' => $bagWeight,
         ] + self::partnerTotals());
     }
@@ -155,7 +144,10 @@ class ConsignmentFlourController extends Controller
         return $this->success($statement->toArray());
     }
 
-    /** ثبت برگشت بخشی (یا همهٔ باقی‌ماندهٔ) یک ردیف. */
+    /**
+     * ثبت برگشت بخشی — فقط برای نسخه‌های قدیمی اپ نگه داشته شده. اپ و پنل
+     * دیگر چنین دکمه‌ای ندارند: ثبتِ عادیِ دادیم/گرفتیم خودش خالص می‌شود.
+     */
     public function storeReturn(Request $request, ConsignmentFlour $consignment): JsonResponse
     {
         $data = $request->validate([
@@ -220,6 +212,10 @@ class ConsignmentFlourController extends Controller
         return $this->success($this->payload($record), 'آرد امانی ثبت شد.', 201);
     }
 
+    /**
+     * «تسویه شد» — فقط برای نسخه‌های قدیمی اپ که هنوز این دکمه را دارند.
+     * اپ و پنل جدید دکمهٔ تسویه ندارند؛ مانده‌ها خودکارند.
+     */
     public function settle(ConsignmentFlour $consignment): JsonResponse
     {
         if ($consignment->is_settled) {
@@ -238,8 +234,10 @@ class ConsignmentFlourController extends Controller
         return $this->success(null, 'رکورد حذف شد.');
     }
 
-    private function payload(ConsignmentFlour $record): array
+    private function payload(ConsignmentFlour $record, ?float $open = null): array
     {
+        $open ??= PartnerNetting::openOf($record);
+
         return [
             'id' => $record->id,
             'partner_id' => $record->customer_id,
@@ -253,9 +251,11 @@ class ConsignmentFlourController extends Controller
             'occurred_on' => $record->occurred_on?->toDateString(),
             'occurred_on_display' => AppCalendar::date($record->occurred_on),
             'settled_on_display' => AppCalendar::date($record->settled_on),
-            'is_settled' => $record->is_settled,
+            // بسته = خالص شده (خودکار) یا تسویهٔ قدیمی. نسخه‌های قدیمی اپ
+            // دکمهٔ «تسویه شد» را فقط برای ردیف‌های باز نشان می‌دهند.
+            'is_settled' => $open <= 0.001,
             'returned_bags' => $record->returnedBags(),
-            'outstanding_bags' => $record->outstandingBags(),
+            'outstanding_bags' => round($open, 2),
             'note' => $record->note,
         ];
     }

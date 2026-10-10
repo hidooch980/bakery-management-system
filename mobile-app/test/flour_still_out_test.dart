@@ -114,13 +114,22 @@ void main() {
     return adapter;
   }
 
-  testWidgets('the partners holding the shop\'s flour are named', (tester) async {
+  testWidgets('the partners holding the shop\'s flour are named',
+      (tester) async {
     await pump(
       tester,
       list: {
         'data': [
-          _row(id: 1, partner: 'عبدالرئوف', direction: 'lent', quantity: '۵۶ کیسه'),
-          _row(id: 2, partner: 'ممد زاکر', direction: 'lent', quantity: '۲۰ کیسه'),
+          _row(
+              id: 1,
+              partner: 'عبدالرئوف',
+              direction: 'lent',
+              quantity: '۵۶ کیسه'),
+          _row(
+              id: 2,
+              partner: 'ممد زاکر',
+              direction: 'lent',
+              quantity: '۲۰ کیسه'),
         ],
       },
       balance: {'lent_bags': 76, 'borrowed_bags': 0, 'net_bags': 76},
@@ -137,7 +146,11 @@ void main() {
       tester,
       list: {
         'data': [
-          _row(id: 1, partner: 'عبدالرئوف', direction: 'lent', quantity: '۵۶ کیسه'),
+          _row(
+              id: 1,
+              partner: 'عبدالرئوف',
+              direction: 'lent',
+              quantity: '۵۶ کیسه'),
         ],
       },
       balance: {'lent_bags': 56, 'borrowed_bags': 0, 'net_bags': 56},
@@ -190,11 +203,11 @@ void main() {
       balance: {'lent_bags': 0, 'borrowed_bags': 0, 'net_bags': 0},
     );
 
-    expect(find.text('هیچ آرد امانی‌ای باز نیست.'), findsOneWidget);
+    expect(find.text('هنوز آرد امانی‌ای ثبت نشده است.'), findsOneWidget);
     expect(find.textContaining('صاف است'), findsOneWidget);
   });
 
-  testWidgets('it asks for the open ones, not the whole history',
+  testWidgets('it asks for every movement — there is nothing to settle',
       (tester) async {
     final adapter = await pump(
       tester,
@@ -202,16 +215,19 @@ void main() {
       balance: {'lent_bags': 0, 'borrowed_bags': 0, 'net_bags': 0},
     );
 
-    // Settled rows are history; a list that grew for ever would stop
-    // being read.
+    // «قسمت تسویه نباشه»: هر ثبت فقط یک جابه‌جایی است و مانده‌ها
+    // خودکارند، پس فهرست همهٔ ثبت‌هاست.
     expect(
       adapter.seen.any((r) => r.contains('/consignment-flour')),
       isTrue,
     );
+    expect(adapter.seen.any((r) => r.contains('outstanding_only')), isFalse);
   });
 
   group('the report, gathered by partner', () {
-    Map<String, Object?> partner(String name, num net, int? days, int entries) => {
+    Map<String, Object?> partner(
+            String name, num net, int? days, int entries) =>
+        {
           'partner_name': name,
           'lent_kg': net * 45,
           'borrowed_kg': 0,
@@ -253,7 +269,7 @@ void main() {
         partners: [partner('رحیم', 5, 0, 1)],
       );
 
-      expect(find.text('از امروز'), findsOneWidget);
+      expect(find.text('از امروز  •  1 ثبت'), findsOneWidget);
     });
 
     testWidgets('owing a partner is labelled as owing, not as holding',
@@ -267,18 +283,24 @@ void main() {
 
       // «۱۰ کیسه» with no word beside it would read as ten sacks of ours
       // out there, when it is ten of theirs in our store.
-      expect(find.text('بدهکاریم'), findsWidgets);
+      expect(find.text('بدهی ما'), findsWidgets);
     });
 
-    testWidgets('with no partner out, the section is absent rather than empty',
+    testWidgets('a partner whose account is square is still listed',
         (tester) async {
+      // «همه اسما باشه».
       await pump(
         tester,
         list: {'data': const []},
         balance: {'lent_bags': 0, 'borrowed_bags': 0, 'net_bags': 0},
+        partners: [partner('رحیم', 0, null, 0)],
       );
 
-      expect(find.text('به تفکیک همکار'), findsNothing);
+      expect(find.text('به تفکیک همکار'), findsOneWidget);
+      expect(find.text('رحیم'), findsOneWidget);
+      expect(find.text('تسویه'), findsOneWidget);
+      expect(find.text('هنوز ثبتی ندارد'), findsOneWidget);
+      expect(find.text('تسویه شد'), findsNothing);
     });
   });
 }

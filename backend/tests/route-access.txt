@@ -62,6 +62,7 @@ GET api/v1/holidays/types                                   (any signed-in)
 GET api/v1/incomes                                          admin
 GET api/v1/incomes/categories                               admin
 GET api/v1/inventory                                        admin, seller
+GET api/v1/inventory/flour/day                              admin, seller
 GET api/v1/inventory/movements                              admin, seller
 GET api/v1/loans                                            admin
 GET api/v1/me                                               (any signed-in)

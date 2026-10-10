@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\CustomerInteractionController;
 use App\Http\Controllers\Api\DoughEntryController;
 use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\FlourAllocationController;
+use App\Http\Controllers\Api\FlourDayController;
 use App\Http\Controllers\Api\FlourSaleController;
 use App\Http\Controllers\Api\FlourStockController;
 use App\Http\Controllers\Api\HolidayController;
@@ -234,6 +235,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/inventory', [InventoryController::class, 'index'])
             ->middleware('permission:view-inventory');
         Route::get('/inventory/movements', [InventoryController::class, 'movements'])
+            ->middleware('permission:view-inventory');
+        // «گردش روزانه آرد»: یک روز انبار آرد به کیسه، فقط خواندنی.
+        Route::get('/inventory/flour/day', [FlourDayController::class, 'show'])
             ->middleware('permission:view-inventory');
         Route::middleware('permission:manage-inventory')->group(function () {
             Route::post('/inventory/movements', [InventoryController::class, 'store']);
