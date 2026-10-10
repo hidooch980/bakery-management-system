@@ -4,6 +4,7 @@ import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
+import 'partner_statement_screen.dart';
 
 /// Flour that is out with a partner bakery, or owed to one.
 ///
@@ -131,7 +132,21 @@ class _ConsignmentFlourScreenState extends State<ConsignmentFlourScreen> {
                   const _SectionTitle('به تفکیک همکار'),
                   const SizedBox(height: 8),
                   for (final partner in data.partners) ...[
-                    _PartnerTile(partner: partner),
+                    _PartnerTile(
+                      partner: partner,
+                      // نام همکار پروندهٔ او را باز می‌کند (گردش ریز به کیسه).
+                      onTap: partner['partner_id'] is int
+                          ? () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => PartnerStatementScreen(
+                                    api: widget.api,
+                                    partnerId: partner['partner_id'] as int,
+                                    partnerName: '${partner['partner_name']}',
+                                  ),
+                                ),
+                              )
+                          : null,
+                    ),
                     const SizedBox(height: 8),
                   ],
                   const SizedBox(height: 14),
@@ -282,9 +297,10 @@ class _SectionTitle extends StatelessWidget {
 /// One partner's whole account on one line: how much of it is out, and
 /// how long the oldest of it has been.
 class _PartnerTile extends StatelessWidget {
-  const _PartnerTile({required this.partner});
+  const _PartnerTile({required this.partner, this.onTap});
 
   final Map<String, dynamic> partner;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -294,57 +310,69 @@ class _PartnerTile extends StatelessWidget {
     final owed = net > 0;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${partner['partner_name']}',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onSurface,
+                          ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      // Days, because that is how the shop talks about it —
+                      // «۵۶ کیسه، ۲۳ روز» — and because a date makes the
+                      // reader do the subtraction.
+                      days == null
+                          ? '${partner['entries']} ثبت'
+                          : days == 0
+                              ? 'از امروز'
+                              : '$days روز  •  ${partner['entries']} ثبت',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${partner['partner_name']}',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: scheme.onSurface,
+                    _bags(net.abs()),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: owed ? AppColors.moneyIn : AppColors.moneyOut,
                         ),
                   ),
-                  const SizedBox(height: 3),
                   Text(
-                    // Days, because that is how the shop talks about it —
-                    // «۵۶ کیسه، ۲۳ روز» — and because a date makes the
-                    // reader do the subtraction.
-                    days == null
-                        ? '${partner['entries']} ثبت'
-                        : days == 0
-                            ? 'از امروز'
-                            : '$days روز  •  ${partner['entries']} ثبت',
+                    owed ? 'دست ایشان' : 'بدهکاریم',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
                   ),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  _bags(net.abs()),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: owed ? AppColors.moneyIn : AppColors.moneyOut,
-                      ),
-                ),
-                Text(
-                  owed ? 'دست ایشان' : 'بدهکاریم',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+              if (onTap != null) ...[
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.chevron_left_rounded,
+                  size: IconSize.row,
+                  color: scheme.onSurfaceVariant,
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -1081,7 +1081,7 @@ class BakeryApi {
       ({
         List<FlourSale> sales,
         int count,
-        double totalWeightKg,
+        double totalBags,
         String totalFormatted,
       })> todayFlourSales() async {
     final body = await _client.getCached('/flour-sales/today');
@@ -1099,7 +1099,8 @@ class BakeryApi {
     return (
       sales: rowList(data['sales']).map(FlourSale.fromJson).toList(),
       count: (summary['count'] as num?)?.toInt() ?? 0,
-      totalWeightKg: double.tryParse('${summary['total_weight_kg']}') ?? 0,
+      // آرد فقط به کیسه دیده می‌شود.
+      totalBags: double.tryParse('${summary['total_bags']}') ?? 0,
       totalFormatted: summary['total_amount_formatted'] as String? ?? '',
     );
   }
@@ -1390,6 +1391,25 @@ class BakeryApi {
   /// Marks one consignment as returned.
   Future<void> settleConsignment(int id) async {
     await _client.patch('/consignment-flour/$id/settle', const {});
+  }
+
+  /// پروندهٔ یک همکار: گردش ریز به کیسه، با ماندهٔ بعد از هر ردیف.
+  ///
+  /// «from» و «to» تاریخ شمسی‌اند (مثل 1405/05/01) و هر دو اختیاری.
+  Future<Map<String, dynamic>> partnerStatement(
+    int partnerId, {
+    String? from,
+    String? to,
+  }) async {
+    final body = await _client.getCached(
+      '/consignment-flour/partners/$partnerId/statement',
+      query: {
+        if (from != null && from.isNotEmpty) 'from': from,
+        if (to != null && to.isNotEmpty) 'to': to,
+      },
+    );
+
+    return (body['data'] as Map).cast<String, dynamic>();
   }
 
   /// Income against expenses, with profit, for a date range.

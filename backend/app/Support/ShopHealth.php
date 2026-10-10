@@ -161,13 +161,21 @@ class ShopHealth
 
             $rows[] = $this->verdict(
                 abs($balance - $item->balance) < 0.001,
-                sprintf(
-                    '%s: ورود %s − خروج %s = %s کیلو',
-                    $item->name,
-                    number_format($in),
-                    number_format($out),
-                    number_format($balance)
-                )
+                $key === InventoryItem::FLOUR
+                    ? sprintf(
+                        '%s: ورود %s − خروج %s = %s',
+                        $item->name,
+                        Qty::flourBags($in),
+                        Qty::flourBags($out),
+                        Qty::flourBags($balance)
+                    )
+                    : sprintf(
+                        '%s: ورود %s − خروج %s = %s کیلو',
+                        $item->name,
+                        number_format($in),
+                        number_format($out),
+                        number_format($balance)
+                    )
             );
 
             // Below zero is impossible in a warehouse and always means a

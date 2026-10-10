@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
+import '../../widgets/partner_flour_card.dart';
 import 'admin_home_screen.dart';
 import 'admin_record_sheet.dart';
 
@@ -146,6 +147,10 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                   ),
                 ],
               ),
+
+              // آرد امانی همکاران به کیسه: طلب ما، بدهی ما، خالص.
+              const SizedBox(height: 12),
+              PartnerFlourCard(api: widget.api),
 
               if (board != null) ...[
                 const SizedBox(height: 22),

@@ -98,6 +98,7 @@ class ReportController extends Controller
             'total_nanino_count' => DoughFormula::fromBakery()
                 ->naninoCountForWeight((float) $chane->sum('nanino_weight_kg')),
             'total_spray_flour_kg' => round((float) $chane->sum('spray_flour_kg'), 2),
+            'total_spray_flour_bags' => self::flourBags((float) $chane->sum('spray_flour_kg')),
             // Day-by-day dough count, so the range total isn't the only
             // figure available — how many batches were made on which day.
             'daily' => $this->dailyDoughCounts($from, $to),
@@ -827,6 +828,9 @@ class ReportController extends Controller
                 'bags_kneaded' => round((float) $rows->sum('bags_kneaded'), 2),
                 'flour_used_kg' => round((float) $rows->sum('flour_used_kg'), 3),
                 'flour_sold_kg' => round((float) $rows->sum('flour_sold_kg'), 3),
+                // آرد در اپ فقط به کیسه نشان داده می‌شود.
+                'flour_used_bags' => self::flourBags((float) $rows->sum('flour_used_kg')),
+                'flour_sold_bags' => self::flourBags((float) $rows->sum('flour_sold_kg')),
                 'salt_kg' => round((float) $rows->sum('salt_kg'), 3),
             ],
             'rows' => $rows,
@@ -859,5 +863,13 @@ class ReportController extends Controller
     private function flourBalance(): float
     {
         return InventoryItem::ofKey(InventoryItem::FLOUR)->balance;
+    }
+
+    /** کیلوگرم آرد به کیسه با وزن کیسهٔ نانوایی. */
+    private static function flourBags(float $kg): float
+    {
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+
+        return $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
     }
 }

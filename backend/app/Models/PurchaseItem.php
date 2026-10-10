@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Money;
+use App\Support\Qty;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -133,6 +134,11 @@ class PurchaseItem extends Model
     {
         if ((float) $this->quantity_kg <= 0) {
             return '—';
+        }
+
+        // آرد فقط به کیسه دیده می‌شود.
+        if ($this->item?->key === InventoryItem::FLOUR) {
+            return Qty::flourBags((float) $this->quantity_kg);
         }
 
         $weight = rtrim(rtrim(number_format((float) $this->quantity_kg, 1), '0'), '.').' کیلوگرم';

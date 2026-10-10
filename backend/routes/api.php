@@ -258,9 +258,12 @@ Route::prefix('v1')->group(function () {
             // Before the {consignment} routes below, or «partners» is read
             // as an id and matched by the model binding.
             Route::get('/consignment-flour/partners', [ConsignmentFlourController::class, 'partners']);
+            // پروندهٔ هر همکار: گردش ریز به کیسه.
+            Route::get('/consignment-flour/partners/{customer}/statement', [ConsignmentFlourController::class, 'statement']);
             Route::get('/consignment-flour', [ConsignmentFlourController::class, 'index']);
             Route::post('/consignment-flour', [ConsignmentFlourController::class, 'store']);
             Route::patch('/consignment-flour/{consignment}/settle', [ConsignmentFlourController::class, 'settle']);
+            Route::post('/consignment-flour/{consignment}/returns', [ConsignmentFlourController::class, 'storeReturn']);
             Route::delete('/consignment-flour/{consignment}', [ConsignmentFlourController::class, 'destroy']);
         });
 

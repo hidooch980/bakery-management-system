@@ -189,11 +189,14 @@ class InventoryItemResource extends Resource
                                 ->required()
                                 ->visible($bagWeight > 0)
                                 ->live(onBlur: true)
-                                ->suffix('هر واحد '.rtrim(rtrim(number_format(max($bagWeight, 0), 3), '0'), '.').' کیلوگرم'),
+                                // آرد فقط به کیسه دیده می‌شود؛ بقیهٔ کالاها وزن هر واحد را می‌گویند.
+                                ->suffix($record->key === InventoryItem::FLOUR
+                                    ? 'کیسه'
+                                    : 'هر واحد '.rtrim(rtrim(number_format(max($bagWeight, 0), 3), '0'), '.').' کیلوگرم'),
 
                             Forms\Components\Placeholder::make('computed_kg')
                                 ->label('معادل کیلوگرم')
-                                ->visible($bagWeight > 0)
+                                ->visible($bagWeight > 0 && $record->key !== InventoryItem::FLOUR)
                                 ->content(function (Forms\Get $get) use ($bagWeight) {
                                     $bags = (float) ($get('bags') ?: 0);
 

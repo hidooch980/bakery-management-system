@@ -72,6 +72,7 @@ class Sms
             'kavenegar' => self::viaKavenegar($phone, $message),
             'ghasedak' => self::viaGhasedak($phone, $message),
             'smsir' => self::viaSmsIr($phone, $code),
+            'smsir_bulk' => self::viaSmsIrBulk($phone, $message),
             default => self::viaLog($phone, $message),
         };
     }
@@ -223,6 +224,40 @@ class Sms
         } catch (\Throwable $e) {
             // متن استثنا ممکن است کلید یا کد را داشته باشد؛ فقط نوعش ثبت می‌شود.
             Log::error('ارتباط با اس‌ام‌اس‌آی‌آر ناموفق بود.', ['type' => $e::class]);
+        }
+
+        return false;
+    }
+
+    /** ارسال پیامک عادی از خط حساب، بدون نیاز به قالب. */
+    private static function viaSmsIrBulk(string $phone, string $message): bool
+    {
+        $key = config('sms.smsir.key');
+        $line = config('sms.from');
+        if (blank($key) || blank($line) || trim($message) === '') {
+            Log::warning('تنظیمات ارسال عادی پیامک کامل نیست.');
+
+            return false;
+        }
+        try {
+            $response = Http::timeout(10)
+                ->withHeaders(['X-API-KEY' => $key])
+                ->acceptJson()
+                ->post('https://api.sms.ir/v1/send/bulk', [
+                    'lineNumber' => $line,
+                    'messageText' => $message,
+                    'mobiles' => [$phone],
+                    'sendDateTime' => null,
+                ]);
+            if ($response->successful() && (int) $response->json('status') === 1) {
+                return true;
+            }
+            Log::warning('ارسال عادی پیامک پذیرفته نشد.', [
+                'http_status' => $response->status(),
+                'provider_status' => $response->json('status'),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('ارتباط ارسال عادی پیامک ناموفق بود.', ['type' => $e::class]);
         }
 
         return false;

@@ -51,7 +51,7 @@ typedef _SellerData = ({
   ({
     List<FlourSale> sales,
     int count,
-    double totalWeightKg,
+    double totalBags,
     String totalFormatted,
   })? flour,
 });
@@ -94,7 +94,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         ({
           List<FlourSale> sales,
           int count,
-          double totalWeightKg,
+          double totalBags,
           String totalFormatted,
         })?>((f) => f, onError: (_) => null);
 
@@ -357,7 +357,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
           subtitle: data.flour!.count == 0
               ? 'امروز آردی فروخته نشده است'
               : '${data.flour!.count} فروش  •  '
-                  '${data.flour!.totalWeightKg.toStringAsFixed(1)} کیلوگرم  •  '
+                  '${flourBags(data.flour!.totalBags)}  •  '
                   '${data.flour!.totalFormatted}',
           icon: Icons.local_shipping_rounded,
           color: AppColors.stock,

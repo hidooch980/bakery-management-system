@@ -177,7 +177,7 @@
             <div class="grid gap-4 sm:grid-cols-3">
                 <x-bakery.figure
                     label="آرد مصرف‌شده"
-                    :value="number_format((float) $consumption->sum('flour_used_kg'), 1).' کیلو'"
+                    :value="\App\Support\Qty::flourBags((float) $consumption->sum('flour_used_kg'))"
                     icon="heroicon-m-fire"
                     tone="warning"
                     caption="خمیرگیری و پاششی"
@@ -185,7 +185,7 @@
 
                 <x-bakery.figure
                     label="آرد فروخته‌شده"
-                    :value="number_format((float) $consumption->sum('flour_sold_kg'), 1).' کیلو'"
+                    :value="\App\Support\Qty::flourBags((float) $consumption->sum('flour_sold_kg'))"
                     icon="heroicon-m-truck"
                     tone="gray"
                     caption="نان نشده — از سهمیه کم نمی‌شود"
@@ -215,10 +215,10 @@
                         <tr class="border-b border-gray-50 transition hover:bg-gray-50/70 dark:border-white/5 dark:hover:bg-white/5">
                             <td class="whitespace-nowrap py-2.5 pe-3 font-medium">{{ $row['label'] }}</td>
                             <td class="py-2.5 pe-3 tabular-nums">{{ number_format($row['bags_kneaded'], 1) }}</td>
-                            <td class="py-2.5 pe-3 tabular-nums">{{ number_format($row['flour_production_kg'], 1) }}</td>
-                            <td class="py-2.5 pe-3 tabular-nums">{{ number_format($row['flour_spray_kg'], 1) }}</td>
-                            <td class="py-2.5 pe-3 font-semibold tabular-nums">{{ number_format($row['flour_used_kg'], 1) }}</td>
-                            <td class="py-2.5 pe-3 tabular-nums text-gray-400 dark:text-gray-500">{{ number_format($row['flour_sold_kg'], 1) }}</td>
+                            <td class="py-2.5 pe-3 tabular-nums">{{ \App\Support\Qty::flourBags($row['flour_production_kg']) }}</td>
+                            <td class="py-2.5 pe-3 tabular-nums">{{ \App\Support\Qty::flourBags($row['flour_spray_kg']) }}</td>
+                            <td class="py-2.5 pe-3 font-semibold tabular-nums">{{ \App\Support\Qty::flourBags($row['flour_used_kg']) }}</td>
+                            <td class="py-2.5 pe-3 tabular-nums text-gray-400 dark:text-gray-500">{{ \App\Support\Qty::flourBags($row['flour_sold_kg']) }}</td>
                             <td class="py-2.5 pe-3 tabular-nums text-gray-500 dark:text-gray-400">{{ number_format($row['salt_kg'], 2) }}</td>
                             <td class="py-2.5 pe-3 tabular-nums text-gray-500 dark:text-gray-400">
                                 {{ number_format($row['yeast_dry_kg'], 2) }}
@@ -229,10 +229,10 @@
                     <x-slot name="footer">
                         <td class="py-3 pe-3">جمع</td>
                         <td class="py-3 pe-3 tabular-nums">{{ number_format((float) $consumption->sum('bags_kneaded'), 1) }}</td>
-                        <td class="py-3 pe-3 tabular-nums">{{ number_format((float) $consumption->sum('flour_production_kg'), 1) }}</td>
-                        <td class="py-3 pe-3 tabular-nums">{{ number_format((float) $consumption->sum('flour_spray_kg'), 1) }}</td>
-                        <td class="py-3 pe-3 tabular-nums">{{ number_format((float) $consumption->sum('flour_used_kg'), 1) }}</td>
-                        <td class="py-3 pe-3 tabular-nums">{{ number_format((float) $consumption->sum('flour_sold_kg'), 1) }}</td>
+                        <td class="py-3 pe-3 tabular-nums">{{ \App\Support\Qty::flourBags((float) $consumption->sum('flour_production_kg')) }}</td>
+                        <td class="py-3 pe-3 tabular-nums">{{ \App\Support\Qty::flourBags((float) $consumption->sum('flour_spray_kg')) }}</td>
+                        <td class="py-3 pe-3 tabular-nums">{{ \App\Support\Qty::flourBags((float) $consumption->sum('flour_used_kg')) }}</td>
+                        <td class="py-3 pe-3 tabular-nums">{{ \App\Support\Qty::flourBags((float) $consumption->sum('flour_sold_kg')) }}</td>
                         <td class="py-3 pe-3 tabular-nums">{{ number_format((float) $consumption->sum('salt_kg'), 2) }}</td>
                         <td class="py-3 pe-3 tabular-nums">
                             {{ number_format((float) $consumption->sum('yeast_dry_kg'), 2) }}
@@ -250,7 +250,6 @@
                 <x-bakery.figure
                     label="مانده اول دوره"
                     :value="$this->sacks($journey['opening_bags'])"
-                    :caption="$this->kilos($journey['opening_kg'])"
                     icon="heroicon-m-archive-box"
                     tone="gray"
                 />
@@ -258,7 +257,6 @@
                 <x-bakery.figure
                     label="جمع خروجی"
                     :value="$this->sacks($journey['out_bags'])"
-                    :caption="$this->kilos($journey['out_kg'])"
                     icon="heroicon-m-arrow-up-tray"
                     tone="danger"
                 />
@@ -266,7 +264,6 @@
                 <x-bakery.figure
                     label="مانده آخر دوره"
                     :value="$this->sacks($journey['closing_bags'])"
-                    :caption="$this->kilos($journey['closing_kg'])"
                     icon="heroicon-m-archive-box"
                     tone="success"
                 />
@@ -281,7 +278,7 @@
                 </x-slot>
 
                 <x-bakery.report-table
-                    :columns="['مقصد', 'کیسه', 'کیلو', 'سهم']"
+                    :columns="['مقصد', 'کیسه', 'سهم']"
                     :rows="count($journey['out'])"
                     empty="در این بازه آردی از انبار خارج نشده است."
                 >
@@ -289,7 +286,6 @@
                         <tr class="border-b border-gray-50 transition hover:bg-gray-50/70 dark:border-white/5 dark:hover:bg-white/5">
                             <td class="whitespace-nowrap py-2.5 pe-3 font-medium">{{ $row['label'] }}</td>
                             <td class="py-2.5 pe-3 tabular-nums">{{ $this->sacks($row['bags']) }}</td>
-                            <td class="py-2.5 pe-3 tabular-nums">{{ $this->kilos($row['kg']) }}</td>
                             <td class="py-2.5 pe-3 font-semibold tabular-nums">{{ number_format($row['share'], 1) }}٪</td>
                         </tr>
                     @endforeach
@@ -297,7 +293,6 @@
                     <x-slot name="footer">
                         <td class="py-3 pe-3">جمع</td>
                         <td class="py-3 pe-3 tabular-nums">{{ $this->sacks($journey['out_bags']) }}</td>
-                        <td class="py-3 pe-3 tabular-nums">{{ $this->kilos($journey['out_kg']) }}</td>
                         <td class="py-3 pe-3 tabular-nums">۱۰۰٪</td>
                     </x-slot>
                 </x-bakery.report-table>
@@ -307,7 +302,7 @@
                 <x-slot name="heading">آرد از کجا آمد</x-slot>
 
                 <x-bakery.report-table
-                    :columns="['منبع', 'کیسه', 'کیلو', 'سهم']"
+                    :columns="['منبع', 'کیسه', 'سهم']"
                     :rows="count($journey['in'])"
                     empty="در این بازه آردی به انبار وارد نشده است."
                 >
@@ -315,7 +310,6 @@
                         <tr class="border-b border-gray-50 transition hover:bg-gray-50/70 dark:border-white/5 dark:hover:bg-white/5">
                             <td class="whitespace-nowrap py-2.5 pe-3 font-medium">{{ $row['label'] }}</td>
                             <td class="py-2.5 pe-3 tabular-nums">{{ $this->sacks($row['bags']) }}</td>
-                            <td class="py-2.5 pe-3 tabular-nums">{{ $this->kilos($row['kg']) }}</td>
                             <td class="py-2.5 pe-3 font-semibold tabular-nums">{{ number_format($row['share'], 1) }}٪</td>
                         </tr>
                     @endforeach
@@ -323,7 +317,6 @@
                     <x-slot name="footer">
                         <td class="py-3 pe-3">جمع</td>
                         <td class="py-3 pe-3 tabular-nums">{{ $this->sacks($journey['in_bags']) }}</td>
-                        <td class="py-3 pe-3 tabular-nums">{{ $this->kilos($journey['in_kg']) }}</td>
                         <td class="py-3 pe-3 tabular-nums">۱۰۰٪</td>
                     </x-slot>
                 </x-bakery.report-table>

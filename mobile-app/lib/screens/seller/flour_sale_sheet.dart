@@ -29,7 +29,8 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
   final _priceController = TextEditingController();
   final _noteController = TextEditingController();
 
-  FlourUnit _unit = FlourUnit.kg;
+  // فروشنده می‌تواند کیلو یا کیسه وارد کند؛ پیش‌فرض کیسه.
+  FlourUnit _unit = FlourUnit.bag;
   // Cash came off what a seller may put on a sale, so the sheet opens on
   // the first type that is still offered rather than on a value the
   // dropdown no longer holds — a DropdownButtonFormField whose value is
@@ -226,14 +227,14 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
                   SegmentedButton<FlourUnit>(
                     segments: const [
                       ButtonSegment(
-                        value: FlourUnit.kg,
-                        label: Text('کیلویی'),
-                        icon: Icon(Icons.scale_rounded),
-                      ),
-                      ButtonSegment(
                         value: FlourUnit.bag,
                         label: Text('کیسه‌ای'),
                         icon: Icon(Icons.shopping_bag_rounded),
+                      ),
+                      ButtonSegment(
+                        value: FlourUnit.kg,
+                        label: Text('کیلویی'),
+                        icon: Icon(Icons.scale_rounded),
                       ),
                     ],
                     selected: {_unit},
@@ -271,6 +272,7 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
                   const SizedBox(height: 14),
                   _Preview(
                     weightKg: _weightKg,
+                    bagWeightKg: _options?.bagWeightKg ?? 0,
                     total: _total,
                     currency: _currency,
                     overStock: _exceedsStock,
@@ -352,12 +354,14 @@ class _FlourSaleSheetState extends State<FlourSaleSheet> {
 class _Preview extends StatelessWidget {
   const _Preview({
     required this.weightKg,
+    required this.bagWeightKg,
     required this.total,
     required this.currency,
     required this.overStock,
   });
 
   final double weightKg;
+  final double bagWeightKg;
   final double total;
   final Currency currency;
   final bool overStock;
@@ -388,7 +392,11 @@ class _Preview extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${weightKg.toStringAsFixed(2)} کیلوگرم',
+                  // آرد فقط به کیسه دیده می‌شود، حتی اگر به کیلو وارد شده باشد.
+                  bagWeightKg > 0
+                      ? flourBags(
+                          (weightKg / bagWeightKg * 100).roundToDouble() / 100)
+                      : '${weightKg.toStringAsFixed(2)} کیلوگرم',
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium

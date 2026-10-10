@@ -116,10 +116,9 @@ class ConsignmentFlourIsEnteredInSacksTest extends TestCase
             'occurred_on' => now()->toDateString(),
         ]);
 
-        // The sack count leads: it is what was counted at the door, and
-        // the weight is for the books.
-        $this->assertStringStartsWith('5 کیسه', $record->quantity_label);
-        $this->assertStringContainsString('200 کیلوگرم', $record->quantity_label);
+        // آرد فقط به کیسه دیده می‌شود؛ وزن فقط در پایگاه داده می‌ماند.
+        $this->assertSame('5 کیسه', $record->quantity_label);
+        $this->assertStringNotContainsString('کیلو', $record->quantity_label);
     }
 
     /**

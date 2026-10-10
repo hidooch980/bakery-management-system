@@ -6,6 +6,8 @@ use App\Filament\Resources\InventoryMovementResource\Pages;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
 use App\Support\AppCalendar;
+use App\Support\DoughFormula;
+use App\Support\Qty;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -45,6 +47,17 @@ class InventoryMovementResource extends Resource
         return false;
     }
 
+    /** آیا این کالا آرد است؟ آرد به کیسه دیده و وارد می‌شود. */
+    public static function isFlour($itemId): bool
+    {
+        if (blank($itemId)) {
+            return false;
+        }
+
+        return InventoryItem::query()->whereKey($itemId)->value('key') === InventoryItem::FLOUR
+            && DoughFormula::fromBakery()->bagWeightKg > 0;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([
@@ -63,12 +76,23 @@ class InventoryMovementResource extends Resource
                         ->required()
                         ->native(false),
 
+                    // آرد به کیسه وارد می‌شود و به کیلوگرم ذخیره؛ بقیهٔ کالاها کیلوگرم.
                     Forms\Components\TextInput::make('quantity')
-                        ->label('مقدار')
+                        ->label(fn (Forms\Get $get) => self::isFlour($get('inventory_item_id')) ? 'تعداد کیسه' : 'مقدار')
                         ->numeric()
                         ->minValue(0.001)
                         ->required()
-                        ->suffix('کیلوگرم'),
+                        ->live(onBlur: true)
+                        ->suffix(fn (Forms\Get $get) => self::isFlour($get('inventory_item_id')) ? 'کیسه' : 'کیلوگرم')
+                        ->helperText(fn (Forms\Get $get) => self::isFlour($get('inventory_item_id'))
+                            ? 'هر کیسه '.Qty::format(DoughFormula::fromBakery()->bagWeightKg, 0).' کیلوگرم؛ کیسهٔ ناقص با اعشار'
+                            : null)
+                        ->formatStateUsing(fn ($state, ?InventoryMovement $record) => $state !== null && $record && self::isFlour($record->inventory_item_id)
+                            ? round((float) $state / max(DoughFormula::fromBakery()->bagWeightKg, 0.001), 2)
+                            : $state)
+                        ->dehydrateStateUsing(fn ($state, Forms\Get $get) => self::isFlour($get('inventory_item_id'))
+                            ? round((float) $state * DoughFormula::fromBakery()->bagWeightKg, 3)
+                            : $state),
 
                     Forms\Components\Select::make('reason')
                         ->label('علت')
@@ -118,8 +142,9 @@ class InventoryMovementResource extends Resource
 
                 Tables\Columns\TextColumn::make('quantity')
                     ->label('مقدار')
-                    ->numeric(3)
-                    ->suffix(' کیلوگرم')
+                    ->formatStateUsing(fn ($state, InventoryMovement $record) => self::isFlour($record->inventory_item_id)
+                        ? Qty::flourBags((float) $state)
+                        : Qty::format((float) $state, 3).' کیلوگرم')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('reason')

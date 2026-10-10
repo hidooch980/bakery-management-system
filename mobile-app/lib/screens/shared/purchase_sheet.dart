@@ -559,6 +559,11 @@ class _LineFields {
   String explain(PurchasableGood good) {
     final kg = kilograms(good);
 
+    // آرد فقط به کیسه دیده می‌شود.
+    if (good.key == 'flour' && good.isSacked) {
+      return '${_trim(_quantityTyped)} کیسه';
+    }
+
     return good.isSacked
         ? '${_trim(_quantityTyped)} کیسه  •  ${_trim(kg)} کیلوگرم'
         : '${_trim(kg)} کیلوگرم';

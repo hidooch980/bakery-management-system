@@ -5,8 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Forms\JalaliMonthInput;
 use App\Filament\Resources\FlourAllocationResource\Pages;
 use App\Models\FlourAllocation;
-use App\Support\DoughFormula;
 use App\Support\Jalali;
+use App\Support\Qty;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -56,14 +56,9 @@ class FlourAllocationResource extends Resource
                                 return 'تعداد کیسه را وارد کنید؛ وزن خودکار محاسبه می‌شود.';
                             }
 
-                            $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
-                            $kg = $bags * $bagWeight;
-
                             return sprintf(
-                                '%s کیسه × %s کیلوگرم = %s کیلوگرم   •   سهم هر دوره حدود %s کیسه',
+                                '%s کیسه   •   سهم هر دوره حدود %s کیسه',
                                 number_format($bags, 0),
-                                number_format($bagWeight, 1),
-                                number_format($kg, 1),
                                 number_format($bags / 3, 1)
                             );
                         }),
@@ -95,10 +90,7 @@ class FlourAllocationResource extends Resource
                                 return 'اگر مانده‌ای از قبل ندارید، صفر بگذارید.';
                             }
 
-                            $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
-
-                            return number_format($bags, 1).' کیسه = '
-                                .number_format($bags * $bagWeight, 1).' کیلوگرم';
+                            return number_format($bags, 1).' کیسه مانده از قبل';
                         }),
 
                     Forms\Components\TextInput::make('carryover_note')
@@ -117,14 +109,11 @@ class FlourAllocationResource extends Resource
                                 return '—';
                             }
 
-                            $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
-
                             return sprintf(
-                                'سهمیه %s + سنوات %s = %s کیسه (%s کیلوگرم)',
+                                'سهمیه %s + سنوات %s = %s کیسه',
                                 number_format($quota, 1),
                                 number_format($carry, 1),
                                 number_format($quota + $carry, 1),
-                                number_format(($quota + $carry) * $bagWeight, 1),
                             );
                         }),
                 ]),
@@ -186,7 +175,6 @@ class FlourAllocationResource extends Resource
                     ->formatStateUsing(fn ($state) => $state
                         ? number_format((float) $state, 0).' کیسه'
                         : '—')
-                    ->description(fn ($record) => number_format((float) $record->total_kg, 1).' کیلوگرم')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('carryover_bags')
@@ -201,7 +189,6 @@ class FlourAllocationResource extends Resource
                 Tables\Columns\TextColumn::make('available_bags')
                     ->label('کل قابل استفاده')
                     ->state(fn (FlourAllocation $record) => number_format($record->available_bags, 0).' کیسه')
-                    ->description(fn (FlourAllocation $record) => number_format($record->available_kg, 1).' کیلوگرم')
                     ->badge()
                     ->color('success')
                     ->weight('bold'),
@@ -222,9 +209,9 @@ class FlourAllocationResource extends Resource
                     })
                     ->wrap()
                     ->description(fn (FlourAllocation $record) => $record->periods
-                        ->map(fn ($p) => number_format($p->used_kg, 0).'/'
-                            .number_format((float) $p->allocated_kg, 0))
-                        ->implode('   •   ').'  (مصرف/سهمیه کیلوگرم)'),
+                        ->map(fn ($p) => str_replace(' کیسه', '', Qty::flourBags($p->used_kg)).'/'
+                            .Qty::flourBags((float) $p->allocated_kg))
+                        ->implode('   •   ').'  (مصرف/سهمیه)'),
 
                 // Flour is only ever measured against the card reader, and
                 // the gap between the two is worked out for each period

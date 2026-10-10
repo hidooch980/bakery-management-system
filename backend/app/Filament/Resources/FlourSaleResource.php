@@ -11,6 +11,7 @@ use App\Models\FlourSale;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
 use App\Support\Money;
+use App\Support\Qty;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -42,7 +43,8 @@ class FlourSaleResource extends Resource
                     Forms\Components\Select::make('unit')
                         ->label('واحد فروش')
                         ->options(FlourSale::UNITS)
-                        ->default(FlourSale::KG)
+                        // فروشنده می‌تواند کیلو یا کیسه وارد کند؛ پیش‌فرض کیسه.
+                        ->default(FlourSale::BAG)
                         ->required()
                         ->live()
                         ->native(false)
@@ -69,7 +71,7 @@ class FlourSaleResource extends Resource
                     // one, and only the payment type tells them apart. See
                     // FlourSale::GIVEAWAY_TYPES.
                     MoneyInput::make('unit_price', 'قیمت واحد')
-                        ->default(fn () => Money::convert(FlourSale::defaultUnitPrice(FlourSale::KG)))
+                        ->default(fn () => Money::convert(FlourSale::defaultUnitPrice(FlourSale::BAG)))
                         ->helperText(fn (Forms\Get $get) => in_array(
                             $get('payment_type'),
                             FlourSale::GIVEAWAY_TYPES,
@@ -104,7 +106,7 @@ class FlourSaleResource extends Resource
                                 ? $quantity * DoughFormula::fromBakery()->bagWeightKg
                                 : $quantity;
 
-                            return number_format($weight, 2).' کیلوگرم  —  '
+                            return Qty::flourBags($weight).'  —  '
                                 .Money::format($quantity * $price);
                         }),
                 ]),
@@ -192,14 +194,15 @@ class FlourSaleResource extends Resource
                     ->formatStateUsing(fn ($state, FlourSale $record) => $record->quantity_label)
                     ->weight('bold'),
 
+                // وزن به کیسه نشان داده می‌شود؛ در پایگاه داده کیلوگرم است.
                 Tables\Columns\TextColumn::make('weight_kg')
-                    ->label('وزن (کیلوگرم)')
-                    ->numeric(2)
+                    ->label('وزن (کیسه)')
+                    ->formatStateUsing(fn ($state) => Qty::flourBags((float) $state))
                     ->sortable()
                     ->summarize(
                         Tables\Columns\Summarizers\Sum::make()
                             ->label('جمع وزن')
-                            ->numeric(2)
+                            ->formatStateUsing(fn ($state) => Qty::flourBags((float) $state))
                     )
                     ->toggleable(),
 

@@ -70,4 +70,31 @@ class SmsIrTest extends TestCase
         Http::fake(fn () => throw new ConnectionException('خطای آزمایشی'));
         $this->assertFalse(Sms::send('09121234567', 'متن آزمایشی', '123456'));
     }
+
+    public function test_ارسال_عادی_بدون_قالب_انجام_می‌شود(): void
+    {
+        config(['sms.driver' => 'smsir_bulk', 'sms.from' => '30007732003996']);
+        Http::fake(['api.sms.ir/*' => Http::response(['status' => 1], 200)]);
+        $this->assertTrue(Sms::send('+989159991669', 'کد بازیابی: 123456', '123456'));
+        Http::assertSent(fn ($r) => $r->url() === 'https://api.sms.ir/v1/send/bulk'
+            && $r->hasHeader('X-API-KEY', 'test-key')
+            && $r['lineNumber'] === '30007732003996'
+            && $r['mobiles'] === ['09159991669']
+            && $r['messageText'] === 'کد بازیابی: 123456');
+    }
+
+    public function test_ارسال_عادی_بدون_خط_درخواست_نمی‌فرستد(): void
+    {
+        config(['sms.driver' => 'smsir_bulk']);
+        Http::fake();
+        $this->assertFalse(Sms::send('09159991669', 'پیام آزمایشی'));
+        Http::assertNothingSent();
+    }
+
+    public function test_رد_ارسال_عادی_موفقیت_نیست(): void
+    {
+        config(['sms.driver' => 'smsir_bulk', 'sms.from' => '30007732003996']);
+        Http::fake(['api.sms.ir/*' => Http::response(['status' => 0], 200)]);
+        $this->assertFalse(Sms::send('09159991669', 'پیام آزمایشی'));
+    }
 }

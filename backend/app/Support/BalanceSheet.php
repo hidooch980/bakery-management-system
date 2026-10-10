@@ -254,10 +254,13 @@ class BalanceSheet
      */
     private static function consignmentValue(string $direction): float
     {
+        // فقط آنچه هنوز برنگشته؛ برگشت‌های بخشی کم می‌شوند.
         $kg = (float) ConsignmentFlour::query()
             ->outstanding()
             ->where('direction', $direction)
-            ->sum('amount_kg');
+            ->with('returns')
+            ->get()
+            ->sum(fn (ConsignmentFlour $c) => $c->outstandingKg());
 
         if ($kg <= 0) {
             return 0.0;

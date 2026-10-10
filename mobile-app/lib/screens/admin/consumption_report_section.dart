@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/formatters.dart';
 import '../../utils/json.dart';
 
 import '../../services/bakery_api.dart';
@@ -101,7 +102,11 @@ class _ConsumptionReportSectionState extends State<ConsumptionReportSection> {
               value: '${_num(totals['bags_kneaded'])} کیسه',
               emphasise: true,
             ),
-            AdminRow(label: 'آرد مصرف‌شده', value: '${_num(used)} کیلوگرم'),
+            // آرد فقط به کیسه.
+            AdminRow(
+              label: 'آرد مصرف‌شده',
+              value: flourBags(_double(totals['flour_used_bags'])),
+            ),
 
             // The one that changes what the rest mean. Flour sold on left
             // the store without becoming bread, so it must not be read as
@@ -109,7 +114,7 @@ class _ConsumptionReportSectionState extends State<ConsumptionReportSection> {
             if (sold > 0)
               AdminRow(
                 label: 'آرد فروخته‌شده',
-                value: '${_num(sold)} کیلوگرم',
+                value: flourBags(_double(totals['flour_sold_bags'])),
                 color: AppColors.attention,
               ),
 

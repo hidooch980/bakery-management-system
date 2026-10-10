@@ -7,6 +7,7 @@ use App\Models\FlourSale;
 use App\Models\InventoryItem;
 use App\Support\DoughFormula;
 use App\Support\Money;
+use App\Support\Qty;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -72,7 +73,7 @@ class FlourSaleController extends Controller
         if ($weightKg > $balance) {
             return $this->error(
                 'موجودی آرد کافی نیست. موجودی فعلی: '
-                    .number_format($balance, 2).' کیلوگرم',
+                    .Qty::flourBags($balance),
                 422
             );
         }
@@ -119,6 +120,10 @@ class FlourSaleController extends Controller
             'summary' => [
                 'count' => $sales->count(),
                 'total_weight_kg' => round((float) $sales->sum('weight_kg'), 3),
+                // آرد همه‌جا به کیسه؛ کیلو فقط در فرم فروش پذیرفته می‌شود.
+                'total_bags' => ($w = DoughFormula::fromBakery()->bagWeightKg) > 0
+                    ? round((float) $sales->sum('weight_kg') / $w, 2)
+                    : 0.0,
                 'bag_count' => round(
                     (float) $sales->where('unit', FlourSale::BAG)->sum('quantity'),
                     2

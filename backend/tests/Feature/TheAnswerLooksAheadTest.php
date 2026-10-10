@@ -93,7 +93,8 @@ class TheAnswerLooksAheadTest extends TestCase
         $this->assertNotNull($line);
         $this->assertSame('calm', $line['tone']);
         $this->assertStringContainsString('۱۶ روز', $line['title']);
-        $this->assertStringContainsString('۱۰۰ کیلو در روز', $line['basis']);
+        // 100 kg a day at 40 kg a sack — flour is only ever said in sacks.
+        $this->assertStringContainsString('۲٫۵ کیسه در روز', $line['basis']);
         $this->assertStringContainsString('۱۴ روز پخت', $line['basis']);
     }
 

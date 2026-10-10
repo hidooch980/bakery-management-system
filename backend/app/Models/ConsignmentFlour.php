@@ -5,9 +5,11 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\RecordsAudit;
 use App\Support\DoughFormula;
+use App\Support\Qty;
 use App\Support\StockLedger;
 use App\Support\StockReversal;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Flour borrowed from, or lent to, a neighbouring bakery.
@@ -134,9 +136,8 @@ class ConsignmentFlour extends Model
         // Out of the store is the positive direction here, which is why
         // lending is the one that counts up: `StockLedger` speaks the same
         // language for every model that shares this rule.
-        $shouldBeOut = $this->settled_on !== null
-            ? 0.0
-            : ($this->direction === 'borrowed' ? -1 : 1) * (float) $this->amount_kg;
+        // آنچه بخش‌بخش برگشته از این مقدار کم می‌شود (جدول برگشت‌ها).
+        $shouldBeOut = ($this->direction === 'borrowed' ? -1 : 1) * $this->outstandingKg();
 
         StockLedger::reconcile(
             $this,
@@ -166,6 +167,109 @@ class ConsignmentFlour extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** برگشت‌های بخشیِ این ردیف، به ترتیب تاریخ. */
+    public function returns()
+    {
+        return $this->hasMany(ConsignmentFlourReturn::class)->orderBy('returned_on')->orderBy('id');
+    }
+
+    /** کیسه‌هایی که با «ثبت برگشت» پس آمده‌اند. */
+    public function returnedBags(): float
+    {
+        $returns = $this->relationLoaded('returns') ? $this->returns : $this->returns()->get();
+
+        return round((float) $returns->sum(fn (ConsignmentFlourReturn $r) => (float) $r->bags), 2);
+    }
+
+    /**
+     * کیسه‌هایی که هنوز برنگشته‌اند.
+     *
+     * ردیفِ تسویه‌شده صفر است، چه با برگشت‌های بخشی تمام شده باشد و چه
+     * با دکمهٔ قدیمی «ثبت تسویه» (که باقی‌مانده را یک‌جا برمی‌گرداند).
+     */
+    public function outstandingBags(): float
+    {
+        if ($this->settled_on !== null) {
+            return 0.0;
+        }
+
+        return max(round((float) $this->bags - $this->returnedBags(), 2), 0.0);
+    }
+
+    /** وزنِ همان کیسه‌های برنگشته، به نسبتِ وزن ثبت‌شدهٔ ردیف. */
+    public function outstandingKg(): float
+    {
+        $bags = (float) $this->bags;
+
+        if ($this->settled_on !== null) {
+            return 0.0;
+        }
+
+        if ($bags <= 0) {
+            return (float) $this->amount_kg;
+        }
+
+        return round((float) $this->amount_kg * $this->outstandingBags() / $bags, 3);
+    }
+
+    /**
+     * ثبت برگشتِ بخشی (یا همهٔ باقی‌مانده).
+     *
+     * اگر با این برگشت چیزی نماند، ردیف در همان تاریخ تسویه‌شده می‌شود؛
+     * وگرنه فقط انبار به اندازهٔ همین برگشت جابه‌جا می‌شود.
+     */
+    public function recordReturn(float $bags, $returnedOn = null, ?string $note = null, ?int $userId = null): ConsignmentFlourReturn
+    {
+        $bags = round($bags, 2);
+        $left = $this->outstandingBags();
+
+        if ($bags <= 0) {
+            throw new \InvalidArgumentException('تعداد کیسهٔ برگشتی باید بیشتر از صفر باشد.');
+        }
+
+        if ($bags > $left + 0.001) {
+            throw new \InvalidArgumentException('بیشتر از باقی‌مانده ('.$left.' کیسه) نمی‌شود برگشت زد.');
+        }
+
+        $returnedOn = $returnedOn ? Carbon::parse($returnedOn) : now();
+
+        $return = $this->returns()->create([
+            'bags' => $bags,
+            'returned_on' => $returnedOn->toDateString(),
+            'note' => $note,
+            'user_id' => $userId ?? auth()->id(),
+        ]);
+
+        $this->unsetRelation('returns');
+
+        if ($left - $bags < 0.001) {
+            // updated() همین ردیف انبار را هم‌حساب می‌کند.
+            $this->update(['settled_on' => $returnedOn->toDateString()]);
+        } else {
+            $this->reconcileStock();
+        }
+
+        return $return;
+    }
+
+    /**
+     * بعد از حذف یک برگشت: اگر تسویهٔ ردیف از همین برگشت آمده بود (همان
+     * تاریخ)، ردیف دوباره باز می‌شود؛ در هر حال انبار هم‌حساب می‌شود.
+     */
+    public function afterReturnRemoved(?ConsignmentFlourReturn $removed = null): void
+    {
+        $this->unsetRelation('returns');
+
+        if ($this->settled_on !== null && $removed !== null
+            && $this->settled_on->toDateString() === $removed->returned_on?->toDateString()) {
+            $this->update(['settled_on' => null]);
+
+            return;
+        }
+
+        $this->reconcileStock();
+    }
+
     public function partner()
     {
         return $this->belongsTo(Customer::class, 'customer_id');
@@ -183,15 +287,12 @@ class ConsignmentFlour extends Model
      */
     public function getQuantityLabelAttribute(): string
     {
-        $weight = rtrim(rtrim(number_format((float) $this->amount_kg, 1), '0'), '.').' کیلوگرم';
-
+        // آرد فقط به کیسه.
         if ($this->bags === null) {
-            return $weight;
+            return Qty::flourBags((float) $this->amount_kg);
         }
 
-        $bags = rtrim(rtrim(number_format((float) $this->bags, 2), '0'), '.');
-
-        return "{$bags} کیسه  •  {$weight}";
+        return rtrim(rtrim(number_format((float) $this->bags, 2), '0'), '.').' کیسه';
     }
 
     public function scopeOutstanding($query)

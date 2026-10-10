@@ -115,18 +115,22 @@ class PurchaseResource extends Resource
                                 ->minValue(0)
                                 ->step('0.01')
                                 ->helperText('وزن خودش حساب می‌شود')
+                                ->required(fn (Forms\Get $get) => filled($get('inventory_item_id'))
+                                    && InventoryItem::query()->whereKey($get('inventory_item_id'))->value('key') === InventoryItem::FLOUR)
                                 // Hidden for a good with no fixed package,
                                 // and for a line that has no good at all: a
                                 // sack count converted at an invented figure
                                 // is worse than a plain weight.
                                 ->visible(fn (Forms\Get $get) => self::bagWeightOf($get('inventory_item_id')) > 0),
 
+                            // آرد فقط به کیسه وارد می‌شود؛ وزن از کیسه حساب می‌شود.
                             Forms\Components\TextInput::make('quantity_kg')
                                 ->label('کیلوگرم')
                                 ->numeric()
                                 ->minValue(0)
                                 ->step('0.001')
-                                ->visible(fn (Forms\Get $get) => filled($get('inventory_item_id'))),
+                                ->visible(fn (Forms\Get $get) => filled($get('inventory_item_id'))
+                                    && InventoryItem::query()->whereKey($get('inventory_item_id'))->value('key') !== InventoryItem::FLOUR),
 
                             MoneyInput::make('unit_price', 'نرخ هر کیلو')
                                 ->visible(fn (Forms\Get $get) => filled($get('inventory_item_id'))),
