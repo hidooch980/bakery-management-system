@@ -1392,6 +1392,25 @@ class BakeryApi {
     await _client.patch('/consignment-flour/$id/settle', const {});
   }
 
+  /// پروندهٔ یک همکار: گردش ریز به کیسه، با ماندهٔ بعد از هر ردیف.
+  ///
+  /// «from» و «to» تاریخ شمسی‌اند (مثل 1405/05/01) و هر دو اختیاری.
+  Future<Map<String, dynamic>> partnerStatement(
+    int partnerId, {
+    String? from,
+    String? to,
+  }) async {
+    final body = await _client.getCached(
+      '/consignment-flour/partners/$partnerId/statement',
+      query: {
+        if (from != null && from.isNotEmpty) 'from': from,
+        if (to != null && to.isNotEmpty) 'to': to,
+      },
+    );
+
+    return (body['data'] as Map).cast<String, dynamic>();
+  }
+
   /// Income against expenses, with profit, for a date range.
   Future<Map<String, dynamic>> financialReport(
       {String? from, String? to}) async {

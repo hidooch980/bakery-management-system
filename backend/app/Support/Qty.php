@@ -21,4 +21,22 @@ class Qty
     {
         return number_format((float) $value, $decimals, '.', Money::GROUP_SEPARATOR);
     }
+
+    /**
+     * کیلوگرمِ آرد به کیسه، با وزن کیسهٔ تنظیمات نانوایی: «۱۳ کیسه»،
+     * «۴۶.۵ کیسه». در پایگاه داده همچنان کیلوگرم نگه داشته می‌شود.
+     */
+    public static function flourBags(float|int|null $kg): string
+    {
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+
+        if ($bagWeight <= 0) {
+            return self::format($kg, 1).' کیلوگرم';
+        }
+
+        $bags = round((float) $kg / $bagWeight, 2);
+        $text = rtrim(rtrim(number_format($bags, 2, '.', Money::GROUP_SEPARATOR), '0'), '.');
+
+        return ($text === '' || $text === '-0' ? '0' : $text).' کیسه';
+    }
 }

@@ -4,10 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Forms\JalaliDateInput;
 use App\Filament\Resources\ConsignmentFlourResource\Pages;
+use App\Filament\Resources\PartnerResource\Pages\PartnerStatementPage;
 use App\Models\ConsignmentFlour;
 use App\Models\Customer;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
+use App\Support\PartnerStatement;
 use App\Support\Qty;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -137,6 +139,7 @@ class ConsignmentFlourResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['partner', 'returns']))
             ->columns([
                 Tables\Columns\TextColumn::make('occurred_on')
                     ->label('تاریخ تحویل')
@@ -151,7 +154,12 @@ class ConsignmentFlourResource extends Resource
                     ->state(fn (ConsignmentFlour $record) => $record->partner_label)
                     ->searchable()
                     ->weight('bold')
-                    ->icon('heroicon-m-building-storefront'),
+                    ->color('primary')
+                    ->icon('heroicon-m-building-storefront')
+                    // نام همکار به پرونده‌اش می‌رود: گردش ریز به کیسه.
+                    ->url(fn (ConsignmentFlour $record) => $record->customer_id
+                        ? PartnerResource::getUrl('statement', ['record' => $record->customer_id])
+                        : null),
 
                 Tables\Columns\TextColumn::make('direction')
                     ->label('نوع')
@@ -163,7 +171,15 @@ class ConsignmentFlourResource extends Resource
                 // was counted at the door, the weight is for the books.
                 Tables\Columns\TextColumn::make('bags')
                     ->label('مقدار')
-                    ->state(fn (ConsignmentFlour $record) => $record->quantity_label)
+                    // فقط کیسه؛ اگر بخشی برگشته، باقی‌مانده هم گفته می‌شود.
+                    ->state(fn (ConsignmentFlour $record) => PartnerStatement::bags((float) $record->bags).' کیسه')
+                    ->description(function (ConsignmentFlour $record) {
+                        $returned = $record->returnedBags();
+
+                        return $returned > 0 && ! $record->is_settled
+                            ? 'برگشته '.PartnerStatement::bags($returned).' • مانده '.PartnerStatement::bags($record->outstandingBags())
+                            : null;
+                    })
                     ->sortable()
                     ->summarize(Tables\Columns\Summarizers\Sum::make()
                         ->label('جمع کیسه')
@@ -188,6 +204,25 @@ class ConsignmentFlourResource extends Resource
                     ->toggle(),
             ])
             ->actions([
+                Tables\Actions\Action::make('recordReturn')
+                    ->label('ثبت برگشت')
+                    ->icon('heroicon-o-arrow-uturn-right')
+                    ->color('info')
+                    ->visible(fn (ConsignmentFlour $record) => ! $record->is_settled)
+                    ->form([
+                        Forms\Components\TextInput::make('bags')
+                            ->label('تعداد کیسهٔ برگشتی')
+                            ->numeric()
+                            ->minValue(0.01)
+                            ->required()
+                            ->suffix('کیسه')
+                            ->helperText(fn (ConsignmentFlour $record) => 'باقی‌مانده: '
+                                .PartnerStatement::bags($record->outstandingBags()).' کیسه'),
+                        JalaliDateInput::today('returned_on', 'تاریخ برگشت')->required(),
+                        Forms\Components\Textarea::make('note')->label('توضیحات')->rows(2),
+                    ])
+                    ->action(fn (ConsignmentFlour $record, array $data) => PartnerStatementPage::storeReturn($data, $record)),
+
                 Tables\Actions\Action::make('settle')
                     ->label('ثبت تسویه')
                     ->icon('heroicon-o-check-circle')

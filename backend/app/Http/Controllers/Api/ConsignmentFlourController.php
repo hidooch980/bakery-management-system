@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ConsignmentFlour;
+use App\Models\Customer;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
+use App\Support\PartnerStatement;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,12 +49,13 @@ class ConsignmentFlourController extends Controller
         $inBags = fn (float $kg) => $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
 
         $rows = ConsignmentFlour::outstanding()
-            ->with('partner:id,name')
+            ->with(['partner:id,name', 'returns'])
             ->get()
             ->groupBy(fn (ConsignmentFlour $c) => $c->partner_label)
             ->map(function ($group, $name) use ($inBags) {
-                $lent = (float) $group->where('direction', 'lent')->sum('amount_kg');
-                $borrowed = (float) $group->where('direction', 'borrowed')->sum('amount_kg');
+                // برگشت‌های بخشی کم می‌شوند: فقط آنچه هنوز برنگشته.
+                $lent = (float) $group->where('direction', 'lent')->sum(fn (ConsignmentFlour $c) => $c->outstandingKg());
+                $borrowed = (float) $group->where('direction', 'borrowed')->sum(fn (ConsignmentFlour $c) => $c->outstandingKg());
 
                 // The oldest unsettled row is the one worth chasing, so the
                 // age of the account is the age of that row and not an
@@ -61,6 +64,8 @@ class ConsignmentFlourController extends Controller
                 $oldest = $group->min('occurred_on');
 
                 return [
+                    // تا اپ بتواند پروندهٔ همین همکار را باز کند.
+                    'partner_id' => $group->first()->customer_id,
                     'partner_name' => $name,
                     'lent_kg' => round($lent, 3),
                     'borrowed_kg' => round($borrowed, 3),
@@ -89,8 +94,9 @@ class ConsignmentFlourController extends Controller
     /** Net position: how much flour we owe partners, and they owe us. */
     public function balance(): JsonResponse
     {
-        $borrowed = (float) ConsignmentFlour::outstanding()->where('direction', 'borrowed')->sum('amount_kg');
-        $lent = (float) ConsignmentFlour::outstanding()->where('direction', 'lent')->sum('amount_kg');
+        $open = ConsignmentFlour::outstanding()->with('returns')->get();
+        $borrowed = (float) $open->where('direction', 'borrowed')->sum(fn (ConsignmentFlour $c) => $c->outstandingKg());
+        $lent = (float) $open->where('direction', 'lent')->sum(fn (ConsignmentFlour $c) => $c->outstandingKg());
 
         $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
         $inBags = fn (float $kg) => $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
@@ -104,7 +110,76 @@ class ConsignmentFlourController extends Controller
             'lent_bags' => $inBags($lent),
             'net_bags' => $inBags($lent - $borrowed),
             'bag_weight_kg' => $bagWeight,
+        ] + self::partnerTotals());
+    }
+
+    /**
+     * جمع طلب و بدهی، همکار به همکار خالص‌شده — همان سه عددِ ویجت
+     * داشبورد پنل، برای صفحهٔ خانهٔ اپ.
+     */
+    private static function partnerTotals(): array
+    {
+        $totals = PartnerStatement::totals();
+
+        return [
+            'owed_to_us_bags' => $totals['owed_to_us'],
+            'we_owe_bags' => $totals['we_owe'],
+            'partners_net_bags' => $totals['net'],
+            'partners_owing' => $totals['partners_owing'],
+            'partners_owed' => $totals['partners_owed'],
+            'headline' => PartnerStatement::headline($totals['net']),
+        ];
+    }
+
+    /**
+     * گردش ریز یک همکار، به کیسه. «from» و «to» اختیاری‌اند و شمسی یا
+     * میلادی هر دو پذیرفته می‌شوند.
+     */
+    public function statement(Request $request, Customer $customer): JsonResponse
+    {
+        if ($customer->type !== Customer::PARTNER_TYPE) {
+            return $this->error('این طرف‌حساب همکار نیست.', 404);
+        }
+
+        $data = $request->validate([
+            'from' => ['nullable', 'string', 'max:20'],
+            'to' => ['nullable', 'string', 'max:20'],
         ]);
+
+        $statement = PartnerStatement::for(
+            $customer,
+            Jalali::parseFlexible($data['from'] ?? null),
+            Jalali::parseFlexible($data['to'] ?? null),
+        );
+
+        return $this->success($statement->toArray());
+    }
+
+    /** ثبت برگشت بخشی (یا همهٔ باقی‌ماندهٔ) یک ردیف. */
+    public function storeReturn(Request $request, ConsignmentFlour $consignment): JsonResponse
+    {
+        $data = $request->validate([
+            'bags' => ['required', 'numeric', 'min:0.01'],
+            'returned_on' => ['nullable', 'string', 'max:20'],
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ($consignment->is_settled) {
+            return $this->error('این مورد قبلاً تسویه شده است.', 409);
+        }
+
+        try {
+            DB::transaction(fn () => $consignment->recordReturn(
+                (float) $data['bags'],
+                Jalali::parseFlexible($data['returned_on'] ?? null) ?? now(),
+                $data['note'] ?? null,
+                $request->user()->id,
+            ));
+        } catch (\InvalidArgumentException $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+
+        return $this->success($this->payload($consignment->fresh()), 'برگشت ثبت شد.', 201);
     }
 
     public function store(Request $request): JsonResponse
@@ -179,6 +254,8 @@ class ConsignmentFlourController extends Controller
             'occurred_on_display' => AppCalendar::date($record->occurred_on),
             'settled_on_display' => AppCalendar::date($record->settled_on),
             'is_settled' => $record->is_settled,
+            'returned_bags' => $record->returnedBags(),
+            'outstanding_bags' => $record->outstandingBags(),
             'note' => $record->note,
         ];
     }

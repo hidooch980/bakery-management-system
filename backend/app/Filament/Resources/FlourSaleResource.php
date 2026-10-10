@@ -11,6 +11,7 @@ use App\Models\FlourSale;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
 use App\Support\Money;
+use App\Support\Qty;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -192,14 +193,15 @@ class FlourSaleResource extends Resource
                     ->formatStateUsing(fn ($state, FlourSale $record) => $record->quantity_label)
                     ->weight('bold'),
 
+                // وزن به کیسه نشان داده می‌شود؛ در پایگاه داده کیلوگرم است.
                 Tables\Columns\TextColumn::make('weight_kg')
-                    ->label('وزن (کیلوگرم)')
-                    ->numeric(2)
+                    ->label('وزن (کیسه)')
+                    ->formatStateUsing(fn ($state) => Qty::flourBags((float) $state))
                     ->sortable()
                     ->summarize(
                         Tables\Columns\Summarizers\Sum::make()
                             ->label('جمع وزن')
-                            ->numeric(2)
+                            ->formatStateUsing(fn ($state) => Qty::flourBags((float) $state))
                     )
                     ->toggleable(),
 

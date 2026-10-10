@@ -6,6 +6,7 @@ use App\Filament\Widgets\BakeryStatsOverview;
 use App\Filament\Widgets\FlourQuotaOverview;
 use App\Filament\Widgets\InventoryOverview;
 use App\Filament\Widgets\MoneyAtAGlance;
+use App\Filament\Widgets\PartnerFlourSummary;
 use App\Filament\Widgets\ProductionTrendChart;
 use App\Filament\Widgets\SystemVersusOvenOverview;
 use Filament\Pages\Dashboard as BaseDashboard;
@@ -26,6 +27,8 @@ class Dashboard extends BaseDashboard
             // the production detail underneath them.
             MoneyAtAGlance::class,
             BakeryStatsOverview::class,
+            // خلاصهٔ آرد امانی همکاران؛ ویجت‌های دیگر دست نخورده‌اند.
+            PartnerFlourSummary::class,
             ProductionTrendChart::class,
             InventoryOverview::class,
             FlourQuotaOverview::class,

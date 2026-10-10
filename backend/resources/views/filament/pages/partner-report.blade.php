@@ -15,9 +15,8 @@
                 {{ $this->bags($netOwed) }}
             </div>
             <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {{ $this->kg($netOwed) }}
                 @if ($value = $this->money($netOwed))
-                    — {{ $value }} به قیمت ثبت‌شدهٔ آرد
+                    {{ $value }} به قیمت ثبت‌شدهٔ آرد
                 @endif
             </div>
         </x-filament::section>
@@ -28,7 +27,7 @@
                 {{ $this->bags($netOwing) }}
             </div>
             <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {{ $this->kg($netOwing) }} — در انبار شماست
+                در انبار شماست
             </div>
         </x-filament::section>
 
@@ -80,7 +79,8 @@
 
         <x-filament::section>
             {{-- The account line: click it and the dealings open below. --}}
-            <button type="button"
+            {{-- div نه button: نام همکار داخلش پیوند است و پیوند داخل دکمه درست نیست. --}}
+            <div role="button" tabindex="0"
                 wire:click="toggle(@js($partner->key))"
                 class="-m-2 flex w-full items-center gap-3 rounded-lg p-2 text-right transition hover:bg-gray-50 dark:hover:bg-white/5">
 
@@ -90,7 +90,15 @@
 
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
-                        <span class="font-bold text-gray-900 dark:text-gray-100">{{ $partner->name }}</span>
+                        @if ($partner->customerId)
+                            {{-- نام همکار به پرونده‌اش می‌رود (گردش ریز به کیسه). --}}
+                            <a href="{{ \App\Filament\Resources\PartnerResource::getUrl('statement', ['record' => $partner->customerId]) }}"
+                                onclick="event.stopPropagation()"
+                                class="font-bold text-primary-600 hover:underline dark:text-primary-400"
+                                data-partner-link>{{ $partner->name }}</a>
+                        @else
+                            <span class="font-bold text-gray-900 dark:text-gray-100">{{ $partner->name }}</span>
+                        @endif
 
                         @if ($partner->isOverdue())
                             <x-filament::badge color="danger" size="sm">نیاز به پیگیری</x-filament::badge>
@@ -133,7 +141,7 @@
                         @endif
                     </div>
                 </div>
-            </button>
+            </div>
 
             {{--
                 The netting, spelled out on the account line itself. A
@@ -182,7 +190,7 @@
                                             </x-filament::badge>
                                         </td>
                                         <td class="py-2 pl-3 whitespace-nowrap align-top font-medium">
-                                            {{ $row->quantity_label }}
+                                            {{ \App\Support\PartnerStatement::bags((float) $row->bags) }} کیسه
                                         </td>
                                         <td class="py-2 pl-3 whitespace-nowrap align-top">
                                             @if ($row->is_settled)

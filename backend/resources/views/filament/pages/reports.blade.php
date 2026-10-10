@@ -177,7 +177,7 @@
             <div class="grid gap-4 sm:grid-cols-3">
                 <x-bakery.figure
                     label="آرد مصرف‌شده"
-                    :value="number_format((float) $consumption->sum('flour_used_kg'), 1).' کیلو'"
+                    :value="\App\Support\Qty::flourBags((float) $consumption->sum('flour_used_kg'))"
                     icon="heroicon-m-fire"
                     tone="warning"
                     caption="خمیرگیری و پاششی"
@@ -185,7 +185,7 @@
 
                 <x-bakery.figure
                     label="آرد فروخته‌شده"
-                    :value="number_format((float) $consumption->sum('flour_sold_kg'), 1).' کیلو'"
+                    :value="\App\Support\Qty::flourBags((float) $consumption->sum('flour_sold_kg'))"
                     icon="heroicon-m-truck"
                     tone="gray"
                     caption="نان نشده — از سهمیه کم نمی‌شود"

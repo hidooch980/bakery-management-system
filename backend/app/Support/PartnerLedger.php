@@ -49,7 +49,7 @@ class PartnerLedger
     {
         $open = ConsignmentFlour::query()
             ->whereNull('settled_on')
-            ->with('partner')
+            ->with(['partner', 'returns'])
             ->get();
 
         return $open
@@ -75,8 +75,8 @@ class PartnerLedger
         $lent = $records->where('direction', 'lent');
         $borrowed = $records->where('direction', 'borrowed');
 
-        $bagsLent = round($lent->sum(fn (ConsignmentFlour $c) => (float) $c->bags), 2);
-        $bagsBorrowed = round($borrowed->sum(fn (ConsignmentFlour $c) => (float) $c->bags), 2);
+        $bagsLent = round($lent->sum(fn (ConsignmentFlour $c) => $c->outstandingBags()), 2);
+        $bagsBorrowed = round($borrowed->sum(fn (ConsignmentFlour $c) => $c->outstandingBags()), 2);
 
         // Only the sacks that left the shop have an age worth chasing.
         // What the shop borrowed sits in its own store, where the balance

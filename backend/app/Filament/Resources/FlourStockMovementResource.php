@@ -4,7 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\FlourStockMovementResource\Pages;
 use App\Models\FlourStockMovement;
+use App\Support\DoughFormula;
 use App\Support\Jalali;
+use App\Support\Qty;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -51,12 +53,17 @@ class FlourStockMovementResource extends Resource
                         ->required()
                         ->native(false),
 
+                    // به کیسه وارد می‌شود و به کیلوگرم ذخیره.
                     Forms\Components\TextInput::make('amount_kg')
                         ->label('مقدار')
                         ->numeric()
                         ->minValue(0.01)
                         ->required()
-                        ->suffix('کیلوگرم'),
+                        ->suffix('کیسه')
+                        ->helperText(fn () => 'هر کیسه '.Qty::format(DoughFormula::fromBakery()->bagWeightKg, 0).' کیلوگرم؛ کیسهٔ ناقص با اعشار')
+                        ->formatStateUsing(fn ($state) => $state === null ? null
+                            : round((float) $state / max(DoughFormula::fromBakery()->bagWeightKg, 0.001), 2))
+                        ->dehydrateStateUsing(fn ($state) => round((float) $state * DoughFormula::fromBakery()->bagWeightKg, 3)),
 
                     Forms\Components\Select::make('user_id')
                         ->label('ثبت‌کننده')
@@ -89,10 +96,10 @@ class FlourStockMovementResource extends Resource
 
                 Tables\Columns\TextColumn::make('amount_kg')
                     ->label('مقدار')
-                    ->numeric(2)
-                    ->suffix(' کیلوگرم')
+                    ->formatStateUsing(fn ($state) => Qty::flourBags((float) $state))
                     ->sortable()
-                    ->summarize(Tables\Columns\Summarizers\Sum::make()->label('جمع')),
+                    ->summarize(Tables\Columns\Summarizers\Sum::make()->label('جمع')
+                        ->formatStateUsing(fn ($state) => Qty::flourBags((float) $state))),
 
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('ثبت‌کننده')

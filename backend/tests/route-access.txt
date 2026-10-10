@@ -36,6 +36,7 @@ GET api/v1/chane-entries/pending                            admin, seller
 GET api/v1/consignment-flour                                admin, seller
 GET api/v1/consignment-flour/balance                        admin, seller
 GET api/v1/consignment-flour/partners                       admin, seller
+GET api/v1/consignment-flour/partners/{customer}/statement  admin, seller
 GET api/v1/customer-debts                                   admin
 GET api/v1/customers                                        (any signed-in)
 GET api/v1/customers/types                                  (any signed-in)
@@ -159,6 +160,7 @@ POST api/v1/cash-counts                                     admin
 POST api/v1/chane-entries                                   admin, chane_gir, seller
 POST api/v1/change-password                                 admin, chane_gir, dough_maker, seller, shater
 POST api/v1/consignment-flour                               admin, seller
+POST api/v1/consignment-flour/{consignment}/returns         admin, seller
 POST api/v1/customer-debts/{customer}/settle                admin
 POST api/v1/customers                                       admin
 POST api/v1/customers/{customer}/interactions               admin
