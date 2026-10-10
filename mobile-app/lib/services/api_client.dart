@@ -141,7 +141,14 @@ class ApiClient {
   /// so screens already holding this one follow the move too.
   void useBaseUrl(String url) {
     _dio.options.baseUrl = url;
+    _currentBaseUrl = url;
   }
+
+  /// The address the app is talking to right now, for code that runs
+  /// without a client in hand — the updater asks this server for the
+  /// newest APK before it tries GitHub.
+  static String get currentBaseUrl => _currentBaseUrl;
+  static String _currentBaseUrl = defaultBaseUrl;
 
   String get baseUrl => _dio.options.baseUrl;
 

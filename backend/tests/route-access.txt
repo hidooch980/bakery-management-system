@@ -20,6 +20,7 @@ DELETE api/v1/suppliers/{supplier}                          admin
 DELETE api/v1/users/{user}                                  admin
 GET api/v1/advance-requests                                 admin
 GET api/v1/advance-requests/mine                            (any signed-in)
+GET api/v1/app/latest                                       (public)
 GET api/v1/attendance/my-history                            admin, chane_gir, dough_maker, seller, shater
 GET api/v1/attendance/roster                                admin, chane_gir, dough_maker, seller, shater
 GET api/v1/attendance/today                                 admin, chane_gir, dough_maker, seller, shater

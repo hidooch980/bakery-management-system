@@ -359,3 +359,67 @@ jobs:
             ### به‌روزرسانی خودکار
             نسخه‌های بعدی از داخل خود برنامه قابل نصب هستند:
             **تنظیمات ← به‌روزرسانی برنامه ← دانلود و نصب**
+
+      # GitHub is often blocked or slow from Iran, so a release is also put
+      # on the bakery's own server, where the in-app updater looks first
+      # (`GET /api/v1/app/latest` reads the latest.json written here).
+      #
+      # The key can do one thing: rsync files *into* /var/www/bakery-downloads.
+      # On the server it is pinned to `rrsync -wo -no-del` for a key-only
+      # user with no password — no shell, no reading, no deleting. SSH goes to
+      # the IP: the name sits behind Arvan, which carries HTTP, not SSH.
+      #
+      # The APK goes up first and the manifest and the «latest» link last,
+      # each by rsync's write-then-rename, so a phone never reads a manifest
+      # pointing at a file that is still arriving.
+      - name: Put the release on the bakery's own server
+        if: steps.config.outputs.release_tag != ''
+        working-directory: mobile-app
+        env:
+          UPLOAD_KEY: ${{ secrets.APK_UPLOAD_SSH_KEY }}
+          UPLOAD_HOST: ${{ secrets.APK_UPLOAD_HOST }}
+          UPLOAD_USER: ${{ secrets.APK_UPLOAD_USER }}
+          UPLOAD_KNOWN_HOSTS: ${{ secrets.APK_UPLOAD_KNOWN_HOSTS }}
+          TAG: ${{ steps.config.outputs.release_tag }}
+          APK: ${{ steps.apk.outputs.name }}
+          NOTES: ${{ steps.notes.outputs.body }}
+        run: |
+          if [ -z "$UPLOAD_KEY" ] || [ -z "$UPLOAD_HOST" ] || [ -z "$UPLOAD_KNOWN_HOSTS" ]; then
+            echo "::warning::APK_UPLOAD_* secrets are missing — the release is on GitHub only, and phones that cannot reach GitHub will not see it."
+            exit 0
+          fi
+
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -1)
+          CODE=$("$AAPT2" dump badging "$APK" | grep -oE "versionCode='[0-9]+'" | grep -oE '[0-9]+')
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          SIZE=$(stat -c %s "$APK")
+
+          mkdir -p "$RUNNER_TEMP/upload/shelf"
+          ( umask 077
+            printf '%s\n' "$UPLOAD_KEY" > "$RUNNER_TEMP/upload/key"
+            printf '%s\n' "$UPLOAD_KNOWN_HOSTS" > "$RUNNER_TEMP/upload/known_hosts" )
+          SSH="ssh -i $RUNNER_TEMP/upload/key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUNNER_TEMP/upload/known_hosts"
+          DEST="${UPLOAD_USER:-bakery-upload}@$UPLOAD_HOST:"
+
+          jq -n --arg version "${TAG#v}" --argjson code "${CODE:-null}" --arg file "$APK" \
+                --arg url "https://baker.molido.ir/download/$APK" --argjson size "$SIZE" \
+                --arg sha "$SHA" --arg notes "$NOTES" \
+                '{version: $version, version_code: $code, file: $file, url: $url,
+                  size: $size, sha256: $sha, notes: $notes}' \
+            > "$RUNNER_TEMP/upload/shelf/latest.json"
+          ln -s "$APK" "$RUNNER_TEMP/upload/shelf/bakery-app.apk"
+          cat "$RUNNER_TEMP/upload/shelf/latest.json"
+
+          rsync -e "$SSH" --chmod=F644 --timeout=600 "$APK" "$DEST"
+          rsync -e "$SSH" -l --chmod=F644 --timeout=120 \
+            "$RUNNER_TEMP/upload/shelf/latest.json" "$RUNNER_TEMP/upload/shelf/bakery-app.apk" "$DEST"
+
+          rm -rf "$RUNNER_TEMP/upload"
+
+          # Read back over plain HTTP on the IP, the address the phones use.
+          GOT=$(curl -fsS --max-time 30 "http://$UPLOAD_HOST/api/v1/app/latest" | jq -r '.data.sha256 // empty' || true)
+          if [ "$GOT" != "$SHA" ]; then
+            echo "::error::Uploaded, but the server's /api/v1/app/latest says sha256 '$GOT', not '$SHA'."
+            exit 1
+          fi
+          echo "On the server: $APK ($SIZE bytes, sha256 $SHA)"

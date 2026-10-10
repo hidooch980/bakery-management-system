@@ -67,4 +67,24 @@ return [
         '/etc/letsencrypt/live/baker.molido.ir/fullchain.pem',
     ),
 
+    /*
+    |--------------------------------------------------------------------------
+    | The app's own download shelf
+    |--------------------------------------------------------------------------
+    |
+    | GitHub is often blocked or slow from Iran, so every signed APK release
+    | is also copied onto this server (build-apk.yml does it after a tag) and
+    | `GET /api/v1/app/latest` reads the manifest written beside it. The app
+    | asks there first and falls back to GitHub Releases.
+    |
+    | `latest.json`: {version, version_code, file, size, sha256, notes}.
+    | `download_path` is the public URL prefix nginx serves the folder on.
+    |
+    */
+
+    'app_release' => [
+        'manifest' => env('APP_RELEASE_MANIFEST', '/var/www/bakery-downloads/latest.json'),
+        'download_path' => env('APP_RELEASE_DOWNLOAD_PATH', '/download'),
+    ],
+
 ];
