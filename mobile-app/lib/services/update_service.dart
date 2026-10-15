@@ -120,13 +120,15 @@ class UpdateService {
       final current = _normalise(info.version);
       final currentCode = int.tryParse(info.buildNumber);
       final server = await _fromServer();
-      if (server != null && _canInstall(server, current, currentCode))
+      if (server != null && _canInstall(server, current, currentCode)) {
         return server;
+      }
 
       // پاسخ قدیمی سرور نباید نسخهٔ جدید گیت‌هاب را پنهان کند.
       final github = await _fromGitHub();
-      if (github != null && _canInstall(github, current, currentCode))
+      if (github != null && _canInstall(github, current, currentCode)) {
         return github;
+      }
       if (server == null && github == null) {
         lastCheckError =
             'بررسی نسخه انجام نشد؛ اتصال به سرور و گیت‌هاب را بررسی و دوباره تلاش کنید.';
@@ -179,8 +181,9 @@ class UpdateService {
 
       final version = _normalise('${data['version'] ?? ''}');
       final url = '${data['url'] ?? ''}'.trim();
-      if (!RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version) || url.isEmpty)
+      if (!RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version) || url.isEmpty) {
         return null;
+      }
       final resolved = Uri.parse(base).resolve(url);
       if (resolved.scheme != 'https' && resolved.scheme != 'http') return null;
 
@@ -265,8 +268,9 @@ class UpdateService {
               receiveTimeout: const Duration(seconds: 60),
               sendTimeout: const Duration(seconds: 15)),
           onReceiveProgress: (received, total) {
-            if (total > 0)
+            if (total > 0) {
               onProgress?.call((received / total).clamp(0.0, 1.0).toDouble());
+            }
           },
         );
         if (!await verifyApk(file, expectedSize: update.sizeBytes) ||
@@ -301,8 +305,9 @@ class UpdateService {
   @visibleForTesting
   static Future<bool> verifyApk(File file, {int expectedSize = 0}) async {
     final length = await file.length();
-    if (length < 4 || (expectedSize > 0 && length != expectedSize))
+    if (length < 4 || (expectedSize > 0 && length != expectedSize)) {
       return false;
+    }
     final handle = await file.open();
     try {
       final bytes = await handle.read(4);

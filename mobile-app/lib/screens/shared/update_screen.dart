@@ -58,9 +58,10 @@ class _UpdateScreenState extends State<UpdateScreen>
       final granted = await InstallPermission.isGranted();
       if (mounted && granted) await _install();
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         showMessage(context, 'بررسی اجازه نصب ممکن نشد؛ دوباره روی نصب بزنید.',
             isError: true);
+      }
     }
   }
 
