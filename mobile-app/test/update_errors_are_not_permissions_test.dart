@@ -1,3 +1,5 @@
+import "package:bakery_app/providers/theme_provider.dart";
+import "package:provider/provider.dart";
 import 'package:bakery_app/screens/shared/update_screen.dart';
 import 'package:bakery_app/services/update_service.dart';
 import 'package:dio/dio.dart';
@@ -42,12 +44,14 @@ class _Service extends UpdateService {
   }
 }
 
+Widget _testApp({required Widget home}) => ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider(), child: MaterialApp(home: home));
+
 void main() {
   testWidgets('خطای بررسی به شکل به‌روز بودن نمایش داده نمی‌شود', (
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(home: UpdateScreen(service: _Service(checkFails: true))),
+      _testApp(home: UpdateScreen(service: _Service(checkFails: true))),
     );
     await tester.pumpAndSettle();
     expect(find.text('بررسی نسخه انجام نشد'), findsOneWidget);
@@ -57,7 +61,7 @@ void main() {
 
   testWidgets('خطای دانلود کاربر را به مجوز نصب نمی‌فرستد', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: UpdateScreen(service: _Service())),
+      _testApp(home: UpdateScreen(service: _Service())),
     );
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('دانلود و نصب'));
@@ -71,7 +75,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _testApp(
         home: UpdateScreen(service: _Service(installPermission: true)),
       ),
     );
