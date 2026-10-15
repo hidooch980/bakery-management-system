@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'api_client.dart';
+import 'install_permission.dart';
 
 /// A release newer than the installed build — from this bakery's own server
 /// when it has one, otherwise from GitHub Releases.
@@ -18,9 +19,11 @@ class AppUpdate {
     required this.sizeBytes,
     this.notes,
     this.sha256,
+    this.versionCode,
   });
 
   final String version;
+  final int? versionCode;
   final String downloadUrl;
   final int sizeBytes;
   final String? notes;
@@ -29,7 +32,8 @@ class AppUpdate {
   /// it is handed to the installer.
   final String? sha256;
 
-  String get sizeLabel => '${(sizeBytes / 1024 / 1024).toStringAsFixed(1)} مگابایت';
+  String get sizeLabel =>
+      '${(sizeBytes / 1024 / 1024).toStringAsFixed(1)} مگابایت';
 }
 
 /// The downloaded APK does not match the checksum that was published, so it
@@ -42,6 +46,15 @@ class UpdateIntegrityException implements Exception {
       ' (ناقص یا دست‌کاری‌شده). دوباره تلاش کنید.';
 }
 
+/// خطای نصب با علت مشخص؛ خطای دانلود نباید درخواست مجوز نصب نشان دهد.
+class UpdateInstallException implements Exception {
+  const UpdateInstallException(this.message, {this.permissionDenied = false});
+  final String message;
+  final bool permissionDenied;
+  @override
+  String toString() => message;
+}
+
 /// Finds a newer APK, downloads it, and hands it to the system installer.
 /// Keeps the app updatable without an app store.
 ///
@@ -49,10 +62,20 @@ class UpdateIntegrityException implements Exception {
 /// from Iran, and every signed release is copied onto the server with a
 /// manifest beside it. GitHub Releases remains the fallback.
 class UpdateService {
-  UpdateService({Dio? dio, String? repo, String? serverBaseUrl})
-      : _dio = dio ?? Dio(),
+  UpdateService(
+      {Dio? dio,
+      String? repo,
+      String? serverBaseUrl,
+      Future<Directory> Function()? temporaryDirectory,
+      Future<bool> Function()? canInstallPackages,
+      Future<OpenResult> Function(String path)? openApk})
+      : _dio = dio ??
+            Dio(BaseOptions(connectTimeout: const Duration(seconds: 15))),
         _repo = repo ?? defaultRepo,
-        _serverBaseUrl = serverBaseUrl;
+        _serverBaseUrl = serverBaseUrl,
+        _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory,
+        _canInstallPackages = canInstallPackages ?? InstallPermission.isGranted,
+        _openApk = openApk ?? _openWithInstaller;
 
   /// Override with --dart-define=UPDATE_REPO=owner/name for a fork.
   static const defaultRepo = String.fromEnvironment(
@@ -62,6 +85,17 @@ class UpdateService {
 
   final Dio _dio;
   final String _repo;
+  final Future<Directory> Function() _temporaryDirectory;
+  final Future<bool> Function() _canInstallPackages;
+  final Future<OpenResult> Function(String path) _openApk;
+  String? _downloadedPath;
+
+  bool get hasDownloaded => _downloadedPath != null;
+
+  static Future<OpenResult> _openWithInstaller(String path) => OpenFilex.open(
+        path,
+        type: 'application/vnd.android.package-archive',
+      );
 
   /// The API base, e.g. `http://37.32.21.125/api/v1`. Read at check time so
   /// a server move picked up after launch is followed.
@@ -70,24 +104,55 @@ class UpdateService {
   String get _apiBase => _serverBaseUrl ?? ApiClient.currentBaseUrl;
 
   Future<String> currentVersion() async {
-    final info = await PackageInfo.fromPlatform();
+    final info =
+        await PackageInfo.fromPlatform().timeout(const Duration(seconds: 5));
     return info.version;
   }
 
-  /// Returns the newer release, or null when already up to date.
-  /// Never throws — a failed check must not block the user's work.
+  /// خطای بررسی دستی باید از «به‌روز است» قابل تشخیص باشد.
+  String? lastCheckError;
+
   Future<AppUpdate?> checkForUpdate() async {
+    lastCheckError = null;
     try {
-      final current = _normalise(await currentVersion());
-      final release = await _fromServer() ?? await _fromGitHub();
+      final info =
+          await PackageInfo.fromPlatform().timeout(const Duration(seconds: 5));
+      final current = _normalise(info.version);
+      final currentCode = int.tryParse(info.buildNumber);
+      final server = await _fromServer();
+      if (server != null && _canInstall(server, current, currentCode))
+        return server;
 
-      if (release == null) return null;
-      if (!_isNewer(release.version, current)) return null;
-
-      return release;
+      // پاسخ قدیمی سرور نباید نسخهٔ جدید گیت‌هاب را پنهان کند.
+      final github = await _fromGitHub();
+      if (github != null && _canInstall(github, current, currentCode))
+        return github;
+      if (server == null && github == null) {
+        lastCheckError =
+            'بررسی نسخه انجام نشد؛ اتصال به سرور و گیت‌هاب را بررسی و دوباره تلاش کنید.';
+      } else if (server != null &&
+          _isNewer(server.version, current) &&
+          server.versionCode != null &&
+          currentCode != null &&
+          server.versionCode! < currentCode) {
+        lastCheckError =
+            'نسخهٔ منتشرشده کد نصب پایین‌تری از برنامهٔ فعلی دارد؛ انتشار جدید باید با کد نصب بالاتر ساخته شود.';
+      }
+      return null;
     } catch (_) {
+      lastCheckError = 'خواندن نسخه یا اتصال برای بررسی به‌روزرسانی ممکن نشد.';
       return null;
     }
+  }
+
+  bool _canInstall(AppUpdate release, String current, int? currentCode) {
+    // اندروید کد نصب را مقایسه می‌کند؛ نام نسخه به‌تنهایی کافی نیست.
+    if (_isNewer(current, release.version)) return false;
+    if (release.versionCode != null && currentCode != null) {
+      if (release.versionCode! < currentCode) return false;
+      return release.versionCode! > currentCode;
+    }
+    return _isNewer(release.version, current);
   }
 
   /// `GET {api}/app/latest`. Null when the server has nothing published,
@@ -114,13 +179,17 @@ class UpdateService {
 
       final version = _normalise('${data['version'] ?? ''}');
       final url = '${data['url'] ?? ''}'.trim();
-      if (version.isEmpty || url.isEmpty) return null;
+      if (!RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version) || url.isEmpty)
+        return null;
+      final resolved = Uri.parse(base).resolve(url);
+      if (resolved.scheme != 'https' && resolved.scheme != 'http') return null;
 
       final sha = '${data['sha256'] ?? ''}'.trim().toLowerCase();
 
       return AppUpdate(
         version: version,
-        downloadUrl: Uri.parse(base).resolve(url).toString(),
+        versionCode: int.tryParse('${data['version_code'] ?? ''}'),
+        downloadUrl: resolved.toString(),
         sizeBytes: (data['size'] as num?)?.toInt() ?? 0,
         notes: data['notes'] as String?,
         sha256: RegExp(r'^[0-9a-f]{64}$').hasMatch(sha) ? sha : null,
@@ -147,7 +216,8 @@ class UpdateService {
       final latest = _normalise(data['tag_name'] as String? ?? '');
       if (latest.isEmpty) return null;
 
-      final assets = (data['assets'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
+      final assets =
+          (data['assets'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
       final apk = assets.firstWhere(
         (a) => (a['name'] as String? ?? '').endsWith('.apk'),
         orElse: () => const <String, dynamic>{},
@@ -178,39 +248,70 @@ class UpdateService {
     void Function(double progress)? onProgress,
     CancelToken? cancelToken,
   }) async {
-    final dir = await getTemporaryDirectory();
+    final dir = await _temporaryDirectory();
     final file = File('${dir.path}/bakery-${update.version}.apk');
-
-    // A partial file from an interrupted attempt would fail to install.
-    if (file.existsSync()) await file.delete();
-
-    await _dio.download(
-      update.downloadUrl,
-      file.path,
-      cancelToken: cancelToken,
-      onReceiveProgress: (received, total) {
-        if (total > 0) onProgress?.call(received / total);
-      },
-    );
-
-    // A cut-off download, a captive portal's HTML page or a tampered file
-    // would otherwise reach the installer, which says only «problem
-    // parsing the package».
-    if (!await verifyChecksum(file, update.sha256)) {
-      if (file.existsSync()) await file.delete();
-      throw const UpdateIntegrityException();
+    final reusable = await file.exists() &&
+        await verifyApk(file, expectedSize: update.sizeBytes) &&
+        await verifyChecksum(file, update.sha256);
+    if (!reusable) {
+      _downloadedPath = null;
+      if (await file.exists()) await file.delete();
+      try {
+        await _dio.download(
+          update.downloadUrl,
+          file.path,
+          cancelToken: cancelToken,
+          options: Options(
+              receiveTimeout: const Duration(seconds: 60),
+              sendTimeout: const Duration(seconds: 15)),
+          onReceiveProgress: (received, total) {
+            if (total > 0)
+              onProgress?.call((received / total).clamp(0.0, 1.0).toDouble());
+          },
+        );
+        if (!await verifyApk(file, expectedSize: update.sizeBytes) ||
+            !await verifyChecksum(file, update.sha256)) {
+          throw const UpdateIntegrityException();
+        }
+      } catch (_) {
+        if (await file.exists()) await file.delete();
+        rethrow;
+      }
     }
+    _downloadedPath = file.path;
+    onProgress?.call(1);
 
-    // Named rather than guessed from the extension: Android hands an APK to
-    // the installer only when the intent says it is one, and left to infer
-    // it the file opened in nothing at all.
-    final result = await OpenFilex.open(
-      file.path,
-      type: 'application/vnd.android.package-archive',
-    );
+    // فایل معتبر نگه داشته می‌شود تا برگشت از تنظیم مجوز، دانلود دوباره نخواهد.
+    if (!await _canInstallPackages()) {
+      throw const UpdateInstallException(
+          'اجازه نصب برنامه‌های ناشناس برای این برنامه فعال نیست.',
+          permissionDenied: true);
+    }
+    final result = await _openApk(file.path);
 
     if (result.type != ResultType.done) {
-      throw Exception(_failureMessage(result));
+      throw UpdateInstallException(
+        _failureMessage(result),
+        permissionDenied: result.type == ResultType.permissionDenied,
+      );
+    }
+  }
+
+  /// بررسی اندازه و امضای آغاز آرشیو؛ فایل ناقص یا HTML به نصب‌کننده نمی‌رود.
+  @visibleForTesting
+  static Future<bool> verifyApk(File file, {int expectedSize = 0}) async {
+    final length = await file.length();
+    if (length < 4 || (expectedSize > 0 && length != expectedSize))
+      return false;
+    final handle = await file.open();
+    try {
+      final bytes = await handle.read(4);
+      return bytes[0] == 0x50 &&
+          bytes[1] == 0x4b &&
+          bytes[2] == 3 &&
+          bytes[3] == 4;
+    } finally {
+      await handle.close();
     }
   }
 

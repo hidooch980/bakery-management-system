@@ -8,14 +8,17 @@ import '../../theme/app_theme.dart';
 
 /// Manual "check for updates" screen, reachable from Settings.
 class UpdateScreen extends StatefulWidget {
-  const UpdateScreen({super.key});
+  const UpdateScreen({super.key, this.service});
+
+  final UpdateService? service;
 
   @override
   State<UpdateScreen> createState() => _UpdateScreenState();
 }
 
-class _UpdateScreenState extends State<UpdateScreen> {
-  final _service = UpdateService();
+class _UpdateScreenState extends State<UpdateScreen>
+    with WidgetsBindingObserver {
+  late final UpdateService _service;
   final _cancelToken = CancelToken();
 
   String _currentVersion = '…';
@@ -23,37 +26,69 @@ class _UpdateScreenState extends State<UpdateScreen> {
   bool _downloading = false;
   double _progress = 0;
   AppUpdate? _update;
+  String? _checkError;
+  bool _waitingForInstallPermission = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _service = widget.service ?? UpdateService();
     _check();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_downloading) _cancelToken.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _waitingForInstallPermission) {
+      _resumeInstallation();
+    }
+  }
+
+  Future<void> _resumeInstallation() async {
+    if (_downloading) return;
+    _waitingForInstallPermission = false;
+    try {
+      final granted = await InstallPermission.isGranted();
+      if (mounted && granted) await _install();
+    } catch (_) {
+      if (mounted)
+        showMessage(context, 'بررسی اجازه نصب ممکن نشد؛ دوباره روی نصب بزنید.',
+            isError: true);
+    }
   }
 
   Future<void> _check() async {
     setState(() => _checking = true);
 
-    final version = await _service.currentVersion();
-    final update = await _service.checkForUpdate();
-
-    if (!mounted) return;
-
-    setState(() {
-      _currentVersion = version;
-      _update = update;
-      _checking = false;
-    });
+    try {
+      final version = await _service.currentVersion();
+      final update = await _service.checkForUpdate();
+      if (!mounted) return;
+      setState(() {
+        _currentVersion = version;
+        _update = update;
+        _checkError = _service.lastCheckError;
+        _checking = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _checkError = 'بررسی نسخه انجام نشد؛ دوباره تلاش کنید.';
+        _checking = false;
+      });
+    }
   }
 
   Future<void> _install() async {
     final update = _update;
-    if (update == null) return;
+    if (update == null || _downloading) return;
 
     setState(() {
       _downloading = true;
@@ -76,11 +111,23 @@ class _UpdateScreenState extends State<UpdateScreen> {
       // the user to toggle a setting would not help.
       if (!mounted) return;
       showMessage(context, e.toString());
+    } on UpdateInstallException catch (e) {
+      if (!mounted) return;
+      if (e.permissionDenied) {
+        await _showPermissionHelp();
+      } else {
+        showMessage(context, e.message, isError: true);
+      }
+    } on DioException catch (e) {
+      if (!mounted || CancelToken.isCancel(e)) return;
+      showMessage(
+        context,
+        'دانلود کامل نشد؛ اتصال اینترنت را بررسی و دوباره تلاش کنید.',
+        isError: true,
+      );
     } catch (e) {
       if (!mounted) return;
-      // The usual cause is the missing install-unknown-apps consent, so offer
-      // to open that settings page rather than just reporting a failure.
-      await _showPermissionHelp();
+      showMessage(context, 'آماده‌سازی نصب انجام نشد: $e', isError: true);
     } finally {
       if (mounted) setState(() => _downloading = false);
     }
@@ -96,7 +143,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
           'اندروید برای نصب برنامه‌هایی که از فروشگاه نیامده‌اند، یک اجازه '
           'یک‌باره می‌خواهد.\n\n'
           'در صفحه‌ای که باز می‌شود، گزینه «اجازه نصب برنامه‌های ناشناس» را '
-          'روشن کنید و سپس برگردید و دوباره روی نصب بزنید.',
+          'روشن کنید و سپس برگردید؛ همان فایل دانلودشده برای نصب باز می‌شود.',
         ),
         actions: [
           TextButton(
@@ -114,11 +161,13 @@ class _UpdateScreenState extends State<UpdateScreen> {
 
     if (open != true || !mounted) return;
 
+    _waitingForInstallPermission = true;
     final opened = await InstallPermission.openSettings();
 
     if (!mounted) return;
 
     if (!opened) {
+      _waitingForInstallPermission = false;
       showMessage(
         context,
         'تنظیمات باز نشد. از مسیر تنظیمات ← برنامه‌ها ← دسترسی ویژه ← '
@@ -143,11 +192,16 @@ class _UpdateScreenState extends State<UpdateScreen> {
           children: [
             Card(
               child: ListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 leading: CircleAvatar(
                   backgroundColor: scheme.primary.withValues(alpha: 0.14),
-                  child: Icon(Icons.info_outline_rounded, color: scheme.primary),
+                  child: Icon(
+                    Icons.info_outline_rounded,
+                    color: scheme.primary,
+                  ),
                 ),
                 title: const Text('نسخه فعلی'),
                 subtitle: Text(_currentVersion),
@@ -168,10 +222,14 @@ class _UpdateScreenState extends State<UpdateScreen> {
             else if (_update == null)
               Column(
                 children: [
-                  const EmptyState(
-                    icon: Icons.check_circle_outline_rounded,
-                    title: 'برنامه به‌روز است',
-                    subtitle: 'نسخه جدیدی برای نصب موجود نیست.',
+                  EmptyState(
+                    icon: _checkError == null
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.cloud_off_outlined,
+                    title: _checkError == null
+                        ? 'برنامه به‌روز است'
+                        : 'بررسی نسخه انجام نشد',
+                    subtitle: _checkError ?? 'نسخه جدیدی برای نصب موجود نیست.',
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
@@ -184,6 +242,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
             else
               _UpdateAvailableCard(
                 update: _update!,
+                readyToInstall: _service.hasDownloaded,
                 downloading: _downloading,
                 progress: _progress,
                 onInstall: _install,
@@ -199,6 +258,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
 class _UpdateAvailableCard extends StatelessWidget {
   const _UpdateAvailableCard({
     required this.update,
+    required this.readyToInstall,
     required this.downloading,
     required this.progress,
     required this.onInstall,
@@ -206,6 +266,7 @@ class _UpdateAvailableCard extends StatelessWidget {
   });
 
   final AppUpdate update;
+  final bool readyToInstall;
   final bool downloading;
   final double progress;
   final VoidCallback onInstall;
@@ -230,8 +291,11 @@ class _UpdateAvailableCard extends StatelessWidget {
                     color: AppColors.moneyIn.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(Corner.control),
                   ),
-                  child: const Icon(Icons.system_update_rounded,
-                      color: AppColors.moneyIn, size: IconSize.heading),
+                  child: const Icon(
+                    Icons.system_update_rounded,
+                    color: AppColors.moneyIn,
+                    size: IconSize.heading,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -279,10 +343,7 @@ class _UpdateAvailableCard extends StatelessWidget {
             if (downloading) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(Corner.chip),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 10,
-                ),
+                child: LinearProgressIndicator(value: progress, minHeight: 10),
               ),
               const SizedBox(height: 10),
               Center(
@@ -295,7 +356,8 @@ class _UpdateAvailableCard extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onInstall,
                 icon: const Icon(Icons.download_rounded),
-                label: const Text('دانلود و نصب'),
+                label: Text(
+                    readyToInstall ? 'نصب فایل دانلودشده' : 'دانلود و نصب'),
               ),
             const SizedBox(height: 12),
             TextButton.icon(
@@ -380,10 +442,11 @@ class _InstallFailedHintState extends State<_InstallFailedHint> {
                 Text(
                   'نسخه‌های خیلی قدیمی این برنامه با کلید دیگری ساخته شده '
                   'بودند و اندروید اجازه نمی‌دهد روی آن‌ها نصب شود.\n\n'
-                  '۱. همین برنامه را از گوشی حذف کنید\n'
-                  '۲. دوباره فایل را نصب کنید\n\n'
-                  'اطلاعات شما روی سرور است و از بین نمی‌رود؛ فقط باید '
-                  'دوباره وارد شوید.',
+                  'قبل از حذف برنامه، همهٔ ثبت‌های آفلاین را ارسال کنید و '
+                  'مطمئن شوید مورد ارسال‌نشده‌ای نمانده است. حذف برنامه '
+                  'ثبت‌های ارسال‌نشدهٔ همین گوشی را پاک می‌کند.\n\n'
+                  'اگر اختلاف امضای نسخهٔ قدیمی تأیید شد، پس از همگام‌سازی '
+                  'برنامه را حذف و نسخهٔ جدید را نصب کنید.',
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:android_intent_plus/android_intent.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 /// Android will not install a downloaded APK until the user has allowed this
@@ -9,6 +10,14 @@ import 'package:package_info_plus/package_info_plus.dart';
 /// instead of hitting a confusing failure mid-install.
 class InstallPermission {
   const InstallPermission._();
+
+  static const _channel = MethodChannel('bakery/install_permission');
+
+  /// مجوز نصب با مجوز خواندن فایل فرق دارد؛ بازشدن Intent به معنی مجازبودن نصب نیست.
+  static Future<bool> isGranted() async {
+    if (!Platform.isAndroid) return true;
+    return await _channel.invokeMethod<bool>('canInstallPackages') ?? false;
+  }
 
   /// Opens the "Install unknown apps" page scoped to this app.
   /// Returns false when the screen could not be opened.

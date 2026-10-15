@@ -18,22 +18,30 @@ class _Router implements HttpClientAdapter {
   final asked = <String>[];
 
   @override
-  Future<ResponseBody> fetch(RequestOptions options,
-      Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
     final url = options.uri.toString();
     asked.add(url);
 
     for (final entry in routes.entries) {
       if (url.contains(entry.key)) {
-        return ResponseBody.fromString(entry.value.$2, entry.value.$1,
-            headers: {
-              Headers.contentTypeHeader: [Headers.jsonContentType],
-            });
+        return ResponseBody.fromString(
+          entry.value.$2,
+          entry.value.$1,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
       }
     }
 
     throw DioException.connectionError(
-        requestOptions: options, reason: 'no route for $url');
+      requestOptions: options,
+      reason: 'no route for $url',
+    );
   }
 
   @override
@@ -42,12 +50,16 @@ class _Router implements HttpClientAdapter {
 
 const _github = 'api.github.com/repos/owner/name/releases/latest';
 
-String _server(String version, {String url = '/download/bakery-app-v9.apk'}) =>
+String _server(
+  String version, {
+  String url = '/download/bakery-app-v9.apk',
+  int versionCode = 10600,
+}) =>
     jsonEncode({
       'success': true,
       'data': {
         'version': version,
-        'version_code': 10600,
+        'version_code': versionCode,
         'url': url,
         'size': 48175473,
         'sha256':
@@ -65,7 +77,7 @@ String _githubRelease(String tag) => jsonEncode({
           'size': 1024,
           'browser_download_url': 'https://github.com/x/$tag.apk',
           'digest': 'sha256:${'a' * 64}',
-        }
+        },
       ],
     });
 
@@ -103,28 +115,36 @@ void main() {
     expect(update, isNotNull);
     expect(update!.version, '5.32.0');
     expect(update.notes, 'از سرور خودمان');
-    expect(update.sha256,
-        'e113b1719846e363057752457b632966e1b71e0ff78871121d21c3b158e6ee27');
+    expect(
+      update.sha256,
+      'e113b1719846e363057752457b632966e1b71e0ff78871121d21c3b158e6ee27',
+    );
     expect(router.asked.single, 'http://37.32.21.125/api/v1/app/latest');
   });
 
-  test('a relative link is resolved against the server the phone uses',
-      () async {
-    final update = await _service(_Router({
-      '/api/v1/app/latest': (200, _server('5.32.0')),
-    })).checkForUpdate();
+  test(
+    'a relative link is resolved against the server the phone uses',
+    () async {
+      final update = await _service(
+        _Router({'/api/v1/app/latest': (200, _server('5.32.0'))}),
+      ).checkForUpdate();
 
-    expect(
-        update!.downloadUrl, 'http://37.32.21.125/download/bakery-app-v9.apk');
-  });
+      expect(
+        update!.downloadUrl,
+        'http://37.32.21.125/download/bakery-app-v9.apk',
+      );
+    },
+  );
 
   test('an absolute link from the server is kept as it is', () async {
-    final update = await _service(_Router({
-      '/api/v1/app/latest': (
-        200,
-        _server('5.32.0', url: 'https://baker.molido.ir/download/a.apk')
-      ),
-    })).checkForUpdate();
+    final update = await _service(
+      _Router({
+        '/api/v1/app/latest': (
+          200,
+          _server('5.32.0', url: 'https://baker.molido.ir/download/a.apk'),
+        ),
+      }),
+    ).checkForUpdate();
 
     expect(update!.downloadUrl, 'https://baker.molido.ir/download/a.apk');
   });
@@ -144,23 +164,61 @@ void main() {
   });
 
   test('an unreachable server falls back to GitHub', () async {
-    final update = await _service(_Router({
-      _github: (200, _githubRelease('v5.33.0')),
-    })).checkForUpdate();
+    final update = await _service(
+      _Router({_github: (200, _githubRelease('v5.33.0'))}),
+    ).checkForUpdate();
 
     expect(update!.version, '5.33.0');
   });
 
   test('the server already being on this version is not an update', () async {
-    final update = await _service(_Router({
-      '/api/v1/app/latest': (200, _server('5.31.0')),
-    })).checkForUpdate();
+    final update = await _service(
+      _Router({
+        '/api/v1/app/latest': (200, _server('5.31.0', versionCode: 10514)),
+      }),
+    ).checkForUpdate();
 
     expect(update, isNull);
   });
 
   test('both unreachable says nothing rather than throwing', () async {
     expect(await _service(_Router({})).checkForUpdate(), isNull);
+  });
+
+  test('نام نسخه برابر است ولی کد نصب بالاتر به‌روزرسانی است', () async {
+    final update = await _service(
+      _Router({
+        '/api/v1/app/latest': (200, _server('5.31.0', versionCode: 10518)),
+      }),
+    ).checkForUpdate();
+    expect(update, isNotNull);
+    expect(update!.versionCode, 10518);
+  });
+
+  test('پاسخ قدیمی سرور نسخه تازه گیت‌هاب را پنهان نمی‌کند', () async {
+    final update = await _service(
+      _Router({
+        '/api/v1/app/latest': (200, _server('5.31.0', versionCode: 10514)),
+        _github: (200, _githubRelease('v5.33.0')),
+      }),
+    ).checkForUpdate();
+    expect(update!.version, '5.33.0');
+  });
+
+  test('کد نصب پایین‌تر به گوشی پیشنهاد نمی‌شود', () async {
+    final service = _service(
+      _Router({
+        '/api/v1/app/latest': (200, _server('5.33.0', versionCode: 10500)),
+      }),
+    );
+    expect(await service.checkForUpdate(), isNull);
+    expect(service.lastCheckError, contains('کد نصب پایین‌تر'));
+  });
+
+  test('قطع اتصال از به‌روز بودن قابل تشخیص است', () async {
+    final service = _service(_Router({}));
+    expect(await service.checkForUpdate(), isNull);
+    expect(service.lastCheckError, isNotNull);
   });
 
   group('checksum', () {
@@ -179,11 +237,21 @@ void main() {
 
       expect(await UpdateService.verifyChecksum(file, hex), isTrue);
       expect(
-          await UpdateService.verifyChecksum(file, hex.toUpperCase()), isTrue);
+        await UpdateService.verifyChecksum(file, hex.toUpperCase()),
+        isTrue,
+      );
     });
 
     test('a different file is refused', () async {
       expect(await UpdateService.verifyChecksum(file, 'b' * 64), isFalse);
+    });
+
+    test('صفحه HTML و فایل ناقص حتی بدون هش، فایل نصب نیستند', () async {
+      file.writeAsStringSync('<html>خطای سرور</html>');
+      expect(await UpdateService.verifyApk(file), isFalse);
+      file.writeAsBytesSync([0x50, 0x4b, 3, 4, 0, 0]);
+      expect(await UpdateService.verifyApk(file, expectedSize: 9), isFalse);
+      expect(await UpdateService.verifyApk(file, expectedSize: 6), isTrue);
     });
 
     test('no published checksum does not block the install', () async {
