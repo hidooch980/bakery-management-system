@@ -33,7 +33,12 @@ class _DieselSectionState extends State<DieselSection> {
     _data = widget.api.dieselQuota();
   }
 
-  void _reload() => setState(() => _data = widget.api.dieselQuota());
+  void _reload() {
+    final data = widget.api.dieselQuota();
+    setState(() {
+      _data = data;
+    });
+  }
 
   Future<void> _recordDelivery() async {
     final result = await showModalBottomSheet<_DeliveryInput>(
