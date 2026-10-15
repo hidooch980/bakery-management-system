@@ -32,6 +32,7 @@ class MonthlyQuotaFromThePhoneTest extends TestCase
     {
         $previous = FlourAllocation::create([
             'month_start' => Jalali::parse('1405/06/01'),
+            'month_label' => 'شهریور ۱۴۰۵',
             'total_bags' => 100,
         ]);
         $previous->syncPeriods();
