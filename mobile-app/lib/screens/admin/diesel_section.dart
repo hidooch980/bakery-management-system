@@ -112,18 +112,37 @@ class _DieselSectionState extends State<DieselSection> {
         // No quota registered is a fact, not a zero. Showing 0 litres left
         // would read as an empty tank rather than an unanswered question.
         if (quota == null) {
-          return const AdminSection(
+          return AdminSection(
             title: 'سهمیه گازوئیل',
             icon: Icons.local_gas_station_rounded,
+            trailing: TextButton.icon(
+              onPressed: _recordDelivery,
+              icon: const Icon(Icons.add_rounded, size: IconSize.row),
+              label: const Text('ثبت تحویل'),
+            ),
             children: [
-              AdminRow(
+              const AdminRow(
                 label: 'وضعیت',
                 value: 'برای این ماه سهمیه‌ای ثبت نشده',
               ),
-              AdminRow(
-                label: 'راه‌حل',
-                value: 'اول سهمیه آرد ماه را وارد کنید',
+              const AdminRow(
+                label: 'ثبت سوخت',
+                value: 'ثبت تحویل بدون سهمیه هم امکان‌پذیر است',
               ),
+              const AdminRow(
+                label: 'تعریف سهمیه',
+                value: 'سهمیه آرد ماه را در پنل مدیر وارد کنید',
+              ),
+              if (deliveries.isNotEmpty) ...[
+                const Divider(height: 24),
+                for (final delivery in deliveries.take(6))
+                  AdminRow(
+                    label: '${delivery.receivedOnLabel}'
+                        '${delivery.docketNumber == null ? '' : ' · ${delivery.docketNumber}'}',
+                    value: '${_litres(delivery.litres)} لیتر'
+                        ' · ${delivery.amountFormatted}',
+                  ),
+              ],
             ],
           );
         }
