@@ -1619,14 +1619,15 @@ class BakeryApi {
     return allocation == null ? null : DieselQuota.fromJson(allocation);
   }
 
-  /// Registers the month's flour quota. The diesel quota follows it, so
-  /// this is what a new month starts from.
+  /// ماه انتخاب‌شده همراه سهمیه فرستاده می‌شود؛ سهمیه گازوئیل از آن ساخته می‌شود.
   Future<void> setFlourQuota({
+    required String monthStart,
     required double totalBags,
     double? carryoverBags,
     String? note,
   }) =>
       _client.post('/flour-allocations', {
+        'month_start': monthStart,
         'total_bags': totalBags,
         if (carryoverBags != null) 'carryover_bags': carryoverBags,
         if (note != null && note.isNotEmpty) 'note': note,

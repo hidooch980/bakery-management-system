@@ -6,6 +6,7 @@ import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
+import 'monthly_quota_button.dart';
 
 typedef _DieselData = ({DieselQuota? quota, List<DieselDelivery> deliveries});
 
@@ -136,8 +137,9 @@ class _DieselSectionState extends State<DieselSection> {
               ),
               const AdminRow(
                 label: 'تعریف سهمیه',
-                value: 'سهمیه آرد ماه را در پنل مدیر وارد کنید',
+                value: 'ماه و تعداد کیسه را از دکمه زیر ثبت کنید',
               ),
+              MonthlyQuotaButton(api: widget.api, onSaved: _reload),
               if (deliveries.isNotEmpty) ...[
                 const Divider(height: 24),
                 for (final delivery in deliveries.take(6))
@@ -161,6 +163,7 @@ class _DieselSectionState extends State<DieselSection> {
             label: const Text('ثبت تحویل'),
           ),
           children: [
+            MonthlyQuotaButton(api: widget.api, onSaved: _reload),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
               child: _QuotaMeter(quota: quota),

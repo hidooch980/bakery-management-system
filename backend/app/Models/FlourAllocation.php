@@ -71,7 +71,11 @@ class FlourAllocation extends Model
         // fuel was left. Only ever created, never updated, because a month
         // already drawn against must not be restated underneath the shop.
         static::created(function (self $allocation) {
-            if (DieselAllocation::forDate($allocation->month_start)) {
+            // روز اول ماه در بازه مصرف ماه قبل است؛ وجود سهمیه را در ماهِ خود سند می‌سنجیم.
+            [$monthFrom, $monthTo] = Jalali::monthRangeFor($allocation->month_start);
+            if (DieselAllocation::whereBetween('month_start', [
+                $monthFrom->toDateString(), $monthTo->toDateString(),
+            ])->exists()) {
                 return;
             }
 
