@@ -183,13 +183,61 @@ class BakeryApi {
     return body['queued'] == true;
   }
 
-  Future<({bool checkedIn, DateTime? at})> attendanceToday() async {
+  Future<
+      ({
+        bool checkedIn,
+        DateTime? at,
+        DateTime? outAt,
+        int? workedMinutes,
+      })> attendanceToday() async {
     final body = await _client.getCached('/attendance/today');
     final data = body['data'] as Map<String, dynamic>;
 
     return (
       checkedIn: data['checked_in'] as bool? ?? false,
       at: DateTime.tryParse(data['checked_in_at'] as String? ?? ''),
+      outAt: DateTime.tryParse(data['checked_out_at'] as String? ?? ''),
+      workedMinutes: (data['worked_minutes'] as num?)?.toInt(),
+    );
+  }
+
+  /// «ثبت خروج» for yourself. Queued like the check-in when there is no
+  /// signal, so leaving is never lost to a dead radio.
+  Future<({AttendanceRecord? record, bool queued})> checkOut() async {
+    final body = await _client.postOrQueue(
+      '/attendance/check-out',
+      const {},
+      label: 'ثبت خروج',
+    );
+
+    if (body['queued'] == true) return (record: null, queued: true);
+
+    return (
+      record: AttendanceRecord.fromJson(body['data'] as Map<String, dynamic>),
+      queued: false,
+    );
+  }
+
+  /// Records someone else leaving. Returns the worked minutes the server
+  /// counted, or null when the request was queued for later.
+  Future<({bool queued, String? at, int? workedMinutes})> checkOutFor(
+      int userId) async {
+    final body = await _client.postOrQueue(
+      '/attendance/check-out/$userId',
+      const {},
+      label: 'ثبت خروج',
+    );
+
+    if (body['queued'] == true) {
+      return (queued: true, at: null, workedMinutes: null);
+    }
+
+    final data = (body['data'] as Map?)?.cast<String, dynamic>() ?? const {};
+
+    return (
+      queued: false,
+      at: data['checked_out_time'] as String?,
+      workedMinutes: (data['worked_minutes'] as num?)?.toInt(),
     );
   }
 

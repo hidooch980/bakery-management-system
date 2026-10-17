@@ -55,6 +55,13 @@ class AttendanceResource extends Resource
                         ->seconds(false)
                         ->required()
                         ->native(false),
+
+                    Forms\Components\DateTimePicker::make('checked_out_at')
+                        ->label('ساعت خروج')
+                        ->seconds(false)
+                        ->after('checked_in_at')
+                        ->validationMessages(['after' => 'ساعت خروج باید بعد از ساعت حضور باشد.'])
+                        ->native(false),
                 ]),
         ]);
     }
@@ -88,6 +95,19 @@ class AttendanceResource extends Resource
                     ->color('success')
                     ->icon('heroicon-m-clock')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('checked_out_at')
+                    ->label('ساعت خروج')
+                    ->formatStateUsing(fn ($state) => Jalali::time($state))
+                    ->placeholder('—')
+                    ->badge()
+                    ->color('warning')
+                    ->icon('heroicon-m-arrow-right-on-rectangle')
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('worked_label')
+                    ->label('مدت کار')
+                    ->placeholder('—'),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('ثبت در سیستم')

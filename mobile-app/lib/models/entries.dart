@@ -93,8 +93,7 @@ enum PaymentType {
   final String apiValue;
   final String label;
 
-  static PaymentType fromApi(String? value) =>
-      PaymentType.values.firstWhere(
+  static PaymentType fromApi(String? value) => PaymentType.values.firstWhere(
         (t) => t.apiValue == value,
         orElse: () => PaymentType.other,
       );
@@ -247,11 +246,19 @@ class AttendanceRecord {
     required this.id,
     required this.date,
     required this.checkedInAt,
+    this.checkedOutAt,
+    this.workedMinutes,
   });
 
   final int id;
   final DateTime? date;
   final DateTime? checkedInAt;
+
+  /// «ثبت خروج»; null until they have left.
+  final DateTime? checkedOutAt;
+
+  /// Worked minutes, from the server; null until they have left.
+  final int? workedMinutes;
 
   /// Nothing here is required to be present.
   ///
@@ -265,6 +272,8 @@ class AttendanceRecord {
         id: (json['id'] as num?)?.toInt() ?? 0,
         date: DateTime.tryParse('${json['date'] ?? ''}'),
         checkedInAt: DateTime.tryParse('${json['checked_in_at'] ?? ''}'),
+        checkedOutAt: DateTime.tryParse('${json['checked_out_at'] ?? ''}'),
+        workedMinutes: (json['worked_minutes'] as num?)?.toInt(),
       );
 }
 
@@ -280,7 +289,19 @@ class StaffAttendance {
     this.role,
     this.checkedInAt,
     this.recordedByAnother = false,
+    this.checkedOut = false,
+    this.checkedOutAt,
+    this.workedMinutes,
   });
+
+  /// They have left for the day («ثبت خروج»).
+  final bool checkedOut;
+
+  /// Wall-clock time they left, already formatted by the server.
+  final String? checkedOutAt;
+
+  /// Minutes between arriving and leaving; null until they have left.
+  final int? workedMinutes;
 
   final int id;
   final String name;
@@ -309,5 +330,8 @@ class StaffAttendance {
         role: json['role'] as String?,
         checkedInAt: json['checked_in_at'] as String?,
         recordedByAnother: json['recorded_by_another'] as bool? ?? false,
+        checkedOut: json['checked_out'] as bool? ?? false,
+        checkedOutAt: json['checked_out_at'] as String?,
+        workedMinutes: (json['worked_minutes'] as num?)?.toInt(),
       );
 }
