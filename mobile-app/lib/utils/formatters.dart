@@ -35,16 +35,53 @@ String flourBags(double bags) {
   return '$text کیسه';
 }
 
+/// Latin digits rewritten as Persian ones, for text that is only read.
+String persianDigits(String value) {
+  const persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+
+  return value.replaceAllMapped(
+      RegExp(r'[0-9]'), (m) => persian[int.parse(m.group(0)!)]);
+}
+
+/// «مدت کار»: «۸ ساعت و ۱۵ دقیقه»، «۸ ساعت»، «۴۵ دقیقه».
+String workedDuration(int minutes) {
+  final safe = minutes < 0 ? 0 : minutes;
+  final hours = safe ~/ 60;
+  final rest = safe % 60;
+  final parts = <String>[
+    if (hours > 0) '$hours ساعت',
+    if (rest > 0 || hours == 0) '$rest دقیقه',
+  ];
+
+  return persianDigits(parts.join(' و '));
+}
+
 class JalaliFormat {
   const JalaliFormat._();
 
   static const _monthNames = [
-    'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
-    'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
+    'فروردین',
+    'اردیبهشت',
+    'خرداد',
+    'تیر',
+    'مرداد',
+    'شهریور',
+    'مهر',
+    'آبان',
+    'آذر',
+    'دی',
+    'بهمن',
+    'اسفند',
   ];
 
   static const _weekDayNames = [
-    'شنبه', 'یک‌شنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه',
+    'شنبه',
+    'یک‌شنبه',
+    'دوشنبه',
+    'سه‌شنبه',
+    'چهارشنبه',
+    'پنج‌شنبه',
+    'جمعه',
   ];
 
   /// ۱۴۰۵/۰۵/۰۳
@@ -241,7 +278,8 @@ class GroupedAmountInputFormatter extends TextInputFormatter {
         dot == -1 ? null : bare.substring(dot + 1).replaceAll('.', '');
 
     final digits = int.tryParse(whole);
-    final text = StringBuffer(digits == null ? whole : MoneyFormat._group(digits));
+    final text =
+        StringBuffer(digits == null ? whole : MoneyFormat._group(digits));
     if (fraction != null) text.write('.$fraction');
 
     final formatted = text.toString();

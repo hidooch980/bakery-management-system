@@ -37,6 +37,10 @@ class _AttendanceCardState extends State<AttendanceCard> {
   bool _submitting = false;
   bool _checkedIn = false;
   DateTime? _checkedInAt;
+  DateTime? _checkedOutAt;
+  int? _workedMinutes;
+
+  bool get _checkedOut => _checkedOutAt != null;
 
   @override
   void initState() {
@@ -51,6 +55,8 @@ class _AttendanceCardState extends State<AttendanceCard> {
       setState(() {
         _checkedIn = status.checkedIn;
         _checkedInAt = status.at;
+        _checkedOutAt = status.outAt;
+        _workedMinutes = status.workedMinutes;
         _loading = false;
         _failed = false;
       });
@@ -94,6 +100,43 @@ class _AttendanceCardState extends State<AttendanceCard> {
     }
   }
 
+  Future<void> _checkOut() async {
+    setState(() => _submitting = true);
+
+    try {
+      final result = await widget.api.checkOut();
+      if (!mounted) return;
+      final out = result.record?.checkedOutAt ?? DateTime.now();
+      setState(() {
+        _checkedOutAt = out;
+        _workedMinutes = result.record?.workedMinutes ??
+            (_checkedInAt != null
+                ? out.difference(_checkedInAt!).inMinutes
+                : null);
+      });
+      showMessage(
+        context,
+        result.queued
+            ? 'اینترنت وصل نیست؛ خروج شما ذخیره شد و با اتصال بعدی ثبت می‌شود.'
+            : 'خروج شما ثبت شد.',
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showMessage(context, e.message, isError: true);
+      if (e.statusCode == 409 || e.statusCode == 422) _refresh();
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  String get _subtitle {
+    if (_failed) return 'اینترنت وصل نشد — دوباره بزنید';
+    if (!_checkedIn) return 'برای ثبت ساعت ورود ضربه بزنید';
+    final inAt = _checkedInAt != null ? JalaliFormat.time(_checkedInAt!) : '—';
+    if (!_checkedOut) return 'ورود ساعت $inAt';
+    return 'ورود $inAt — خروج ${JalaliFormat.time(_checkedOutAt!)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -109,15 +152,15 @@ class _AttendanceCardState extends State<AttendanceCard> {
           // the roster inside the loaded branch meant one failed request
           // took away a button about somebody else entirely.
           child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_loading)
-                      const SizedBox(
-                        height: 76,
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else
-                      Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_loading)
+                const SizedBox(
+                  height: 76,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else
+                Row(
                   children: [
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 350),
@@ -144,7 +187,11 @@ class _AttendanceCardState extends State<AttendanceCard> {
                           Text(
                             _failed
                                 ? 'وضعیت امروز خوانده نشد'
-                                : (_checkedIn ? 'حضور ثبت شده' : 'تیک حضور امروز'),
+                                : (_checkedOut
+                                    ? 'خروج ثبت شده'
+                                    : (_checkedIn
+                                        ? 'حضور ثبت شده'
+                                        : 'تیک حضور امروز')),
                             style: Theme.of(context)
                                 .textTheme
                                 .titleMedium
@@ -152,16 +199,24 @@ class _AttendanceCardState extends State<AttendanceCard> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _failed
-                                ? 'اینترنت وصل نشد — دوباره بزنید'
-                                : (_checkedIn && _checkedInAt != null
-                                    ? 'ساعت ${JalaliFormat.time(_checkedInAt!)}'
-                                    : 'برای ثبت ساعت ورود ضربه بزنید'),
+                            _subtitle,
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
                                 ?.copyWith(color: scheme.onSurfaceVariant),
                           ),
+                          if (_checkedOut && _workedMinutes != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'مدت کار: ${workedDuration(_workedMinutes!)}',
+                              key: const ValueKey('worked-duration'),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                      color: done, fontWeight: FontWeight.w700),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -178,9 +233,25 @@ class _AttendanceCardState extends State<AttendanceCard> {
                         tooltip: 'دوباره',
                         icon: const Icon(Icons.refresh_rounded),
                       )
-                    else if (_checkedIn)
+                    else if (_checkedOut)
                       const Icon(Icons.check_circle_rounded,
                           color: done, size: IconSize.large)
+                    else if (_checkedIn)
+                      OutlinedButton(
+                        key: const ValueKey('check-out'),
+                        onPressed: _submitting ? null : _checkOut,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(104, 48),
+                        ),
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('ثبت خروج'),
+                      )
                     else
                       FilledButton(
                         onPressed: _submitting ? null : _checkIn,
@@ -192,28 +263,31 @@ class _AttendanceCardState extends State<AttendanceCard> {
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary),
+                                    strokeWidth: 2,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onPrimary),
                               )
                             : const Text('ثبت'),
                       ),
-                      ],
-                    ),
-                    if (widget.canRecordForOthers) ...[
-                      const Divider(height: 22),
-                      // The bakers are at the oven with flour on their
-                      // hands; whoever holds a phone marks them in.
-                      TextButton.icon(
-                        onPressed: () => showModalBottomSheet<void>(
-                          context: context,
-                          isScrollControlled: true,
-                          builder: (_) => _RosterSheet(api: widget.api),
-                        ),
-                        icon: const Icon(Icons.groups_rounded, size: IconSize.row),
-                        label: const Text('ثبت حضور بقیه کارکنان'),
-                      ),
-                    ],
                   ],
                 ),
+              if (widget.canRecordForOthers) ...[
+                const Divider(height: 22),
+                // The bakers are at the oven with flour on their
+                // hands; whoever holds a phone marks them in.
+                TextButton.icon(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => _RosterSheet(api: widget.api),
+                  ),
+                  icon: const Icon(Icons.groups_rounded, size: IconSize.row),
+                  label: const Text('ثبت حضور و خروج بقیه کارکنان'),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -307,6 +381,59 @@ class _RosterSheetState extends State<_RosterSheet> {
     }
   }
 
+  Future<void> _tickOut(StaffAttendance person) async {
+    setState(() => _busy.add(person.id));
+
+    try {
+      final result = await widget.api.checkOutFor(person.id);
+      if (!mounted) return;
+
+      setState(() {
+        _staff = [
+          for (final s in _staff ?? const <StaffAttendance>[])
+            if (s.id == person.id)
+              StaffAttendance(
+                id: s.id,
+                name: s.name,
+                role: s.role,
+                checkedIn: true,
+                checkedInAt: s.checkedInAt,
+                recordedByAnother: s.recordedByAnother,
+                checkedOut: true,
+                checkedOutAt: result.at,
+                workedMinutes: result.workedMinutes,
+              )
+            else
+              s,
+        ];
+      });
+
+      if (result.queued) {
+        showMessage(
+          context,
+          'اینترنت وصل نیست؛ خروج ${person.displayName} ذخیره شد و با اتصال بعدی ثبت می‌شود.',
+        );
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      showMessage(context, e.message, isError: true);
+      if (e.statusCode == 409 || e.statusCode == 422) _load();
+    } finally {
+      if (mounted) setState(() => _busy.remove(person.id));
+    }
+  }
+
+  String _rowStatus(StaffAttendance person) {
+    final inAt = person.checkedInAt ?? '—';
+    if (!person.checkedOut) {
+      return person.checkedInAt != null ? 'ورود ساعت $inAt' : 'ثبت شده';
+    }
+    final out = 'ورود $inAt — خروج ${person.checkedOutAt ?? '—'}';
+    return person.workedMinutes != null
+        ? '$out\nمدت کار: ${workedDuration(person.workedMinutes!)}'
+        : out;
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -329,7 +456,7 @@ class _RosterSheetState extends State<_RosterSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              'برای هر نفر که سر کار آمده ضربه بزنید.',
+              'برای ورود و خروج هر نفر ضربه بزنید.',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
@@ -375,33 +502,53 @@ class _RosterSheetState extends State<_RosterSheet> {
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(person.displayName),
+                      isThreeLine: person.checkedOut,
                       subtitle: person.checkedIn
                           ? Text(
-                              person.checkedInAt != null
-                                  ? 'ساعت ${person.checkedInAt}'
-                                  : 'ثبت شده',
+                              _rowStatus(person),
                               style: const TextStyle(color: done),
                             )
                           : Text(
                               person.role ?? '',
                               style: TextStyle(color: scheme.onSurfaceVariant),
                             ),
-                      trailing: person.checkedIn
+                      trailing: person.checkedOut
                           ? const Icon(Icons.check_circle_rounded,
                               color: done, size: IconSize.heading)
-                          : FilledButton(
-                              onPressed:
-                                  working ? null : () => _tickIn(person),
-                              child: working
-                                  ? SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Theme.of(context).colorScheme.onPrimary),
-                                    )
-                                  : const Text('ثبت'),
-                            ),
+                          : person.checkedIn
+                              ? OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(88, 40),
+                                  ),
+                                  onPressed:
+                                      working ? null : () => _tickOut(person),
+                                  child: working
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
+                                        )
+                                      : const Text('ثبت خروج'),
+                                )
+                              : FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size(88, 40),
+                                  ),
+                                  onPressed:
+                                      working ? null : () => _tickIn(person),
+                                  child: working
+                                      ? SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onPrimary),
+                                        )
+                                      : const Text('ثبت'),
+                                ),
                     );
                   },
                 ),

@@ -134,6 +134,7 @@ Route::prefix('v1')->group(function () {
         // --- Attendance (all staff) ---
         Route::middleware('permission:record-attendance')->group(function () {
             Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn']);
+            Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut']);
             Route::get('/attendance/today', [AttendanceController::class, 'today']);
             Route::get('/attendance/my-history', [AttendanceController::class, 'myHistory']);
 
@@ -141,6 +142,7 @@ Route::prefix('v1')->group(function () {
             Route::middleware('permission:record-attendance-for-others')->group(function () {
                 Route::get('/attendance/roster', [AttendanceController::class, 'roster']);
                 Route::post('/attendance/check-in/{user}', [AttendanceController::class, 'checkInFor']);
+                Route::post('/attendance/check-out/{user}', [AttendanceController::class, 'checkOutFor']);
             });
         });
 

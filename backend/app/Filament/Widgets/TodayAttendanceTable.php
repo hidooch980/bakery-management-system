@@ -47,6 +47,17 @@ class TodayAttendanceTable extends BaseWidget
                     ->badge()
                     ->color('success')
                     ->icon('heroicon-m-clock'),
+
+                Tables\Columns\TextColumn::make('checked_out_at')
+                    ->label('ساعت خروج')
+                    ->formatStateUsing(fn ($state) => Jalali::time($state))
+                    ->placeholder('هنوز نرفته')
+                    ->badge()
+                    ->color('warning'),
+
+                Tables\Columns\TextColumn::make('worked_label')
+                    ->label('مدت کار')
+                    ->placeholder('—'),
             ])
             ->emptyStateHeading('هنوز کسی تیک حضور نزده است')
             ->emptyStateIcon('heroicon-o-clock')

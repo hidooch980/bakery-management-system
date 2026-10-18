@@ -74,6 +74,9 @@ class AttendanceController extends Controller
                     'role' => $person->getRoleNames()->first(),
                     'checked_in' => $attendance !== null,
                     'checked_in_at' => $attendance?->checked_in_at?->format('H:i'),
+                    'checked_out' => $attendance?->checked_out_at !== null,
+                    'checked_out_at' => $attendance?->checked_out_at?->format('H:i'),
+                    'worked_minutes' => $attendance?->worked_minutes,
                     // So the person ticking can see they already did it,
                     // rather than wondering why the button went quiet.
                     'recorded_by_another' => (bool) $attendance?->was_recorded_by_another,
@@ -120,6 +123,60 @@ class AttendanceController extends Controller
     }
 
     /**
+     * Record when the authenticated staff member left today.
+     */
+    public function checkOut(Request $request): JsonResponse
+    {
+        return $this->leave($request->user(), null, 'خروج شما ثبت شد.', 'شما');
+    }
+
+    /**
+     * Records someone else leaving, mirroring checkInFor.
+     */
+    public function checkOutFor(Request $request, User $user): JsonResponse
+    {
+        $user = SameBakery::or404($user);
+
+        if (! $user->is_active) {
+            return $this->error('این کارمند فعال نیست.', 422);
+        }
+
+        return $this->leave($user, $request->user()->id, 'خروج '.$user->name.' ثبت شد.', 'این کارمند');
+    }
+
+    /**
+     * One rule for both: a check-in today, not already out, and out after in.
+     */
+    private function leave(User $user, ?int $recordedBy, string $message, string $who): JsonResponse
+    {
+        $attendance = Attendance::where('user_id', $user->id)
+            ->where('date', now()->toDateString())
+            ->first();
+
+        if ($attendance === null) {
+            return $this->error('برای '.$who.' امروز ورودی ثبت نشده است.', 422);
+        }
+
+        if ($attendance->checked_out_at !== null) {
+            return $this->error('خروج '.$who.' برای امروز قبلاً ثبت شده است.', 409);
+        }
+
+        $now = now();
+
+        if ($attendance->checked_in_at !== null && $now->lt($attendance->checked_in_at)) {
+            return $this->error('ساعت خروج نمی‌تواند پیش از ساعت ورود باشد.', 422);
+        }
+
+        $attendance->forceFill(['checked_out_at' => $now])->save();
+
+        return $this->success(array_merge($attendance->toApi(), [
+            'name' => $user->name,
+            'checked_in_time' => $attendance->checked_in_at?->format('H:i'),
+            'checked_out_time' => $attendance->checked_out_at->format('H:i'),
+        ]), $message);
+    }
+
+    /**
      * Today's attendance status for the authenticated user.
      */
     public function today(Request $request): JsonResponse
@@ -131,6 +188,9 @@ class AttendanceController extends Controller
         return $this->success([
             'checked_in' => (bool) $attendance,
             'checked_in_at' => $attendance?->checked_in_at?->toDateTimeString(),
+            'checked_out' => $attendance?->checked_out_at !== null,
+            'checked_out_at' => $attendance?->checked_out_at?->toDateTimeString(),
+            'worked_minutes' => $attendance?->worked_minutes,
         ]);
     }
 
