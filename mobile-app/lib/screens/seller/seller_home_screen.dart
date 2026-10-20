@@ -588,6 +588,8 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
   List<Customer> _customerOptions = const [];
   List<StaffName> _staff = const [];
   bool _saving = false;
+  bool _staffLoading = true;
+  String? _staffProblem;
 
   @override
   void initState() {
@@ -621,12 +623,25 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
   }
 
   Future<void> _loadStaff() async {
+    setState(() {
+      _staffLoading = true;
+      _staffProblem = null;
+    });
     try {
       final list = await widget.api.saleStaff();
-      if (mounted) setState(() => _staff = list);
-    } on ApiException {
-      // Only «منزل» needs it, and naming somebody is optional there, so
-      // a failure here must not stop a sale being recorded.
+      if (!mounted) return;
+      setState(() {
+        _staff = list;
+        if (list.isEmpty) {
+          _staffProblem = 'کارمند فعالی در فهرست پیدا نشد.';
+        }
+      });
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() => _staffProblem = 'فهرست کارکنان دریافت نشد: ${e.message}');
+      }
+    } finally {
+      if (mounted) setState(() => _staffLoading = false);
     }
   }
 
@@ -900,7 +915,7 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
                     ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
-              for (final type in PaymentType.saleChoices)
+              for (final type in PaymentType.saleChoices) ...[
                 _PaymentRow(
                   key: ValueKey(type),
                   type: type,
@@ -918,41 +933,57 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
                   selectedConsumer: _consumedBy,
                   onConsumerChanged: (id) => setState(() => _consumedBy = id),
                 ),
-              for (final row in _extraHome)
-                Column(
-                  key: ObjectKey(row),
-                  children: [
-                    _PaymentRow(
-                      type: PaymentType.home,
-                      controller: row.count,
-                      count: _readCount(row.count),
-                      unitPrice: _unitPrice,
-                      unit: _unit,
-                      customers: const [],
-                      selectedCustomer: null,
-                      canFill: _unassigned > 0,
-                      onFill: () {
-                        row.count.text =
-                            '${_readCount(row.count) + _unassigned}';
-                      },
-                      onCustomerChanged: (_) {},
-                      staff: _staff,
-                      selectedConsumer: row.userId,
-                      onConsumerChanged: (id) =>
-                          setState(() => row.userId = id),
+                if (type == PaymentType.home) ...[
+                  if (_staffLoading)
+                    const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text('در حال دریافت نام کارکنان…'),
                     ),
+                  if (_staffProblem != null) ...[
+                    Text(_staffProblem!),
                     TextButton.icon(
-                      onPressed: _saving ? null : () => _removeHome(row),
-                      icon: const Icon(Icons.remove_circle_outline),
-                      label: const Text('حذف ردیف کارمند'),
+                      onPressed: _saving || _staffLoading ? null : _loadStaff,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('دریافت دوباره نام کارکنان'),
                     ),
                   ],
-                ),
-              OutlinedButton.icon(
-                onPressed: _saving || _staff.isEmpty ? null : _addHome,
-                icon: const Icon(Icons.person_add_alt_1),
-                label: const Text('افزودن کارمند برای نان منزل'),
-              ),
+                  for (final row in _extraHome)
+                    Column(
+                      key: ObjectKey(row),
+                      children: [
+                        _PaymentRow(
+                          type: PaymentType.home,
+                          controller: row.count,
+                          count: _readCount(row.count),
+                          unitPrice: _unitPrice,
+                          unit: _unit,
+                          customers: const [],
+                          selectedCustomer: null,
+                          canFill: _unassigned > 0,
+                          onFill: () {
+                            row.count.text =
+                                '${_readCount(row.count) + _unassigned}';
+                          },
+                          onCustomerChanged: (_) {},
+                          staff: _staff,
+                          selectedConsumer: row.userId,
+                          onConsumerChanged: (id) =>
+                              setState(() => row.userId = id),
+                        ),
+                        TextButton.icon(
+                          onPressed: _saving ? null : () => _removeHome(row),
+                          icon: const Icon(Icons.remove_circle_outline),
+                          label: const Text('حذف ردیف کارمند'),
+                        ),
+                      ],
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _saving ? null : _addHome,
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: const Text('افزودن کارمند برای نان منزل'),
+                  ),
+                ],
+              ],
               const SizedBox(height: 16),
               _TotalRow(
                 count: _totalCount,
