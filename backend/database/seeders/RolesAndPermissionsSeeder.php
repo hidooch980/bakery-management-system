@@ -29,6 +29,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'manage-finance',
         'view-financial-reports',
         'manage-inventory',
+        'record-consignment-flour',
         'view-inventory',
         'manage-customers',
         'view-chane-board',
@@ -99,6 +100,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // Flour arriving, and flour lent to or borrowed from a partner.
             'view-inventory',
             'manage-inventory',
+            'record-consignment-flour',
             'view-chane-board',
             'record-attendance',
             // Who is in today — the whole floor, not just themselves.
