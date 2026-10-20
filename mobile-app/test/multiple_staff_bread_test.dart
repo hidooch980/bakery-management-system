@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 class _Api extends BakeryApi {
   _Api() : super(ApiClient(baseUrl: 'https://server.test/api/v1'));
   List<SalePaymentLine>? saved;
+  bool staffUnavailable = false;
 
   @override
   Future<List<Customer>> customers(
@@ -18,10 +19,13 @@ class _Api extends BakeryApi {
       [];
 
   @override
-  Future<List<StaffName>> saleStaff() async => const [
+  Future<List<StaffName>> saleStaff() async {
+    if (staffUnavailable) throw ApiException('ارتباط برقرار نشد');
+    return const [
         StaffName(id: 11, name: 'علی'),
         StaffName(id: 12, name: 'رضا'),
       ];
+  }
 
   @override
   Future<bool> recordSplitSale(
@@ -80,8 +84,9 @@ void main() {
     await tap(tester, find.byType(DropdownButtonFormField<int>).first);
     await tap(tester, find.text('علی').last);
     await tap(tester, find.text('افزودن کارمند برای نان منزل'));
-    final fields = find.byType(TextFormField);
-    final extra = fields.at(fields.evaluate().length - 2);
+    final extra = find.descendant(
+        of: find.byWidgetPredicate((widget) => widget is Column && widget.key is ObjectKey),
+        matching: find.byType(TextFormField));
     await tester.ensureVisible(extra);
     await tester.enterText(extra, secondCount);
     await tester.pumpAndSettle();
@@ -121,4 +126,30 @@ void main() {
     expect(
         find.text('هر کارمند را فقط در یک ردیف انتخاب کنید.'), findsOneWidget);
   });
+  testWidgets('با خطای دریافت نام‌ها ردیف دوم ساخته و پس از تلاش دوباره ثبت می‌شود',
+      (tester) async {
+    final api = _Api()..staffUnavailable = true;
+    await open(tester, api);
+    expect(find.textContaining('فهرست کارکنان دریافت نشد'), findsOneWidget);
+    await tap(tester, find.text('افزودن کارمند برای نان منزل'));
+    expect(find.text('حذف ردیف کارمند'), findsOneWidget);
+    final extra = find.descendant(
+        of: find.byWidgetPredicate((widget) => widget is Column && widget.key is ObjectKey),
+        matching: find.byType(TextFormField));
+    await tester.ensureVisible(extra);
+    await tester.enterText(extra, '۵');
+    await tap(tester, find.text('ثبت فروش').last);
+    expect(api.saved, isNull);
+    expect(find.text('برای ردیف نان کارکنان، کارمند را انتخاب کنید.'), findsOneWidget);
+    api.staffUnavailable = false;
+    await tap(tester, find.text('دریافت دوباره نام کارکنان'));
+    await tap(tester, find.byType(DropdownButtonFormField<int>).last);
+    await tap(tester, find.text('رضا').last);
+    await tap(tester, find.text('ثبت فروش').last);
+    expect(api.saved!.map((r) => r.toJson()).toList(), [
+      {'payment_type': 'home', 'bread_count': 5, 'consumed_by_user_id': 12},
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+
 }
