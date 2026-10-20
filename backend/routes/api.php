@@ -267,7 +267,10 @@ Route::prefix('v1')->group(function () {
             Route::patch('/diesel/quota', [QuotaController::class, 'updateDieselQuota']);
             Route::post('/diesel/deliveries', [QuotaController::class, 'storeDieselDelivery']);
             Route::delete('/diesel/deliveries/{delivery}', [QuotaController::class, 'destroyDieselDelivery']);
+        });
 
+        // ثبت و مشاهدهٔ آرد همکار با مجوز اختصاصی هم در دسترس است.
+        Route::middleware('permission:manage-inventory|record-consignment-flour')->group(function () {
             Route::get('/consignment-flour/balance', [ConsignmentFlourController::class, 'balance']);
             // Before the {consignment} routes below, or «partners» is read
             // as an id and matched by the model binding.
@@ -276,6 +279,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/consignment-flour/partners/{customer}/statement', [ConsignmentFlourController::class, 'statement']);
             Route::get('/consignment-flour', [ConsignmentFlourController::class, 'index']);
             Route::post('/consignment-flour', [ConsignmentFlourController::class, 'store']);
+        });
+
+        // اصلاح و حذف همچنان مجوز مدیریت انبار می‌خواهد.
+        Route::middleware('permission:manage-inventory')->group(function () {
             Route::patch('/consignment-flour/{consignment}/settle', [ConsignmentFlourController::class, 'settle']);
             Route::post('/consignment-flour/{consignment}/returns', [ConsignmentFlourController::class, 'storeReturn']);
             Route::delete('/consignment-flour/{consignment}', [ConsignmentFlourController::class, 'destroy']);
