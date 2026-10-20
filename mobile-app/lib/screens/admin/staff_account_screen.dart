@@ -22,6 +22,9 @@ class StaffAccountScreen extends StatefulWidget {
 class _StaffAccountScreenState extends State<StaffAccountScreen> {
   late Future<Map<String, dynamic>> _future;
   Map<String, dynamic> _data = {};
+  String _history = 'salary';
+  String _query = '';
+  bool _unpaidOnly = false;
 
   @override
   void initState() {
@@ -66,6 +69,32 @@ class _StaffAccountScreenState extends State<StaffAccountScreen> {
         'bread' => 'bread',
         _ => 'adjustments',
       }]);
+
+  // ترتیب سرور در هر گروه حفظ می‌شود؛ فقط فیش‌های پرداخت‌نشده جلو می‌آیند.
+  List<Map<String, dynamic>> get _visibleRows {
+    var rows = _rows(_history);
+    if (_history == 'salary') {
+      rows = [
+        ...rows.where((r) => r['is_paid'] == false),
+        ...rows.where((r) => r['is_paid'] != false),
+      ];
+      if (_unpaidOnly) rows = rows.where((r) => r['is_paid'] == false).toList();
+    }
+    final query = latinDigits(_query.trim()).toLowerCase();
+    if (query.isEmpty) return rows;
+    return rows
+        .where((r) => latinDigits([
+              r['id'],
+              r['period_label'],
+              r['date'],
+              r['note'],
+              r['net_amount_formatted'],
+              r['amount_formatted'],
+            ].where((v) => v != null).join(' '))
+                .toLowerCase()
+                .contains(query))
+        .toList();
+  }
 
   Future<void> _linked(String kind, int id) async {
     final matches = _rows(kind).where((r) => r['id'] == id);
@@ -205,10 +234,19 @@ class _StaffAccountScreenState extends State<StaffAccountScreen> {
               }
               _data = snapshot.data!;
               final summary = keyedGroup(_data['summary']);
+              final unpaid =
+                  _rows('salary').where((r) => r['is_paid'] == false).toList();
+              final visible = _visibleRows;
+              final hasDebt = _number(summary['advance_outstanding']) > 0 ||
+                  _number(summary['bread_outstanding']) > 0;
               return RefreshIndicator(
                   onRefresh: () async {
                     _reload();
-                    await _future;
+                    try {
+                      await _future;
+                    } catch (_) {
+                      // خطا در همین صفحه همراه دکمه تلاش دوباره نمایش داده می‌شود.
+                    }
                   },
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
@@ -220,15 +258,57 @@ class _StaffAccountScreenState extends State<StaffAccountScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
+                                  Text('خلاصه حساب',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium),
+                                  const SizedBox(height: 12),
                                   Text(
-                                      'حقوق پرداخت‌نشده: ${summary['unpaid']}'),
-                                  Text('مانده مساعده: ${summary['advances']}'),
-                                  Text('مانده بدهی نان: ${summary['bread']}'),
+                                      'حقوق پرداخت‌نشده: ${summary['unpaid'] ?? '—'}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium),
+                                  const Divider(height: 24),
+                                  Text('بدهی‌های باقی‌مانده',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                      'مانده مساعده: ${summary['advances'] ?? '—'}'),
+                                  Text(
+                                      'مانده بدهی نان: ${summary['bread'] ?? '—'}'),
                                   const SizedBox(height: 8),
                                   const Text(
                                       'مانده بدهی با حقوق پرداخت‌نشده یکی نیست؛ بدهی فقط طبق انتخاب مدیر در فیش کسر می‌شود.'),
                                 ],
                               ))),
+                      if (unpaid.isNotEmpty)
+                        Card(
+                            child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                    '${unpaid.length} فیش پرداخت‌نشده در سوابق اخیر',
+                                    style:
+                                        Theme.of(context).textTheme.titleSmall),
+                                const Text(
+                                    'پیش از پرداخت جدید، فیش موجود را بررسی کنید.'),
+                                TextButton.icon(
+                                    onPressed: () =>
+                                        _detail('salary', unpaid.first),
+                                    icon:
+                                        const Icon(Icons.receipt_long_outlined),
+                                    label: const Text('بررسی فیش پرداخت‌نشده')),
+                              ]),
+                        )),
+                      if (hasDebt)
+                        const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                                'بدهی باقی مانده است؛ هنگام ثبت یا اصلاح فیش، انتخاب کسر مساعده و نان را بررسی کنید.')),
                       FilledButton.icon(
                           onPressed: _addAdvance,
                           icon: const Icon(Icons.payments_outlined),
@@ -245,33 +325,59 @@ class _StaffAccountScreenState extends State<StaffAccountScreen> {
                           icon: const Icon(Icons.add),
                           label: const Text(
                               'ثبت تشویقی یا کسورات برای این کارمند')),
-                      for (final kind in [
-                        'salary',
-                        'advance',
-                        'bread',
-                        'adjustment'
-                      ])
-                        Card(
-                            child: ExpansionTile(
-                                initiallyExpanded: kind == 'salary',
-                                title: Text(_label(kind)),
-                                subtitle:
-                                    Text('${_rows(kind).length} رکورد اخیر'),
-                                children: [
-                              if (_rows(kind).isEmpty)
-                                const ListTile(title: Text('رکوردی ثبت نشده')),
-                              for (final row in _rows(kind))
-                                ListTile(
-                                  title: Text(kind == 'salary'
-                                      ? '${row['period_label']}'
-                                      : '${_label(kind)} #${row['id']}'),
-                                  subtitle: Text(kind == 'salary'
-                                      ? '${row['is_paid'] == true ? 'پرداخت شده' : 'پرداخت نشده'} • ${row['net_amount_formatted']}'
-                                      : '${row['date']} • ${row['outstanding_formatted'] ?? row['amount_formatted']}'),
-                                  trailing: const Icon(Icons.chevron_left),
-                                  onTap: () => _detail(kind, row),
-                                ),
-                            ])),
+                      const SizedBox(height: 16),
+                      Text('سوابق مالی',
+                          style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      Wrap(spacing: 8, runSpacing: 8, children: [
+                        for (final kind in [
+                          'salary',
+                          'advance',
+                          'bread',
+                          'adjustment'
+                        ])
+                          ChoiceChip(
+                            label: Text(_label(kind)),
+                            selected: _history == kind,
+                            onSelected: (selected) {
+                              if (selected) setState(() => _history = kind);
+                            },
+                          ),
+                      ]),
+                      const SizedBox(height: 8),
+                      TextField(
+                          decoration: const InputDecoration(
+                              labelText: 'جست‌وجو در سوابق اخیر',
+                              hintText: 'دوره، تاریخ، شناسه یا توضیح',
+                              prefixIcon: Icon(Icons.search)),
+                          onChanged: (value) => setState(() => _query = value)),
+                      if (_history == 'salary')
+                        FilterChip(
+                            label: const Text('فقط پرداخت‌نشده‌ها'),
+                            selected: _unpaidOnly,
+                            onSelected: (value) =>
+                                setState(() => _unpaidOnly = value)),
+                      Text(
+                          '${visible.length} از ${_rows(_history).length} رکورد اخیر'),
+                      Card(
+                          child: Column(children: [
+                        if (visible.isEmpty)
+                          ListTile(
+                              title: Text(_rows(_history).isEmpty
+                                  ? 'رکوردی ثبت نشده'
+                                  : 'موردی مطابق جست‌وجو و فیلتر نیست')),
+                        for (final row in visible)
+                          ListTile(
+                            title: Text(_history == 'salary'
+                                ? '${row['period_label']}'
+                                : '${_label(_history)} #${row['id']}'),
+                            subtitle: Text(_history == 'salary'
+                                ? '${row['is_paid'] == true ? 'پرداخت شده' : 'پرداخت نشده'} • ${row['net_amount_formatted']}'
+                                : '${row['date']} • ${row['outstanding_formatted'] ?? row['amount_formatted']}'),
+                            trailing: const Icon(Icons.chevron_left),
+                            onTap: () => _detail(_history, row),
+                          ),
+                      ])),
                       const Text(
                           'ریز هر بخش حداکثر ۱۰۰ رکورد اخیر است؛ مانده‌های بالا از کل حساب محاسبه می‌شوند.'),
                     ],
