@@ -1,28 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../models/today_answer.dart';
+import 'today_actions.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import '../../widgets/role_home_scaffold.dart';
 
-/// One answer: whether the shop is sound, and what is the owner's to do.
-///
-/// The owner's half of «یک کار». The production roles are asked one
-/// question a screen; he is given one answer — and until now he was given
-/// four tabs of figures and left to work it out.
-///
-/// It matters that this is on the phone and not only in the panel. He is
-/// more often beside the oven than at a desk, and an answer he can only
-/// get by sitting down is an answer he goes on getting by asking a person
-/// instead. That is how a 400 kg hole in the ledger survived four days of
-/// screens that all said green: nothing was wrong with the figures he
-/// could see, and the one that would have told him was a command over SSH.
-///
-/// Every sentence here is composed on the server. The phone draws what it
-/// is given and invents nothing, so the panel and the phone cannot come to
-/// different conclusions about the same shop.
+/// وضعیت نانوایی و کارهای منتظر مدیر از پاسخ مشترک سرور نمایش داده می‌شوند.
+/// هشدارهای وضعیت از سرور می‌آیند تا نتیجه پنل و گوشی یکسان بماند.
 class AdminTodayTab extends StatefulWidget {
   const AdminTodayTab({super.key, required this.api});
 
@@ -34,6 +21,7 @@ class AdminTodayTab extends StatefulWidget {
 
 class _AdminTodayTabState extends State<AdminTodayTab> {
   late Future<TodayAnswer> _answer;
+  int _generation = 0;
 
   @override
   void initState() {
@@ -41,7 +29,10 @@ class _AdminTodayTabState extends State<AdminTodayTab> {
     _answer = widget.api.today();
   }
 
-  void _reload() => setState(() => _answer = widget.api.today());
+  void _reload() => setState(() {
+        _generation++;
+        _answer = widget.api.today();
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -57,11 +48,22 @@ class _AdminTodayTabState extends State<AdminTodayTab> {
           if (snapshot.hasError) {
             return ListView(
               padding: const EdgeInsets.all(20),
-              children: [ErrorBox(message: '${snapshot.error}', onRetry: _reload)],
+              children: [
+                ErrorBox(message: '${snapshot.error}', onRetry: _reload),
+                TodayActions(
+                    key: ValueKey(_generation),
+                    api: widget.api,
+                    needs: const [],
+                    openNeed: (_) {},
+                    onReturn: _reload),
+              ],
             );
           }
 
           return _Answer(
+            key: ValueKey(_generation),
+            api: widget.api,
+            onReturn: _reload,
             answer: snapshot.data!,
             checkedAt: widget.api.todayCheckedAt(),
           );
@@ -72,14 +74,18 @@ class _AdminTodayTabState extends State<AdminTodayTab> {
 }
 
 class _Answer extends StatelessWidget {
-  const _Answer({required this.answer, required this.checkedAt});
+  const _Answer(
+      {super.key,
+      required this.api,
+      required this.onReturn,
+      required this.answer,
+      required this.checkedAt});
+  final BakeryApi api;
+  final VoidCallback onReturn;
 
   final TodayAnswer answer;
 
-  /// When this answer was fetched, or null when it came from the server
-  /// just now. A saved copy must not say «همین حالا»: a green screen
-  /// with the wrong time on it is the four days this page was built
-  /// against.
+  /// زمان دریافت نسخه ذخیره‌شده؛ پاسخ قدیمی نباید «همین حالا» معرفی شود.
   final DateTime? checkedAt;
 
   @override
@@ -87,9 +93,7 @@ class _Answer extends StatelessWidget {
     final theme = Theme.of(context);
     final muted = theme.textTheme.bodySmall?.color;
 
-    // Sound reads in the shop's own accent; broken reads in the colour
-    // this palette keeps for money going the wrong way, which is the only
-    // red it has and the only one it needs.
+    // وضعیت ناسازگار با رنگ هشدار و وضعیت عادی با رنگ اصلی نمایش داده می‌شود.
     final toneColour = switch (answer.tone) {
       TodayTone.fail => AppColors.moneyOut,
       _ => AppColors.signalFor(theme.brightness),
@@ -108,7 +112,9 @@ class _Answer extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          answer.yours,
+          answer.sound && answer.needs.isEmpty
+              ? 'کارهای مالی و درخواست‌ها را در بخش زیر بررسی کنید.'
+              : answer.yours,
           style: theme.textTheme.titleMedium?.copyWith(
             color: muted,
             height: 1.4,
@@ -117,8 +123,7 @@ class _Answer extends StatelessWidget {
 
         const SizedBox(height: 14),
 
-        // The stamp. A green screen with no time on it is exactly what
-        // those four days looked like.
+        // زمان بررسی برای تشخیص پاسخ قدیمی از نتیجه تازه لازم است.
         Row(
           children: [
             Icon(
@@ -143,9 +148,7 @@ class _Answer extends StatelessWidget {
         const SizedBox(height: 20),
         const Divider(height: 1),
 
-        // A contradiction in the records comes before the shop's own
-        // business, and says plainly that the figures below are not to be
-        // trusted until it is settled.
+        // ناسازگاری دفتر پیش از کارهای روزانه نمایش داده می‌شود تا مدیر ابتدا اعتبار ارقام را بررسی کند.
         if (!answer.sound) ...[
           const SizedBox(height: 16),
           _Broken(failures: answer.failures),
@@ -154,15 +157,24 @@ class _Answer extends StatelessWidget {
         if (answer.needs.isEmpty && answer.warnings.isEmpty) ...[
           const SizedBox(height: 24),
           Text(
-            'هیچ چیزی منتظر شما نیست.',
+            'هشداری در گزارش وضعیت نانوایی ثبت نشده است.',
             style: theme.textTheme.bodyMedium?.copyWith(color: muted),
           ),
         ],
 
-        for (final need in answer.needs) _Need(need: need),
+        TodayActions(
+            api: api,
+            needs: answer.needs,
+            onReturn: onReturn,
+            openNeed: (need) => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                showDragHandle: true,
+                builder: (_) => _NeedSheet(need: need))),
+        for (final need in answer.needs.where((need) => !isTodayAction(need)))
+          _Need(need: need),
 
-        // Cycle warnings are the shop's to look at but are not faults, so
-        // they sit under the issues rather than beside the sentence.
+        // هشدار چرخه کار قابل بررسی است و به معنی خرابی ثبت‌ها نیست.
         for (final warning in answer.warnings)
           _Need(
             need: TodayNeed(
@@ -174,9 +186,7 @@ class _Answer extends StatelessWidget {
             ),
           ),
 
-        // What the next few days look like, from what the last few did.
-        // After what needs him and before the quiet figures: it is the
-        // question he asks with a delivery to order.
+        // پیش‌بینی پس از کارها و پیش از ارقام خلاصه، همراه مبنای محاسبه نمایش داده می‌شود.
         if (answer.outlook.isNotEmpty) ...[
           const SizedBox(height: 22),
           const Divider(height: 1),
@@ -216,11 +226,7 @@ class _Answer extends StatelessWidget {
   }
 }
 
-/// One forecast and the arithmetic under it.
-///
-/// The basis is never dropped for space. A forecast without it is a
-/// number the owner has to take on trust, and this screen exists because
-/// he stopped taking screens on trust.
+/// پیش‌بینی همراه مبنای محاسبه تا مدیر بتواند نتیجه را بررسی کند.
 class _OutlookLine extends StatelessWidget {
   const _OutlookLine({required this.line});
 
@@ -239,7 +245,8 @@ class _OutlookLine extends StatelessWidget {
           Text(
             line.title,
             style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: line.needsAttention ? FontWeight.w700 : FontWeight.w500,
+              fontWeight:
+                  line.needsAttention ? FontWeight.w700 : FontWeight.w500,
               color: line.needsAttention ? AppColors.emberWarm : null,
             ),
           ),
@@ -293,21 +300,13 @@ class _Broken extends StatelessWidget {
   }
 }
 
-/// One line of work, with a stripe that says how loudly.
-///
-/// The stripe is `attention`, never the accent: ten places in the admin
-/// surface once used the yellow to mean «overdue», which after the repaint
-/// would have made every warning look like a button.
+/// شدت هشدار با نوار مشخص می‌شود؛ رنگ هشدار با رنگ دکمه‌ها اشتباه نمی‌شود.
 class _Need extends StatelessWidget {
   const _Need({required this.need});
 
   final TodayNeed need;
 
-  /// Whether there is anything behind the row worth opening.
-  ///
-  /// A cycle warning is one sentence and has no cause, no suggestion and
-  /// nowhere to go: making it tappable would promise something that is
-  /// not there.
+  /// فقط ردیفی باز می‌شود که علت، پیشنهاد یا مسیر پیگیری داشته باشد.
   bool get _hasMore =>
       need.cause.isNotEmpty ||
       need.suggestion.isNotEmpty ||
@@ -327,7 +326,8 @@ class _Need extends StatelessWidget {
     final row = Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor, width: 0.5)),
+        border:
+            Border(bottom: BorderSide(color: theme.dividerColor, width: 0.5)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -363,8 +363,7 @@ class _Need extends StatelessWidget {
             ),
           ),
 
-          // Says the row opens. Without it the only way to find out was to
-          // try, and most people do not try.
+          // پیکان نشان می‌دهد ردیف جزئیات قابل باز شدن دارد.
           if (_hasMore) ...[
             const SizedBox(width: 8),
             Icon(Icons.chevron_left_rounded, size: 20, color: muted),
@@ -388,21 +387,13 @@ class _Need extends StatelessWidget {
   }
 }
 
-/// What is wrong, why it probably happened, what to do, and the way there.
-///
-/// The row on «امروز» has only ever said the first of those four. The
-/// other three existed the whole time — the panel put them behind a click
-/// and the phone was never given them — so an owner reading «موجودی «حساب
-/// اصلی» منفی است» was told what, and left to work out why, what about it,
-/// and where. The button at the bottom is the «where».
+/// جزئیات هشدار شامل مسئله، علت احتمالی، پیشنهاد و مسیر پیگیری است.
 class _NeedSheet extends StatelessWidget {
   const _NeedSheet({required this.need});
 
   final TodayNeed need;
 
-  /// What the destination is called in the shop's own words. The server
-  /// names the tab; this names it the way the bottom bar does, so the
-  /// button and the place it lands agree.
+  /// نام مقصد باید با عنوان تب در نوار برنامه یکسان باشد.
   static const _tabNames = {
     'overview': 'خلاصه',
     'finance': 'مالی',
@@ -450,9 +441,7 @@ class _NeedSheet extends StatelessWidget {
               _Part(title: 'چه کنید', body: need.suggestion),
             ],
 
-            // Only when this role has the tab. A seller has no «مالی» to
-            // be sent to, and a button that does nothing is worse than no
-            // button.
+            // دکمه مسیر فقط در صفحه‌ای نمایش داده می‌شود که ناوبری تب‌ها در دسترس باشد.
             if (name != null && tabs != null) ...[
               const SizedBox(height: 20),
               SizedBox(
