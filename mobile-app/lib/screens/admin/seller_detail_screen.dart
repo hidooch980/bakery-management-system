@@ -2,18 +2,11 @@ import 'package:flutter/material.dart';
 import '../../utils/json.dart';
 
 import '../../services/bakery_api.dart';
+import '../../services/manager_corrections_api.dart';
+import 'seller_work_screen.dart';
 import '../../theme/app_theme.dart';
 import 'admin_home_screen.dart';
 
-/// One seller, sale by sale.
-///
-/// Grouped by day rather than shown flat, because that is how the shop
-/// remembers a week — «سه‌شنبه چقدر فروختی» — and because ninety lines in
-/// a single column is not something anybody reads standing in a bakery.
-///
-/// Every line carries the time, the payment type, the loaves and the
-/// customer where there is one. The owner reads this next to the person it
-/// is about, and a row that says only a number gives him nothing to ask.
 class SellerDetailScreen extends StatefulWidget {
   const SellerDetailScreen({
     super.key,
@@ -42,7 +35,24 @@ class _SellerDetailScreenState extends State<SellerDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('کارکرد ${widget.sellerName}')),
+      appBar: AppBar(title: Text('کارکرد ${widget.sellerName}'), actions: [
+        IconButton(
+            tooltip: 'اصلاح حضور و فروش',
+            icon: const Icon(Icons.edit_note_rounded),
+            onPressed: () async {
+              await Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                      builder: (_) => SellerWorkScreen(
+                          api: ManagerCorrectionsApi(widget.api.client),
+                          sellerId: widget.sellerId,
+                          sellerName: widget.sellerName)));
+              if (mounted) {
+                setState(
+                    () => _detail = widget.api.sellerDetail(widget.sellerId));
+              }
+            }),
+      ]),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _detail,
         builder: (context, snapshot) {
@@ -55,26 +65,19 @@ class _SellerDetailScreenState extends State<SellerDetailScreen> {
           }
 
           final data = snapshot.data!;
-          final summary =
-              keyedGroup(data['summary']);
-          final days =
-              rowList(data['days']);
+          final summary = keyedGroup(data['summary']);
+          final days = rowList(data['days']);
 
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
               _Summary(summary: summary, data: data),
               const SizedBox(height: 16),
-
               if (days.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 32),
                   child: Center(child: Text('در این دوره فروشی ثبت نشده')),
                 ),
-
-              // Newest first from the server, so the first entry is the
-              // most recent day — the one a manager opening this screen is
-              // almost always asking about.
               for (final (i, day) in days.indexed)
                 _Day(day: day, startOpen: i == 0),
             ],
@@ -93,8 +96,8 @@ class _Summary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final types = rowList(summary['by_payment_type'])
-        .cast<Map<String, dynamic>>();
+    final types =
+        rowList(summary['by_payment_type']).cast<Map<String, dynamic>>();
     final shortfallCount = summary['shortfall_count'] as int? ?? 0;
 
     return AdminSection(
@@ -123,17 +126,12 @@ class _Summary extends StatelessWidget {
           label: 'تعداد فروش',
           value: '${summary['sale_count'] ?? 0}',
         ),
-
         if (types.isNotEmpty) const Divider(height: 20),
         for (final type in types)
           AdminRow(
             label: '${type['label']}',
             value: '${type['bread_count']} نان — ${type['amount_formatted']}',
           ),
-
-        // Below the takings and visually apart from them. Bread that left
-        // with no money behind it is not a smaller sale, it is a different
-        // kind of fact.
         if (shortfallCount > 0) ...[
           const Divider(height: 20),
           AdminRow(
@@ -147,19 +145,11 @@ class _Summary extends StatelessWidget {
   }
 }
 
-/// One day, closed until it is asked about.
-///
-/// The first version drew every line of every day at once. Ninety-odd
-/// sales over a quota period is a wall of text on a phone, and the day
-/// totals — which are what the owner actually reads first — were lost
-/// inside it. A day is a summary now, and opens when he wants the detail.
 class _Day extends StatefulWidget {
   const _Day({required this.day, required this.startOpen});
 
   final Map<String, dynamic> day;
 
-  /// Today is open on arrival; the rest are not. The question a manager
-  /// has when he opens this screen is almost always about today.
   final bool startOpen;
 
   @override
@@ -172,8 +162,7 @@ class _DayState extends State<_Day> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final lines =
-        rowList(widget.day['lines']);
+    final lines = rowList(widget.day['lines']);
 
     final shortfall = lines.fold<int>(
       0,
@@ -192,7 +181,9 @@ class _DayState extends State<_Day> {
               child: Row(
                 children: [
                   Icon(
-                    _open ? Icons.expand_more_rounded : Icons.chevron_left_rounded,
+                    _open
+                        ? Icons.expand_more_rounded
+                        : Icons.chevron_left_rounded,
                     size: IconSize.row,
                     color: scheme.onSurfaceVariant,
                   ),
@@ -211,11 +202,12 @@ class _DayState extends State<_Day> {
                         Text(
                           '${lines.length} فروش'
                           '${shortfall > 0 ? '  ·  کسری $shortfall نان' : ''}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: shortfall > 0
-                                    ? AppColors.attention
-                                    : scheme.onSurfaceVariant,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: shortfall > 0
+                                        ? AppColors.attention
+                                        : scheme.onSurfaceVariant,
+                                  ),
                         ),
                       ],
                     ),
@@ -254,13 +246,6 @@ class _DayState extends State<_Day> {
   }
 }
 
-/// One sale, on one line.
-///
-/// Four stacked lines per sale is what the first version drew, and with a
-/// hundred sales in a period nothing could be found in it. Time, kind and
-/// loaves sit in fixed columns so the eye can run down them; the customer
-/// and the note only appear when they say something, and the shortfall
-/// keeps its own colour because it is the line worth stopping on.
 class _Line extends StatelessWidget {
   const _Line({required this.line});
 
@@ -300,10 +285,6 @@ class _Line extends StatelessWidget {
               ),
             ],
           ),
-
-          // Only when there is something to say. On an ordinary cash sale
-          // these are all empty, and a blank line under every row is what
-          // made the first version unreadable.
           if ((customer != null && customer.isNotEmpty) ||
               (note != null && note.isNotEmpty) ||
               shortfall != null)
@@ -314,8 +295,7 @@ class _Line extends StatelessWidget {
                 children: [
                   if (customer != null && customer.isNotEmpty)
                     Text(customer, style: quiet),
-                  if (note != null && note.isNotEmpty)
-                    Text(note, style: quiet),
+                  if (note != null && note.isNotEmpty) Text(note, style: quiet),
                   if (shortfall != null)
                     Text(
                       'کسری ${line['shortfall_count']} نان — $shortfall',
