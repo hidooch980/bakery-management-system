@@ -10,20 +10,9 @@ import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import 'adjustment_sheet.dart';
 import 'staff_account_screen.dart';
+import 'salary_settlement_review.dart';
 import 'admin_home_screen.dart';
 
-/// Paying wages, from the phone.
-///
-/// This shop pays at the end of each Jalali month and had recorded not one
-/// payslip since it opened — so every profit figure it has ever printed
-/// was overstated by the whole payroll, silently. The reason was not
-/// neglect: paying meant opening the panel on a computer, and the owner
-/// carries a phone.
-///
-/// So the payroll is here. It opens on everyone who works at the shop with
-/// what was agreed for them already filled in, because the ordinary month
-/// is everybody on their usual wage and typing five numbers to say so is
-/// how a payroll gets skipped.
 class PayrollSection extends StatefulWidget {
   const PayrollSection({super.key, required this.api});
 
@@ -45,6 +34,7 @@ class _PayrollSectionState extends State<PayrollSection> {
   final _writes = OneWrite();
 
   late Future<_Payroll> _data;
+  bool _paymentOpen = false;
 
   @override
   void initState() {
@@ -56,10 +46,6 @@ class _PayrollSectionState extends State<PayrollSection> {
     final staff = await widget.api.payrollEmployees();
     final slips = await widget.api.payslips();
 
-    // The accounts too, because a wage has to come out of one. A payslip
-    // with no account records the cost and moves nothing: the money is
-    // handed over, the balance does not fall, and the bank stops
-    // reconciling with nothing on the page to say why.
     final balances = await widget.api.bankBalances();
 
     return (
@@ -73,7 +59,6 @@ class _PayrollSectionState extends State<PayrollSection> {
         _data = _load();
       });
 
-  /// Writing one down as it happens, rather than recalling it at payday.
   Future<void> _addAdjustment(List<Employee> staff) async {
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -84,12 +69,6 @@ class _PayrollSectionState extends State<PayrollSection> {
     if (saved == true) _reload();
   }
 
-  /// The period a payslip belongs to: the first of the Jalali month that
-  /// is being paid for. Sent as the shop writes dates, not as ISO.
-  ///
-  /// In Latin digits, which is what the server sends back for the same
-  /// field. Half-Persian and half-Latin parsed correctly but would never
-  /// compare equal to anything, and comparing is what it is for.
   String get _thisPeriod {
     final now = latinDigits(JalaliFormat.date(DateTime.now()));
     final parts = now.split('/');
@@ -97,34 +76,120 @@ class _PayrollSectionState extends State<PayrollSection> {
     return parts.length == 3 ? '${parts[0]}/${parts[1]}/01' : now;
   }
 
-  Future<void> _pay(Employee person, List<BankAccount> accounts) async {
+  /// در زمان باز بودن فرم و انتظار پاسخ، مسیر پرداخت دوباره اجرا نمی‌شود.
+  Future<void> _withPayment(Future<void> Function() action) async {
+    if (_paymentOpen) return;
+    setState(() => _paymentOpen = true);
+    try {
+      await action();
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message, isError: true);
+    } on StateError catch (e) {
+      if (mounted) {
+        showMessage(context, e.message, isError: true);
+        _reload();
+      }
+    } catch (_) {
+      if (mounted) {
+        showMessage(context,
+            'پاسخ قطعی دریافت نشد؛ پیش از تلاش دوباره پرونده کارکنان را بررسی کنید.',
+            isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _paymentOpen = false);
+    }
+  }
+
+  /// پرونده تازه هم بدهی‌ها را می‌دهد و هم فیشی را که دستگاه دیگری ثبت کرده است.
+  Future<({double advance, double bread, String currency})> _freshAccount(
+      int personId, String period) async {
+    final data = await widget.api.staffAccount(personId);
+    final summary = data['summary'];
+    final slips = data['payslips'];
+    if (summary is! Map ||
+        slips is! List ||
+        data['currency_label'] is! String) {
+      throw StateError('پرونده کامل دریافت نشد؛ تسویه ثبت نشد.');
+    }
+    if (slips
+        .whereType<Map>()
+        .any((s) => latinDigits('${s['period_start_jalali']}') == period)) {
+      throw StateError(
+          'برای این کارمند در این دوره قبلاً فیش ثبت شده است؛ فیش موجود را از پرونده پیگیری کنید.');
+    }
+    double amount(String key) {
+      final value = double.tryParse('${summary[key]}');
+      if (value == null || !value.isFinite || value < 0) {
+        throw StateError('مانده بدهی معتبر دریافت نشد؛ تسویه ثبت نشد.');
+      }
+      return value;
+    }
+
+    return (
+      advance: amount('advance_outstanding'),
+      bread: amount('bread_outstanding'),
+      currency: data['currency_label'] as String
+    );
+  }
+
+  Future<void> _pay(Employee person, List<BankAccount> accounts) =>
+      _withPayment(() => _preparePay(person, accounts));
+
+  Future<void> _preparePay(Employee person, List<BankAccount> accounts) async {
+    final period = _thisPeriod;
     final result = await showModalBottomSheet<_PayInput>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _PaySheet(person: person, accounts: accounts),
     );
 
-    if (result == null) return;
+    if (result == null || !mounted) return;
+    final before = await _freshAccount(person.id, period);
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => SalarySettlementReview(
+        personName: person.displayName,
+        period: period,
+        accountTitle: result.accountId == null
+            ? 'صندوق'
+            : accounts.firstWhere((a) => a.id == result.accountId).title,
+        currency: before.currency,
+        note: result.note,
+        settlement: SalarySettlement(
+            base: result.base,
+            bonus: result.bonus,
+            deduction: result.deduction,
+            advanceOwed: before.advance,
+            breadOwed: before.bread,
+            recoverAdvances: result.recoverAdvances,
+            recoverBread: result.recoverBread),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final after = await _freshAccount(person.id, period);
+    if (!mounted) return;
+    if (before != after || period != _thisPeriod) {
+      throw StateError(
+          'پرونده یا دوره حقوق تغییر کرده است؛ برای دیدن مبلغ تازه، تسویه را دوباره باز کنید.');
+    }
 
     // قصد، خودِ فیش است: همان کارگر، همان ماه، همان عددها. اگر مالک
     // بعداً عدد دیگری بزند، کار دیگری است و نام دیگری می‌گیرد.
-    final intent = 'salary-${person.id}-$_thisPeriod'
+    final intent = 'salary-${person.id}-$period'
         '-${result.base}-${result.bonus}-${result.deduction}'
         '-${result.recoverAdvances}-${result.recoverBread}-${result.accountId}';
 
     try {
       await widget.api.recordSalary(
         userId: person.id,
-        periodStart: _thisPeriod,
+        periodStart: period,
         baseAmount: result.base,
         bonus: result.bonus,
         deduction: result.deduction,
         recoverAdvances: result.recoverAdvances,
         recoverBread: result.recoverBread,
         attemptKey: _writes.nameFor(intent),
-        // Recorded as handed over, because that is what pressing «پرداخت
-        // شد» means. A slip prepared before payday is a different action
-        // and does not exist yet.
         paidOn: JalaliFormat.date(DateTime.now()),
         bankAccountId: result.accountId,
         note: result.note,
@@ -141,12 +206,11 @@ class _PayrollSectionState extends State<PayrollSection> {
     }
   }
 
-  /// Handing over a slip that was written but never paid.
-  ///
-  /// Not `recordSalary` again: that would write a second slip for the same
-  /// month and the payroll would have paid twice. This marks the one that
-  /// is already there.
   Future<void> _handOver(
+          Employee person, Payslip slip, List<BankAccount> accounts) =>
+      _withPayment(() => _prepareHandOver(person, slip, accounts));
+
+  Future<void> _prepareHandOver(
     Employee person,
     Payslip slip,
     List<BankAccount> accounts,
@@ -157,15 +221,6 @@ class _PayrollSectionState extends State<PayrollSection> {
       builder: (_) => _HandOverSheet(slip: slip, accounts: accounts),
     );
 
-    // «چیزی انتخاب نشد» and «از صندوق» are two different answers, and both
-    // carry no account. The sheet returns a record for the second and
-    // nothing for the first, so the difference survives.
-    //
-    // It used to return a sentinel int for dismissal — which only the two
-    // buttons could ever send. Tapping the scrim, dragging the sheet down
-    // or pressing back pops null without going through either, so backing
-    // out handed the wage over. The test for it tapped «بی‌خیال» and so
-    // never saw it.
     if (answer == null || !mounted) return;
 
     try {
@@ -179,8 +234,6 @@ class _PayrollSectionState extends State<PayrollSection> {
       showMessage(context, 'پرداخت ${person.displayName} ثبت شد.');
       _reload();
     } on ApiException catch (e) {
-      // The server refuses a slip already paid, which is the one failure
-      // worth reading here.
       if (mounted) showMessage(context, e.message, isError: true);
     }
   }
@@ -205,32 +258,12 @@ class _PayrollSectionState extends State<PayrollSection> {
         final slips = snapshot.data!.slips;
         final accounts = snapshot.data!.accounts;
 
-        // Who has already been paid for the period the button would write,
-        // so the list does not offer to pay the same person twice.
-        //
-        // Keyed on that period and on the person's id. It used to key on
-        // whichever period was newest on file, which is the same period only
-        // until a month turns: from the first of the next month everyone
-        // paid in the last one reads as already paid, and the payroll shuts
-        // itself for a month it has not paid at all.
-        //
-        // And on `isPaid`, not on the slip being there at all. Every slip
-        // this screen writes is paid the moment it is written, so here the
-        // two look like the same question. They are not: the panel has an
-        // «unpaid» filter, a mark-paid action and a badge counting them, so
-        // a slip prepared and not yet handed over is an ordinary state. One
-        // of those made this row print «پرداخت شد» with a tick and refuse
-        // the tap — the wage could not be paid from the phone, and the
-        // screen said it already had been.
         final thisPeriod =
             slips.where((s) => s.periodStartJalali == _thisPeriod);
 
         final paidThisPeriod =
             thisPeriod.where((s) => s.isPaid).map((s) => s.userId).toSet();
 
-        // The slip that is waiting, by whose it is. Tapping such a row must
-        // hand that one over rather than write a second slip: two slips for
-        // one month is the payroll paid twice.
         final awaiting = {
           for (final slip in thisPeriod.where((s) => !s.isPaid))
             slip.userId: slip,
@@ -240,6 +273,9 @@ class _PayrollSectionState extends State<PayrollSection> {
           title: 'حقوق کارکنان',
           icon: Icons.payments_rounded,
           children: [
+            if (_paymentOpen) ...[
+              const Text('در حال بررسی تسویه؛ این مرحله را کامل کنید.'),
+            ],
             if (staff.isNotEmpty)
               AdminRow(
                 label: 'ثبت تشویقی یا تنبیهی',
@@ -288,9 +324,6 @@ class _PayrollSectionState extends State<PayrollSection> {
                     icon: Icons.arrow_circle_left_rounded,
                     onTap: () => _pay(person, accounts),
                   ),
-                // He has asked. Shown before the row is tapped, because a
-                // person chasing their own wage is the one thing on this
-                // screen that is about somebody waiting.
                 if (person.hasRequested && !paidThisPeriod.contains(person.id))
                   Padding(
                     padding: const EdgeInsetsDirectional.only(
@@ -314,10 +347,6 @@ class _PayrollSectionState extends State<PayrollSection> {
                       ],
                     ),
                   ),
-                // Before the sheet is opened, not after. The wage on the row
-                // above is not what this person is going to be handed, and
-                // finding that out only once the sum is on screen is how the
-                // deduction came to look like it was not happening.
                 if ((person.owesAdvance || person.owesBread) &&
                     !paidThisPeriod.contains(person.id))
                   Padding(
@@ -380,7 +409,6 @@ typedef _PayInput = ({
   String? note,
 });
 
-/// One person's pay, opened on what was agreed for them.
 class _PaySheet extends StatefulWidget {
   const _PaySheet({required this.person, required this.accounts});
 
@@ -405,31 +433,18 @@ class _PaySheetState extends State<_PaySheet> {
   void initState() {
     super.initState();
 
-    // Opened on the account this person's money last came from. It is the
-    // field a tired owner skips at the end of a long month, and skipping it
-    // is what makes a wage that costs the shop nothing.
     final suggested = widget.person.suggestedBankAccountId;
 
     _accountId = widget.accounts.any((a) => a.id == suggested)
         ? suggested
         : (widget.accounts.isEmpty ? null : widget.accounts.first.id);
 
-    // Filled in with the agreed wage. The ordinary month is everybody on
-    // their usual figure, and a form that starts empty is a form that
-    // makes the ordinary month the most work.
     _base = TextEditingController(
       text: widget.person.monthlySalary == 0
           ? ''
           : widget.person.monthlySalary.toStringAsFixed(0),
     );
 
-    // Opened on this month's rewards and penalties, already totalled from
-    // what was written down as it happened. These two boxes used to start
-    // empty and be filled from memory at the end of a long month, which is
-    // how a figure gets guessed at.
-    //
-    // Still editable: the server does not add these during save, so
-    // whatever is here when the button is pressed is what the shop owes.
     _bonus = TextEditingController(
       text: widget.person.suggestedBonus == 0
           ? ''
@@ -452,41 +467,22 @@ class _PaySheetState extends State<_PaySheet> {
     super.dispose();
   }
 
-  /// What was typed, as a number. The grouping formatter puts separators in
-  /// and Persian keyboards put Persian digits in; neither parses. The same
-  /// reading the flour sheet does, through the same helper.
   double _read(TextEditingController c) =>
       MoneyFormat.parseInput(c.text.trim()) ?? 0;
 
-  double get _gross => _read(_base) + _read(_bonus) - _read(_deduction);
+  SalarySettlement get _settlement => SalarySettlement(
+      base: _read(_base),
+      bonus: _read(_bonus),
+      deduction: _read(_deduction),
+      advanceOwed: widget.person.advanceOutstanding,
+      breadOwed: widget.person.breadOutstanding,
+      recoverAdvances: _recoverAdvances,
+      recoverBread: _recoverBread);
 
-  /// How much of the outstanding advance this payslip absorbs — never more
-  /// than the pay itself, which is the same rule the server applies.
-  double get _advance {
-    if (!_recoverAdvances) return 0;
-    if (_gross <= 0) return 0;
-
-    final owed = widget.person.advanceOutstanding;
-
-    return owed < _gross ? owed : _gross;
-  }
-
-  /// Bread the person took home, out of what the advance left. The same
-  /// order the server uses — a sheet that showed a different net from the
-  /// one about to be stored is the bug this shop spent 2026-08-17 finding
-  /// in the panel's own preview.
-  double get _bread {
-    if (!_recoverBread) return 0;
-    final left = _gross - _advance;
-
-    if (left <= 0) return 0;
-
-    final owed = widget.person.breadOutstanding;
-
-    return owed < left ? owed : left;
-  }
-
-  double get _net => _gross - _advance - _bread;
+  double get _gross => _settlement.gross;
+  double get _advance => _settlement.advance;
+  double get _bread => _settlement.bread;
+  double get _net => _settlement.net;
 
   bool get _carriesOver =>
       (widget.person.advanceOutstanding - _advance) +
@@ -516,7 +512,10 @@ class _PaySheetState extends State<_PaySheet> {
               _Field(
                   controller: _base, label: 'حقوق پایه', onChanged: _refresh),
               const SizedBox(height: 12),
-              _Field(controller: _bonus, label: 'تشویقی', onChanged: _refresh),
+              _Field(
+                  controller: _bonus,
+                  label: 'پاداش و اضافه‌کاری',
+                  onChanged: _refresh),
               const SizedBox(height: 12),
               _Field(
                   controller: _deduction,
@@ -538,8 +537,6 @@ class _PaySheetState extends State<_PaySheet> {
                   onChanged: (value) =>
                       setState(() => _recoverBread = value ?? false),
                 ),
-              // A box that fills itself is a box the owner has to be able
-              // to account for, or he will not trust the total under it.
               if (widget.person.hasAdjustments) ...[
                 const SizedBox(height: Gap.tight),
                 Row(
@@ -585,14 +582,6 @@ class _PaySheetState extends State<_PaySheet> {
                 decoration: const InputDecoration(labelText: 'توضیح (اختیاری)'),
               ),
               const SizedBox(height: 20),
-              // The net, shown as it is typed. It is the server's arithmetic
-              // that is stored — this is the same sum done here so nobody
-              // presses the button on a figure they have not seen.
-              //
-              // Including the advance, which is the whole point. The server
-              // always took it off; this panel used to show the wage before
-              // it, so the figure agreed to and the figure paid were two
-              // different numbers and only the first was ever on screen.
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -601,8 +590,12 @@ class _PaySheetState extends State<_PaySheet> {
                 ),
                 child: Column(
                   children: [
-                    if (_advance > 0 || _bread > 0) ...[
-                      _SumLine(label: 'حقوق و پاداش', amount: _gross),
+                    ...[
+                      _SumLine(label: 'حقوق پایه', amount: _read(_base)),
+                      _SumLine(
+                          label: 'پاداش و اضافه‌کاری', amount: _read(_bonus)),
+                      _SumLine(
+                          label: 'کسورات دستی', amount: -_read(_deduction)),
                       if (_advance > 0) ...[
                         const SizedBox(height: Gap.tight),
                         _SumLine(
@@ -611,9 +604,6 @@ class _PaySheetState extends State<_PaySheet> {
                           color: AppColors.moneyOut,
                         ),
                       ],
-                      // Its own line, never folded into the advance: they
-                      // are two different debts and the person will ask
-                      // which one a deduction was.
                       if (_bread > 0) ...[
                         const SizedBox(height: Gap.tight),
                         _SumLine(
@@ -628,10 +618,6 @@ class _PaySheetState extends State<_PaySheet> {
                   ],
                 ),
               ),
-              // What an advance bigger than a month's pay does. It is not a
-              // negative wage — the rest stands and comes off next month —
-              // and being told that now is better than wondering next month
-              // why the deduction is still there.
               if (_carriesOver) ...[
                 const SizedBox(height: Gap.item),
                 Row(
@@ -652,10 +638,6 @@ class _PaySheetState extends State<_PaySheet> {
               ],
               const SizedBox(height: 20),
               FilledButton.icon(
-                // On the gross, not the net. A wage entirely swallowed by an
-                // advance still has to be recorded: that is the month the
-                // debt gets worked off, and refusing to write it leaves the
-                // advance outstanding forever.
                 onPressed: _gross <= 0
                     ? null
                     : () => Navigator.pop(context, (
@@ -670,9 +652,7 @@ class _PaySheetState extends State<_PaySheet> {
                               : _note.text.trim(),
                         )),
                 icon: const Icon(Icons.check_rounded),
-                label: Text(_net <= 0 && _advance > 0
-                    ? 'تسویه با علی‌الحساب'
-                    : 'پرداخت شد'),
+                label: const Text('پیش‌نمایش تسویه'),
                 style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(52)),
               ),
@@ -686,7 +666,6 @@ class _PaySheetState extends State<_PaySheet> {
   void _refresh(String _) => setState(() {});
 }
 
-/// One line of the pay sum: what it is, and how much.
 class _SumLine extends StatelessWidget {
   const _SumLine({
     required this.label,
@@ -709,10 +688,12 @@ class _SumLine extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
+        Expanded(
+            child: Text(
           label,
           style: theme.textTheme.bodyMedium?.copyWith(color: color),
-        ),
+        )),
+        const SizedBox(width: 8),
         Text(
           MoneyFormat.plain(amount),
           style: style?.copyWith(
@@ -746,12 +727,8 @@ class _Field extends StatelessWidget {
   }
 }
 
-/// An answer from the hand-over sheet. Its absence is the dismissal, so
-/// «از صندوق» — an answer with no account — is not mistaken for one.
 typedef _HandOver = ({int? accountId});
 
-/// The dropdown's own value for «صندوق». Only ever an id or this, and it
-/// never leaves the sheet: what comes back is the record above.
 const int _fromTill = 0;
 
 class _HandOverSheet extends StatefulWidget {
