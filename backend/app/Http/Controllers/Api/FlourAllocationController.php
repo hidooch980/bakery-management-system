@@ -137,6 +137,10 @@ class FlourAllocationController extends Controller
                 'ends_on_display' => AppCalendar::date($p->ends_on),
                 'allocated_kg' => (float) $p->allocated_kg,
                 'allocated_bags' => $allocation->bagsForPeriod($p),
+                'working_days' => $p->working_days,
+                'holiday_days' => $p->holiday_days,
+                // سهم هر روز کاری از سهمیه همین دوره، با همان محاسبه پنل.
+                'daily_pace_bags' => $this->inBags($p->daily_pace_kg),
                 'used_kg' => $p->used_kg,
                 'used_bags' => $this->inBags($p->used_kg),
                 'remaining_kg' => $p->remaining_kg,
@@ -200,6 +204,7 @@ class FlourAllocationController extends Controller
 
         $allocated = $sum('allocated_kg');
         $used = $sum('used_kg');
+        $workingDays = (int) $periods->sum('working_days');
 
         return [
             'number' => 0,
@@ -209,6 +214,10 @@ class FlourAllocationController extends Controller
             'starts_on_display' => AppCalendar::date($first->starts_on),
             'ends_on_display' => AppCalendar::date($last->ends_on),
             'allocated_kg' => $allocated,
+            'working_days' => $workingDays,
+            'holiday_days' => (int) $periods->sum('holiday_days'),
+            // میانگین ماه از مجموع سهمیه و روزهای کاری است، نه میانگین سه میانگین.
+            'daily_pace_bags' => $workingDays > 0 ? $this->inBags($allocated / $workingDays) : 0.0,
             'allocated_bags' => round($periods->sum(fn ($p) => $allocation->bagsForPeriod($p)), 2),
             'used_kg' => $used,
             'used_bags' => $this->inBags($used),

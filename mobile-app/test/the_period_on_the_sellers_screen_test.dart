@@ -365,4 +365,23 @@ void main() {
     // unknown fortnight.
     expect(find.text('دوره سوم'), findsOneWidget);
   });
+  testWidgets('سهم روزانه داخل کارت سهمیه دوره و جمع ماه نمایش داده می‌شود',
+      (tester) async {
+    final allocation = _allocation(allocated: 24000, sold: 19600);
+    final periods = allocation['periods'] as List;
+    final current = periods.last as Map;
+    current['daily_pace_bags'] = 12.5;
+    current['working_days'] = 8;
+    final whole = allocation['whole_period'] as Map;
+    whole['daily_pace_bags'] = 10.25;
+    whole['working_days'] = 30;
+    await pump(tester, allocation);
+
+    expect(find.text('سهم روزانه آرد'), findsNWidgets(2));
+    expect(find.text('12.5 کیسه در روز کاری'), findsOneWidget);
+    expect(find.text('10.25 کیسه در روز کاری'), findsOneWidget);
+    expect(find.text('24000'), findsOneWidget);
+    expect(find.text('23295'), findsOneWidget);
+  });
+
 }
