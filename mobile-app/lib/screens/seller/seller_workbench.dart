@@ -10,6 +10,7 @@ import '../../services/last_used.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
+import '../../widgets/daily_flour_quota.dart';
 import '../admin/admin_record_sheet.dart';
 import '../shared/purchase_sheet.dart';
 
@@ -993,6 +994,7 @@ class _QuotaCard extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
         child: Column(
           children: [
+            DailyFlourQuota(period: period),
             Row(
               children: [
                 Expanded(
