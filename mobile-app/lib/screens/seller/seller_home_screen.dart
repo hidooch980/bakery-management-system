@@ -18,6 +18,7 @@ import '../../widgets/pay_card.dart';
 import '../../widgets/seller_account_card.dart';
 import '../../widgets/seller_ask.dart';
 import '../../widgets/seller_collections_card.dart';
+import '../../widgets/seller_daily_production_card.dart';
 import '../../widgets/station_rail.dart';
 import '../../widgets/role_home_scaffold.dart';
 import '../../widgets/work_start_card.dart';
@@ -28,14 +29,8 @@ import 'flour_sale_sheet.dart';
 import 'seller_workbench.dart';
 import '../../theme/app_theme.dart';
 
-/// Home screen for the seller.
-///
-/// It used to be one scrolling page of everything: the greeting, attendance,
-/// the workbench, chane waiting to be sold, flour, the account, the day's
-/// sales. Reaching the sales meant scrolling past the lot. The same content
-/// is now three pages — what the day looks like, the selling itself, and
-/// what the seller is answerable for — laid out the way the admin's screen
-/// already was.
+/// صفحه فروشنده با سه بخش خلاصه، فروش و حساب من.
+/// جدا شدن بخش‌ها دسترسی به فروش را از عبور میان تمام کارت‌های صفحه بی‌نیاز می‌کند.
 class SellerHomeScreen extends StatefulWidget {
   const SellerHomeScreen({super.key, required this.api});
 
@@ -60,7 +55,7 @@ typedef _SellerData = ({
 class _SellerHomeScreenState extends State<SellerHomeScreen> {
   late Future<_SellerData> _data;
 
-  /// Bread price and currency, used to suggest a sale amount.
+  /// قیمت نان و واحد پول برای پیشنهاد مبلغ فروش.
   Bakery? _bakery;
 
   @override
@@ -71,21 +66,13 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
   }
 
   Future<_SellerData> _load() async {
-    // Together, not one after another. These four reads do not depend on
-    // each other, and awaiting them in turn meant four timeouts in a row
-    // whenever the phone was off the network: fifteen seconds each, so
-    // the screen drew nothing for something close to a minute and then
-    // drew it correctly. Everything worked. Nobody stands in a shop for a
-    // minute to find out.
-    //
-    // Started before any is awaited, so the waiting overlaps. With signal
-    // this is also simply faster.
+    // این چهار خواندن مستقل هم‌زمان شروع می‌شوند؛ انتظار پیاپی در حالت آفلاین
+    // چهار مهلت پانزده‌ثانیه‌ای را به حدود یک دقیقه تأخیر تبدیل می‌کرد.
     final pendingCall = widget.api.pendingChane();
     final todayCall = widget.api.todaySales();
 
-    // The comparison is informational; the rest of the page still works
-    // without it. Same for flour, which is a permission the seller may
-    // not hold — a failure there hides the section rather than the page.
+    // مقایسه تولید و فروش آرد اطلاعات کمکی‌اند؛ خطای دریافت یا نداشتن مجوز
+    // آن‌ها نباید مانع نمایش بقیه صفحه شود.
     final boardCall = widget.api.chaneBoard().then<ChaneBoard?>(
           (b) => b,
           onError: (_) => null,
@@ -112,16 +99,14 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
       final bakery = await widget.api.bakery();
       if (mounted) setState(() => _bakery = bakery);
     } on ApiException {
-      // The price is a convenience, not a requirement.
+      // قیمت پیشنهادی کمک به ورود اطلاعات است و الزام ثبت نیست.
     }
   }
 
-  /// Set while the one-button answer is in flight, so the button cannot be
-  /// pressed twice into two sales.
+  /// وضعیت انتظار پاسخ تک‌دکمه‌ای، برای جلوگیری از ثبت هم‌زمان دو فروش.
 
-  /// Counts the reloads, so sections that cannot see a sale being saved
-  /// still hear that one happened. The quota card is the one that needs
-  /// it: it moves with the card reader and is refreshed by nothing else.
+  /// شمار بازخوانی‌ها به بخش‌هایی مانند سهمیه خبر می‌دهد که بیرون از خودشان
+  /// فروشی ثبت شده و عدد کارتخوان باید دوباره خوانده شود.
   int _revision = 0;
 
   void _reload() => setState(() {
@@ -181,9 +166,8 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     );
   }
 
-  /// Every page reads the same fetch and pulls to refresh the same way, so
-  /// switching pages does not re-ask the server and the three cannot show
-  /// figures from different moments.
+  /// همه بخش‌ها از یک پاسخ استفاده می‌کنند و با یک مسیر تازه می‌شوند؛
+  /// جابه‌جایی میان زبانه‌ها درخواست تازه یا اعداد مربوط به زمان‌های متفاوت نمی‌سازد.
   Widget _withData(List<Widget> Function(_SellerData data) children) {
     return RefreshIndicator(
       onRefresh: () async => _reload(),
@@ -253,16 +237,14 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
         ],
       ),
       const SizedBox(height: 14),
-      // The seller is the one on the floor holding a phone, so they mark
-      // in the bakers who are not.
+      // فروشنده حاضر در نانوایی حضور کارکنانی را که گوشی همراه ندارند ثبت می‌کند.
       AttendanceCard(api: widget.api, canRecordForOthers: true),
       const SizedBox(height: 14),
       PayCard(api: widget.api),
       const SizedBox(height: 14),
       WorkStartCard(
         api: widget.api,
-        // Shaping start is the chane gir's tick — the seller only records
-        // the start of baking.
+        // شروع چانه‌گیری با چانه‌گیر است؛ فروشنده فقط شروع پخت را ثبت می‌کند.
         visibleTypes: const {WorkStartType.baking},
       ),
       const SizedBox(height: 16),
@@ -302,9 +284,9 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
     final today = data.today;
 
     return [
-      // Kneading, shaping, flour and who is in today. Sections hide
-      // themselves when the permission is not held, so a shop that keeps
-      // the roles separate sees nothing new.
+      SellerDailyProductionCard(board: data.board, onRetry: _reload),
+      const SizedBox(height: 14),
+      // خمیر، چانه، آرد و حضور کارکنان؛ بخش‌های بدون مجوز نمایش داده نمی‌شوند.
       SellerWorkbench(
         api: widget.api,
         bakery: _bakery,
@@ -323,9 +305,8 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
           icon: Icons.done_all_rounded,
           text: 'همه چانه‌ها فروخته شده‌اند.',
         )
-      // One batch is not a choice, so it is not offered as one: the screen
-      // asks the question instead. Several batches is a real choice and
-      // gets the list — the same rule the chane maker's screen follows.
+      // برای یک بچ، پاسخ مستقیم نشان داده می‌شود؛ چند بچ به فهرست انتخاب نیاز دارند،
+      // مانند صفحه چانه‌گیر.
       else if (pending.length == 1)
         SellerAsk(
           chane: pending.single,
@@ -409,15 +390,14 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
   List<Widget> _account(_SellerData data) {
     return [
       SellerAccountCard(api: widget.api),
-      // Money the buyers who run an account still owe, and what they have
-      // handed back.
+      // بدهی مشتریان حساب‌دار و مبلغی که بازپرداخت کرده‌اند.
       const SizedBox(height: 14),
       SellerCollectionsCard(api: widget.api),
     ];
   }
 }
 
-/// A small titled divider between the page's sections.
+/// جداکننده عنوان‌دار بخش‌های صفحه.
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.title,
@@ -465,7 +445,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// Compact empty state for a section inside a longer page.
+/// حالت خالی کوچک برای بخشی از یک صفحه بلند.
 class _InlineEmpty extends StatelessWidget {
   const _InlineEmpty({required this.icon, required this.text});
 
@@ -556,17 +536,15 @@ class RecordSaleSheet extends StatefulWidget {
 class _RecordSaleSheetState extends State<RecordSaleSheet> {
   final _note = TextEditingController();
 
-  /// One field per payment type. A sale can run to hundreds of loaves,
-  /// so the count is typed rather than stepped.
+  /// برای هر روش پرداخت یک ورودی تعداد؛ صدها نان با تایپ وارد می‌شوند.
   final Map<PaymentType, TextEditingController> _fields = {
     for (final type in PaymentType.saleChoices) type: TextEditingController(),
   };
 
-  /// Buyer per payment type, needed for نسیه and مدارس.
+  /// مشتری هر روش پرداخت، برای نسیه و مدارس.
   final Map<PaymentType, int?> _customers = {};
 
-  /// Who took the bread, for the «منزل» row. Left empty it behaves as it
-  /// always has — bread owed by nobody — so an older habit still works.
+  /// گیرنده نان در ردیف منزل؛ خالی ماندن آن مانند قبل نان بدون بدهکار ثبت می‌کند.
   int? _consumedBy;
 
   // هر کارمند اضافه، تعداد مستقل و یک ردیف منزل جدا دارد.
@@ -595,16 +573,11 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
   void initState() {
     super.initState();
 
-    // Nothing is pre-filled. Cash came off the sheet at the owner's word,
-    // and it was the row that used to open holding the whole batch — so
-    // the sheet now starts empty and every loaf has to be named.
-    //
-    // What nobody names stays on the seller's account. That is not new:
-    // the server has always derived a shortfall from the batch less what
-    // was accounted for. What is new is that it is the resting state
-    // rather than the exception.
+    // فرم بدون مقدار اولیه باز می‌شود؛ نقد از این فرم حذف شده و هر نان باید
+    // در ردیفی نام برده شود. باقی نان‌ها مانند محاسبه همیشگی سرور تا تسویه
+    // در حساب فروشنده می‌مانند؛ این بار حالت معمول فرم همین است.
 
-    // Every keystroke moves the running total and the banner above it.
+    // هر تغییر ورودی، جمع و پیام بالای فرم را تازه می‌کند.
     for (final field in _fields.values) {
       field.addListener(() => setState(() {}));
     }
@@ -618,7 +591,7 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
       final list = await widget.api.customers();
       if (mounted) setState(() => _customerOptions = list);
     } on ApiException {
-      // Only نسیه and مدارس need it; the rest of the sheet still works.
+      // فقط نسیه و مدارس به فهرست مشتری نیاز دارند؛ بقیه فرم مستقل کار می‌کند.
     }
   }
 
@@ -664,15 +637,14 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
   int get _totalCount =>
       PaymentType.saleChoices.fold(0, (sum, type) => sum + _countFor(type));
 
-  /// In Toman, the unit everything is stored in. MoneyFormat converts
-  /// to the shop's display unit when it renders — doing it here too
-  /// showed every figure ten times over on a Rial shop.
+  /// مبلغ به تومان ذخیره می‌شود؛ تبدیل به واحد نمایشی فقط هنگام نمایش انجام
+  /// می‌شود تا مبلغ نانوایی ریالی دو بار در ده ضرب نشود.
   double get _totalAmount => _usedTypes
       .where((type) => !type.expectsNoAmount)
       .fold(0.0, (sum, type) => sum + _countFor(type) * _unitPrice);
 
-  /// Loaves of the batch not yet placed on any payment row. Recorded as a
-  /// temporary debt against the seller, so it is worth showing plainly.
+  /// نان‌های تخصیص‌نیافته به ردیف پرداخت، بدهی موقت فروشنده می‌شوند
+  /// و باید روشن نمایش داده شوند.
   int get _unassigned => widget.chane.chaneCount - _totalCount;
 
   int _readCount(TextEditingController field) =>
@@ -684,15 +656,14 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
           ? _extraHome.fold<int>(0, (sum, row) => sum + _readCount(row.count))
           : 0);
 
-  /// Puts every loaf still unassigned onto this row — the usual gesture
-  /// when one payment type covers the rest of the batch.
+  /// همه نان‌های تخصیص‌نیافته به این ردیف منتقل می‌شوند؛ برای پرداخت یک‌جای بچ.
   void _fill(PaymentType type) {
     if (_unassigned <= 0) return;
 
     _fields[type]!.text = '${_readCount(_fields[type]!) + _unassigned}';
   }
 
-  /// Payment types actually used, so the summary names only what was paid.
+  /// خلاصه فقط روش‌های پرداخت استفاده‌شده را نام می‌برد.
   Iterable<PaymentType> get _usedTypes =>
       PaymentType.saleChoices.where((type) => _countFor(type) > 0);
 
@@ -720,18 +691,10 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
         return 'هر کارمند را فقط در یک ردیف انتخاب کنید.';
       }
     }
-    // An empty sheet used to be refused, and it had to be: cash was a row
-    // here, so a seller with nothing to enter had simply not started.
-    //
-    // Cash now lives only on the settlement — «فقط در تسویه حساب فروشنده
-    // باشد» — so an empty sheet is the commonest day there is: the whole
-    // batch went over the counter and the seller is holding the notes.
-    // Refusing it would leave that batch open for ever and the shop
-    // unable to record its ordinary day.
-    //
-    // It is confirmed rather than waved through: the whole batch landing
-    // on somebody's own account is not a thing to do by brushing a
-    // button.
+    // وقتی نقد داخل فرم بود، خالی بودن فرم یعنی شروع نشدن ثبت؛ اکنون نقد
+    // فقط هنگام تسویه حساب فروشنده ثبت می‌شود و خالی بودن این فرم حالت عادی است.
+    // رد کردن آن بچ را باز نگه می‌دارد. ثبت فرم خالی تأیید می‌خواهد چون
+    // تمام نان‌ها تا تسویه به حساب همان فروشنده می‌روند.
     if (_totalCount > widget.chane.chaneCount) {
       return 'مجموع تعداد نان از ${widget.chane.chaneCount} عدد این چانه بیشتر است.';
     }
@@ -745,12 +708,8 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
     return null;
   }
 
-  /// Says out loud what the seller is taking on, when anything is.
-  ///
-  /// Every loaf not named here stays on his own account until he settles
-  /// — that is the whole shape of the day now. It is his money either
-  /// way, but he should read the figure before it becomes his to answer
-  /// for, not find it on the accounts page a week later.
+  /// تعهد فروشنده پیش از ثبت روشن گفته می‌شود؛ هر نان نامشخص تا تسویه
+  /// در حساب او می‌ماند و نباید نخستین بار در صفحه حساب دیده شود.
   Future<bool> _confirmedWhatStaysOnHisAccount() async {
     if (_unassigned <= 0) return true;
 
@@ -794,27 +753,20 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
     setState(() => _saving = true);
 
     try {
-      // Everything the seller did not name is his until he settles, and
-      // it is said out loud rather than left for the server to infer.
-      //
-      // It has to be said: a sheet with no lines at all is refused, and
-      // with cash off the sheet an ordinary day has nothing else on it.
-      // That batch would have stayed open for ever.
+      // نان‌های نامشخص تا تسویه به حساب فروشنده می‌روند. این موضوع باید
+      // صریح گفته شود؛ وگرنه فرم خالی با حذف نقد، بچ را برای همیشه باز می‌گذارد.
       final payments = [
         ..._usedTypes.where((type) => type != PaymentType.home).map(
               (type) => SalePaymentLine(
                 paymentType: type,
                 breadCount: _countFor(type),
-                // The API always stores Toman, whatever the shop displays,
-                // and the bread price is already in it. Bread given away
-                // is sent with no amount rather than a zero, which would
-                // read as money that went missing.
+                // سرور مبلغ را به تومان ذخیره می‌کند و قیمت نان نیز تومان است.
+                // نان رایگان بدون مبلغ فرستاده می‌شود؛ صفر ممکن است پول مفقود برداشت شود.
                 amount:
                     type.expectsNoAmount ? null : _countFor(type) * _unitPrice,
                 customerId: _customers[type],
-                // Only «منزل» carries a person. Charity is a gift and is
-                // owed by nobody, so naming one there would charge
-                // somebody for bread they gave away.
+                // فقط منزل گیرنده دارد؛ خیریه بدهکار ندارد و نام‌گذاری آن
+                // به‌اشتباه برای نان بخشیده‌شده بدهی ایجاد می‌کند.
                 consumedByUserId: type == PaymentType.home ? _consumedBy : null,
               ),
             ),
@@ -1023,8 +975,7 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
   }
 }
 
-/// How much of the batch is still unaccounted for, stated plainly because
-/// anything left over is recorded as a debt against the seller.
+/// نان‌های حساب‌نشده روشن نمایش داده می‌شوند چون بدهی فروشنده خواهند شد.
 class _RemainingBanner extends StatelessWidget {
   const _RemainingBanner({required this.unassigned, required this.batchCount});
 
@@ -1077,13 +1028,8 @@ class _RemainingBanner extends StatelessWidget {
   }
 }
 
-/// One payment type with its loaf count, a stepper either side, and the
-/// money it comes to. Tapping the row's + button sweeps up whatever is
-/// left of the batch, which is the usual case.
-/// One payment type with its loaf count typed in, and the money it comes
-/// to. A sale can run to hundreds of loaves, so the count is entered
-/// rather than stepped; the button beside it sweeps up whatever is left of
-/// the batch, which is the usual case.
+/// هر روش پرداخت، تعداد تایپی نان و مبلغ آن را دارد؛ دکمه افزودن
+/// باقی‌مانده بچ را یک‌جا به همان ردیف منتقل می‌کند.
 class _HomeBreadDraft {
   final count = TextEditingController();
   int? userId;
@@ -1126,8 +1072,7 @@ class _PaymentRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final active = count > 0;
 
-    // Toman, the unit everything is stored in. MoneyFormat converts to the
-    // shop's display unit when it renders.
+    // واحد ذخیره تومان است و تبدیل به واحد نانوایی هنگام نمایش انجام می‌شود.
     final amount = type.expectsNoAmount ? 0.0 : count * unitPrice;
 
     return Container(
@@ -1209,7 +1154,7 @@ class _PaymentRow extends StatelessWidget {
             ],
           ),
 
-          // Only نسیه and مدارس need a named buyer, and only once used.
+          // فقط ردیف استفاده‌شده نسیه یا مدارس به نام مشتری نیاز دارد.
           if (active && type.needsCustomer)
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 4),
@@ -1235,9 +1180,8 @@ class _PaymentRow extends StatelessWidget {
               ),
             ),
 
-          // «منزل» only, and only once used. Optional on purpose: leaving
-          // it empty records what the shop has always recorded — bread
-          // owed by nobody. Naming somebody charges their payslip.
+          // نام گیرنده فقط برای منزل و اختیاری است؛ خالی بودن، نان بدون بدهکار
+          // ثبت می‌کند و انتخاب کارمند آن را از حقوق همان فرد قابل کسر می‌کند.
           if (type == PaymentType.home && staff.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 4),
@@ -1318,7 +1262,7 @@ class _TotalRow extends StatelessWidget {
   }
 }
 
-/// One flour sale in the day's list.
+/// یک ردیف از فروش آرد امروز.
 class _FlourSaleTile extends StatelessWidget {
   const _FlourSaleTile({required this.sale});
 
