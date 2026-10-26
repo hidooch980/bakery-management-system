@@ -1813,12 +1813,12 @@ class BakeryApi {
   // ------------------------------------------- penalty requests
 
   Future<PenaltyOptions> penaltyOptions() async {
-    final body = await _client.get('/penalty-requests/options');
+    final body = await _client.getCached('/penalty-requests/options');
     return PenaltyOptions.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   Future<List<PenaltyRequest>> myPenaltyRequests() async {
-    final body = await _client.get('/penalty-requests/mine');
+    final body = await _client.getCached('/penalty-requests/mine');
     final data = body['data'] as Map<String, dynamic>;
     return ((data['requests'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
@@ -1847,7 +1847,7 @@ class BakeryApi {
       _client.delete('/penalty-requests/$id');
 
   Future<List<PenaltyRequest>> pendingPenaltyRequests() async {
-    final body = await _client.get('/penalty-requests');
+    final body = await _client.getCached('/penalty-requests');
     return _paginated(body).map(PenaltyRequest.fromJson).toList();
   }
 

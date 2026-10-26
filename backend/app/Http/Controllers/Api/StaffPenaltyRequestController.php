@@ -26,6 +26,8 @@ class StaffPenaltyRequestController extends Controller
     public function options(Request $request): JsonResponse
     {
         $staff = User::query()
+            // This shop's people only; another shop's staff are not ours to name.
+            ->ofCurrentBakery()
             ->where('is_active', true)
             ->where('id', '!=', $request->user()->id)
             ->orderBy('name')
@@ -50,6 +52,10 @@ class StaffPenaltyRequestController extends Controller
             'amount' => ['nullable', 'required_if:type,fine', 'numeric', 'min:1'],
             'note' => ['nullable', 'string', 'max:500'],
         ]);
+
+        if (! User::query()->ofCurrentBakery()->whereKey($data['user_id'])->exists()) {
+            return $this->error('این شخص از کارکنان این نانوایی نیست.', 422);
+        }
 
         $penalty = StaffPenaltyRequest::create([
             'user_id' => $data['user_id'],
