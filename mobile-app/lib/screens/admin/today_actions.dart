@@ -4,6 +4,7 @@ import '../../models/today_answer.dart';
 import '../../services/bakery_api.dart';
 import '../../widgets/role_home_scaffold.dart';
 import 'advance_requests_section.dart';
+import 'penalty_requests_section.dart';
 import 'bank_loans_screen.dart';
 import 'payroll_section.dart';
 import 'salary_requests_section.dart';
@@ -75,6 +76,7 @@ class _TodayActionsState extends State<TodayActions> {
       'درخواست‌های پرداخت',
       ListView(padding: const EdgeInsets.all(16), children: [
         AdvanceRequestsSection(api: widget.api),
+        PenaltyRequestsSection(api: widget.api),
         const SizedBox(height: 16),
         SalaryRequestsSection(api: widget.api),
       ]));

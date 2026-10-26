@@ -10,6 +10,7 @@ DELETE api/v1/expenses/{expense}                            admin
 DELETE api/v1/flour-allocations/{allocation}                admin, seller
 DELETE api/v1/holidays/{holiday}                            admin
 DELETE api/v1/incomes/{income}                              admin
+DELETE api/v1/penalty-requests/{penaltyRequest}             admin, seller
 DELETE api/v1/purchases/{purchase}                          admin
 DELETE api/v1/salaries/{salary}                             admin
 DELETE api/v1/salary-requests/{salaryRequest}               (any signed-in)
@@ -71,6 +72,9 @@ GET api/v1/inventory/movements                              admin, seller
 GET api/v1/loans                                            admin
 GET api/v1/me                                               (any signed-in)
 GET api/v1/my-collections                                   admin, seller
+GET api/v1/penalty-requests                                 admin
+GET api/v1/penalty-requests/mine                            admin, seller
+GET api/v1/penalty-requests/options                         admin, seller
 GET api/v1/purchases                                        admin
 GET api/v1/purchases/mine                                   admin, seller
 GET api/v1/purchases/options                                admin, seller
@@ -143,6 +147,9 @@ PATCH api/v1/diesel/quota                                   admin, seller
 PATCH api/v1/expenses/{expense}                             admin
 PATCH api/v1/incomes/{income}                               admin
 PATCH api/v1/inventory/{key}/threshold                      admin, seller
+PATCH api/v1/penalty-requests/{penaltyRequest}/approve      admin
+PATCH api/v1/penalty-requests/{penaltyRequest}/cancel       admin
+PATCH api/v1/penalty-requests/{penaltyRequest}/reject       admin
 PATCH api/v1/salaries/{salary}                              admin
 PATCH api/v1/salaries/{salary}/mark-paid                    admin
 PATCH api/v1/salary-requests/{salaryRequest}/reject         admin
@@ -192,6 +199,7 @@ POST api/v1/loans/{loan}/payments                           admin
 POST api/v1/login                                           (public)
 POST api/v1/logout                                          (any signed-in)
 POST api/v1/my-collections/{customer}/collect               admin, seller
+POST api/v1/penalty-requests                                admin, seller
 POST api/v1/purchases                                       admin, seller
 POST api/v1/reset-password                                  (public)
 POST api/v1/salaries                                        admin

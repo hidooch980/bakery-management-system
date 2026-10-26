@@ -13,6 +13,7 @@ import '../../widgets/common.dart';
 import '../../widgets/daily_flour_quota.dart';
 import '../admin/admin_record_sheet.dart';
 import '../shared/purchase_sheet.dart';
+import 'penalty_requests_section.dart';
 
 /// The rest of the shop, on the seller's screen.
 ///
@@ -76,6 +77,9 @@ class _SellerWorkbenchState extends State<SellerWorkbench> {
         ),
         const SizedBox(height: 22),
         StaffAttendanceSection(api: widget.api),
+        const SizedBox(height: 22),
+        // Asking only: nothing is docked until the manager approves.
+        SellerPenaltyRequestsSection(api: widget.api),
       ],
     );
   }

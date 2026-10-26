@@ -6,6 +6,7 @@ import '../../utils/json.dart';
 import '../../widgets/common.dart';
 import '../../widgets/admin_detail_group.dart';
 import 'advance_requests_section.dart';
+import 'penalty_requests_section.dart';
 import 'lateness_report_section.dart';
 import 'salary_requests_section.dart';
 import 'payroll_section.dart';
@@ -128,6 +129,7 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                   icon: Icons.pending_actions,
                   builder: (_) => Column(children: [
                         AdvanceRequestsSection(api: widget.api),
+                        PenaltyRequestsSection(api: widget.api),
                         const SizedBox(height: 16),
                         SalaryRequestsSection(api: widget.api)
                       ])),
