@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\StaffAccountController;
 use App\Http\Controllers\Api\StaffAdjustmentController;
 use App\Http\Controllers\Api\StaffAdvanceController;
 use App\Http\Controllers\Api\StaffAdvanceRequestController;
+use App\Http\Controllers\Api\StaffPenaltyRequestController;
 use App\Http\Controllers\Api\StaffReportController;
 use App\Http\Controllers\Api\StockCountController;
 use App\Http\Controllers\Api\SupplierController;
@@ -420,6 +421,14 @@ Route::prefix('v1')->group(function () {
         Route::post('/advance-requests', [StaffAdvanceRequestController::class, 'store']);
         Route::delete('/advance-requests/{advanceRequest}', [StaffAdvanceRequestController::class, 'destroy']);
 
+        // Penalty request: the seller asks; only the manager's yes docks pay.
+        Route::middleware('permission:view-own-sales|manage-finance')->group(function () {
+            Route::get('/penalty-requests/options', [StaffPenaltyRequestController::class, 'options']);
+            Route::get('/penalty-requests/mine', [StaffPenaltyRequestController::class, 'mine']);
+            Route::post('/penalty-requests', [StaffPenaltyRequestController::class, 'store']);
+            Route::delete('/penalty-requests/{penaltyRequest}', [StaffPenaltyRequestController::class, 'destroy']);
+        });
+
         // --- Admin: finance (expenses & payroll) ---
         Route::middleware('permission:manage-finance')->group(function () {
             Route::get('/expenses/categories', [ExpenseController::class, 'categories']);
@@ -458,6 +467,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/advance-requests', [StaffAdvanceRequestController::class, 'index']);
             Route::patch('/advance-requests/{advanceRequest}/approve', [StaffAdvanceRequestController::class, 'approve']);
             Route::patch('/advance-requests/{advanceRequest}/reject', [StaffAdvanceRequestController::class, 'reject']);
+            Route::get('/penalty-requests', [StaffPenaltyRequestController::class, 'index']);
+            Route::patch('/penalty-requests/{penaltyRequest}/approve', [StaffPenaltyRequestController::class, 'approve']);
+            Route::patch('/penalty-requests/{penaltyRequest}/reject', [StaffPenaltyRequestController::class, 'reject']);
+            Route::patch('/penalty-requests/{penaltyRequest}/cancel', [StaffPenaltyRequestController::class, 'cancel']);
             Route::apiResource('staff-advances', StaffAdvanceController::class)
                 ->parameters(['staff-advances' => 'advance'])
                 ->only(['index', 'store', 'destroy']);

@@ -8,6 +8,7 @@ import '../models/customer.dart';
 import '../models/entries.dart';
 import '../models/my_bakery.dart';
 import '../models/payroll.dart';
+import '../models/penalty_request.dart';
 import '../models/purchase.dart';
 import '../models/staff_adjustment.dart';
 import '../models/stock_count.dart';
@@ -1808,6 +1809,56 @@ class BakeryApi {
   /// money early is worse than no answer at all.
   Future<void> rejectAdvanceRequest(int id, {required String note}) =>
       _client.patch('/advance-requests/$id/reject', {'note': note});
+
+  // ------------------------------------------- penalty requests
+
+  Future<PenaltyOptions> penaltyOptions() async {
+    final body = await _client.get('/penalty-requests/options');
+    return PenaltyOptions.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<List<PenaltyRequest>> myPenaltyRequests() async {
+    final body = await _client.get('/penalty-requests/mine');
+    final data = body['data'] as Map<String, dynamic>;
+    return ((data['requests'] as List?) ?? const [])
+        .cast<Map<String, dynamic>>()
+        .map(PenaltyRequest.fromJson)
+        .toList();
+  }
+
+  Future<PenaltyRequest> requestPenalty({
+    required int userId,
+    required String type,
+    required String reason,
+    double? amount,
+    String? note,
+  }) async {
+    final body = await _client.post('/penalty-requests', {
+      'user_id': userId,
+      'type': type,
+      'reason': reason,
+      if (type == 'fine') 'amount': amount,
+      if (note != null && note.isNotEmpty) 'note': note,
+    });
+    return PenaltyRequest.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> withdrawPenaltyRequest(int id) =>
+      _client.delete('/penalty-requests/$id');
+
+  Future<List<PenaltyRequest>> pendingPenaltyRequests() async {
+    final body = await _client.get('/penalty-requests');
+    return _paginated(body).map(PenaltyRequest.fromJson).toList();
+  }
+
+  Future<void> approvePenaltyRequest(int id, {double? amount, String? note}) =>
+      _client.patch('/penalty-requests/$id/approve', {
+        if (amount != null) 'amount': amount,
+        if (note != null && note.isNotEmpty) 'note': note,
+      });
+
+  Future<void> rejectPenaltyRequest(int id, {required String note}) =>
+      _client.patch('/penalty-requests/$id/reject', {'note': note});
 
   /// Laravel paginators nest the rows under `data.data`; plain lists don't.
   // ------------------------------------------------------------ buying
