@@ -83,7 +83,7 @@ class BankSmsBook
      *
      * @throws DuplicateRecord when a twin is on the books and $force is off
      */
-    public static function confirm(BankSms $sms, User $user, string $category, ?int $accountId = null, ?string $note = null, bool $force = false): BankSms
+    public static function confirm(BankSms $sms, User $user, string $category, ?int $accountId = null, ?string $note = null, bool $force = false, ?string $date = null): BankSms
     {
         self::mustBeOpen($sms);
 
@@ -101,7 +101,8 @@ class BankSmsBook
         }
 
         $title = trim(($sms->bank ? 'پیامک بانک '.$sms->bank : 'پیامک بانکی').' — '.$categories[$category]);
-        $day = Carbon::parse($sms->received_at)->toDateString();
+        $day = ($date !== null ? Jalali::parseFlexible($date) : null)?->toDateString()
+            ?? self::defaultDate($sms)->toDateString();
 
         return DB::transaction(function () use ($sms, $user, $in, $category, $accountId, $note, $force, $title, $day) {
             BankSmsMatcher::$pinned = $sms->id;
@@ -135,6 +136,18 @@ class BankSmsBook
 
             return $sms;
         });
+    }
+
+    /**
+     * The day the money belongs to. The card reader's group deposit lands
+     * the morning after the bread was sold, so it is the day before the
+     * SMS; everything else is the SMS's own day. The sheet can change it.
+     */
+    public static function defaultDate(BankSms $sms): Carbon
+    {
+        $at = Carbon::parse($sms->received_at)->startOfDay();
+
+        return $sms->kind === 'pos_group' ? $at->subDay() : $at;
     }
 
     public static function ignore(BankSms $sms, User $user): BankSms
@@ -238,6 +251,8 @@ class BankSmsBook
             'body' => BankSmsParser::mask($sms->body),
             'received_at' => Carbon::parse($sms->received_at)->toIso8601String(),
             'received_at_jalali' => Jalali::format(Carbon::parse($sms->received_at), 'Y/m/d H:i'),
+            'default_date' => self::defaultDate($sms)->toDateString(),
+            'default_date_jalali' => Jalali::format(self::defaultDate($sms), 'Y/m/d'),
             'direction' => $sms->direction,
             'kind' => $sms->kind,
             'amount' => (float) $sms->amount,

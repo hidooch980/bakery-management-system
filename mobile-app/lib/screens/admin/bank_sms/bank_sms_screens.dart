@@ -25,6 +25,8 @@ class BankSms {
     this.matchedLabel,
     this.candidates = const [],
     this.possibleDuplicateAt,
+    this.kind,
+    this.defaultDateJalali,
   });
 
   factory BankSms.fromJson(Map<String, dynamic> j) => BankSms(
@@ -44,6 +46,8 @@ class BankSms {
           for (final c in rowList(j['candidates']))
             (id: (c['id'] as num).toInt(), label: '${c['label']}'),
         ],
+        kind: j['kind'] as String?,
+        defaultDateJalali: j['default_date_jalali'] as String?,
         possibleDuplicateAt:
             keyedGroup(j['possible_duplicate_of'])['at'] as String?,
       );
@@ -74,6 +78,13 @@ class BankSms {
 
   /// Another SMS with the same amount minutes apart — maybe sent twice.
   final String? possibleDuplicateAt;
+
+  /// pos_group is the card reader's daily deposit.
+  final String? kind;
+
+  /// The day it is booked on unless changed: the card reader's deposit is
+  /// the day before the SMS (the bread was sold then).
+  final String? defaultDateJalali;
 
   /// Waiting for someone: pending, or ambiguous.
   bool get isOpen => status == 'pending' || status == 'ambiguous';
@@ -560,7 +571,12 @@ class _SumBox extends StatelessWidget {
 // ----------------------------------------------------------- confirm sheet
 
 /// What the owner chose in the sheet.
-typedef BankSmsChoice = ({String category, int? accountId, String note});
+typedef BankSmsChoice = ({
+  String category,
+  int? accountId,
+  String note,
+  String date,
+});
 
 class BankSmsConfirmSheet extends StatefulWidget {
   const BankSmsConfirmSheet({
@@ -589,11 +605,14 @@ class _BankSmsConfirmSheetState extends State<BankSmsConfirmSheet> {
   late String _category = widget.sms.suggestedCategory ?? 'other';
   late int? _account = widget.sms.accountId;
   late final _note = TextEditingController(text: widget.initialNote);
+  late final _date =
+      TextEditingController(text: widget.sms.defaultDateJalali ?? '');
   bool _busy = false;
 
   @override
   void dispose() {
     _note.dispose();
+    _date.dispose();
     super.dispose();
   }
 
@@ -658,6 +677,18 @@ class _BankSmsConfirmSheetState extends State<BankSmsConfirmSheet> {
               ),
             const SizedBox(height: 10),
             TextField(
+              controller: _date,
+              keyboardType: TextInputType.datetime,
+              decoration: InputDecoration(
+                labelText: 'تاریخ ثبت',
+                helperText: sms.kind == 'pos_group'
+                    ? 'کارتخوان: فروشِ روز قبل از پیامک'
+                    : null,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
               controller: _note,
               decoration: const InputDecoration(
                   labelText: 'توضیح (اختیاری)', border: OutlineInputBorder()),
@@ -673,6 +704,7 @@ class _BankSmsConfirmSheetState extends State<BankSmsConfirmSheet> {
                             category: _category,
                             accountId: _account,
                             note: _note.text.trim(),
+                            date: _date.text.trim(),
                           ));
                         } finally {
                           if (mounted) setState(() => _busy = false);

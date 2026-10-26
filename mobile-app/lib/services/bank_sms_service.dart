@@ -147,11 +147,13 @@ class BankSmsService {
           {required String category,
           int? accountId,
           String? note,
+          String? date,
           bool force = false}) =>
       _client.post('/bank-sms/$id/confirm', {
         'category': category,
         if (accountId != null) 'bank_account_id': accountId,
         if (note != null && note.isNotEmpty) 'note': note,
+        if (date != null && date.isNotEmpty) 'date': date,
         if (force) 'force': true,
       });
 

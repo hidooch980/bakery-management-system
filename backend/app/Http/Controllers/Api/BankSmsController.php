@@ -99,11 +99,12 @@ class BankSmsController extends Controller
             'bank_account_id' => ['nullable', 'integer'],
             'note' => ['nullable', 'string', 'max:500'],
             'force' => ['sometimes', 'boolean'],
+            'date' => ['nullable', 'string', 'max:20'],
         ]);
 
         try {
             $sms = BankSmsBook::confirm($sms, $request->user(), $data['category'],
-                $data['bank_account_id'] ?? null, $data['note'] ?? null, (bool) ($data['force'] ?? false));
+                $data['bank_account_id'] ?? null, $data['note'] ?? null, (bool) ($data['force'] ?? false), $data['date'] ?? null);
         } catch (DuplicateRecord $e) {
             return response()->json([
                 'success' => false,

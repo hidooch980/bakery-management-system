@@ -133,6 +133,7 @@ Future<void> _openConfirm(
             category: choice.category,
             accountId: choice.accountId,
             note: choice.note,
+            date: choice.date,
             force: force);
         try {
           await send();

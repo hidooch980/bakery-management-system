@@ -85,6 +85,12 @@
                                             <option value="{{ $key }}" @selected($key === ($r['suggested_category'] ?? 'other'))>{{ $r['direction'] === 'in' ? 'درآمد' : 'هزینه' }} — {{ $label }}</option>
                                         @endforeach
                                     </select>
+                                    <label class="mt-1 block text-xs text-gray-500">تاریخ ثبت
+                                        <input type="text" wire:model="date.{{ $r['id'] }}" class="mt-1 block w-28 rounded-lg border-gray-300 text-sm dark:border-white/10 dark:bg-white/5" />
+                                    </label>
+                                    @if ($r['kind'] === 'pos_group')
+                                        <div class="text-xs text-gray-500">کارتخوان: فروشِ روز قبل</div>
+                                    @endif
                                 @else
                                     {{ $r['direction'] === 'in' ? 'درآمد' : 'هزینه' }} — {{ $r['suggested_category_label'] ?? 'سایر' }}
                                 @endif

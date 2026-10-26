@@ -176,7 +176,7 @@ void main() {
   });
 
   testWidgets('برگهٔ تأیید با دسته', (tester) async {
-    final pos = _list('open').firstWhere((s) => s.isIncome);
+    final pos = _list('open').firstWhere((s) => s.kind == 'pos_group');
     await show(
       tester,
       Scaffold(

@@ -10,6 +10,7 @@ use App\Models\Expense;
 use App\Models\Income;
 use App\Support\BankSmsBook;
 use App\Support\BankSmsMatcher;
+use App\Support\Jalali;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Validation\ValidationException;
@@ -43,6 +44,9 @@ class BankSmsInbox extends Page
 
     /** @var array<int, bool> «بله، جداست» after a twin was named */
     public array $force = [];
+
+    /** @var array<int, string> the day each SMS is booked on (Jalali) */
+    public array $date = [];
 
     public ?string $newLast4 = null;
 
@@ -85,6 +89,7 @@ class BankSmsInbox extends Page
 
         foreach ($open as $sms) {
             $this->category[$sms->id] ??= $sms->suggested_category ?? 'other';
+            $this->date[$sms->id] ??= Jalali::format(BankSmsBook::defaultDate($sms), 'Y/m/d');
         }
 
         return $open->concat($done)->map(fn ($s) => BankSmsBook::present($s))->all();
@@ -123,7 +128,7 @@ class BankSmsInbox extends Page
             BankSmsBook::confirm($sms, auth()->user(),
                 $this->category[$id] ?? $sms->suggested_category ?? 'other',
                 ($this->account[$id] ?? null) ? (int) $this->account[$id] : null,
-                null, (bool) ($this->force[$id] ?? false));
+                null, (bool) ($this->force[$id] ?? false), $this->date[$id] ?? null);
         } catch (DuplicateRecord $e) {
             $this->force[$id] = true;
             Notification::make()->title('همین مبلغ امروز ثبت شده: '.$e->twin->describe())

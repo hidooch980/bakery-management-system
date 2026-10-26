@@ -89,6 +89,35 @@ class BankSmsFromThePhoneTest extends TestCase
         $this->assertNull($this->sepah->refresh()->sms_balance);
     }
 
+    public function test_a_card_reader_deposit_is_booked_on_the_day_before_unless_changed(): void
+    {
+        $pos = $this->send(self::POS_GROUP, '2026-10-26 08:41:00')->json('data.results.0.id');
+        $paya = $this->send(self::PAYA, '2026-10-26 09:00:00')->json('data.results.0.id');
+
+        $this->actingAs($this->owner, 'sanctum')->getJson('/api/v1/bank-sms')
+            ->assertJsonFragment(['id' => $pos, 'default_date' => '2026-10-25']);
+
+        $this->actingAs($this->owner, 'sanctum')->postJson("/api/v1/bank-sms/{$pos}/confirm", ['category' => 'card_sale'])->assertOk();
+        $this->actingAs($this->owner, 'sanctum')->postJson("/api/v1/bank-sms/{$paya}/confirm", ['category' => 'other'])->assertOk();
+
+        $this->assertSame('2026-10-25', Income::where('category', 'card_sale')->sole()->received_on->toDateString());
+        $this->assertSame('2026-10-26', Income::where('category', 'other')->sole()->received_on->toDateString());
+        $this->assertSame('2026-10-25', BankTransaction::find(BankSms::find($pos)->bank_transaction_id)->occurred_on->toDateString());
+
+        // The balance still follows the SMS's own time.
+        $this->assertSame('2026-10-26 09:00:00', $this->sepah->refresh()->sms_balance_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_the_owner_can_book_a_card_reader_deposit_on_another_day(): void
+    {
+        $pos = $this->send(self::POS_GROUP, '2026-10-26 08:41:00')->json('data.results.0.id');
+
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson("/api/v1/bank-sms/{$pos}/confirm", ['category' => 'card_sale', 'date' => '1405/08/02'])->assertOk();
+
+        $this->assertSame('2026-10-24', Income::sole()->received_on->toDateString());
+    }
+
     public function test_a_sepah_withdrawal_is_read(): void
     {
         $p = BankSmsParser::parse('9830003', self::WITHDRAWAL);
