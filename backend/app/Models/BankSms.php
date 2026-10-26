@@ -26,7 +26,7 @@ class BankSms extends Model
 
     protected $fillable = [
         'user_id', 'sender', 'bank', 'body', 'received_at', 'hash',
-        'direction', 'amount', 'balance', 'card_last4', 'bank_account_id',
+        'direction', 'kind', 'amount', 'balance', 'last4', 'bank_account_id',
         'suggested_category', 'status', 'bank_transaction_id',
         'decided_by', 'decided_at',
     ];

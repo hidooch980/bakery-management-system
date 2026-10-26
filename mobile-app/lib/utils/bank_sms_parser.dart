@@ -142,6 +142,8 @@ class BankSmsParser {
         r'(برداشت|واریز|مبلغ|خرید|انتقال|کسر|پرداخت|بستانکار|بدهکار|دریافت|سود)[^0-9+\n-]{0,25}([+-]?)\s*([0-9][0-9,]*)');
     for (final m in labeled.allMatches(n)) {
       if (m.start == balanceStart) continue;
+      // «واریز پایا به حساب 0101…»: that number is the account, not money.
+      if (RegExp(r'حساب|کارت|شماره').hasMatch(m.group(0)!)) continue;
       final v = _num(m.group(3)!);
       if (v == null || v < 100) continue;
       amount = conv(v);

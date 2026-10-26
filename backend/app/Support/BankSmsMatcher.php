@@ -4,6 +4,8 @@ namespace App\Support;
 
 use App\Models\BankSms;
 use App\Models\BankTransaction;
+use App\Models\Expense;
+use App\Models\Income;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -21,6 +23,12 @@ use Illuminate\Support\Collection;
 class BankSmsMatcher
 {
     public const WINDOW_DAYS = 1;
+
+    /**
+     * Set while a record is being created *from* an SMS, so the movement
+     * it posts is linked to that SMS and not to a look-alike.
+     */
+    public static ?int $pinned = null;
 
     /** @return Collection<int, BankTransaction> */
     public static function candidates(BankSms $sms): Collection
@@ -69,10 +77,17 @@ class BankSmsMatcher
      */
     public static function claim(BankTransaction $tx): ?BankSms
     {
+        if (self::$pinned !== null) {
+            $sms = BankSms::query()->whereKey(self::$pinned)->whereNull('bank_transaction_id')->first();
+            self::$pinned = null;
+            $sms?->forceFill(['bank_transaction_id' => $tx->id])->save();
+
+            return $sms;
+        }
+
         $date = Carbon::parse($tx->occurred_on)->startOfDay();
 
-        $open = BankSms::query()
-            ->whereIn('status', BankSms::OPEN)
+        $fits = fn ($q) => $q
             ->whereNull('bank_transaction_id')
             ->where('direction', $tx->direction)
             ->where('amount', $tx->amount)
@@ -80,8 +95,18 @@ class BankSmsMatcher
             ->whereBetween('received_at', [
                 $date->copy()->subDays(self::WINDOW_DAYS),
                 $date->copy()->addDays(self::WINDOW_DAYS)->endOfDay(),
-            ])
-            ->get();
+            ]);
+
+        // A record that is edited has its movement rebuilt, which drops
+        // the link; the SMS it had is taken back first.
+        $orphan = $fits(BankSms::query()->whereIn('status', ['matched', 'confirmed']))->orderBy('id')->first();
+        if ($orphan) {
+            $orphan->forceFill(['bank_transaction_id' => $tx->id])->save();
+
+            return $orphan;
+        }
+
+        $open = $fits(BankSms::query()->whereIn('status', BankSms::OPEN))->get();
 
         if ($open->count() !== 1) {
             return null;
@@ -96,7 +121,9 @@ class BankSmsMatcher
     /** «حقوق — جلیل درازهی»: what an SMS turned out to be. */
     public static function describe(BankTransaction $tx): string
     {
-        $who = $tx->source?->user?->name
+        // An income or expense says what it was; anything else, whom it was for.
+        $who = ($tx->source instanceof Income || $tx->source instanceof Expense ? $tx->source->title : null)
+            ?? $tx->source?->user?->name
             ?? $tx->source?->supplier?->name
             ?? $tx->source?->customer?->name
             ?? $tx->source?->title

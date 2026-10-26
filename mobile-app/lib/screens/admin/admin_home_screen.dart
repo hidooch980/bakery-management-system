@@ -7,6 +7,7 @@ import '../../utils/formatters.dart';
 import '../../widgets/role_home_scaffold.dart';
 import 'admin_finance_tab.dart';
 import 'admin_today_tab.dart';
+import 'bank_sms/bank_sms_pages.dart';
 import 'admin_overview_tab.dart';
 import 'admin_staff_tab.dart';
 import 'admin_warehouse_tab.dart';
@@ -48,7 +49,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return RoleHomeScaffold(
+    return BankSmsGate(
+      hub: BankSmsHub.of(widget.api),
+      child: RoleHomeScaffold(
       api: widget.api,
       bakery: _bakery,
       tabs: [
@@ -95,6 +98,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           builder: (_) => AdminStaffTab(api: widget.api),
         ),
       ],
+    ),
     );
   }
 }

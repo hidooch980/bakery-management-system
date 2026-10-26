@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/today_answer.dart';
 import 'today_actions.dart';
+import 'bank_sms/bank_sms_pages.dart';
 import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
@@ -36,7 +37,18 @@ class _AdminTodayTabState extends State<AdminTodayTab> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
+    final hub = BankSmsHub.of(widget.api);
+    return Column(children: [
+      // Only once something is waiting; the switch lives in «مالی».
+      ListenableBuilder(
+        listenable: hub,
+        builder: (_, __) => hub.openCount > 0
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: BankSmsHomeEntry(hub: hub))
+            : const SizedBox.shrink(),
+      ),
+      Expanded(child: RefreshIndicator(
       onRefresh: () async => _reload(),
       child: FutureBuilder<TodayAnswer>(
         future: _answer,
@@ -69,7 +81,8 @@ class _AdminTodayTabState extends State<AdminTodayTab> {
           );
         },
       ),
-    );
+    )),
+    ]);
   }
 }
 

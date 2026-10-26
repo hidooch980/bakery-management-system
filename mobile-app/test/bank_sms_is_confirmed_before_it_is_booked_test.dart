@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -10,7 +11,9 @@ import 'package:bakery_app/screens/admin/bank_sms/bank_sms_screens.dart';
 import 'package:bakery_app/theme/app_theme.dart';
 import 'package:bakery_app/utils/bank_sms_parser.dart';
 
-/// طرح «پیامک‌های بانکی». اعداد ساختگی‌اند.
+/// «پیامک‌های بانکی». The inbox below is the server's own answer
+/// (test/fixtures/bank_sms_inbox.json, made by the backend from fake Sepah
+/// SMS), so the screens are checked against what the API really sends.
 Future<void> _preview(WidgetTester tester, String name) async {
   final dir = Platform.environment['BAKERY_UI_PREVIEW_DIR'];
   if (dir == null) return;
@@ -25,166 +28,69 @@ Future<void> _preview(WidgetTester tester, String name) async {
   });
 }
 
-final _now = DateTime(2026, 10, 26, 9, 0);
+/// The three shapes Bank Sepah sends, with made-up numbers.
+const _withdrawal =
+    'بانك سپه\nبرداشت از حساب 0101234567890\nمبلغ:1,111,000\nمانده:98,765,000\n1405/08/04-07:00';
+const _posGroup =
+    'بانك سپه\nواريز گروهي به حساب 0101234567890\nمبلغ:12,345,000\nکارتخوان\nمانده:111,110,000\n1405/08/04-08:41';
+const _paya =
+    'بانك سپه\nواريز پايا به حساب 0101234567890\nمبلغ:3,333,000\nمانده:114,443,000\n1405/08/04-09:00';
 
-final _samples = <BankSms>[
-  BankSms(
-    id: 1,
-    bank: 'ملی',
-    body:
-        'بانک ملی\nواریز: 12,345,000 ریال\nکارت 6037**1234\nمانده: 98,765,000\n1405/08/04 08:41',
-    receivedAt: _now.subtract(const Duration(minutes: 19)),
-    amountToman: 1234500,
-    direction: BankSmsDirection.deposit,
-    cardLast4: '1234',
-    accountName: 'ملی — حساب کارتخوان',
-    suggestedCategory: 'sale',
-  ),
-  BankSms(
-    id: 2,
-    bank: 'ملی',
-    body:
-        'بانک ملی\nبرداشت: 1,111,000 ریال\nکارت 6037**1234\nمانده: 97,654,000',
-    receivedAt: _now.subtract(const Duration(hours: 2)),
-    amountToman: 111100,
-    direction: BankSmsDirection.withdrawal,
-    cardLast4: '1234',
-    accountName: 'ملی — حساب کارتخوان',
-    suggestedCategory: 'freight',
-  ),
-  BankSms(
-    id: 3,
-    bank: 'سپه',
-    body: 'سپه\nحساب 0987\nبرداشت 2,222,000\nبابت قبض برق',
-    receivedAt: _now.subtract(const Duration(hours: 5)),
-    amountToman: 222200,
-    direction: BankSmsDirection.withdrawal,
-    cardLast4: '0987',
-    suggestedCategory: 'utilities',
-  ),
-  BankSms(
-    id: 4,
-    bank: 'ملت',
-    body: 'ملت\n+3,333,000\nحساب 5678\nیارانه',
-    receivedAt: _now.subtract(const Duration(days: 1)),
-    amountToman: 333300,
-    direction: BankSmsDirection.deposit,
-    cardLast4: '5678',
-    accountName: 'ملت — حساب اصلی',
-    suggestedCategory: 'subsidy',
-  ),
-];
+final _fixture =
+    jsonDecode(File('test/fixtures/bank_sms_inbox.json').readAsStringSync())
+        as Map<String, dynamic>;
 
-final _matched = <BankSms>[
-  BankSms(
-    id: 7,
-    bank: 'ملی',
-    body: 'برداشت: 6,500,000 ریال — کارت 6037**1234',
-    receivedAt: _now.subtract(const Duration(hours: 15)),
-    amountToman: 650000,
-    direction: BankSmsDirection.withdrawal,
-    cardLast4: '1234',
-    accountName: 'ملی — حساب کارتخوان',
-    suggestedCategory: 'salary',
-    status: 'matched',
-    matchedLabel: 'حقوق — جلیل درازهی (۱۴۰۵/۰۸/۰۳)',
-  ),
-  BankSms(
-    id: 8,
-    bank: 'ملت',
-    body: 'برداشت 12,000,000 — حساب 5678 — قسط',
-    receivedAt: _now.subtract(const Duration(hours: 20)),
-    amountToman: 1200000,
-    direction: BankSmsDirection.withdrawal,
-    cardLast4: '5678',
-    accountName: 'ملت — حساب اصلی',
-    suggestedCategory: 'other',
-    status: 'matched',
-    matchedLabel: 'قسط وام — وام ملت (قسط ۷)',
-  ),
-];
-
-final _ambiguous = BankSms(
-  id: 9,
-  bank: 'ملی',
-  body: 'برداشت 3,000,000 ریال — کارت 6037**1234',
-  receivedAt: _now.subtract(const Duration(hours: 1)),
-  amountToman: 300000,
-  direction: BankSmsDirection.withdrawal,
-  cardLast4: '1234',
-  accountName: 'ملی — حساب کارتخوان',
-  suggestedCategory: 'other',
-  status: 'ambiguous',
-  candidates: const ['علی‌الحساب — سعید غلامزهی', 'هزینه — تعمیر دستگاه'],
-);
-
-final _duplicate = BankSms(
-  id: 10,
-  bank: 'ملی',
-  body: 'واریز: 12,345,000 ریال — کارت 6037**1234',
-  receivedAt: _now.subtract(const Duration(minutes: 17)),
-  amountToman: 1234500,
-  direction: BankSmsDirection.deposit,
-  cardLast4: '1234',
-  accountName: 'ملی — حساب کارتخوان',
-  suggestedCategory: 'sale',
-  possibleDuplicateOf: 'واریز همین مبلغ ساعت 08:41 هم آمده',
-);
-
-final _done = <BankSms>[
-  ..._matched,
-  BankSms(
-    id: 5,
-    bank: 'ملی',
-    body: 'واریز 4,444,000',
-    receivedAt: _now.subtract(const Duration(days: 1, hours: 3)),
-    amountToman: 444400,
-    direction: BankSmsDirection.deposit,
-    cardLast4: '1234',
-    accountName: 'ملی — حساب کارتخوان',
-    suggestedCategory: 'sale',
-    status: 'confirmed',
-  ),
-  BankSms(
-    id: 6,
-    bank: 'ملی',
-    body: 'برداشت 555,000',
-    receivedAt: _now.subtract(const Duration(days: 2)),
-    amountToman: 55500,
-    direction: BankSmsDirection.withdrawal,
-    cardLast4: '1234',
-    accountName: 'ملی — حساب کارتخوان',
-    suggestedCategory: 'other',
-    status: 'ignored',
-  ),
-];
+List<BankSms> _list(String key) => [
+      for (final j in _fixture[key] as List)
+        BankSms.fromJson((j as Map).cast<String, dynamic>())
+    ];
 
 void main() {
-  group('خواندن پیامک بانک', () {
-    test('واریز با رقم فارسی و ریال', () {
-      final p = BankSmsParser.parse('300017',
-          'بانک ملي\nواريز: ۱۲٬۳۴۵٬۰۰۰ ريال\nکارت ۶۰۳۷**۱۲۳۴\nمانده: ۹۸٬۷۶۵٬۰۰۰');
-      expect(p.direction, BankSmsDirection.deposit);
-      expect(p.amountToman, 1234500);
-      expect(p.balanceToman, 9876500);
-      expect(p.bank, 'ملی');
-      expect(p.cardLast4, '1234');
-    });
-
-    test('برداشت با علامت منفی', () {
-      final p = BankSmsParser.parse('200033', 'ملت\n-1,111,000\nحساب 5678');
+  group('خواندن پیامک بانک سپه', () {
+    test('برداشت از حساب', () {
+      final p = BankSmsParser.parse('9830003', _withdrawal);
       expect(p.direction, BankSmsDirection.withdrawal);
       expect(p.amountToman, 111100);
-      expect(p.cardLast4, '5678');
+      expect(p.balanceToman, 9876500);
+      expect(p.cardLast4, '7890');
+    });
+
+    test('واریز گروهی کارتخوان', () {
+      final p = BankSmsParser.parse('9830003', _posGroup);
+      expect(p.direction, BankSmsDirection.deposit);
+      expect(p.amountToman, 1234500);
+      expect(p.cardLast4, '7890');
+    });
+
+    test('واریز پایا', () {
+      final p = BankSmsParser.parse('9830003', _paya);
+      expect(p.direction, BankSmsDirection.deposit);
+      expect(p.amountToman, 333300);
     });
 
     test('رمز پویا هرگز پیامک بانکی حساب نمی‌شود', () {
-      expect(BankSmsParser.isBankMessage('300017', 'رمز پویا شما: 123456'),
+      expect(BankSmsParser.isOtp('بانک سپه — رمز پویا: 123456'), isTrue);
+      expect(BankSmsParser.isBankMessage('9830003', 'رمز پویا شما: 123456'),
           isFalse);
-      expect(
-          BankSmsParser.isBankMessage('+98300017', 'واریز 1,000,000'), isTrue);
-      expect(BankSmsParser.isBankMessage('09121234567', 'واریز 1,000,000'),
-          isFalse);
+    });
+  });
+
+  group('پاسخ سرور', () {
+    test('شمارهٔ کامل حساب هرگز به گوشی برنمی‌گردد', () {
+      final raw = File('test/fixtures/bank_sms_inbox.json').readAsStringSync();
+      expect(raw.contains('0101234567890'), isFalse);
+      expect(raw.contains('****7890'), isTrue);
+    });
+
+    test('پیامک‌های قبلاً ثبت‌شده در صف انتظار نیستند', () {
+      final open = _list('open');
+      expect(open.every((s) => s.isOpen), isTrue);
+      expect(open.where((s) => s.status == 'ambiguous').single.candidates,
+          hasLength(2));
+      expect(open.where((s) => s.possibleDuplicateAt != null), hasLength(1));
+      final matched = _list('done').where((s) => s.status == 'matched');
+      expect(matched.map((s) => s.matchedLabel),
+          containsAll(['حقوق — جلیل درازهی', 'قسط وام — قسط ۷ وام سپه']));
     });
   });
 
@@ -227,26 +133,41 @@ void main() {
 
   testWidgets('با باز شدن برنامه، پیامک‌های منتظر بالا می‌آیند',
       (tester) async {
-    final open = [..._samples, _ambiguous, _duplicate, ..._matched]
-        .where((s) => s.isOpen)
-        .toList();
-    await show(tester, BankSmsPendingPopup(items: open),
-        size: const Size(390, 1700));
+    var later = false;
+    await show(tester,
+        BankSmsPendingPopup(items: _list('open'), onLater: () => later = true),
+        size: const Size(390, 1900));
     expect(find.text('۶ پیامک بانکی منتظر ثبت'), findsOneWidget);
     expect(find.text('قبلاً ثبت شده'), findsNothing);
-    expect(find.text('بعداً'), findsOneWidget);
     await _preview(tester, '2-popup-on-open');
+    await tester.tap(find.text('بعداً'));
+    expect(later, isTrue);
   });
 
   testWidgets('صندوق تأیید', (tester) async {
+    BankSms? confirmed;
+    int? picked;
     await show(
         tester,
         BankSmsInboxScreen(
-            items: [_ambiguous, _duplicate, ..._samples, ..._done]),
-        size: const Size(390, 2100));
+          open: _list('open'),
+          done: _list('done'),
+          actions: BankSmsActions(
+            confirm: (s) => confirmed = s,
+            pick: (s, id) => picked = id,
+          ),
+        ),
+        size: const Size(390, 2300));
     expect(find.textContaining('همین است:'), findsNWidgets(2));
     expect(find.textContaining('شاید تکراری'), findsOneWidget);
+    expect(find.text('حساب وصل نشده'), findsOneWidget);
     await _preview(tester, '3-inbox');
+
+    await tester.tap(find.textContaining('همین است:').first);
+    expect(picked, isNotNull);
+    await tester.tap(find.text('ثبت درآمد').first);
+    expect(confirmed?.isIncome, isTrue);
+
     await tester.tap(find.text('ثبت‌شده و نادیده'));
     await tester.pumpAndSettle();
     expect(find.text('قبلاً ثبت شده'), findsNWidgets(2));
@@ -254,6 +175,7 @@ void main() {
   });
 
   testWidgets('برگهٔ تأیید با دسته', (tester) async {
+    final pos = _list('open').firstWhere((s) => s.isIncome);
     await show(
       tester,
       Scaffold(
@@ -262,43 +184,54 @@ void main() {
           child: Material(
             elevation: 4,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            child: BankSmsConfirmSheet(sms: _samples[1]),
+            child: BankSmsConfirmSheet(sms: pos, onSubmit: (_) async {}),
           ),
         ),
       ),
     );
-    expect(find.text('ثبت به‌عنوان هزینه'), findsOneWidget);
+    expect(find.text('ثبت به‌عنوان درآمد'), findsOneWidget);
     await _preview(tester, '4-confirm-sheet');
   });
 
-  testWidgets('تنظیمات و وصل کارت به حساب', (tester) async {
+  testWidgets('تنظیمات و وصل حساب', (tester) async {
     await show(
       tester,
-      const BankSmsSettingsScreen(
-        cards: [
-          ('1234', 'ملی', 'ملی — حساب کارتخوان'),
-          ('5678', 'ملت', 'ملت — حساب اصلی'),
-          ('0987', 'سپه', null),
+      BankSmsSettingsScreen(
+        enabled: true,
+        permitted: true,
+        showOnOpen: true,
+        mappings: [
+          for (final m in _fixture['mappings'] as List)
+            (
+              id: ((m as Map)['id'] as num).toInt(),
+              last4: '${m['last4']}',
+              accountName: m['account_name'] as String?,
+            ),
         ],
-        senders: [('300017', 'ملی'), ('200033', 'ملت'), ('200020', 'سپه')],
+        unmapped: [for (final d in _fixture['unmapped'] as List) '$d'],
+        onEnabled: (_) {},
+        onShowOnOpen: (_) {},
+        onMap: (_) {},
+        onUnmap: (_) {},
       ),
-      size: const Size(390, 1100),
+      size: const Size(390, 900),
     );
+    expect(find.text('حساب …۷۸۹۰'), findsOneWidget);
     await _preview(tester, '5-settings');
   });
 
   testWidgets('نشان شمار روی صفحهٔ اصلی', (tester) async {
     await show(
       tester,
-      const Scaffold(
+      Scaffold(
         body: Padding(
-          padding: EdgeInsets.all(16),
-          child: BankSmsHomeCard(pending: 6),
+          padding: const EdgeInsets.all(16),
+          child: BankSmsHomeCard(pending: _list('open').length),
         ),
       ),
       size: const Size(390, 200),
     );
-    expect(find.text('۶ پیامک منتظر تأیید'), findsOneWidget);
+    expect(find.text('۶'), findsOneWidget);
     await _preview(tester, '6-home-badge');
   });
 }
