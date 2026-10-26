@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
 use App\Support\AppCalendar;
+use App\Support\BankSmsMatcher;
 use App\Support\Money;
 use Illuminate\Database\Eloquent\Model;
 
@@ -51,6 +52,15 @@ class BankTransaction extends Model
      */
     protected static function booted(): void
     {
+        // «تکراری ثبت نشه»: a movement entered by hand takes its waiting SMS.
+        static::created(function (self $tx) {
+            try {
+                BankSmsMatcher::claim($tx);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
+
         static::created(fn () => BankAccount::forgetLedgerTotals());
         static::updated(fn () => BankAccount::forgetLedgerTotals());
         static::deleted(fn () => BankAccount::forgetLedgerTotals());
