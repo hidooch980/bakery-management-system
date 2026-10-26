@@ -30,6 +30,9 @@ class BankSmsHub extends ChangeNotifier {
   List<BankSms> open = const [];
   List<BankSms> done = const [];
   int openCount = 0;
+
+  /// «بعد از اولین پیامک موجودی بروز بشه»: what the bank last reported.
+  List<BankSmsBalance> balances = const [];
   bool loading = false;
   String? error;
   Map<int, String> accounts = const {};
@@ -49,6 +52,7 @@ class BankSmsHub extends ChangeNotifier {
       final o = await service.list();
       open = [for (final j in o.items) BankSms.fromJson(j)];
       openCount = o.open;
+      balances = [for (final b in o.balances) BankSmsBalance.fromJson(b)];
       if (withDone) {
         final d = await service.list(open: false);
         done = [for (final j in d.items) BankSms.fromJson(j)];
@@ -447,6 +451,7 @@ class BankSmsHomeEntry extends StatelessWidget {
         listenable: hub,
         builder: (context, _) => BankSmsHomeCard(
           pending: hub.openCount,
+          balances: hub.balances,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => BankSmsInboxPage(hub: hub)),

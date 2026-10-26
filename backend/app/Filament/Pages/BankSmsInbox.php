@@ -48,6 +48,11 @@ class BankSmsInbox extends Page
 
     public ?int $newAccount = null;
 
+    public function balances(): array
+    {
+        return BankSmsBook::balances();
+    }
+
     public static function canAccess(): bool
     {
         return (bool) auth()->user()?->hasRole('admin');
@@ -173,6 +178,7 @@ class BankSmsInbox extends Page
                 BankSmsMatcher::settle($sms);
             });
 
+        BankSmsBook::applyLatestBalanceFor($this->newLast4);
         $this->reset('newLast4', 'newAccount');
         Notification::make()->title('حساب وصل شد.')->success()->send();
     }

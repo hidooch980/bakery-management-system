@@ -76,6 +76,7 @@ class BankSmsController extends Controller
         return $this->success([
             'items' => $items->map(fn ($s) => BankSmsBook::present($s))->values(),
             'open' => BankSms::query()->whereIn('status', BankSms::OPEN)->count(),
+            'balances' => BankSmsBook::balances(),
         ]);
     }
 
@@ -83,7 +84,10 @@ class BankSmsController extends Controller
     {
         $this->ownerOnly($request);
 
-        return $this->success(['open' => BankSms::query()->whereIn('status', BankSms::OPEN)->count()]);
+        return $this->success([
+            'open' => BankSms::query()->whereIn('status', BankSms::OPEN)->count(),
+            'balances' => BankSmsBook::balances(),
+        ]);
     }
 
     public function confirm(Request $request, BankSms $sms): JsonResponse
@@ -165,6 +169,8 @@ class BankSmsController extends Controller
                 $sms->forceFill(['bank_account_id' => $mapping->bank_account_id])->save();
                 BankSmsMatcher::settle($sms);
             });
+
+        BankSmsBook::applyLatestBalanceFor($data['last4']);
 
         return $this->success(['id' => $mapping->id], 'حساب وصل شد.');
     }

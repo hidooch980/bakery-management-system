@@ -226,12 +226,19 @@ void main() {
       Scaffold(
         body: Padding(
           padding: const EdgeInsets.all(16),
-          child: BankSmsHomeCard(pending: _list('open').length),
+          child: BankSmsHomeCard(
+            pending: _list('open').length,
+            balances: [
+              for (final b in _fixture['balances'] as List)
+                BankSmsBalance.fromJson((b as Map).cast<String, dynamic>()),
+            ],
+          ),
         ),
       ),
-      size: const Size(390, 200),
+      size: const Size(390, 220),
     );
     expect(find.text('۶'), findsOneWidget);
+    expect(find.textContaining('موجودی سپه — حساب اصلی'), findsOneWidget);
     await _preview(tester, '6-home-badge');
   });
 }

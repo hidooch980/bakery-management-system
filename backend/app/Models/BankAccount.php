@@ -39,6 +39,7 @@ class BankAccount extends Model
             'is_default' => 'boolean',
             'is_cash_box' => 'boolean',
             'is_active' => 'boolean',
+            'sms_balance_at' => 'datetime',
         ];
     }
 

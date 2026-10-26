@@ -120,14 +120,19 @@ class BankSmsService {
     return open;
   }
 
-  Future<({List<Map<String, dynamic>> items, int open})> list(
-      {bool open = true}) async {
+  Future<
+      ({
+        List<Map<String, dynamic>> items,
+        int open,
+        List<Map<String, dynamic>> balances
+      })> list({bool open = true}) async {
     final body = await _client
         .get('/bank-sms', query: {'status': open ? 'open' : 'done'});
     final data = body['data'] as Map<String, dynamic>;
     return (
       items: rowList(data['items']),
       open: (data['open'] as num).toInt(),
+      balances: rowList(data['balances']),
     );
   }
 

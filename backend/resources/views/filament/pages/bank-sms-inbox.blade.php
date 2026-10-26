@@ -3,6 +3,20 @@
     @php($open = collect($rows)->whereIn('status', ['pending', 'ambiguous']))
     @php($accounts = $this->accounts())
 
+    @if ($balances = $this->balances())
+        <x-filament::section heading="موجودی طبق آخرین پیامک بانک" description="خودکار از «مانده» هر پیامک تازه؛ چیزی در دفتر ثبت نمی‌کند.">
+            <div class="grid gap-4 md:grid-cols-3">
+                @foreach ($balances as $b)
+                    <div>
+                        <div class="text-sm text-gray-500">{{ $b['account_name'] }}</div>
+                        <div class="mt-1 text-2xl font-extrabold">{{ number_format($b['balance'] * 10) }} ریال</div>
+                        <div class="text-xs text-gray-500">به‌روز شده: {{ $b['at_jalali'] }}</div>
+                    </div>
+                @endforeach
+            </div>
+        </x-filament::section>
+    @endif
+
     <div class="grid gap-4 md:grid-cols-4">
         <x-filament::section>
             <div class="text-sm text-gray-500">منتظر ثبت</div>

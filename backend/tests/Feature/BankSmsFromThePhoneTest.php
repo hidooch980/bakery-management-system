@@ -276,6 +276,40 @@ class BankSmsFromThePhoneTest extends TestCase
         $this->assertSame($this->sepah->id, BankSms::find($id)->bank_account_id);
     }
 
+    // --------------------------------------------------------- balance
+
+    public function test_the_first_sms_sets_the_balance_and_an_older_one_never_overwrites_it(): void
+    {
+        $this->send(self::WITHDRAWAL, '2026-10-26 07:00:00');
+        $this->sepah->refresh();
+        $this->assertEquals(9_876_500, $this->sepah->sms_balance);
+
+        $this->send(self::PAYA, '2026-10-26 09:00:00');
+        $this->assertEquals(11_444_300, $this->sepah->refresh()->sms_balance);
+
+        // Delivered late: older than what the account already shows.
+        $this->send(self::POS_GROUP, '2026-10-26 08:41:00');
+        $this->assertEquals(11_444_300, $this->sepah->refresh()->sms_balance);
+
+        // Nothing was booked by any of it.
+        $this->assertSame(0, Income::count() + Expense::count() + BankTransaction::count());
+
+        $this->actingAs($this->owner, 'sanctum')->getJson('/api/v1/bank-sms/count')
+            ->assertJsonPath('data.balances.0.balance', 11_444_300);
+    }
+
+    public function test_tying_digits_later_sets_the_balance_from_the_latest_sms(): void
+    {
+        BankSmsAccount::query()->delete();
+        $this->send(self::PAYA, '2026-10-26 09:00:00');
+        $this->assertNull($this->sepah->refresh()->sms_balance);
+
+        $this->actingAs($this->owner, 'sanctum')
+            ->postJson('/api/v1/bank-sms/accounts', ['last4' => '7890', 'bank_account_id' => $this->sepah->id]);
+
+        $this->assertEquals(11_444_300, $this->sepah->refresh()->sms_balance);
+    }
+
     // ----------------------------------------------------------- panel
 
     public function test_the_panel_page_books_and_ignores_through_the_same_code(): void

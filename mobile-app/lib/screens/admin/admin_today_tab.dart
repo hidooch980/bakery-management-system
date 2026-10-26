@@ -42,7 +42,7 @@ class _AdminTodayTabState extends State<AdminTodayTab> {
       // Only once something is waiting; the switch lives in «مالی».
       ListenableBuilder(
         listenable: hub,
-        builder: (_, __) => hub.openCount > 0
+        builder: (_, __) => hub.openCount > 0 || hub.balances.isNotEmpty
             ? Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                 child: BankSmsHomeEntry(hub: hub))

@@ -65,7 +65,10 @@ class BankSmsBook
                 'suggested_category' => $parsed['suggested_category'],
             ]);
 
-            return BankSmsMatcher::settle($sms);
+            BankSmsMatcher::settle($sms);
+            self::applyBalance($sms);
+
+            return $sms;
         });
 
         return [$sms, 'created'];
@@ -156,6 +159,45 @@ class BankSmsBook
         ])->save();
 
         return $sms;
+    }
+
+    /**
+     * «بعد از اولین پیامک موجودی بروز بشه»: the account takes the balance
+     * the bank reported, unless a newer SMS already gave one. Nothing is
+     * booked: the ledger is left exactly as it was.
+     */
+    public static function applyBalance(BankSms $sms): void
+    {
+        if ($sms->bank_account_id === null || $sms->balance === null) {
+            return;
+        }
+
+        BankAccount::query()->whereKey($sms->bank_account_id)
+            ->where(fn ($q) => $q->whereNull('sms_balance_at')->orWhere('sms_balance_at', '<=', $sms->received_at))
+            ->update(['sms_balance' => $sms->balance, 'sms_balance_at' => $sms->received_at]);
+    }
+
+    /** The latest SMS on these digits sets the newly tied account. */
+    public static function applyLatestBalanceFor(string $last4): void
+    {
+        $latest = BankSms::query()->where('last4', $last4)->whereNotNull('balance')->latest('received_at')->first();
+        if ($latest) {
+            $latest->bank_account_id ??= BankSmsAccount::accountFor($last4);
+            self::applyBalance($latest);
+        }
+    }
+
+    /** Bank-reported balances, for the home card and the panel. */
+    public static function balances(): array
+    {
+        return BankAccount::query()->whereNotNull('sms_balance_at')->orderBy('title')->get()
+            ->map(fn (BankAccount $a) => [
+                'bank_account_id' => $a->id,
+                'account_name' => $a->title,
+                'balance' => (float) $a->sms_balance,
+                'at' => $a->sms_balance_at->toIso8601String(),
+                'at_jalali' => Jalali::format($a->sms_balance_at, 'Y/m/d H:i'),
+            ])->values()->all();
     }
 
     /** A record deleted after its SMS was settled puts the SMS back. */

@@ -79,6 +79,22 @@ class BankSms {
   bool get isOpen => status == 'pending' || status == 'ambiguous';
 }
 
+/// The balance the bank itself last reported for one of the shop's accounts.
+class BankSmsBalance {
+  const BankSmsBalance(
+      {required this.accountName, required this.toman, required this.at});
+
+  factory BankSmsBalance.fromJson(Map<String, dynamic> j) => BankSmsBalance(
+        accountName: '${j['account_name'] ?? ''}',
+        toman: (j['balance'] as num? ?? 0).round(),
+        at: DateTime.parse(j['at'] as String).toLocal(),
+      );
+
+  final String accountName;
+  final int toman;
+  final DateTime at;
+}
+
 const expenseCategories = <String, String>{
   'freight': 'حمل و نقل',
   'unloading': 'تخلیه و باربری',
@@ -749,9 +765,11 @@ class BankSmsPendingPopup extends StatelessWidget {
 // ------------------------------------------------------------- home badge
 
 class BankSmsHomeCard extends StatelessWidget {
-  const BankSmsHomeCard({super.key, required this.pending, this.onTap});
+  const BankSmsHomeCard(
+      {super.key, required this.pending, this.balances = const [], this.onTap});
 
   final int pending;
+  final List<BankSmsBalance> balances;
   final VoidCallback? onTap;
 
   @override
@@ -769,9 +787,19 @@ class BankSmsHomeCard extends StatelessWidget {
         ),
         title: const Text('پیامک‌های بانکی',
             style: TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text(pending > 0
-            ? '${persianDigits('$pending')} پیامک منتظر تأیید'
-            : 'همه ثبت شده‌اند'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(pending > 0
+                ? '${persianDigits('$pending')} پیامک منتظر تأیید'
+                : 'همه ثبت شده‌اند'),
+            for (final b in balances)
+              Text(
+                'موجودی ${b.accountName}: ${_amount(b.toman)} • ${JalaliFormat.dateTime(b.at)}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+          ],
+        ),
         trailing: const Icon(Icons.chevron_left_rounded),
       ),
     );
