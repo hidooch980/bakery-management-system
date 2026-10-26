@@ -82,6 +82,16 @@ class BankSmsParser {
           'ك' => 'ک',
           '٬' || '،' || '\u066B' => ',',
           '\u200C' || '\u200F' || '\u200E' => ' ',
+          '\u202A' ||
+          '\u202B' ||
+          '\u202C' ||
+          '\u202D' ||
+          '\u202E' ||
+          '\u2066' ||
+          '\u2067' ||
+          '\u2068' ||
+          '\u2069' =>
+            '',
           '\u2212' || '\u2013' => '-',
           _ => c,
         });
@@ -126,7 +136,7 @@ class BankSmsParser {
 
     int? balance;
     int balanceStart = -1;
-    final bm = RegExp(r'(مانده|موجودی)[^0-9+-]{0,20}([+-]?)\s*([0-9][0-9,]*)')
+    final bm = RegExp(r'(مانده|موجودی)[^0-9+\n-]{0,20}([+-]?)[ \t]*([0-9][0-9,]*)')
         .firstMatch(n);
     if (bm != null) {
       final v = _num(bm.group(3)!);
@@ -159,6 +169,10 @@ class BankSmsParser {
             : BankSmsDirection.withdrawal;
       }
     }
+    // Sepah heads its card-reader settlement «پرداخت گروهی»; the money comes in.
+    if (n.contains('گروهی') && n.contains('کارتخوان')) {
+      dir = BankSmsDirection.deposit;
+    }
     if (dir == BankSmsDirection.unknown) {
       final w = RegExp(r'برداشت|خرید|بدهکار|کسر|پرداخت').firstMatch(n)?.start;
       final d = RegExp(r'واریز|بستانکار|دریافت|سود').firstMatch(n)?.start;
@@ -167,7 +181,7 @@ class BankSmsParser {
     }
 
     // «کارت 6037**1234» یا «حساب 0987»: چهار رقم آخر همان شماره.
-    final token = RegExp(r'(?:کارت|حساب)[^0-9*]{0,6}([0-9*.\-]{4,})')
+    final token = RegExp(r'(?:کارت|حساب)[^0-9*\n]{0,6}([0-9*.\-]{4,})')
         .firstMatch(n)
         ?.group(1)
         ?.replaceAll(RegExp(r'[^0-9]'), '');

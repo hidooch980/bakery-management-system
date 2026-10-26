@@ -61,7 +61,11 @@ class BankSmsBook
                 'amount' => $parsed['amount'] === null ? null : (string) $parsed['amount'],
                 'balance' => $parsed['balance'] === null ? null : (string) $parsed['balance'],
                 'last4' => $parsed['last4'],
-                'bank_account_id' => BankSmsAccount::accountFor($parsed['last4']),
+                'bank_account_id' => BankSmsAccount::accountFor($parsed['last4'])
+                    // Sepah's card-reader and Paya messages may name no account;
+                    // a shop with one tied account means that one.
+                    ?? ($parsed['last4'] === null && BankSmsAccount::query()->count() === 1
+                        ? BankSmsAccount::query()->value('bank_account_id') : null),
                 'suggested_category' => $parsed['suggested_category'],
             ]);
 

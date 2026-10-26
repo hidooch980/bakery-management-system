@@ -36,7 +36,8 @@ class BankSmsParser
             '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
             '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
             'ي' => 'ی', 'ى' => 'ی', 'ك' => 'ک', '٬' => ',', '،' => ',',
-            '：' => ':', "\u{200C}" => ' ', "\u{200F}" => '', "\u{200E}" => '',
+            '：' => ':', "\u{200C}" => ' ', "\u{200F}" => '', "\u{200E}" => '', "\u{202A}" => '', "\u{202B}" => '', "\u{202C}" => '',
+            "\u{202D}" => '', "\u{202E}" => '', "\u{2066}" => '', "\u{2067}" => '', "\u{2068}" => '', "\u{2069}" => '',
         ]);
 
         return preg_replace('/[ \t]+/u', ' ', $text);
@@ -82,6 +83,7 @@ class BankSmsParser
             'amount' => $amount,
             'balance' => self::balance($t),
             'last4' => self::last4($t),
+            'time' => self::time($t),
             'bank' => self::bank($sender, $t),
             'suggested_category' => match (true) {
                 $kind === 'pos_group' => 'card_sale',
@@ -92,6 +94,12 @@ class BankSmsParser
 
     public static function direction(string $t): string
     {
+        // Sepah heads its card-reader settlement «پرداخت گروهی», but the money
+        // comes in: «واریز گروهی فروش … با کارتخوان».
+        if (str_contains($t, 'واریز گروهی') || (str_contains($t, 'گروهی') && str_contains($t, 'کارتخوان'))) {
+            return 'in';
+        }
+
         $out = self::firstPosition($t, ['برداشت', 'خرید', 'کسر', 'انتقال از', 'پرداخت']);
         $in = self::firstPosition($t, ['واریز', 'انتقال به', 'افزایش', 'بستانکار']);
 
@@ -130,7 +138,7 @@ class BankSmsParser
 
     public static function balance(string $t): ?float
     {
-        if (preg_match('/(?:مانده|موجودی)\s*:?\s*(-?[\d,\.]+)/u', $t, $m)) {
+        if (preg_match('/(?:مانده|موجودی)[ \t]*:?[ \t]*(-?[\d,\.]+)/u', $t, $m)) {
             return self::toToman($m[1], $t);
         }
 
@@ -140,7 +148,7 @@ class BankSmsParser
     /** The last four digits after «حساب» or «کارت», masked or not. */
     public static function last4(string $t): ?string
     {
-        if (preg_match('/(?:حساب|کارت|سپرده)\s*(?:شماره|ش)?\.?\s*:?\s*([\d\*\.\-x]{4,})/u', $t, $m)) {
+        if (preg_match('/(?:حساب|کارت|سپرده)[ \t]*(?:شماره|ش)?\.?[ \t]*:?[ \t]*([\d\*\.\-x]{4,})/u', $t, $m)) {
             $digits = preg_replace('/\D/', '', $m[1]);
 
             return strlen($digits) >= 4 ? substr($digits, -4) : null;
@@ -159,7 +167,31 @@ class BankSmsParser
 
         $code = ltrim(preg_replace('/\D/', '', $sender), '0');
 
-        return self::SENDER_BANKS[$code] ?? self::SENDER_BANKS[preg_replace('/^98/', '', $code)] ?? null;
+        return self::SENDER_BANKS[$code]
+            ?? self::SENDER_BANKS[preg_replace('/^98/', '', $code)]
+            // Sepah often names no bank at all («واریز:… / حساب / مانده /
+            // 8/4-4:51 / انتقال وجه پایا»). Its shape gives it away: a
+            // «month/day-hour:minute» line, or «زمان:1405/8/4».
+            ?? (preg_match('/(^|\n)\s*\d{1,2}\/\d{1,2}-\d{1,2}:\d{2}\s*(\n|$)|زمان:\s*1[34]\d\d\//u', $t) ? 'سپه' : null);
+    }
+
+    /**
+     * When the SMS says it happened, as Jalali text: «1405/08/04 15:44»
+     * from «8/4-15:44» (the year is the current one), «1405/08/04» from
+     * «زمان:1405/8/4». Null when it does not say.
+     */
+    public static function time(string $t, ?int $year = null): ?string
+    {
+        if (preg_match('/(?:(1[34]\d\d)\/)?(\d{1,2})\/(\d{1,2})(?:[- _](\d{1,2}):(\d{2}))?/u', $t, $m)
+            && (int) $m[2] >= 1 && (int) $m[2] <= 12 && (int) $m[3] >= 1 && (int) $m[3] <= 31
+            && ($m[1] !== '' || isset($m[4]))) {
+            $y = $m[1] !== '' ? (int) $m[1] : ($year ?? (int) Jalali::format(now(), 'Y'));
+            $date = sprintf('%04d/%02d/%02d', $y, $m[2], $m[3]);
+
+            return isset($m[4]) ? $date.sprintf(' %02d:%s', $m[4], $m[5]) : $date;
+        }
+
+        return null;
     }
 
     /**

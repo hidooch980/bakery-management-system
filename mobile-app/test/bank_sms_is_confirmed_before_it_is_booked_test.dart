@@ -28,13 +28,12 @@ Future<void> _preview(WidgetTester tester, String name) async {
   });
 }
 
-/// The three shapes Bank Sepah sends, with made-up numbers.
+/// The user's three real Bank Sepah messages, with a made-up account.
 const _withdrawal =
-    'بانك سپه\nبرداشت از حساب 0101234567890\nمبلغ:1,111,000\nمانده:98,765,000\n1405/08/04-07:00';
+    'بانک سپه\nبرداشت:120,049,500\nحساب :\u202A0101234567890\u202C\nمانده:35,000,000\n8/4-15:44';
 const _posGroup =
-    'بانك سپه\nواريز گروهي به حساب 0101234567890\nمبلغ:12,345,000\nکارتخوان\nمانده:111,110,000\n1405/08/04-08:41';
-const _paya =
-    'بانك سپه\nواريز پايا به حساب 0101234567890\nمبلغ:3,333,000\nمانده:114,443,000\n1405/08/04-09:00';
+    'پرداخت گروهي\nحساب\nمبلغ:1,550,000\nمانده\nزمان:1405/8/4\nواريز گروهي فروش نذري نان با کارتخوان هوشمند بانک سپه';
+const _paya = 'واريز:74,750,000ريال\nحساب\nمانده\n8/4-4:51\nانتقال وجه پايا';
 
 final _fixture =
     jsonDecode(File('test/fixtures/bank_sms_inbox.json').readAsStringSync())
@@ -47,25 +46,27 @@ List<BankSms> _list(String key) => [
 
 void main() {
   group('خواندن پیامک بانک سپه', () {
-    test('برداشت از حساب', () {
-      final p = BankSmsParser.parse('9830003', _withdrawal);
+    test('برداشت', () {
+      final p = BankSmsParser.parse('x', _withdrawal);
       expect(p.direction, BankSmsDirection.withdrawal);
-      expect(p.amountToman, 111100);
-      expect(p.balanceToman, 9876500);
+      expect(p.amountToman, 12004950);
+      expect(p.balanceToman, 3500000);
       expect(p.cardLast4, '7890');
     });
 
-    test('واریز گروهی کارتخوان', () {
-      final p = BankSmsParser.parse('9830003', _posGroup);
+    test('پرداخت گروهی کارتخوان واریز است', () {
+      final p = BankSmsParser.parse('x', _posGroup);
       expect(p.direction, BankSmsDirection.deposit);
-      expect(p.amountToman, 1234500);
-      expect(p.cardLast4, '7890');
+      expect(p.amountToman, 155000);
+      expect(p.balanceToman, isNull);
+      expect(p.cardLast4, isNull);
     });
 
-    test('واریز پایا', () {
-      final p = BankSmsParser.parse('9830003', _paya);
+    test('واریز پایا بدون نام بانک', () {
+      final p = BankSmsParser.parse('x', _paya);
       expect(p.direction, BankSmsDirection.deposit);
-      expect(p.amountToman, 333300);
+      expect(p.amountToman, 7475000);
+      expect(p.balanceToman, isNull);
     });
 
     test('رمز پویا هرگز پیامک بانکی حساب نمی‌شود', () {

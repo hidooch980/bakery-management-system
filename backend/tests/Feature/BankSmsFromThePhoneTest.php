@@ -28,11 +28,12 @@ class BankSmsFromThePhoneTest extends TestCase
 {
     use RefreshDatabase;
 
-    public const WITHDRAWAL = "بانك سپه\nبرداشت از حساب 0101234567890\nمبلغ:1,111,000\nمانده:98,765,000\n1405/08/04-07:00";
+    // The user's three real Bank Sepah shapes, with a made-up account.
+    public const WITHDRAWAL = "بانک سپه\nبرداشت:1,111,000\nحساب :\u{202A}0101234567890\u{202C}\nمانده:98,765,000\n8/4-07:00";
 
-    public const POS_GROUP = "بانك سپه\nواريز گروهي به حساب 0101234567890\nمبلغ:12,345,000\nکارتخوان\nمانده:111,110,000\n1405/08/04-08:41";
+    public const POS_GROUP = "پرداخت گروهي\nحساب:0101234567890\nمبلغ:12,345,000\nمانده:111,110,000\nزمان:1405/8/4\nواريز گروهي فروش نذري نان با کارتخوان هوشمند بانک سپه";
 
-    public const PAYA = "بانك سپه\nواريز پايا به حساب 0101234567890\nمبلغ:3,333,000\nمانده:114,443,000\n1405/08/04-09:00";
+    public const PAYA = "واريز:3,333,000ريال\nحساب:0101234567890\nمانده:114,443,000\n8/4-09:00\nانتقال وجه پايا";
 
     private User $owner;
 
@@ -60,6 +61,33 @@ class BankSmsFromThePhoneTest extends TestCase
     }
 
     // ---------------------------------------------------------- parser
+
+    public function test_the_users_three_sepah_messages_are_read_exactly(): void
+    {
+        $a = BankSmsParser::parse('x', "بانک سپه\nبرداشت:120,049,500\nحساب :\u{202A}****2405\u{202C}\nمانده:35,000,000\n8/4-15:44");
+        $this->assertSame(['out', 12_004_950.0, 3_500_000.0, '2405', '1405/08/04 15:44', 'سپه'],
+            [$a['direction'], $a['amount'], $a['balance'], $a['last4'], $a['time'], $a['bank']]);
+
+        $b = BankSmsParser::parse('x', "پرداخت گروهي\nحساب\nمبلغ:1,550,000\nمانده\nزمان:1405/8/4\nواريز گروهي فروش نذري نان با کارتخوان هوشمند بانک سپه");
+        $this->assertSame(['in', 'pos_group', 155_000.0, null, '1405/08/04', 'card_sale'],
+            [$b['direction'], $b['kind'], $b['amount'], $b['balance'], $b['time'], $b['suggested_category']]);
+
+        // No «بانک سپه» line at all, and the labels left bare.
+        $c = BankSmsParser::parse('x', "واريز:74,750,000ريال\nحساب\nمانده\n8/4-4:51\nانتقال وجه پايا");
+        $this->assertSame(['in', 'paya', 7_475_000.0, null, null, '1405/08/04 04:51', 'سپه'],
+            [$c['direction'], $c['kind'], $c['amount'], $c['balance'], $c['last4'], $c['time'], $c['bank']]);
+    }
+
+    public function test_a_message_naming_no_account_goes_to_the_only_tied_one(): void
+    {
+        $id = $this->send("واريز:74,750,000ريال\nحساب\nمانده\n8/4-4:51\nانتقال وجه پايا", '2026-10-26 04:51:00')
+            ->json('data.results.0.id');
+
+        $sms = BankSms::find($id);
+        $this->assertSame($this->sepah->id, $sms->bank_account_id);
+        $this->assertSame('سپه', $sms->bank);
+        $this->assertNull($this->sepah->refresh()->sms_balance);
+    }
 
     public function test_a_sepah_withdrawal_is_read(): void
     {

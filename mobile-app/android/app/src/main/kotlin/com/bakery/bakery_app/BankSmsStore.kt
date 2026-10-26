@@ -14,7 +14,9 @@ object BankSmsStore {
 
     private val otp = Regex("(رمز|کد ?(تایید|تأیید|فعال)|پویا|OTP)", RegexOption.IGNORE_CASE)
     private val money = Regex("(واریز|واريز|برداشت|مبلغ|انتقال|خرید|خريد)")
-    private val bankWord = Regex("(بانک|بانك)")
+    // Sepah often names no bank («واریز:… / حساب / مانده / 8/4-4:51»): a
+    // balance or account line is as good a sign.
+    private val bankWord = Regex("(بانک|بانك|مانده|حساب)")
 
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
