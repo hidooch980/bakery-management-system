@@ -4,6 +4,8 @@ import '../../utils/json.dart';
 import '../../models/flour_sale.dart';
 import '../../services/api_client.dart';
 import '../../services/bakery_api.dart';
+import '../../services/manager_corrections_api.dart';
+import 'partner_flour_corrections_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
@@ -105,6 +107,24 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
             return ListView(
               padding: const EdgeInsets.all(20),
               children: [
+                AdminSection(
+                    title: 'اصلاح آرد همکاران',
+                    icon: Icons.edit_note_rounded,
+                    children: [
+                      AdminRow(
+                          label: 'اصلاح ثبت اشتباه آرد همکار',
+                          value: 'مقدار و جهت',
+                          onTap: () async {
+                            await Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        PartnerFlourCorrectionsScreen(
+                                            api: ManagerCorrectionsApi(
+                                                widget.api.client))));
+                            if (mounted) _reload();
+                          }),
+                    ]),
                 ErrorBox(message: '${snapshot.error}', onRetry: _reload)
               ],
             );
