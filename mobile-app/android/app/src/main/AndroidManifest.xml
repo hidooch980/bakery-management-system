@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <!-- Offline queue: detects reconnection to trigger an automatic sync. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- «پیامک‌های بانکی»: only new SMS, only when the owner turns it on in
+         the app; nothing in the SMS inbox is ever read, so no READ_SMS. -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
     <application
         android:label="مدیریت نانوایی"
         android:name="${applicationName}"
@@ -34,6 +37,14 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <receiver
+            android:name=".BankSmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

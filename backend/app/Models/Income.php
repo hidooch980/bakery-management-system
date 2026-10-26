@@ -25,6 +25,8 @@ class Income extends Model
         'scrap' => 'فروش ضایعات و کیسه',
         'service' => 'خدمات',
         'partner' => 'تسویه همکار',
+        // What the card reader's daily group deposit is, from the bank SMS.
+        'card_sale' => 'فروش نان (کارتخوان)',
         'other' => 'سایر',
     ];
 

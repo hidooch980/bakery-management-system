@@ -1,5 +1,6 @@
 DELETE api/v1/advance-requests/{advanceRequest}             (any signed-in)
 DELETE api/v1/bank-accounts/{account}                       admin
+DELETE api/v1/bank-sms/accounts/{mapping}                   admin
 DELETE api/v1/consignment-flour/{consignment}               admin, seller
 DELETE api/v1/customers/{customer}                          admin
 DELETE api/v1/devices/others                                (any signed-in)
@@ -30,6 +31,9 @@ GET api/v1/bakery                                           (any signed-in)
 GET api/v1/bakery-applications                              admin
 GET api/v1/bank-accounts                                    admin
 GET api/v1/bank-accounts/{account}/transactions             admin
+GET api/v1/bank-sms                                         admin
+GET api/v1/bank-sms/accounts                                admin
+GET api/v1/bank-sms/count                                   admin
 GET api/v1/cash-counts                                      admin
 GET api/v1/chane-board                                      admin, chane_gir, seller, shater
 GET api/v1/chane-entries/my-history                         admin, chane_gir, seller
@@ -160,6 +164,11 @@ POST api/v1/bakery-applications/{application}/reject        admin
 POST api/v1/bank-accounts                                   admin
 POST api/v1/bank-accounts/transfer                          admin
 POST api/v1/bank-accounts/{account}/transactions            admin
+POST api/v1/bank-sms                                        admin
+POST api/v1/bank-sms/accounts                               admin
+POST api/v1/bank-sms/{sms}/confirm                          admin
+POST api/v1/bank-sms/{sms}/ignore                           admin
+POST api/v1/bank-sms/{sms}/link                             admin
 POST api/v1/cash-counts                                     admin
 POST api/v1/chane-entries                                   admin, chane_gir, seller
 POST api/v1/change-password                                 admin, chane_gir, dough_maker, seller, shater

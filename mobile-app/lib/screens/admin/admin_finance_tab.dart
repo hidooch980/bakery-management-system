@@ -12,6 +12,7 @@ import 'admin_home_screen.dart';
 import 'balance_sheet_section.dart';
 import 'bank_balances_section.dart';
 import 'bank_loans_screen.dart';
+import 'bank_sms/bank_sms_pages.dart';
 import 'cash_count_sheet.dart';
 import 'consumption_report_section.dart';
 import 'customer_debts_section.dart';
@@ -262,6 +263,14 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                                         BankLoansScreen(api: widget.api))),
                             icon: const Icon(Icons.account_balance),
                             label: const Text('اقساط وام بانکی و ثبت پرداخت')),
+                        OutlinedButton.icon(
+                            onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                    builder: (_) => BankSmsInboxPage(
+                                        hub: BankSmsHub.of(widget.api)))),
+                            icon: const Icon(Icons.sms_outlined),
+                            label: const Text('پیامک‌های بانکی')),
                         OutlinedButton.icon(
                             onPressed: () async {
                               if (await showCashCountSheet(
