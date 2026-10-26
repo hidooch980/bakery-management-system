@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\BakeryController;
 use App\Http\Controllers\Api\BakeryShareController;
 use App\Http\Controllers\Api\BalanceSheetController;
 use App\Http\Controllers\Api\BankAccountController;
+use App\Http\Controllers\Api\BankSmsController;
 use App\Http\Controllers\Api\CashCountController;
 use App\Http\Controllers\Api\ChaneBoardController;
 use App\Http\Controllers\Api\ChaneEntryController;
@@ -526,6 +527,18 @@ Route::prefix('v1')->group(function () {
             // What is actually in the drawer, against what the books say.
             Route::get('/cash-counts', [CashCountController::class, 'index']);
             Route::post('/cash-counts', [CashCountController::class, 'store']);
+
+            // «پیامک‌های بانکی»: the owner's phone sends, the owner decides.
+            // The controller refuses anyone but the admin.
+            Route::get('/bank-sms', [BankSmsController::class, 'index']);
+            Route::post('/bank-sms', [BankSmsController::class, 'store'])->middleware('throttle:30,1');
+            Route::get('/bank-sms/count', [BankSmsController::class, 'count']);
+            Route::get('/bank-sms/accounts', [BankSmsController::class, 'accounts']);
+            Route::post('/bank-sms/accounts', [BankSmsController::class, 'saveAccount']);
+            Route::delete('/bank-sms/accounts/{mapping}', [BankSmsController::class, 'deleteAccount']);
+            Route::post('/bank-sms/{sms}/confirm', [BankSmsController::class, 'confirm']);
+            Route::post('/bank-sms/{sms}/ignore', [BankSmsController::class, 'ignore']);
+            Route::post('/bank-sms/{sms}/link', [BankSmsController::class, 'link']);
 
             Route::post('/bank-accounts/transfer', [BankAccountController::class, 'transfer']);
             Route::get('/bank-accounts/{account}/transactions', [BankAccountController::class, 'transactions']);
