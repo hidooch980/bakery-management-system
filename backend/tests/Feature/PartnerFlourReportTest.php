@@ -29,6 +29,8 @@ class PartnerFlourReportTest extends TestCase
 
     private Customer $partner;
 
+    private bool $smsAccepted = true;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -46,7 +48,7 @@ class PartnerFlourReportTest extends TestCase
         ]);
         config(['sms.driver' => 'smsir', 'sms.smsir.key' => 'test-key', 'sms.from' => '30001234']);
         Http::preventStrayRequests();
-        Http::fake(['api.sms.ir/*' => Http::response(['status' => 1], 200)]);
+        Http::fake(['api.sms.ir/*' => fn () => Http::response(['status' => $this->smsAccepted ? 1 : 0], 200)]);
     }
 
     private function record(string $direction, float $bags, string $date = '2026-10-01'): ConsignmentFlour
@@ -131,7 +133,7 @@ class PartnerFlourReportTest extends TestCase
     {
         foreach (['log', 'missing-line', 'provider-rejected'] as $case) {
             config(['sms.driver' => $case === 'log' ? 'log' : 'smsir', 'sms.from' => $case === 'missing-line' ? null : '30001234']);
-            Http::fake(['api.sms.ir/*' => Http::response(['status' => 0], 200)]);
+            $this->smsAccepted = false;
             try {
                 $this->send();
                 $this->fail('ارسال ناموفق نباید موفق گزارش شود.');
@@ -219,10 +221,13 @@ class PartnerFlourReportTest extends TestCase
     public function test_کمبود_اعتبار_و_خطای_بله_و_شماره_دیگر_به_پیامک_تبدیل_نمی‌شود(): void
     {
         $this->enableBale();
-        foreach ([20, 2, 17] as $code) {
-            Http::fake(['safir.bale.ai/*' => Http::response([
+        $code = 20;
+        Http::fake(['safir.bale.ai/*' => function () use (&$code) {
+            return Http::response([
                 'error_data' => [['phone_number' => '989121234568', 'code' => $code]],
-            ], 200)]);
+            ], 200);
+        }]);
+        foreach ([20, 2, 17] as $code) {
             try {
                 $this->send();
                 $this->fail('این خطا مجوز پیامک جایگزین نیست.');
