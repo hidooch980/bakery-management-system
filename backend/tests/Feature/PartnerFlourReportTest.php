@@ -4,16 +4,18 @@ namespace Tests\Feature;
 
 use App\Filament\Resources\PartnerResource\Pages\PartnerStatementPage;
 use App\Models\Bakery;
+use App\Models\BaleSetting;
 use App\Models\ConsignmentFlour;
 use App\Models\Customer;
 use App\Models\InventoryItem;
 use App\Models\User;
 use App\Support\CurrentBakery;
-use App\Support\PartnerFlourSms;
+use App\Support\PartnerFlourReport;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
@@ -21,7 +23,7 @@ use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
-class PartnerFlourSmsTest extends TestCase
+class PartnerFlourReportTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -57,8 +59,8 @@ class PartnerFlourSmsTest extends TestCase
 
     private function send(): void
     {
-        $preview = PartnerFlourSms::preview($this->partner);
-        PartnerFlourSms::send($this->partner, $preview['fingerprint']);
+        $preview = PartnerFlourReport::preview($this->partner);
+        PartnerFlourReport::send($this->partner, $preview['fingerprint']);
     }
 
     public function test_گردش_و_مانده_با_همان_پیش‌نمایش_به_شماره_همکار_ارسال_می‌شود(): void
@@ -67,14 +69,14 @@ class PartnerFlourSmsTest extends TestCase
         $borrowed = $this->record('borrowed', 8);
         $lent->recordReturn(2, '2026-10-02');
         $borrowed->recordReturn(1, '2026-10-02');
-        $preview = PartnerFlourSms::preview($this->partner);
+        $preview = PartnerFlourReport::preview($this->partner);
         $this->assertSame('09121234567', $preview['phone']);
         $this->assertStringContainsString('تحویلی به شما: 20 کیسه', $preview['message']);
         $this->assertStringContainsString('دریافتی از شما: 8 کیسه', $preview['message']);
         $this->assertStringContainsString('برگشت از شما: 2 کیسه', $preview['message']);
         $this->assertStringContainsString('برگشت به شما: 1 کیسه', $preview['message']);
         $this->assertStringContainsString('شما 11 کیسه به نانوایی هیدوچ بدهکارید.', $preview['message']);
-        PartnerFlourSms::send($this->partner, $preview['fingerprint']);
+        PartnerFlourReport::send($this->partner, $preview['fingerprint']);
         Http::assertSent(fn ($r) => $r->url() === 'https://api.sms.ir/v1/send/bulk'
             && $r['mobiles'] === ['09121234567'] && $r['messageText'] === $preview['message']);
         Http::assertSentCount(1);
@@ -85,7 +87,7 @@ class PartnerFlourSmsTest extends TestCase
         $this->record('borrowed', 5, '2026-09-01');
         $this->record('lent', 2, '2026-10-01');
         $this->record('lent', 10, '2026-11-01');
-        $preview = PartnerFlourSms::preview($this->partner, Carbon::parse('2026-10-01'), Carbon::parse('2026-10-31'));
+        $preview = PartnerFlourReport::preview($this->partner, Carbon::parse('2026-10-01'), Carbon::parse('2026-10-31'));
         $this->assertStringContainsString('مانده اول بازه: نانوایی هیدوچ 5 کیسه به شما بدهکار است.', $preview['message']);
         $this->assertStringContainsString('مانده پایان بازه: نانوایی هیدوچ 3 کیسه به شما بدهکار است.', $preview['message']);
         $this->assertStringContainsString('مانده فعلی: شما 7 کیسه به نانوایی هیدوچ بدهکارید.', $preview['message']);
@@ -95,8 +97,8 @@ class PartnerFlourSmsTest extends TestCase
     {
         $this->record('lent', 4);
         $page = Livewire::test(PartnerStatementPage::class, ['record' => $this->partner->id])
-            ->mountAction('sendStatementSms')
-            ->assertSet('mountedActionsData.0.message', PartnerFlourSms::preview($this->partner)['message']);
+            ->mountAction('sendStatementReport')
+            ->assertSet('mountedActionsData.0.message', PartnerFlourReport::preview($this->partner)['message']);
         Http::assertNothingSent();
         $page->callMountedAction()->assertHasNoActionErrors();
         Http::assertSentCount(1);
@@ -115,10 +117,10 @@ class PartnerFlourSmsTest extends TestCase
 
     public function test_تغییر_شماره_یا_حساب_پس_از_پیش‌نمایش_ارسال_را_متوقف_می‌کند(): void
     {
-        $preview = PartnerFlourSms::preview($this->partner);
+        $preview = PartnerFlourReport::preview($this->partner);
         $this->partner->update(['phone' => '09121234568']);
         try {
-            PartnerFlourSms::send($this->partner, $preview['fingerprint']);
+            PartnerFlourReport::send($this->partner, $preview['fingerprint']);
             $this->fail('پیش‌نمایش قدیمی نباید ارسال شود.');
         } catch (ValidationException $e) {
             Http::assertNothingSent();
@@ -173,6 +175,85 @@ class PartnerFlourSmsTest extends TestCase
             'name' => 'همکار دیگر', 'type' => Customer::PARTNER_TYPE, 'phone' => '09121234568',
         ]));
         $this->expectException(ModelNotFoundException::class);
-        PartnerFlourSms::preview($partner);
+        PartnerFlourReport::preview($partner);
+    }
+
+    private function enableBale(): void
+    {
+        BaleSetting::current()->update([
+            'safir_enabled' => true, 'safir_api_key' => 'safir-test-key', 'safir_bot_id' => 12345,
+        ]);
+    }
+
+    public function test_گزارش_برای_عضو_بله_فقط_به_بله_می‌رود(): void
+    {
+        $this->enableBale();
+        Http::fake(['safir.bale.ai/*' => Http::response(['message_id' => 'bale-message', 'error_data' => null], 200)]);
+        $preview = PartnerFlourReport::preview($this->partner);
+        $this->assertSame('بله؛ پیامک فقط در صورت عدم عضویت', $preview['channel']);
+        $this->assertSame('بله', PartnerFlourReport::send($this->partner, $preview['fingerprint']));
+        Http::assertSent(fn ($r) => $r->url() === 'https://safir.bale.ai/api/v3/send_message'
+            && $r->hasHeader('api-access-key', 'safir-test-key')
+            && $r['phone_number'] === '989121234567'
+            && $r['bot_id'] === 12345 && filled($r['request_id'])
+            && $r['message_data']['message']['text'] === $preview['message']);
+        Http::assertSentCount(1);
+        $setting = BaleSetting::current();
+        $this->assertNotSame('safir-test-key', $setting->getRawOriginal('safir_api_key'));
+        $this->assertArrayNotHasKey('safir_api_key', $setting->toArray());
+    }
+
+    public function test_فقط_عدم_عضویت_صریح_همان_شماره_به_پیامک_می‌رود(): void
+    {
+        $this->enableBale();
+        Http::fake(['safir.bale.ai/*' => Http::response([
+            'error_data' => [['phone_number' => '989121234567', 'code' => 17]],
+        ], 200)]);
+        $preview = PartnerFlourReport::preview($this->partner);
+        $this->assertSame('پیامک', PartnerFlourReport::send($this->partner, $preview['fingerprint']));
+        Http::assertSentCount(2);
+        Http::assertSent(fn ($r) => $r->url() === 'https://api.sms.ir/v1/send/bulk'
+            && $r['mobiles'] === ['09121234567'] && $r['messageText'] === $preview['message']);
+    }
+
+    public function test_کمبود_اعتبار_و_خطای_بله_و_شماره_دیگر_به_پیامک_تبدیل_نمی‌شود(): void
+    {
+        $this->enableBale();
+        foreach ([20, 2, 17] as $code) {
+            Http::fake(['safir.bale.ai/*' => Http::response([
+                'error_data' => [['phone_number' => '989121234568', 'code' => $code]],
+            ], 200)]);
+            try {
+                $this->send();
+                $this->fail('این خطا مجوز پیامک جایگزین نیست.');
+            } catch (ValidationException $e) {
+                Http::assertNotSent(fn ($r) => str_contains($r->url(), 'api.sms.ir'));
+            }
+        }
+        $ids = Http::recorded()->map(fn ($pair) => $pair[0]['request_id'])->unique();
+        $this->assertCount(1, $ids);
+    }
+
+    public function test_قطع_پاسخ_بله_باعث_ارسال_دوگانه_نمی‌شود(): void
+    {
+        $this->enableBale();
+        Http::fake(['safir.bale.ai/*' => fn () => throw new ConnectionException('خطای آزمایشی')]);
+        try {
+            $this->send();
+            $this->fail('پاسخ نامشخص نباید ارسال موفق حساب شود.');
+        } catch (ValidationException $e) {
+            Http::assertNotSent(fn ($r) => str_contains($r->url(), 'api.sms.ir'));
+        }
+    }
+
+    public function test_بله_فعال_بدون_کلید_و_بازو_هیچ_پیامی_نمی‌فرستد(): void
+    {
+        BaleSetting::current()->update(['safir_enabled' => true]);
+        try {
+            $this->send();
+            $this->fail('تنظیمات ناقص نباید با پیامک پنهان شود.');
+        } catch (ValidationException $e) {
+            Http::assertNothingSent();
+        }
     }
 }

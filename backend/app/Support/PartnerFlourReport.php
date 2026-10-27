@@ -2,14 +2,16 @@
 
 namespace App\Support;
 
+use App\Models\BaleSetting;
 use App\Models\Customer;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /** گزارش آرد امانی با همان اعداد پرونده؛ شماره همیشه از اطلاعات همکار خوانده می‌شود. */
-class PartnerFlourSms
+class PartnerFlourReport
 {
     public static function preview(Customer $partner, ?Carbon $from = null, ?Carbon $to = null): array
     {
@@ -37,10 +39,13 @@ class PartnerFlourSms
             'مانده فعلی: '.self::balanceText($statement->current),
         ]);
 
+        $viaBale = (bool) BaleSetting::query()->first()?->safir_enabled;
+
         return [
+            'channel' => $viaBale ? 'بله؛ پیامک فقط در صورت عدم عضویت' : 'پیامک',
             'phone' => $phone ?? '',
             'message' => $message,
-            'fingerprint' => hash('sha256', ($phone ?? '')."\n".$message),
+            'fingerprint' => hash('sha256', ($phone ?? '')."\n".$message."\n".($viaBale ? 'bale' : 'sms')),
         ];
     }
 
@@ -56,11 +61,11 @@ class PartnerFlourSms
         };
     }
 
-    public static function send(Customer $partner, string $fingerprint, ?Carbon $from = null, ?Carbon $to = null): void
+    public static function send(Customer $partner, string $fingerprint, ?Carbon $from = null, ?Carbon $to = null): string
     {
         abort_unless(auth()->user()?->is_active && auth()->user()?->hasRole('admin'), 403);
 
-        $key = 'partner-flour-sms:'.CurrentBakery::id().':'.$partner->getKey();
+        $key = 'partner-flour-report:'.CurrentBakery::id().':'.$partner->getKey();
         $sent = Cache::lock($key.':lock', 30)->get(function () use ($partner, $fingerprint, $from, $to, $key) {
             $preview = self::preview($partner, $from, $to);
 
@@ -76,17 +81,33 @@ class PartnerFlourSms
                 throw ValidationException::withMessages(['message' => 'گزارش همین همکار به‌تازگی ارسال شده؛ یک دقیقه صبر کنید.']);
             }
 
+            $setting = BaleSetting::query()->first();
+            if ($setting?->safir_enabled) {
+                $requestId = Cache::remember($key.':request:'.$fingerprint, 86400, fn () => (string) Str::uuid());
+                $result = BaleSafir::send($setting, $preview['phone'], $preview['message'], $requestId);
+                if ($result === 'sent') {
+                    RateLimiter::hit($key, 60);
+
+                    return 'بله';
+                }
+                if ($result !== 'not_member') {
+                    throw ValidationException::withMessages(['message' => 'ارسال بله تأیید نشد. تنظیمات، اعتبار و وضعیت سفیر را بررسی و سپس تلاش کنید. برای جلوگیری از ارسال دوگانه، پیامک جایگزین فرستاده نشد.']);
+                }
+            }
+
             if (! Sms::sendReport($preview['phone'], $preview['message'])) {
                 throw ValidationException::withMessages(['message' => 'ارسال پذیرفته نشد. سرویس ارسال عادی اس‌ام‌اس‌آی‌آر، خط فرستنده، اعتبار و اتصال را بررسی کنید.']);
             }
 
             RateLimiter::hit($key, 60);
 
-            return true;
+            return 'پیامک';
         });
 
-        if ($sent !== true) {
+        if (! is_string($sent)) {
             throw ValidationException::withMessages(['message' => 'ارسال گزارش این همکار در حال انجام است.']);
         }
+
+        return $sent;
     }
 }

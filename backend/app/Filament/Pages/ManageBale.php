@@ -13,12 +13,7 @@ use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 
-/**
- * The Bale bot the nightly backup can travel through — see ManageTelegram,
- * the sibling page this mirrors. Bale is reachable inside Iran where
- * Telegram itself is not, which is the whole reason this page exists
- * alongside it rather than instead of it.
- */
+/** تنظیمات بله و سفیر نانوایی؛ ارسال پشتیبان و گزارش همکاران مستقل‌اند. */
 class ManageBale extends Page implements HasForms
 {
     use InteractsWithForms;
@@ -44,6 +39,7 @@ class ManageBale extends Page implements HasForms
         $this->form->fill([
             ...$settings->toArray(),
             'bot_token' => $settings->bot_token,
+            'safir_api_key' => $settings->safir_api_key,
         ]);
     }
 
@@ -51,6 +47,23 @@ class ManageBale extends Page implements HasForms
     {
         return $form
             ->schema([
+                Forms\Components\Section::make('گزارش آرد امانی در بله')
+                    ->description('از سفیر کسب‌وکار بله استفاده می‌کند. نخست بله؛ فقط برای شماره‌ای که عضو بله نیست، پیامک جایگزین ارسال می‌شود.')
+                    ->schema([
+                        Forms\Components\Toggle::make('safir_enabled')
+                            ->label('اولویت ارسال گزارش همکار به بله')
+                            ->live(),
+                        Forms\Components\TextInput::make('safir_api_key')
+                            ->label('کلید دسترسی سفیر')
+                            ->password()->revealable()->maxLength(4096)
+                            ->required(fn (Forms\Get $get) => (bool) $get('safir_enabled'))
+                            ->helperText('از پنل کسب‌وکار بله؛ رمزنگاری‌شده ذخیره می‌شود و با توکن ربات پشتیبان فرق دارد.'),
+                        Forms\Components\TextInput::make('safir_bot_id')
+                            ->label('شناسه عددی بازوی سفیر')
+                            ->numeric()->rule('integer')->minValue(1)->maxValue(999999999999999999)
+                            ->required(fn (Forms\Get $get) => (bool) $get('safir_enabled')),
+                    ]),
+
                 Forms\Components\Section::make('بازو')
                     ->description('یک بار در بله با @botfather چت کنید تا این دو مقدار را بگیرید.')
                     ->icon('heroicon-o-cpu-chip')
@@ -96,12 +109,7 @@ class ManageBale extends Page implements HasForms
             ->send();
     }
 
-    /**
-     * Sends one real message through the saved settings.
-     *
-     * Saving first, so the button tests what is in the boxes rather than
-     * what was there before the admin edited them.
-     */
+    /** تنظیمات فرم پیش از ارسال آزمایشی ذخیره می‌شوند تا همان مقادیر آزموده شوند. */
     public function sendTest(): void
     {
         $settings = BaleSetting::current();
