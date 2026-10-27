@@ -6,34 +6,19 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Sending one text message.
+ * ارسال پیامک با تنظیمات سرویس نانوایی.
  *
- * Deliberately small and deliberately not a package. The shop sends
- * exactly one kind of message — a six-digit code to someone who has
- * forgotten their password — and a queue, a notification channel and a
- * driver abstraction for that would be more machinery than the thing it
- * carries.
- *
- * The default driver writes to the log. That is not a stub: it means the
- * whole flow works end to end before the shop has bought an SMS account,
- * and the code can be read out of `storage/logs` in the meantime. On the
- * day an account exists, one line in .env switches it.
- *
- * Nothing here throws on a provider failure. A password reset that returns
- * an error saying «the SMS gateway is down» tells whoever asked that the
- * number they typed is a real user, which is exactly what the flow is
- * built not to say.
+ * مسیر پیش‌فرض فقط در لاگ می‌نویسد تا بازیابی رمز پیش از خرید حساب هم
+ * قابل استفاده باشد. خطای سرویس در بازیابی رمز بیرون داده نمی‌شود، چون
+ * نباید از پاسخ فهمید شماره در سیستم وجود دارد یا نه. گزارش حساب از
+ * مسیر جداگانه ارسال می‌شود و ثبت در لاگ را ارسال موفق نمی‌شمارد.
  */
 class Sms
 {
     /**
-     * Messages captured instead of sent, while a test is running.
-     *
-     * Null means «really send». The alternative was a test that recovered
-     * the code by hashing every six-digit number until one matched — which
-     * is what the first version of these tests did, and it wedged the
-     * suite for forty minutes before anyone noticed it was not stuck but
-     * simply doing a million bcrypt comparisons.
+     * پیام‌های آزمون به‌جای ارسال واقعی اینجا نگه داشته می‌شوند.
+     * مقدار null یعنی ارسال واقعی. استخراج کد با حدس‌زدن همهٔ کدهای
+     * شش‌رقمی و مقایسهٔ هش، آزمون را ده‌ها دقیقه متوقف می‌کرد.
      */
     private static ?array $captured = null;
 
@@ -53,7 +38,31 @@ class Sms
         self::$captured = null;
     }
 
-    /** True if the message was handed over. Never throws. */
+    /** پیام گزارش فقط از مسیر ارسال عادی می‌رود؛ ثبت در لاگ موفقیت نیست. */
+    public static function sendReport(string $phone, string $message): bool
+    {
+        $phone = self::normalise($phone);
+
+        if ($phone === null || trim($message) === '') {
+            return false;
+        }
+
+        if (self::$captured !== null) {
+            self::$captured[] = ['phone' => $phone, 'message' => $message];
+
+            return true;
+        }
+
+        // تنظیمات کد بازیابی تغییر نمی‌کند؛ گزارش به قالب رمز یک‌بارمصرف فرستاده نمی‌شود.
+        return match (config('sms.driver')) {
+            'smsir', 'smsir_bulk' => self::viaSmsIrBulk($phone, $message),
+            default => false,
+        };
+    }
+
+    /**
+     * اگر پیام تحویل مسیر ارسال شد درست برمی‌گرداند؛ استثنا بیرون نمی‌رود.
+     */
     public static function send(string $phone, string $message, ?string $code = null): bool
     {
         $phone = self::normalise($phone);
@@ -78,12 +87,8 @@ class Sms
     }
 
     /**
-     * An Iranian mobile number in the one shape a provider will accept.
-     *
-     * The shop's own records hold 09xxxxxxxxx, someone typing on a phone
-     * may produce +989xxxxxxxxx or 00989…, and a copied number arrives
-     * with spaces and dashes in it. All four are the same number and none
-     * of them match each other as strings.
+     * شمارهٔ همراه ایران در قالب یکنواخت سرویس‌دهنده.
+     * پیش‌شماره‌های ۰، ۹۸+ و ۰۰۹۸ و فاصله و خط تیره یکسان‌سازی می‌شوند.
      */
     public static function normalise(?string $phone): ?string
     {
@@ -103,7 +108,9 @@ class Sms
         return preg_match('/^09\d{9}$/', $digits) === 1 ? $digits : null;
     }
 
-    /** Persian and Arabic digits as Latin ones, so a typed number parses. */
+    /**
+     * رقم‌های فارسی و عربی برای خواندن شماره به لاتین تبدیل می‌شوند.
+     */
     public static function latinDigits(string $value): string
     {
         $persian = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
@@ -117,11 +124,9 @@ class Sms
     }
 
     /**
-     * No account yet: the message goes to the log.
-     *
-     * Written at warning level on purpose. It is not an error, but it is
-     * the one line somebody will be searching for at the counter while a
-     * baker waits to get back into his phone.
+     * بدون حساب سرویس‌دهنده، پیام فقط در لاگ ثبت می‌شود.
+     * سطح هشدار کمک می‌کند مسئول نانوایی کد بازیابی را سریع پیدا کند؛
+     * این مسیر به معنی ارسال واقعی به گوشی نیست.
      */
     private static function viaLog(string $phone, string $message): bool
     {
@@ -153,9 +158,7 @@ class Sms
 
             return $response->successful();
         } catch (\Throwable $e) {
-            // Swallowed on purpose — see the class note. The caller must
-            // not be able to tell a failed send from a phone that is not
-            // registered.
+            // بازیابی رمز نباید تفاوت خطای ارسال و شماره ثبت‌نشده را آشکار کند.
             Log::error('ارسال پیامک ناموفق بود', ['to' => $phone, 'error' => $e->getMessage()]);
 
             return false;
@@ -263,3 +266,4 @@ class Sms
         return false;
     }
 }
+

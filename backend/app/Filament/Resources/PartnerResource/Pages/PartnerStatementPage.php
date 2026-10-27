@@ -6,8 +6,10 @@ use App\Filament\Resources\PartnerResource;
 use App\Models\ConsignmentFlour;
 use App\Models\Customer;
 use App\Support\Jalali;
+use App\Support\PartnerFlourSms;
 use App\Support\PartnerStatement;
 use Filament\Actions;
+use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
@@ -76,6 +78,38 @@ class PartnerStatementPage extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('sendStatementSms')
+                ->label('ارسال گزارش پیامکی')
+                ->icon('heroicon-o-chat-bubble-left-right')
+                ->authorize(fn () => auth()->user()?->is_active && auth()->user()?->hasRole('admin'))
+                ->modalHeading('گزارش آرد امانی برای همکار')
+                ->modalDescription('گزارش بازه انتخاب‌شده به شماره ثبت‌شده همکار ارسال می‌شود؛ هزینه طبق تعرفه پنل پیامکی است.')
+                ->modalSubmitActionLabel('ارسال به همکار')
+                ->form([
+                    Forms\Components\TextInput::make('phone')->label('شماره همکار')->disabled(),
+                    Forms\Components\Textarea::make('message')->label('متن گزارش')->rows(15)->disabled(),
+                    Forms\Components\Hidden::make('fingerprint')->required(),
+                ])
+                ->mountUsing(function (Forms\Form $form) {
+                    $form->fill(PartnerFlourSms::preview(
+                        $this->record,
+                        Jalali::parseFlexible($this->from),
+                        Jalali::parseFlexible($this->to),
+                    ));
+                })
+                ->action(function (array $data) {
+                    PartnerFlourSms::send(
+                        $this->record,
+                        $data['fingerprint'],
+                        Jalali::parseFlexible($this->from),
+                        Jalali::parseFlexible($this->to),
+                    );
+                    Notification::make()->success()
+                        ->title('گزارش به سرویس پیامکی تحویل شد.')
+                        ->body('تحویل نهایی به گوشی با وضعیت دریافت در پنل پیامکی مشخص می‌شود.')
+                        ->send();
+                }),
+
             Actions\Action::make('print')
                 ->label('چاپ')
                 ->icon('heroicon-o-printer')
@@ -123,3 +157,4 @@ class PartnerStatementPage extends Page
         Notification::make()->success()->title('برگشت ثبت شد.')->send();
     }
 }
+
