@@ -158,17 +158,20 @@ class WhatTheSellerActuallyDidTest extends TestCase
         $this->assertSame(Money::format(1_000_000), $seller['amount_formatted']);
     }
 
-    public function test_days_active_counts_days_sold_on_not_days_in_the_period(): void
+    public function test_روزهای_فعال_در_بازه_صریح_از_روزهای_فروش_شمرده_می‌شود(): void
     {
         $this->sell($this->hasan, ['created_at' => now()->subDays(2)]);
         $this->sell($this->hasan, ['created_at' => now()->subDays(2)]);
         $this->sell($this->hasan, ['created_at' => now()]);
 
-        // Two days, three sales. Dividing by the length of the period
-        // would punish a man for the shop being shut and for his own days
-        // off alike.
-        $this->assertSame(2, $this->board()->json('data.sellers.0.days_active'));
-        $this->assertSame(3, $this->board()->json('data.sellers.0.sale_count'));
+        // در ابتدای دورهٔ سهمیه، پریروز بیرون بازهٔ پیش‌فرض است؛ این
+        // آزمون گروه‌بندی روزهاست، پس بازه باید هر سه فروش را در بر بگیرد.
+        $response = $this->board([
+            'from' => now()->subDays(2)->toDateString(),
+            'to' => now()->toDateString(),
+        ]);
+        $this->assertSame(2, $response->json('data.sellers.0.days_active'));
+        $this->assertSame(3, $response->json('data.sellers.0.sale_count'));
     }
 
     public function test_each_payment_type_is_broken_out(): void
@@ -228,14 +231,19 @@ class WhatTheSellerActuallyDidTest extends TestCase
 
     // ------------------------------------------------- the itemised view
 
-    public function test_one_sellers_sales_come_back_grouped_by_day(): void
+    public function test_ریز_فروش_در_بازه_صریح_به_تفکیک_روز_است(): void
     {
         $this->sell($this->hasan, ['created_at' => now()->subDay(), 'bread_count' => 30]);
         $this->sell($this->hasan, ['created_at' => now(), 'bread_count' => 40]);
         $this->sell($this->hasan, ['created_at' => now(), 'bread_count' => 20]);
 
+        // دیروز حتی در روز شروع دورهٔ سهمیه باید داخل بازهٔ این آزمون باشد.
+        $query = http_build_query([
+            'from' => now()->subDay()->toDateString(),
+            'to' => now()->toDateString(),
+        ]);
         $days = $this->actingAs($this->owner, 'sanctum')
-            ->getJson("/api/v1/reports/sellers/{$this->hasan->id}")
+            ->getJson("/api/v1/reports/sellers/{$this->hasan->id}?{$query}")
             ->assertOk()
             ->json('data.days');
 
