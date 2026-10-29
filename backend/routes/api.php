@@ -115,494 +115,463 @@ Route::prefix('v1')->group(function () {
         'auth:sanctum', 'active', 'app-version', 'picks-bakery', 'idempotent',
     ])->group(function () {
         // --- Available to every authenticated user ---
-        Route::get('/me', [AuthC…102675 tokens truncated…or a
-        // while and the seller had to add up off three numbers nobody
-        // showed them.
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::post('/logout', [AuthController::class, 'logout']);
+        Route::post('/change-password', [AuthController::class, 'changePassword'])
+            ->middleware('permission:change-password');
+
+        // Your own devices, and signing them out. No permission gate: these
+        // read and close nothing but the caller's own sessions, and the
+        // person who needs them most is whoever has just lost a phone —
+        // not necessarily somebody with a role that can do anything else.
+        Route::get('/devices', [AuthController::class, 'devices']);
+        Route::delete('/devices/others', [AuthController::class, 'revokeOtherDevices']);
+        Route::delete('/devices/{token}', [AuthController::class, 'revokeDevice'])
+            ->whereNumber('token');
+        Route::get('/bakery', [BakeryController::class, 'show']);
+        // No permission gate: it lists only what this person already
+        // reaches, and somebody who reaches one shop gets one row.
+        Route::get('/bakeries/mine', [BakeryController::class, 'mine']);
+
+        // --- Attendance (all staff) ---
+        Route::middleware('permission:record-attendance')->group(function () {
+            Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn']);
+            Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut']);
+            Route::get('/attendance/today', [AttendanceController::class, 'today']);
+            Route::get('/attendance/my-history', [AttendanceController::class, 'myHistory']);
+
+            // Whoever is holding a phone ticks in the ones who are not.
+            Route::middleware('permission:record-attendance-for-others')->group(function () {
+                Route::get('/attendance/roster', [AttendanceController::class, 'roster']);
+                Route::post('/attendance/check-in/{user}', [AttendanceController::class, 'checkInFor']);
+                Route::post('/attendance/check-out/{user}', [AttendanceController::class, 'checkOutFor']);
+            });
+        });
+
+        // --- Dough maker ---
+        Route::post('/dough-entries', [DoughEntryController::class, 'store'])
+            ->middleware('permission:record-dough');
+        Route::get('/dough-entries/my-history', [DoughEntryController::class, 'myHistory'])
+            ->middleware('permission:view-own-dough-history');
+
+        // --- Chane gir ---
+        Route::get('/dough-entries/pending', [DoughEntryController::class, 'pending'])
+            ->middleware('permission:view-pending-dough');
+        Route::post('/chane-entries', [ChaneEntryController::class, 'store'])
+            ->middleware('permission:record-chane');
+        Route::get('/chane-entries/my-history', [ChaneEntryController::class, 'myHistory'])
+            ->middleware('permission:view-own-chane-history');
+
+        // --- Seller ---
+        Route::get('/chane-entries/pending', [ChaneEntryController::class, 'pending'])
+            ->middleware('permission:view-pending-chane');
+        Route::post('/sales', [SaleController::class, 'store'])
+            ->middleware('permission:record-sale');
+        Route::get('/sales/today', [SaleController::class, 'today'])
+            ->middleware('permission:view-own-sales');
+        Route::get('/sales/payment-types', [SaleController::class, 'paymentTypes']);
+        // Named on a «منزل» line, so it needs exactly the permission that
+        // records one.
+        Route::get('/sales/staff', [SaleController::class, 'staff'])
+            ->middleware('permission:record-sale');
+        Route::get('/sales/my-account', [SaleController::class, 'myAccount'])
+            ->middleware('permission:view-own-sales');
+
+        // The seller asks to settle; the admin confirms it in the panel.
+        Route::middleware('permission:view-own-sales')->group(function () {
+            // What the schools, offices and dormitories owe this seller,
+            // and the money they hand back.
+            Route::get('/my-collections', [SellerCollectionController::class, 'index']);
+            Route::post('/my-collections/{customer}/collect', [SellerCollectionController::class, 'collect']);
+
+            Route::get('/settlement-requests', [SettlementRequestController::class, 'index']);
+            // The open debts, one line each, for a seller handing over only
+            // part of what they owe.
+            Route::get('/settlement-requests/settleable', [SettlementRequestController::class, 'settleable']);
+            // One figure the seller can pay against, rather than a list
+            // of sales to reconcile.
+            Route::get('/settlement-requests/account', [SettlementRequestController::class, 'account']);
+            Route::post('/settlement-requests', [SettlementRequestController::class, 'store']);
+        });
+
+        // --- Seller: flour sold by the kilo or by the sack ---
+        Route::post('/flour-sales', [FlourSaleController::class, 'store'])
+            ->middleware('permission:record-flour-sale');
+        Route::get('/flour-sales/today', [FlourSaleController::class, 'today'])
+            ->middleware('permission:view-own-flour-sales');
+        Route::get('/flour-sales/options', [FlourSaleController::class, 'options'])
+            ->middleware('permission:record-flour-sale');
+
+        // --- Admin: staff management ---
+        Route::middleware('permission:manage-users')->group(function () {
+            Route::get('/users/roles', [UserManagementController::class, 'roles']);
+            Route::patch('/users/{user}/toggle-active', [UserManagementController::class, 'toggleActive']);
+            Route::apiResource('users', UserManagementController::class);
+        });
+
+        // --- Daily start ticks for shaping and baking ---
+        Route::get('/work-starts/today', [WorkStartController::class, 'today']);
+        Route::post('/work-starts', [WorkStartController::class, 'store'])
+            ->middleware('permission:record-work-start');
+        Route::get('/work-starts/rules', [WorkStartController::class, 'rules']);
+
+        // A person's own record, behind no permission at all: it is about
+        // them, and the tariff only works as a rule if the person it
+        // applies to can see where they stand in it.
+        Route::get('/work-starts/mine', [WorkStartController::class, 'mine']);
+        Route::get('/work-starts/late-report', [WorkStartController::class, 'lateReport'])
+            ->middleware('permission:view-work-start-report');
+
+        // --- Production board: shater, chane gir and seller ---
+        Route::get('/chane-board', [ChaneBoardController::class, 'show'])
+            ->middleware('permission:view-chane-board');
+
+        // --- Customers: sellers read, admins manage ---
+        Route::get('/customers', [CustomerController::class, 'index']);
+        Route::get('/customers/types', [CustomerController::class, 'types']);
+        Route::middleware('permission:manage-customers')->group(function () {
+            Route::post('/customers', [CustomerController::class, 'store']);
+            Route::put('/customers/{customer}', [CustomerController::class, 'update']);
+            Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
+        });
+
+        // --- Warehouse ---
+        Route::get('/inventory', [InventoryController::class, 'index'])
+            ->middleware('permission:view-inventory');
+        Route::get('/inventory/movements', [InventoryController::class, 'movements'])
+            ->middleware('permission:view-inventory');
+        // «گردش روزانه آرد»: یک روز انبار آرد به کیسه، فقط خواندنی.
+        Route::get('/inventory/flour/day', [FlourDayController::class, 'show'])
+            ->middleware('permission:view-inventory');
+        Route::middleware('permission:manage-inventory')->group(function () {
+            Route::post('/inventory/movements', [InventoryController::class, 'store']);
+            Route::patch('/inventory/{key}/threshold', [InventoryController::class, 'updateThreshold']);
+
+            // آنچه واقعاً روی قفسه هست، در برابر آنچه دفتر می‌گوید.
+            Route::get('/stock-counts', [StockCountController::class, 'index']);
+            Route::post('/stock-counts', [StockCountController::class, 'store']);
+        });
+
+        // --- Flour quota, split across the three delivery periods ---
+        Route::middleware('permission:view-inventory')->group(function () {
+            Route::get('/flour-allocations/current', [FlourAllocationController::class, 'current']);
+            Route::get('/flour-allocations', [FlourAllocationController::class, 'index']);
+        });
+        Route::middleware('permission:manage-inventory')->group(function () {
+            Route::post('/flour-allocations', [FlourAllocationController::class, 'store']);
+            Route::put('/flour-allocations/{allocation}', [FlourAllocationController::class, 'update']);
+            Route::delete('/flour-allocations/{allocation}', [FlourAllocationController::class, 'destroy']);
+
+            // Diesel follows the flour quota above, and was panel-only:
+            // the litres off a docket had to be carried back to a desk to
+            // be entered, and by then the docket was in somebody's pocket.
+            Route::get('/diesel/quota', [QuotaController::class, 'dieselQuota']);
+            Route::patch('/diesel/quota', [QuotaController::class, 'updateDieselQuota']);
+            Route::post('/diesel/deliveries', [QuotaController::class, 'storeDieselDelivery']);
+            Route::delete('/diesel/deliveries/{delivery}', [QuotaController::class, 'destroyDieselDelivery']);
+        });
+
+        // ثبت و مشاهدهٔ آرد همکار با مجوز اختصاصی هم در دسترس است.
+        Route::middleware('permission:manage-inventory|record-consignment-flour')->group(function () {
+            Route::get('/consignment-flour/balance', [ConsignmentFlourController::class, 'balance']);
+            // Before the {consignment} routes below, or «partners» is read
+            // as an id and matched by the model binding.
+            Route::get('/consignment-flour/partners', [ConsignmentFlourController::class, 'partners']);
+            // پروندهٔ هر همکار: گردش ریز به کیسه.
+            Route::get('/consignment-flour/partners/{customer}/statement', [ConsignmentFlourController::class, 'statement']);
+            Route::get('/consignment-flour', [ConsignmentFlourController::class, 'index']);
+            Route::post('/consignment-flour', [ConsignmentFlourController::class, 'store']);
+        });
+
+        // اصلاح و حذف همچنان مجوز مدیریت انبار می‌خواهد.
+        Route::middleware('permission:manage-inventory')->group(function () {
+            Route::patch('/consignment-flour/{consignment}/settle', [ConsignmentFlourController::class, 'settle']);
+            Route::post('/consignment-flour/{consignment}/returns', [ConsignmentFlourController::class, 'storeReturn']);
+            Route::delete('/consignment-flour/{consignment}', [ConsignmentFlourController::class, 'destroy']);
+        });
+
+        // --- Buying: the door, and the books ---
         //
-        // Summed by the server off those same periods, so it can never
-        // disagree with the card above it.
-        if (_whole != null) ...[
-          _WholePeriodRule(label: _whole!['label'] as String?),
-          _QuotaCard(period: _whole!),
-        ],
-      ],
-    );
-  }
-}
+        // Two permissions, because they are two acts. Writing down what
+        // came off the lorry is the seller's — they are the one standing
+        // there, the same reason they tick the bakers in. What the shop
+        // owes the mill, paying it, and correcting an invoice already
+        // filed belong to whoever holds the money.
+        //
+        // The literal paths are declared before `{purchase}` and
+        // `{supplier}` below, or the model binding matches «options» as
+        // an id and answers 404 to a form that has never worked.
+        Route::middleware('permission:record-purchase')->group(function () {
+            Route::get('/suppliers', [SupplierController::class, 'index']);
+            Route::get('/purchases/options', [PurchaseController::class, 'options']);
+            Route::get('/purchases/mine', [PurchaseController::class, 'mine']);
+            Route::post('/purchases', [PurchaseController::class, 'store']);
+        });
 
-/// «جمع هر سه دوره» — a rule and a word.
-///
-/// Without it a second card under the first reads as a second period, or
-/// worse as a correction of the one above it.
-class _WholePeriodRule extends StatelessWidget {
-  const _WholePeriodRule({required this.label});
+        Route::middleware('permission:manage-purchases')->group(function () {
+            Route::get('/suppliers/balances', [SupplierController::class, 'balances']);
+            Route::post('/suppliers', [SupplierController::class, 'store']);
+            Route::get('/suppliers/{supplier}/account', [SupplierPaymentController::class, 'account']);
+            Route::put('/suppliers/{supplier}', [SupplierController::class, 'update']);
+            Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy']);
 
-  final String? label;
+            Route::get('/purchases', [PurchaseController::class, 'index']);
+            Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
+            Route::put('/purchases/{purchase}', [PurchaseController::class, 'update']);
+            Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy']);
 
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+            Route::get('/supplier-payments', [SupplierPaymentController::class, 'index']);
+            Route::post('/supplier-payments', [SupplierPaymentController::class, 'store']);
+            Route::delete('/supplier-payments/{payment}', [SupplierPaymentController::class, 'destroy']);
+        });
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 14, bottom: 10),
-      child: Row(
-        children: [
-          Expanded(child: Divider(color: scheme.outlineVariant)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text(
-              label ?? 'جمع هر سه دوره',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ),
-          Expanded(child: Divider(color: scheme.outlineVariant)),
-        ],
-      ),
-    );
-  }
-}
+        // --- Holidays: everyone reads, admin manages ---
+        Route::get('/holidays', [HolidayController::class, 'index']);
+        Route::get('/holidays/today', [HolidayController::class, 'today']);
+        Route::get('/holidays/types', [HolidayController::class, 'types']);
+        Route::middleware('permission:manage-bakery')->group(function () {
+            Route::post('/holidays', [HolidayController::class, 'store']);
+            Route::put('/holidays/{holiday}', [HolidayController::class, 'update']);
+            Route::delete('/holidays/{holiday}', [HolidayController::class, 'destroy']);
+        });
 
-/// The three bread figures for one period, or for all three added up.
-///
-/// One widget for both so the total reads as the same kind of thing as
-/// the period above it — the owner's screen makes the same choice, and
-/// two different-looking cards would invite the question of why.
-class _QuotaCard extends StatelessWidget {
-  const _QuotaCard({required this.period});
+        // --- Admin: bakery settings ---
+        Route::put('/bakery', [BakeryController::class, 'update'])
+            ->middleware('permission:manage-bakery');
 
-  final Map<String, dynamic> period;
+        // The card-terminal link to nanino was here. Removed 1405/06/12:
+        // their gateway answers «Full authentication is required to
+        // access this resource» to any server-to-server call, and the
+        // owner confirmed nanino does not offer this as a service.
+        // Getting past it would mean defeating bot protection, which is
+        // the same line as solving the captcha, so it was not attempted.
+        // The support class and the bakeries columns are kept, so it can
+        // be reconnected in an afternoon if nanino ever publishes an API.
 
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final allocated = (period['allocated_bread_count'] as num?)?.toInt() ?? 0;
-    final sold = (period['card_bread_count'] as num?)?.toInt() ?? 0;
-    final left = (period['bread_remainder'] as num?)?.toInt() ?? 0;
-    final over = left < 0;
+        // --- Admin: backups ---
+        // Status and a «take one now», nothing that hands the file over:
+        // the whole shop in one download is not a convenience worth the
+        // risk, and a .sql.gz is no use on a phone.
+        Route::middleware('permission:manage-bakery')->group(function () {
+            Route::get('/backups', [BackupController::class, 'index']);
+            Route::post('/backups', [BackupController::class, 'store']);
+        });
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-        child: Column(
-          children: [
-            DailyFlourQuota(period: period),
-            Row(
-              children: [
-                Expanded(
-                  child: _QuotaFigure(
-                    label: 'نان دوره',
-                    value: allocated,
-                    color: scheme.onSurface,
-                  ),
-                ),
-                Expanded(
-                  child: _QuotaFigure(
-                    label: 'فروش کارتخوان',
-                    value: sold,
-                    color: AppColors.moneyIn,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 26),
-            Row(
-              children: [
-                Icon(
-                  over
-                      ? Icons.error_outline_rounded
-                      : Icons.trending_flat_rounded,
-                  size: IconSize.row,
-                  color: over ? AppColors.moneyOut : scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  over ? 'بیش از سهمیه' : 'باقی‌مانده',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                ),
-                const Spacer(),
-                Text(
-                  // The absolute value with a word beside it, never a
-                  // minus sign: «-۴۰۰ نان باقی‌مانده» is a sentence
-                  // nobody can act on.
-                  '${left.abs()} نان',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: over ? AppColors.moneyOut : AppColors.moneyIn,
-                      ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+        // --- Admin: reports & flour stock ---
+        Route::middleware('permission:view-all-reports')->group(function () {
+            // One answer, before the dashboard it stands in front of: is
+            // the shop sound, and what is the owner's to do. Same words as
+            // the panel, composed in one class so the two cannot drift.
+            Route::get('/today', [TodayController::class, 'show']);
 
-class _QuotaFigure extends StatelessWidget {
-  const _QuotaFigure({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
+            Route::get('/reports/dashboard', [ReportController::class, 'dashboard']);
+            Route::get('/reports/production', [ReportController::class, 'production']);
+            Route::get('/reports/sales', [ReportController::class, 'sales']);
 
-  final String label;
-  final int value;
-  final Color color;
+            // What each seller sold, and one seller sale by sale. Sits
+            // beside the other reports and behind the same permission:
+            // it is the same class of question, asked per person.
+            Route::get('/reports/sellers', [SellerPerformanceController::class, 'index']);
+            Route::get('/reports/sellers/{seller}', [SellerPerformanceController::class, 'show']);
 
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+            // What each bench got out of a sack, against the formula. Here
+            // rather than beside the attendance reports, which a seller can
+            // read: this is what somebody's work came to, and it belongs
+            // with «what each seller sold» behind the owner's permission.
+            Route::get('/reports/staff-yield', [ReportController::class, 'staffYield']);
+            Route::get('/reports/flour', [ReportController::class, 'flourConsumption']);
+            // Where every good in the store went, not just how much is left.
+            Route::get('/reports/inventory', [ReportController::class, 'inventory']);
+            Route::get('/reports/efficiency', [ReportController::class, 'efficiency']);
+            // What the shop got through, a day, a week or a month at a time.
+            Route::get('/reports/consumption-series', [ReportController::class, 'consumptionSeries']);
 
-    return Column(
-      children: [
-        Text(
-          '$value',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-        ),
-      ],
-    );
-  }
-}
+            Route::get('/flour/balance', [FlourStockController::class, 'balance']);
+            Route::get('/flour/movements', [FlourStockController::class, 'index']);
+            Route::post('/flour/movements', [FlourStockController::class, 'store']);
+        });
 
-class _FlourSection extends StatefulWidget {
-  const _FlourSection({
-    required this.api,
-    required this.onChanged,
-    this.bakery,
-  });
+        Route::middleware('permission:view-attendance-reports')->group(function () {
+            Route::get('/reports/attendance', [ReportController::class, 'attendance']);
+            Route::get('/reports/attendance-summary', [ReportController::class, 'attendanceSummary']);
+        });
 
-  final BakeryApi api;
-  final Bakery? bakery;
-  final VoidCallback onChanged;
+        // Every employee can see their own payslips. Declared before the
+        // salaries resource so `/salaries/{salary}` does not swallow "mine".
+        Route::get('/salaries/mine', [SalaryController::class, 'mine']);
 
-  @override
-  State<_FlourSection> createState() => _FlourSectionState();
-}
+        // The same money as one figure, for the card on their home screen.
+        // Their pay was visible to everyone but them.
+        Route::get('/salaries/my-summary', [SalaryController::class, 'mySummary']);
 
-class _FlourSectionState extends State<_FlourSection> {
-  FlourSaleOptions? _stock;
+        // And what they have drawn against them. Whoever took the advance
+        // is the person who most needs to know what next month is short by.
+        Route::get('/staff-advances/mine', [StaffAdvanceController::class, 'mine']);
 
-  @override
-  void initState() {
-    super.initState();
-    _loadStock();
-  }
+        // Asking for one, which used to happen in the doorway and left no
+        // record of who asked or what was said back. Open to every
+        // employee: asking is not the same as granting.
+        // Asking to be paid for the month. No amount is sent — the wage is
+        // what was agreed, and the person asking is saying he has not had
+        // it, not proposing a figure.
+        Route::get('/salary-requests/mine', [SalaryPaymentRequestController::class, 'mine']);
+        Route::post('/salary-requests', [SalaryPaymentRequestController::class, 'store']);
+        Route::delete('/salary-requests/{salaryRequest}', [SalaryPaymentRequestController::class, 'destroy']);
 
-  Future<void> _loadStock() async {
-    try {
-      final stock = await widget.api.flourSaleOptions();
-      if (mounted) setState(() => _stock = stock);
-    } on ApiException {
-      // The two buttons below still work; the heading simply says nothing
-      // rather than showing a figure it could not confirm.
-    }
-  }
+        Route::get('/advance-requests/mine', [StaffAdvanceRequestController::class, 'mine']);
+        Route::post('/advance-requests', [StaffAdvanceRequestController::class, 'store']);
+        Route::delete('/advance-requests/{advanceRequest}', [StaffAdvanceRequestController::class, 'destroy']);
 
-  Future<void> _open(BuildContext context, AdminRecordKind kind) async {
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => AdminRecordSheet(
-        api: widget.api,
-        kind: kind,
-        bakery: widget.bakery,
-      ),
-    );
+        // Penalty request: the seller asks; only the manager's yes docks pay.
+        Route::middleware('permission:view-own-sales|manage-finance')->group(function () {
+            Route::get('/penalty-requests/options', [StaffPenaltyRequestController::class, 'options']);
+            Route::get('/penalty-requests/mine', [StaffPenaltyRequestController::class, 'mine']);
+            Route::post('/penalty-requests', [StaffPenaltyRequestController::class, 'store']);
+            Route::delete('/penalty-requests/{penaltyRequest}', [StaffPenaltyRequestController::class, 'destroy']);
+        });
 
-    if (saved == true) {
-      widget.onChanged();
-      await _loadStock();
-    }
-  }
+        // --- Admin: finance (expenses & payroll) ---
+        Route::middleware('permission:manage-finance')->group(function () {
+            Route::get('/expenses/categories', [ExpenseController::class, 'categories']);
+            Route::apiResource('expenses', ExpenseController::class)->except(['show']);
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _Heading(
-          title: 'انبار',
-          icon: Icons.grain_rounded,
-          trailing: _stock == null ? null : InkWell(
-            onTap: () => showInventoryEntries(context, api: widget.api,
-              itemKey: 'flour', itemName: 'آرد', subtitle: 'ریز گردش اخیر'),
-            child: Padding(padding: const EdgeInsets.all(6),
-              child: _FlourOnHand(stock: _stock!)),
-          ),
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _open(context, AdminRecordKind.intake),
-                icon: const Icon(Icons.local_shipping_rounded, size: IconSize.row),
-                label: const Text('ورودی انبار'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _open(context, AdminRecordKind.consignment),
-                icon: const Icon(Icons.swap_horiz_rounded, size: IconSize.row),
-                label: const Text('آرد همکار'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        // «ورودی انبار» above is stock arriving with no invoice behind it
-        // — an opening balance, a count that came up short. This one is a
-        // delivery: it carries the mill's name and what the shop owes for
-        // it, and the docket is in somebody's pocket by the time it would
-        // otherwise reach a desk.
-        FilledButton.icon(
-          onPressed: () async {
-            if (await PurchaseSheet.open(context, widget.api)) {
-              widget.onChanged();
-              await _loadStock();
-            }
-          },
-          icon: const Icon(Icons.receipt_long_rounded, size: IconSize.row),
-          label: const Text('ثبت محموله با فاکتور'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(50),
-          ),
-        ),
-      ],
-    );
-  }
-}
+            // Rewards and penalties, recorded on the day. The pay sheet
+            // opens on their total rather than asking the owner to
+            // remember who was late three weeks ago.
+            Route::get('/staff-adjustments/period', [StaffAdjustmentController::class, 'forPeriod']);
+            Route::get('/staff-adjustments', [StaffAdjustmentController::class, 'index']);
+            Route::post('/staff-adjustments', [StaffAdjustmentController::class, 'store']);
+            Route::delete('/staff-adjustments/{adjustment}', [StaffAdjustmentController::class, 'destroy']);
+            // Whether to take what the tariff worked out is the owner's,
+            // and the literal paths sit before the model-bound one above
+            // would match «waive» as an id.
+            Route::patch('/staff-adjustments/{adjustment}/waive', [StaffAdjustmentController::class, 'waive']);
+            Route::patch('/staff-adjustments/{adjustment}/restore', [StaffAdjustmentController::class, 'restore']);
 
-/// «۱۹۳ کیسه · ۷٬۷۲۰ کگ» — what is in the store, at a glance.
-///
-/// Coloured only when it is low. A figure that is always tinted is a
-/// figure nobody reads a warning into; this one stays plain until there
-/// really is something to say, and the threshold is the shop's own, set on
-/// the warehouse item rather than guessed at here.
-class _FlourOnHand extends StatelessWidget {
-  const _FlourOnHand({required this.stock});
+            // پرونده مالی و اصلاح رکورد اصلی فقط برای مدیر امور مالی.
+            Route::get('/loans', [LoanController::class, 'index']);
+            Route::post('/loans/{loan}/payments', [LoanController::class, 'pay']);
+            Route::get('/staff-accounts/{person}', [StaffAccountController::class, 'show']);
+            Route::patch('/staff-account-entries/{kind}/{id}', [StaffAccountController::class, 'update']);
+            Route::get('/salaries/employees', [SalaryController::class, 'employees']);
+            Route::patch('/salaries/{salary}/mark-paid', [SalaryController::class, 'markPaid']);
+            Route::apiResource('salaries', SalaryController::class)->except(['show']);
 
-  /// Ten sacks: about a week of baking at this shop's rate, which is time
-  /// enough to order more before the oven stops.
-  static const _lowBags = 10;
+            Route::get('/staff-advances/outstanding', [StaffAdvanceController::class, 'outstanding']);
 
-  final FlourSaleOptions stock;
+            // No approve route on purpose: paying the person through the
+            // pay sheet is what approval means, and that is where the
+            // figures are on screen before the money moves.
+            Route::get('/salary-requests', [SalaryPaymentRequestController::class, 'index']);
+            Route::patch('/salary-requests/{salaryRequest}/reject', [SalaryPaymentRequestController::class, 'reject']);
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final low = stock.availableBags < _lowBags;
+            Route::get('/advance-requests', [StaffAdvanceRequestController::class, 'index']);
+            Route::patch('/advance-requests/{advanceRequest}/approve', [StaffAdvanceRequestController::class, 'approve']);
+            Route::patch('/advance-requests/{advanceRequest}/reject', [StaffAdvanceRequestController::class, 'reject']);
+            Route::get('/penalty-requests', [StaffPenaltyRequestController::class, 'index']);
+            Route::patch('/penalty-requests/{penaltyRequest}/approve', [StaffPenaltyRequestController::class, 'approve']);
+            Route::patch('/penalty-requests/{penaltyRequest}/reject', [StaffPenaltyRequestController::class, 'reject']);
+            Route::patch('/penalty-requests/{penaltyRequest}/cancel', [StaffPenaltyRequestController::class, 'cancel']);
+            Route::apiResource('staff-advances', StaffAdvanceController::class)
+                ->parameters(['staff-advances' => 'advance'])
+                ->only(['index', 'store', 'destroy']);
+        });
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (low)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(end: 4),
-            child: Icon(
-              Icons.error_outline_rounded,
-              size: IconSize.inline,
-              color: AppColors.attention,
-            ),
-          ),
-        Text(
-          '${stock.availableBags.toStringAsFixed(stock.availableBags % 1 == 0 ? 0 : 1)} کیسه',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: low ? AppColors.attention : null,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-        Text(
-          '  ·  ${stock.availableKg.toStringAsFixed(0)} کگ',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-      ],
-    );
-  }
-}
+        // --- Admin: miscellaneous income ---
+        Route::middleware('permission:manage-finance')->group(function () {
+            Route::get('/incomes/categories', [IncomeController::class, 'categories']);
+            Route::apiResource('incomes', IncomeController::class)->except(['show']);
 
-// ------------------------------------------------------------- attendance
+            // --- Who has asked to use this system ---
+            // Guarded again inside the controller: only the head shop,
+            // never an admin of a shop that was itself opened this way.
+            Route::get('/bakery-applications', [BakeryApplicationController::class, 'index']);
+            Route::post('/bakery-applications/{application}/approve', [BakeryApplicationController::class, 'approve']);
+            Route::post('/bakery-applications/{application}/reject', [BakeryApplicationController::class, 'reject']);
 
-/// Who is in today, for the whole floor rather than just the person looking.
-class StaffAttendanceSection extends StatefulWidget {
-  const StaffAttendanceSection({super.key, required this.api});
+            // --- Seller accounts: what each seller still owes ---
+            Route::get('/seller-accounts', [SellerAccountController::class, 'index']);
+            // Where the figure came from, day by day. «معلوم نیست عدد از
+            // کجا آمده» — the page showed one number per seller and
+            // nothing behind it.
+            Route::get('/seller-accounts/{seller}/daily-report', [SellerAccountController::class, 'dailyReport']);
+            Route::get('/seller-accounts/{seller}/breakdown', [SellerAccountController::class, 'breakdown']);
+            // «سابقهٔ تسویه‌های فروشنده» — there was no list: the owner
+            // settling somebody at the counter left only a bank movement.
+            Route::get('/seller-accounts/{seller}/history', [SellerAccountController::class, 'history']);
+            Route::post('/seller-accounts/{seller}/settle', [SellerAccountController::class, 'settle']);
+            // «اصلاح تسویهٔ اشتباه» — the wrong seller, amount or day.
+            Route::post('/seller-settlements/{record}/reverse', [SellerAccountController::class, 'reverse']);
+            Route::post('/seller-accounts/{seller}/settle-loaves', [SellerAccountController::class, 'settleLoaves']);
+            Route::post('/settlement-requests/{settlement}/confirm', [SellerAccountController::class, 'confirm']);
+            Route::post('/settlement-requests/{settlement}/reject', [SellerAccountController::class, 'reject']);
 
-  final BakeryApi api;
+            // --- CRM: what was said to a customer, and what is owed back ---
+            Route::get('/follow-ups', [CustomerInteractionController::class, 'dueFollowUps']);
+            Route::get('/customers/{customer}/interactions', [CustomerInteractionController::class, 'index']);
+            Route::post('/customers/{customer}/interactions', [CustomerInteractionController::class, 'store']);
+            Route::post('/interactions/{interaction}/complete', [CustomerInteractionController::class, 'complete']);
 
-  @override
-  State<StaffAttendanceSection> createState() => _StaffAttendanceSectionState();
-}
+            // --- What the schools and offices still owe ---
+            Route::get('/customer-debts', [CustomerDebtController::class, 'index']);
+            Route::post('/customer-debts/{customer}/settle', [CustomerDebtController::class, 'settle']);
 
-class _StaffAttendanceSectionState extends State<StaffAttendanceSection> {
-  late Future<List<Map<String, dynamic>>> _records;
+            // --- Partner shares (دنگ) and the profit split ---
+            Route::get('/shares/split', [BakeryShareController::class, 'split']);
+            Route::get('/shares/settlements', [BakeryShareController::class, 'settlements']);
+            Route::post('/shares/{share}/settle', [BakeryShareController::class, 'settle']);
+            Route::apiResource('shares', BakeryShareController::class)->except(['show']);
+        });
 
-  /// Why the list is empty, when it is empty for a reason other than
-  /// nobody having ticked in yet.
-  String? _failure;
+        // --- Admin: bank accounts and balances ---
+        Route::middleware('permission:manage-finance')->group(function () {
+            // What is actually in the drawer, against what the books say.
+            Route::get('/cash-counts', [CashCountController::class, 'index']);
+            Route::post('/cash-counts', [CashCountController::class, 'store']);
 
-  @override
-  void initState() {
-    super.initState();
-    _records = _load();
-  }
+            // «پیامک‌های بانکی»: the owner's phone sends, the owner decides.
+            // The controller refuses anyone but the admin.
+            Route::get('/bank-sms', [BankSmsController::class, 'index']);
+            Route::post('/bank-sms', [BankSmsController::class, 'store'])->middleware('throttle:30,1');
+            Route::get('/bank-sms/count', [BankSmsController::class, 'count']);
+            Route::get('/bank-sms/accounts', [BankSmsController::class, 'accounts']);
+            Route::post('/bank-sms/accounts', [BankSmsController::class, 'saveAccount']);
+            Route::delete('/bank-sms/accounts/{mapping}', [BankSmsController::class, 'deleteAccount']);
+            Route::post('/bank-sms/{sms}/confirm', [BankSmsController::class, 'confirm']);
+            Route::post('/bank-sms/{sms}/ignore', [BankSmsController::class, 'ignore']);
+            Route::post('/bank-sms/{sms}/link', [BankSmsController::class, 'link']);
 
-  Future<List<Map<String, dynamic>>> _load() async {
-    try {
-      final records = await widget.api.adminAttendanceToday();
-      if (mounted) setState(() => _failure = null);
-      return records;
-    } on ApiException catch (e) {
-      // This used to swallow the error and return an empty list, so a
-      // refusal, a timeout and a genuinely quiet morning all rendered as
-      // «هنوز کسی تیک حضور نزده» — a sentence that is a fact in one case
-      // and a lie in the other two, with nothing on screen to tell them
-      // apart.
-      if (mounted) setState(() => _failure = e.message);
-      return const [];
-    }
-  }
+            Route::post('/bank-accounts/transfer', [BankAccountController::class, 'transfer']);
+            Route::get('/bank-accounts/{account}/transactions', [BankAccountController::class, 'transactions']);
+            Route::post('/bank-accounts/{account}/transactions', [BankAccountController::class, 'record']);
+            // The parameter must be named `account` to match the controller
+            // signature, or implicit binding silently hands over an empty model.
+            Route::apiResource('bank-accounts', BankAccountController::class)
+                ->except(['show'])
+                ->parameters(['bank-accounts' => 'account']);
+        });
 
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+        // --- Admin: financial reports ---
+        Route::middleware('permission:view-financial-reports')->group(function () {
+            Route::get('/reports/financial', [ReportController::class, 'financial']);
+            Route::get('/reports/financial-trend', [ReportController::class, 'financialTrend']);
+            Route::get('/reports/payroll', [ReportController::class, 'payroll']);
+            // The staff read as people rather than as rows in four
+            // separate reports: one row each to compare them, and one
+            // page each to talk to them. Behind the financial permission
+            // because what a person costs is somebody's pay.
+            Route::get('/reports/staff', [StaffReportController::class, 'index']);
+            Route::get('/reports/staff/{person}', [StaffReportController::class, 'show']);
+            Route::get('/reports/debts', [ReportController::class, 'debts']);
+            // What the shop owns against what it owes, as of now.
+            Route::get('/reports/balance-sheet', [BalanceSheetController::class, 'show']);
+            Route::get('/reports/profit-and-loss', [ReportController::class, 'profitAndLoss']);
+            // Income and cost bucketed daily, weekly or monthly.
+            Route::get('/reports/financial-series', [ReportController::class, 'financialSeries']);
+            // Flat rows for Power BI and anything else that models its own
+            // data — see docs/POWERBI.md.
+            Route::get('/reports/export/{dataset}', [PowerBiExportController::class, 'show']);
+        });
 
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _records,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox.shrink();
-        }
-
-        final records = snapshot.data ?? const <Map<String, dynamic>>[];
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _Heading(
-              title: 'حاضری امروز',
-              icon: Icons.how_to_reg_rounded,
-              trailing: Text(
-                '${records.length} نفر',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ),
-            if (records.isEmpty)
-              Card(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                  child: Row(
-                    children: [
-                      if (_failure != null) ...[
-                        Icon(
-                          Icons.cloud_off_rounded,
-                          size: 18,
-                          color: scheme.error,
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      Expanded(
-                        child: Text(
-                          _failure ?? 'هنوز کسی تیک حضور نزده.',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: _failure != null ? scheme.error : null,
-                                  ),
-                        ),
-                      ),
-                      if (_failure != null)
-                        TextButton(
-                          onPressed: () =>
-                              setState(() { _records = _load(); }),
-                          child: const Text('دوباره'),
-                        ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              Card(
-                child: Column(
-                  children: [
-                    for (var i = 0; i < records.length; i++) ...[
-                      if (i > 0) const Divider(height: 1),
-                      _AttendanceRow(record: records[i]),
-                    ],
-                  ],
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _AttendanceRow extends StatelessWidget {
-  const _AttendanceRow({required this.record});
-
-  final Map<String, dynamic> record;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final user = keyedGroup(record['user']);
-    final checkedInAt = DateTime.tryParse('${record['checked_in_at']}');
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      child: Row(
-        children: [
-          Icon(Icons.person_rounded, size: IconSize.button, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              personName(user, fallbackId: record['user_id']),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-            ),
-          ),
-          Text(
-            JalaliFormat.time(checkedInAt),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.moneyIn,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+    });
+});
