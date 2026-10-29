@@ -6,6 +6,7 @@ use App\Models\Bakery;
 use App\Models\FlourAllocation;
 use App\Models\Holiday;
 use App\Models\User;
+use App\Support\FlourQuota;
 use App\Support\Jalali;
 use Database\Seeders\BakerySeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -95,5 +96,28 @@ class DailyFlourQuotaOnPhoneTest extends TestCase
         $response = $this->getJson('/api/v1/flour-allocations/current')->assertOk();
         $response->assertJsonPath('data.periods.0.working_days', 0);
         $this->assertEquals(0, $response->json('data.periods.0.daily_pace_bags'));
+    }
+
+    public function test_انتقال_دستی_از_مانده_کم_نمی‌شود_و_در_سهم_روزانه_هم_پخش_نمی‌شود(): void
+    {
+        $this->allocation(90);
+        // ۹۰ کیسه ماندهٔ اصلاح‌شده + ۱۰۰ کیسهٔ دورهٔ اول؛ دوره‌های آینده هنوز اعتبار ندارند.
+        $response = $this->getJson('/api/v1/flour-allocations/current')->assertOk();
+        $this->assertEquals(190, $response->json('data.carried_balance.remaining_bags'));
+        $this->assertEquals(10, $response->json('data.periods.0.daily_pace_bags'));
+    }
+
+    public function test_ماندهٔ_واقعی_ماه_قبل_با_ثبت_دستی_آن_دوباره_جمع_نمی‌شود(): void
+    {
+        $prior = FlourAllocation::create([
+            'month_start' => Jalali::parse('1405/04/01'), 'month_label' => 'تیر', 'total_bags' => 90,
+        ]);
+        $prior->syncPeriods();
+        $this->allocation(90);
+        $response = $this->getJson('/api/v1/flour-allocations/current')->assertOk();
+        $this->assertEquals(190, $response->json('data.carried_balance.remaining_bags'));
+        $this->travelTo(Jalali::parse('1405/06/06')->setTime(12, 0));
+        // هر سه دورهٔ مرداد آغاز شده‌اند و مانده از بین نرفته است.
+        $this->assertEquals(390, FlourQuota::remainingBags());
     }
 }

@@ -1618,7 +1618,7 @@ class BakeryApi {
 
   /// گردش ماهانهٔ گازوئیل و ماندهٔ منتقل‌شده از ماه‌های قبل.
   Future<Map<String, dynamic>> dieselLedger({String? month}) async {
-    final body = await _client.get('/diesel/ledger',
+    final body = await _client.getCached('/diesel/ledger',
         query: {if (month != null) 'month': month});
     return body['data'] as Map<String, dynamic>;
   }
