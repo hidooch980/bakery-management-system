@@ -6,6 +6,7 @@ import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
+import 'seller_daily_report_screen.dart';
 
 /// What each seller still owes, and the requests waiting on an answer.
 ///
@@ -215,6 +216,13 @@ class _SellerDebtsSectionState extends State<SellerDebtsSection> {
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
                 child: _SellerTile(
                 seller: seller,
+                onReport: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => SellerDailyReportScreen(
+                    api: widget.api,
+                    sellerId: seller['id'] as int,
+                    sellerName: '${seller['name']}',
+                  ),
+                )),
                 onConfirm: () => _confirm(seller),
                 onReject: () => _reject(seller),
                   onSettle: () => _settleDirect(seller),
@@ -233,12 +241,14 @@ class _SellerTile extends StatelessWidget {
     required this.onConfirm,
     required this.onReject,
     required this.onSettle,
+    required this.onReport,
   });
 
   final Map<String, dynamic> seller;
   final VoidCallback onConfirm;
   final VoidCallback onReject;
   final VoidCallback onSettle;
+  final VoidCallback onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -313,6 +323,11 @@ class _SellerTile extends StatelessWidget {
               ),
             ),
 
+          TextButton.icon(
+            onPressed: onReport,
+            icon: const Icon(Icons.receipt_long_outlined),
+            label: const Text('ریز بدهی، سهم آرد و کارتخوان'),
+          ),
           const SizedBox(height: 8),
           // Was `!= null` when this came from a cast; an absent request
           // now arrives as an empty map, which means the same thing here.

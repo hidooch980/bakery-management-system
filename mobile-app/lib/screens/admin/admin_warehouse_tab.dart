@@ -296,14 +296,14 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
         _ => Icons.inventory_rounded,
       };
 
-  /// آرد فقط با تعداد کیسه نمایش داده می‌شود، چون واحد شمارش و سفارش مغازه است.
-  /// نمک و خمیرمایه کیسه ثابت ندارند و با وزن نمایش داده می‌شوند.
+  /// موجودی با وزن و تعداد کیسهٔ تنظیم‌شده کنار هم خوانده می‌شود.
+  /// بدون اندازهٔ بسته، فقط وزن نمایش داده می‌شود.
   static String _balanceLabel(Map<String, dynamic> item) {
     final bags = item['balance_bags'];
 
     if (bags == null) return '${_fmt(item['balance'])} ${item['unit']}';
 
-    return '${_fmt(bags)} کیسه';
+    return '${_fmt(bags)} کیسه • ${_fmt(item['balance'])} ${item['unit']}';
   }
 }
 

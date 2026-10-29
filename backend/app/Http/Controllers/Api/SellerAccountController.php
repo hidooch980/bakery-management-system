@@ -12,6 +12,7 @@ use App\Support\AppCalendar;
 use App\Support\Exclusively;
 use App\Support\Money;
 use App\Support\SameBakery;
+use App\Support\SellerDailyReport;
 use App\Support\SellerSettlement;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,17 @@ use Illuminate\Http\Request;
 class SellerAccountController extends Controller
 {
     use ApiResponse;
+
+    /** گزارش ریز حساب با زمینهٔ سهمیه و تولید؛ این مسیر فقط خواندنی است. */
+    public function dailyReport(Request $request, User $seller): JsonResponse
+    {
+        $data = $request->validate([
+            'from' => ['nullable', 'string', 'max:20'],
+            'to' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        return $this->success(SellerDailyReport::build($seller, $data['from'] ?? null, $data['to'] ?? null));
+    }
 
     /** Every seller with something still open, plus their pending request. */
     public function index(): JsonResponse

@@ -100,6 +100,7 @@ class _InventoryEntriesSheetState extends State<InventoryEntriesSheet> {
               widget.subtitle,
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            const Text('تعداد کیسه، معادل وزن با اندازهٔ فعلی بسته است.'),
             const SizedBox(height: 12),
             FutureBuilder<List<Map<String, dynamic>>>(
               future: _rows,
@@ -202,7 +203,8 @@ class _EntryRow extends StatelessWidget {
             ),
           ),
           Text(
-            '${_fmt(row['quantity'] as num?)} $unit',
+            '${_fmt(row['quantity'] as num?)} $unit'
+            '${row['quantity_bags'] is num ? '\n${_fmt(row['quantity_bags'] as num)} کیسه' : ''}',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: outbound ? AppColors.moneyOut : AppColors.moneyIn,

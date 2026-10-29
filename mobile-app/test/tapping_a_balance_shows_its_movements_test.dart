@@ -65,6 +65,20 @@ void main() {
     expect(find.text('پخت صبح'), findsOneWidget);
   });
 
+  testWidgets('ریز گردش وزن و تعداد کیسه را کنار هم نشان می‌دهد', (tester) async {
+    await _open(tester, rows: _entry.replaceFirst('"quantity":120',
+        '"quantity":120,"quantity_bags":3,"bag_weight_kg":40'));
+    expect(find.text('120 کیلوگرم\n3 کیسه'), findsOneWidget);
+    expect(find.textContaining('اندازهٔ فعلی بسته'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('پاسخ سرور قدیمی کیسهٔ صفر یا ساختگی نشان نمی‌دهد', (tester) async {
+    await _open(tester);
+    expect(find.text('120 کیلوگرم'), findsOneWidget);
+    expect(find.textContaining('0 کیسه'), findsNothing);
+  });
+
   testWidgets('it says which stretch it is showing', (tester) async {
     // A list of entries read against the wrong dates is worse than none.
     await _open(tester, subtitle: '۱۴۰۵/۰۶/۲۱');

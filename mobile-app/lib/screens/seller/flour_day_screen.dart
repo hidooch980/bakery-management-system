@@ -7,7 +7,7 @@ import '../../utils/formatters.dart';
 import '../../utils/json.dart';
 import '../../widgets/jalali_date_range.dart';
 
-/// «گردش روزانه آرد»: یک روز انبار آرد، فقط به کیسه و فقط خواندنی.
+/// «گردش روزانه آرد»: یک روز انبار آرد، به وزن و کیسه و فقط خواندنی.
 ///
 /// موجودی اول روز، آنچه آمد (خرید، دریافت از همکار)، آنچه رفت (خمیر،
 /// پاششی، فروش آرد، تحویل به همکار)، موجودی آخر روز، و ریز حرکت‌ها با
@@ -253,7 +253,7 @@ class _Summary extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    Widget cell(String label, double bags, {Color? color, bool big = false}) {
+    Widget cell(String label, double bags, {Object? kg, Color? color, bool big = false}) {
       return Expanded(
         child: Column(
           children: [
@@ -268,6 +268,7 @@ class _Summary extends StatelessWidget {
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
+            if (kg is num) Text('${kg.toStringAsFixed(kg % 1 == 0 ? 0 : 2)} کیلوگرم'),
             const SizedBox(height: 4),
             Text(
               label,
@@ -288,15 +289,15 @@ class _Summary extends StatelessWidget {
           children: [
             Row(
               children: [
-                cell('موجودی اول روز', _num(data['opening_bags'])),
-                cell('آمد', _num(data['in_bags']), color: AppColors.moneyIn),
-                cell('رفت', _num(data['out_bags']), color: AppColors.moneyOut),
+                cell('موجودی اول روز', _num(data['opening_bags']), kg: data['opening_kg']),
+                cell('آمد', _num(data['in_bags']), kg: data['in_kg'], color: AppColors.moneyIn),
+                cell('رفت', _num(data['out_bags']), kg: data['out_kg'], color: AppColors.moneyOut),
               ],
             ),
             const Divider(height: 26),
             Row(
               children: [
-                cell('موجودی آخر روز', _num(data['closing_bags']), big: true),
+                cell('موجودی آخر روز', _num(data['closing_bags']), kg: data['closing_kg'], big: true),
               ],
             ),
           ],
@@ -417,6 +418,7 @@ class _MovementRow extends StatelessWidget {
               ],
             ),
           ),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(
             // علامت و عدد چپ‌به‌راست جدا می‌شوند تا «کیسه» درست کنارشان بماند.
             signedBags(_num(movement['bags']), incoming: incoming),
@@ -425,6 +427,8 @@ class _MovementRow extends StatelessWidget {
                   color: tone,
                 ),
           ),
+          if (movement['quantity_kg'] is num) Text('${_num(movement['quantity_kg']).toStringAsFixed(2)} کیلوگرم'),
+          ]),
         ],
       ),
     );
