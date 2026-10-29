@@ -144,6 +144,7 @@ final _day = <String, Object?>{
       'reason': 'production',
       'label': 'مصرف در تولید',
       'bags': 5.5,
+      'quantity_kg': 220,
       'note': 'خمیر نوبت صبح',
       'user': 'خمیرگیر'
     },
@@ -318,8 +319,9 @@ void main() {
     expect(find.text('خروجی'), findsOneWidget);
     expect(find.text('06:40'), findsOneWidget);
     expect(find.text(signedBags(20, incoming: true)), findsOneWidget);
+    expect(find.text('220.00 کیلوگرم'), findsOneWidget);
     expect(find.text('\u2066−5.5\u2069 کیسه'), findsNWidgets(2));
-    expect(find.textContaining('کیلو'), findsNothing);
+    expect(find.textContaining('کیلو'), findsOneWidget);
     // فقط خواندنی: هیچ درخواست نوشتنی.
     expect(adapter.seen.every((u) => u.startsWith('GET ')), isTrue);
     expect(tester.takeException(), isNull);

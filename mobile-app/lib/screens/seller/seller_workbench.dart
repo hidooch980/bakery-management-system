@@ -12,6 +12,7 @@ import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import '../../widgets/daily_flour_quota.dart';
 import '../admin/admin_record_sheet.dart';
+import '../admin/inventory_entries_sheet.dart';
 import '../shared/purchase_sheet.dart';
 import 'penalty_requests_section.dart';
 
@@ -1150,7 +1151,12 @@ class _FlourSectionState extends State<_FlourSection> {
         _Heading(
           title: 'انبار',
           icon: Icons.grain_rounded,
-          trailing: _stock == null ? null : _FlourOnHand(stock: _stock!),
+          trailing: _stock == null ? null : InkWell(
+            onTap: () => showInventoryEntries(context, api: widget.api,
+              itemKey: 'flour', itemName: 'آرد', subtitle: 'ریز گردش اخیر'),
+            child: Padding(padding: const EdgeInsets.all(6),
+              child: _FlourOnHand(stock: _stock!)),
+          ),
         ),
         Row(
           children: [

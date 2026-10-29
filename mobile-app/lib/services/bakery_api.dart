@@ -976,6 +976,16 @@ class BakeryApi {
     return BankStatement.fromJson(body['data'] as Map<String, dynamic>);
   }
 
+  /// ریز حساب و گزارش سهمیه، تولید و کارتخوان فروشنده در بازهٔ انتخابی.
+  Future<Map<String, dynamic>> sellerDailyReport(int sellerId,
+      {String? from, String? until}) async {
+    final body = await _client.getCached('/seller-accounts/$sellerId/daily-report', query: {
+      if (from != null) 'from': from,
+      if (until != null) 'to': until,
+    });
+    return body['data'] as Map<String, dynamic>;
+  }
+
   Future<List<Map<String, dynamic>>> sellerAccounts() async {
     final body = await _client.getCached('/seller-accounts');
     final data = body['data'] as Map<String, dynamic>;

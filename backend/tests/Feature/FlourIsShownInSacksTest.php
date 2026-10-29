@@ -89,6 +89,7 @@ class FlourIsShownInSacksTest extends TestCase
 
         $this->get(InventoryMovementResource::getUrl('index'))
             ->assertOk()
-            ->assertSee('46.5 کیسه');
+            ->assertSee('46.5 کیسه')
+            ->assertSee('1،860.000 کیلوگرم');
     }
 }

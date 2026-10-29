@@ -374,7 +374,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
       // «گردش روزانه آرد برای فروشنده»: فقط خواندنی، به کیسه.
       ActionCard(
         title: 'گردش روزانه آرد',
-        subtitle: 'موجودی اول و آخر روز، ورودی و خروجی، به کیسه',
+        subtitle: 'موجودی اول و آخر روز، ورودی و خروجی، به وزن و کیسه',
         icon: Icons.swap_vert_rounded,
         color: AppColors.stock,
         onTap: () => Navigator.of(context).push(

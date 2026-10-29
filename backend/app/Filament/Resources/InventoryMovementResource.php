@@ -142,9 +142,19 @@ class InventoryMovementResource extends Resource
 
                 Tables\Columns\TextColumn::make('quantity')
                     ->label('مقدار')
-                    ->formatStateUsing(fn ($state, InventoryMovement $record) => self::isFlour($record->inventory_item_id)
-                        ? Qty::flourBags((float) $state)
-                        : Qty::format((float) $state, 3).' کیلوگرم')
+                    ->formatStateUsing(function ($state, InventoryMovement $record) {
+                        $weight = $record->item?->bagWeightKg();
+                        $kg = Qty::format((float) $state, 3).' کیلوگرم';
+
+                        if ($weight <= 0) {
+                            return $kg;
+                        }
+                        $bags = self::isFlour($record->inventory_item_id)
+                            ? Qty::flourBags((float) $state)
+                            : Qty::format(round($state / $weight, 2), 2).' کیسه';
+
+                        return $kg.' • '.$bags;
+                    })
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('reason')

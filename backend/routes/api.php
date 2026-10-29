@@ -494,6 +494,7 @@ Route::prefix('v1')->group(function () {
             // Where the figure came from, day by day. «معلوم نیست عدد از
             // کجا آمده» — the page showed one number per seller and
             // nothing behind it.
+            Route::get('/seller-accounts/{seller}/daily-report', [SellerAccountController::class, 'dailyReport']);
             Route::get('/seller-accounts/{seller}/breakdown', [SellerAccountController::class, 'breakdown']);
             // «سابقهٔ تسویه‌های فروشنده» — there was no list: the owner
             // settling somebody at the counter left only a bank movement.

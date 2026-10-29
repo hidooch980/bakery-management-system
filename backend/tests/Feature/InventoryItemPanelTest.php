@@ -50,7 +50,7 @@ class InventoryItemPanelTest extends TestCase
         $this->assertStringContainsString('3.00 کیسه', $html);
     }
 
-    public function test_flour_shows_no_weight_beside_the_sacks(): void
+    public function test_وزن_آرد_کنار_تعداد_کیسه_نمایش_داده_می‌شود(): void
     {
         InventoryItem::ofKey('flour')->move('in', 120, 'purchase');
 
@@ -58,16 +58,12 @@ class InventoryItemPanelTest extends TestCase
             ListInventoryItems::class
         )->html();
 
-        // «کیلو در انبار معنی نداره، فقط کیسه بیاد». The weight next to the
-        // sack count said the same thing twice, in the unit the shop does
-        // not use for flour. This test used to assert the opposite — that
-        // the count came *before* the weight — which was the right rule
-        // while both were shown.
+        // وزن و تعداد کیسه طبق درخواست جدید کنار هم نمایش داده می‌شوند.
         $this->assertStringContainsString('3.00 کیسه', $html);
-        $this->assertStringNotContainsString('120.000 کیلوگرم', $html);
+        $this->assertStringContainsString('120.000 کیلوگرم', $html);
     }
 
-    public function test_salt_reads_in_sacks_too_now_that_its_size_is_known(): void
+    public function test_نمک_با_وزن_و_کیسه_نمایش_داده_می‌شود(): void
     {
         InventoryItem::ofKey('salt')->move('in', 75, 'purchase');
 
@@ -75,10 +71,9 @@ class InventoryItemPanelTest extends TestCase
             ListInventoryItems::class
         )->html();
 
-        // Three sacks of 25. The same rule as flour, for the same reason:
-        // the shop counts sacks, so «کیلو در انبار معنی نداره».
+        // سه کیسهٔ ۲۵کیلویی، همراه با وزن کل.
         $this->assertStringContainsString('3.00 کیسه', $html);
-        $this->assertStringNotContainsString('75.000 کیلوگرم', $html);
+        $this->assertStringContainsString('75.000 کیلوگرم', $html);
     }
 
     public function test_a_good_with_no_sack_size_keeps_its_weight(): void

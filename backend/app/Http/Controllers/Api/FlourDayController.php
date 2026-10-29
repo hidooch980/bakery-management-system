@@ -13,7 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * «گردش روزانه آرد برای فروشنده»: یک روز انبار آرد، فقط به کیسه.
+ * «گردش روزانه آرد برای فروشنده»: یک روز انبار آرد، به وزن و کیسه.
  *
  * موجودی اول روز، ورودی‌ها (خرید، دریافت از همکار، …)، خروجی‌ها (خمیر،
  * پاششی، فروش آرد، تحویل به همکار، …)، موجودی آخر روز، و ریز حرکت‌های
@@ -62,6 +62,7 @@ class FlourDayController extends Controller
                 'reason' => $reason,
                 'label' => InventoryMovement::REASONS[$reason] ?? $reason,
                 'bags' => $bags((float) $group->sum('quantity')),
+                'quantity_kg' => (float) $group->sum('quantity'),
                 'count' => $group->count(),
             ])
             ->sortByDesc('bags')
@@ -75,6 +76,10 @@ class FlourDayController extends Controller
             // فردای امروز هنوز گردشی ندارد.
             'next_date' => $day->copy()->addDay()->lte(now()) ? $day->copy()->addDay()->toDateString() : null,
             'bag_weight_kg' => $bagWeight,
+            'opening_kg' => $openingKg,
+            'in_kg' => $inKg,
+            'out_kg' => $outKg,
+            'closing_kg' => $openingKg + $inKg - $outKg,
             'opening_bags' => $bags($openingKg),
             'in_bags' => $bags($inKg),
             'out_bags' => $bags($outKg),
@@ -88,6 +93,7 @@ class FlourDayController extends Controller
                 'reason' => $m->reason,
                 'label' => $m->reason_label,
                 'bags' => $bags((float) $m->quantity),
+                'quantity_kg' => (float) $m->quantity,
                 'note' => $m->note,
                 'user' => $m->user?->name,
             ])->values(),

@@ -47,7 +47,7 @@ class InventoryController extends Controller
 
     public function movements(Request $request): JsonResponse
     {
-        $movements = InventoryMovement::with(['item:id,key,name,unit', 'user:id,name'])
+        $movements = InventoryMovement::with(['item:id,key,name,unit,bag_weight_kg', 'user:id,name'])
             ->when($request->query('item'), fn ($q, $key) => $q->whereHas(
                 'item', fn ($i) => $i->where('key', $key)
             ))
@@ -74,6 +74,11 @@ class InventoryController extends Controller
                 'item' => $m->item?->only(['key', 'name', 'unit']),
                 'direction' => $m->direction,
                 'quantity' => (float) $m->quantity,
+                // بستهٔ هر کالا از تنظیمات خودش خوانده می‌شود؛ اندازهٔ کیسه آرد از فرمول نانوایی است.
+                'bag_weight_kg' => $m->item?->bagWeightKg(),
+                'quantity_bags' => ($weight = $m->item?->bagWeightKg()) > 0
+                    ? round((float) $m->quantity / $weight, 2)
+                    : null,
                 'reason' => $m->reason,
                 'reason_label' => $m->reason_label,
                 'note' => $m->note,

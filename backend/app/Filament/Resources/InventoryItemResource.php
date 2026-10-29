@@ -121,20 +121,13 @@ class InventoryItemResource extends Resource
 
                 Tables\Columns\TextColumn::make('balance')
                     ->label('موجودی فعلی')
-                    // Sacks alone, where the item has a sack. «کیلو در انبار
-                    // معنی نداره، فقط کیسه بیاد» — this shop counts flour in
-                    // sacks, orders it in sacks and lends it in sacks, and
-                    // the weight beside the count restated the same fact in
-                    // a unit nobody uses at the door.
-                    //
-                    // Salt and yeast arrive in no fixed sack, so there is no
-                    // bag count for them and the weight is all there is.
+                    // وزن و معادل تعداد کیسه با اندازهٔ بستهٔ فعلی، کنار هم.
                     ->state(function (InventoryItem $record) {
                         if ($record->balance_bags === null) {
                             return number_format($record->balance, 3).' '.$record->unit;
                         }
 
-                        return number_format($record->balance_bags, 2).' کیسه';
+                        return number_format($record->balance_bags, 2).' کیسه • '.number_format($record->balance, 3).' '.$record->unit;
                     })
                     ->badge()
                     ->color(fn (InventoryItem $record) => $record->is_low ? 'danger' : 'success')
