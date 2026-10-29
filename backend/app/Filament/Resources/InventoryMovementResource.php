@@ -146,7 +146,14 @@ class InventoryMovementResource extends Resource
                         $weight = $record->item?->bagWeightKg();
                         $kg = Qty::format((float) $state, 3).' کیلوگرم';
 
-                        return $weight > 0 ? $kg.' • '.Qty::format(round($state / $weight, 2), 2).' کیسه' : $kg;
+                        if ($weight <= 0) {
+                            return $kg;
+                        }
+                        $bags = self::isFlour($record->inventory_item_id)
+                            ? Qty::flourBags((float) $state)
+                            : Qty::format(round($state / $weight, 2), 2).' کیسه';
+
+                        return $kg.' • '.$bags;
                     })
                     ->sortable(),
 

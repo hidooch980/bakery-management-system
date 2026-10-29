@@ -15,8 +15,8 @@ use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
- * «گردش روزانه آرد برای فروشنده نمایش داده بشه» — یک روز انبار آرد، فقط
- * به کیسه، فقط خواندنی.
+ * «گردش روزانه آرد برای فروشنده نمایش داده بشه» — یک روز انبار آرد،
+ * به وزن و کیسه، فقط خواندنی.
  */
 class TheSellerSeesTheDaysFlourTest extends TestCase
 {
@@ -95,8 +95,13 @@ class TheSellerSeesTheDaysFlourTest extends TestCase
         $this->assertSame('2026-10-11', $day['next_date']);
         $this->assertFalse($day['is_today']);
 
-        // هیچ کیلویی در پاسخ نیست، جز وزن کیسه برای اطلاع.
-        $this->assertStringNotContainsString('_kg"', str_replace('"bag_weight_kg"', '', json_encode($day)));
+        // وزن دقیق کنار تعداد کیسه برای پنل فروشنده فرستاده می‌شود.
+        $this->assertEquals(400, $day['opening_kg']);
+        $this->assertEquals(240, $day['in_kg']);
+        $this->assertEquals(220, $day['out_kg']);
+        $this->assertEquals(420, $day['closing_kg']);
+        $this->assertEquals(200, $day['movements'][0]['quantity_kg']);
+        $this->assertEquals(200, $day['in'][0]['quantity_kg']);
     }
 
     public function test_today_by_default_and_tomorrow_is_not_offered(): void
