@@ -32,7 +32,9 @@ void main() {
       {'daily_pace_bags': 'NaN', 'working_days': 10},
     ]) {
       await show(tester, data);
-      expect(find.text('سهم روزانه آرد'), findsNothing);
+      expect(find.text('سهم روزانه آرد'), findsOneWidget);
+      expect(find.textContaining('اطلاعات سهم روزانه از سرور دریافت نشد'), findsOneWidget);
+      expect(find.text('0 کیسه در روز کاری'), findsNothing);
     }
   });
 
