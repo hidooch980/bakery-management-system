@@ -321,7 +321,7 @@ void main() {
     expect(find.text(signedBags(20, incoming: true)), findsOneWidget);
     expect(find.text('220.00 کیلوگرم'), findsOneWidget);
     expect(find.text('\u2066−5.5\u2069 کیسه'), findsNWidgets(2));
-    expect(find.textContaining('کیلو'), findsNothing);
+    expect(find.textContaining('کیلو'), findsOneWidget);
     // فقط خواندنی: هیچ درخواست نوشتنی.
     expect(adapter.seen.every((u) => u.startsWith('GET ')), isTrue);
     expect(tester.takeException(), isNull);

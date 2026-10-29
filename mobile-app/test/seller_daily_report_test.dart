@@ -61,6 +61,12 @@ void main() {
     expect(find.text('700'), findsOneWidget);
     expect(find.text('400 نان — ۲٬۰۰۰٬۰۰۰ تومان'), findsOneWidget);
     expect(find.text('۶۰٬۰۰۰ تومان'), findsOneWidget);
+    await tester.ensureVisible(find.byTooltip('بازه گزارش'));
+    await tester.tap(find.byTooltip('بازه گزارش'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('۳۰ روز اخیر'));
+    await tester.pumpAndSettle();
+    expect(find.text('ماندهٔ بدهی فروشنده'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

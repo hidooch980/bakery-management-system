@@ -33,7 +33,9 @@ class _SellerDailyReportScreenState extends State<SellerDailyReportScreen> {
         until: _to,
       );
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   void _period(int days, Map<String, dynamic> report) {
     final end = DateTime.tryParse('${report['to']}') ?? DateTime.now();
