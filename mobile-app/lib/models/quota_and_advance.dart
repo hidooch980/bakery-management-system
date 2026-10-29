@@ -13,10 +13,14 @@ class DieselQuota {
     required this.isTankEmpty,
     this.litresPerBag,
     this.derivationLabel,
+    this.openingQuotaLitres,
+    this.openingTankLitres,
   });
 
   factory DieselQuota.fromJson(Map<String, dynamic> json) => DieselQuota(
         monthLabel: json['month_label'] as String? ?? '',
+        openingQuotaLitres: json['opening_quota_litres'] == null ? null : _d(json['opening_quota_litres']),
+        openingTankLitres: json['opening_tank_litres'] == null ? null : _d(json['opening_tank_litres']),
         totalLitres: _d(json['total_litres']),
         deliveredLitres: _d(json['delivered_litres']),
         remainingLitres: _d(json['remaining_litres']),
@@ -32,6 +36,8 @@ class DieselQuota {
         derivationLabel: json['derivation_label'] as String?,
       );
 
+  final double? openingQuotaLitres;
+  final double? openingTankLitres;
   final String monthLabel;
   final double totalLitres;
   final double deliveredLitres;

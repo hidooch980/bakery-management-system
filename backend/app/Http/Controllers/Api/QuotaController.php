@@ -8,6 +8,7 @@ use App\Models\DieselAllocation;
 use App\Models\DieselDelivery;
 use App\Models\FlourAllocation;
 use App\Support\AppCalendar;
+use App\Support\DieselLedger;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Traits\ApiResponse;
@@ -39,6 +40,13 @@ class QuotaController extends Controller
                 ->orderByDesc('received_on')->orderByDesc('id')->limit(20)->get()
                 ->map(fn (DieselDelivery $d) => $this->deliveryPayload($d)),
         ]);
+    }
+
+    public function dieselLedger(Request $request): JsonResponse
+    {
+        $data = $request->validate(['month' => ['nullable', 'string', 'max:20']]);
+
+        return $this->success(DieselLedger::month($data['month'] ?? null));
     }
 
     public function storeDieselDelivery(Request $request): JsonResponse
@@ -172,6 +180,8 @@ class QuotaController extends Controller
             'month_label' => $d->month_label,
             'total_litres' => (float) $d->total_litres,
             'carryover_litres' => (float) $d->carryover_litres,
+            'opening_quota_litres' => DieselLedger::quotaOpening($d->quotaRange()[0], $d),
+            'opening_tank_litres' => DieselLedger::tankOpening($d->quotaRange()[0])['litres'],
             'available_litres' => $d->available_litres,
             'delivered_litres' => $d->delivered_litres,
             'remaining_litres' => $d->remaining_litres,

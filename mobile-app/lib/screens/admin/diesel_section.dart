@@ -6,6 +6,7 @@ import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
+import 'diesel_ledger_screen.dart';
 import 'monthly_quota_button.dart';
 
 typedef _DieselData = ({DieselQuota? quota, List<DieselDelivery> deliveries});
@@ -96,6 +97,13 @@ class _DieselSectionState extends State<DieselSection> {
     }
   }
 
+  Widget _ledgerButton() => TextButton.icon(
+    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => DieselLedgerScreen(api: widget.api))),
+    icon: const Icon(Icons.receipt_long_outlined),
+    label: const Text('گردش ماهانه و انتقال مانده'),
+  );
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_DieselData>(
@@ -139,6 +147,7 @@ class _DieselSectionState extends State<DieselSection> {
                 label: 'تعریف سهمیه',
                 value: 'ماه و تعداد کیسه را از دکمه زیر ثبت کنید',
               ),
+              _ledgerButton(),
               MonthlyQuotaButton(api: widget.api, onSaved: _reload),
               if (deliveries.isNotEmpty) ...[
                 const Divider(height: 24),
@@ -163,11 +172,14 @@ class _DieselSectionState extends State<DieselSection> {
             label: const Text('ثبت تحویل'),
           ),
           children: [
+            _ledgerButton(),
             MonthlyQuotaButton(api: widget.api, onSaved: _reload),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
               child: _QuotaMeter(quota: quota),
             ),
+            if (quota.openingQuotaLitres != null)
+              AdminRow(label: 'مانده سهمیه از ماه قبل', value: '${_litres(quota.openingQuotaLitres!)} لیتر'),
             AdminRow(
               label: 'سهمیه ماه',
               value: '${_litres(quota.totalLitres)} لیتر',
@@ -193,6 +205,8 @@ class _DieselSectionState extends State<DieselSection> {
               value: '${_litres(quota.bagsBaked)} کیسه'
                   ' · ${_litres(quota.consumedLitres)} لیتر سوخته',
             ),
+            if (quota.openingTankLitres != null)
+              AdminRow(label: 'مانده باک از ماه قبل (تخمینی)', value: '${_litres(quota.openingTankLitres!)} لیتر'),
             AdminRow(
               label: 'مانده باک (تخمینی)',
               value: quota.isTankEmpty
