@@ -7,6 +7,7 @@ import '../../services/bakery_api.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
+import '../../widgets/daily_flour_quota.dart';
 import '../../widgets/admin_detail_group.dart';
 import '../shared/purchase_sheet.dart';
 import 'admin_home_screen.dart';
@@ -394,6 +395,7 @@ class _PeriodCard extends StatelessWidget {
                   ?.copyWith(color: scheme.onSurfaceVariant),
             ),
             const SizedBox(height: 14),
+            DailyFlourQuota(period: period),
             ClipRRect(
               borderRadius: BorderRadius.circular(Corner.hair),
               child: LinearProgressIndicator(

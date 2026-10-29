@@ -11,9 +11,17 @@ class DailyFlourQuota extends StatelessWidget {
     final bags = num.tryParse('${period['daily_pace_bags']}');
     final days = int.tryParse('${period['working_days']}');
 
-    // پاسخ سرور قدیمی سهم روزانه ندارد؛ مقدار نامعلوم صفر نمایش داده نمی‌شود.
-    if (bags == null || !bags.isFinite || days == null) {
-      return const SizedBox.shrink();
+    // پاسخ قدیمی یا نامعتبر، با صفر واقعی سهمیه اشتباه نمی‌شود.
+    if (bags == null || !bags.isFinite || bags < 0 || days == null || days < 0) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('سهم روزانه آرد'),
+          SizedBox(height: 6),
+          Text('اطلاعات سهم روزانه از سرور دریافت نشد؛ به‌روزرسانی سرور را بررسی کنید.'),
+          Divider(height: 26),
+        ],
+      );
     }
 
     final theme = Theme.of(context);
