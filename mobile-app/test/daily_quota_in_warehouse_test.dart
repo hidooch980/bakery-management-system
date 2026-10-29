@@ -27,7 +27,7 @@ class _Api extends BakeryApi {
   @override
   Future<({List<FlourSale> sales, int count, double totalBags, String totalFormatted})>
       todayFlourSales() async =>
-          (sales: <FlourSale>[], count: 0, totalBags: 0, totalFormatted: '۰ تومان');
+          (sales: <FlourSale>[], count: 0, totalBags: 0.0, totalFormatted: '۰ تومان');
 
   @override
   Future<Map<String, dynamic>?> currentFlourAllocation() async => {
