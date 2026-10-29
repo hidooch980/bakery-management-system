@@ -48,6 +48,7 @@ GET api/v1/customers                                        (any signed-in)
 GET api/v1/customers/types                                  (any signed-in)
 GET api/v1/customers/{customer}/interactions                admin
 GET api/v1/devices                                          (any signed-in)
+GET api/v1/diesel/ledger                                    admin, seller
 GET api/v1/diesel/quota                                     admin, seller
 GET api/v1/dough-entries/my-history                         admin, dough_maker, seller
 GET api/v1/dough-entries/pending                            admin, chane_gir, seller

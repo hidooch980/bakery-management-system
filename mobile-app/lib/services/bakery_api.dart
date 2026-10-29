@@ -1616,6 +1616,13 @@ class BakeryApi {
     );
   }
 
+  /// گردش ماهانهٔ گازوئیل و ماندهٔ منتقل‌شده از ماه‌های قبل.
+  Future<Map<String, dynamic>> dieselLedger({String? month}) async {
+    final body = await _client.getCached('/diesel/ledger',
+        query: {if (month != null) 'month': month});
+    return body['data'] as Map<String, dynamic>;
+  }
+
   /// Records a tanker. The warning comes back set when it took the month
   /// past its quota, so it can be said while the driver is still there.
   ///

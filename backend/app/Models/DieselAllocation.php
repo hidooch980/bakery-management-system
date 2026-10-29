@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\RecordsAudit;
 use App\Support\AppCalendar;
+use App\Support\DieselLedger;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
 use Illuminate\Database\Eloquent\Model;
@@ -188,7 +189,9 @@ class DieselAllocation extends Model
     /** Quota plus anything carried over: what the shop may draw this month. */
     public function getAvailableLitresAttribute(): float
     {
-        return round((float) $this->total_litres + (float) $this->carryover_litres, 2);
+        [$from] = $this->quotaRange();
+
+        return round((float) $this->total_litres + DieselLedger::quotaOpening($from, $this), 2);
     }
 
     /** Litres actually delivered inside this month. */
@@ -246,7 +249,10 @@ class DieselAllocation extends Model
      */
     public function getInTankLitresAttribute(): float
     {
-        return round($this->delivered_litres - $this->consumed_litres, 2);
+        [$from] = $this->quotaRange();
+        $opening = DieselLedger::tankOpening($from)['litres'];
+
+        return round($opening + $this->delivered_litres - $this->consumed_litres, 2);
     }
 
     /** The tank is estimated to be dry, whatever the quota still allows. */

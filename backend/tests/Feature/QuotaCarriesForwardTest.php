@@ -177,26 +177,17 @@ class QuotaCarriesForwardTest extends TestCase
         $this->assertCount(1, $this->quotaIssues());
     }
 
-    public function test_a_hand_typed_carryover_is_not_counted_twice(): void
+    public function test_انتقال_دستی_در_دورهٔ_قدیمی_یک_بار_شمرده_می‌شود(): void
     {
-        // A month's periods are cut from total + carryover_bags. The
-        // balance already carries last month's leftover forward, so
-        // counting the typed figure as well would credit the same flour
-        // twice. It has been zero in every real record; this keeps it
-        // harmless if it ever is not.
-        $bagWeight = 40.0;
-        $this->period(
-            allocatedKg: 4000.0,
+        // ساختار قدیمی: ۱۰۰ کیسه سهمیه و ۱۰ کیسه انتقال در دورهٔ ۱۱۰کیسه‌ای ذخیره شده است.
+        $allocation = $this->period(
+            allocatedKg: 4400.0,
             usedKg: 0.0,
             startedDaysAgo: 7,
             carryoverBags: 10,
         );
-
-        $this->assertEqualsWithDelta(
-            4000.0 - (10 * $bagWeight),
-            FlourQuota::balance()['allocated'],
-            0.01,
-        );
+        $allocation->update(['total_bags' => 100]);
+        $this->assertEqualsWithDelta(4400, FlourQuota::balance()['allocated'], 0.01);
     }
 
     public function test_a_shop_with_no_quota_recorded_says_nothing(): void

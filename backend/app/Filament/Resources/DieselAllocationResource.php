@@ -78,7 +78,7 @@ class DieselAllocationResource extends Resource
                         ->numeric()
                         ->minValue(0)
                         ->default(0)
-                        ->helperText('اگر سهمیه استفاده‌نشده ماه قبل منتقل شده.'),
+                        ->helperText('صفر: انتقال خودکار از گردش قبل؛ عدد مثبت: اصلاح ماندهٔ ابتدای این ماه، بدون دوباره‌شماری ماندهٔ قبلی.'),
 
                     Forms\Components\TextInput::make('note')
                         ->label('توضیح')

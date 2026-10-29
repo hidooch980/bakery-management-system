@@ -266,6 +266,7 @@ Route::prefix('v1')->group(function () {
             // the litres off a docket had to be carried back to a desk to
             // be entered, and by then the docket was in somebody's pocket.
             Route::get('/diesel/quota', [QuotaController::class, 'dieselQuota']);
+            Route::get('/diesel/ledger', [QuotaController::class, 'dieselLedger']);
             Route::patch('/diesel/quota', [QuotaController::class, 'updateDieselQuota']);
             Route::post('/diesel/deliveries', [QuotaController::class, 'storeDieselDelivery']);
             Route::delete('/diesel/deliveries/{delivery}', [QuotaController::class, 'destroyDieselDelivery']);
