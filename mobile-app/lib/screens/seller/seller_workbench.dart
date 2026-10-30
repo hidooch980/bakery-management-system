@@ -11,6 +11,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import '../../widgets/daily_flour_quota.dart';
+import '../../widgets/daily_flour_period_card.dart';
 import '../admin/admin_record_sheet.dart';
 import '../admin/inventory_entries_sheet.dart';
 import '../shared/purchase_sheet.dart';
@@ -852,6 +853,7 @@ class _QuotaSection extends StatefulWidget {
 }
 
 class _QuotaSectionState extends State<_QuotaSection> {
+  Map<String, dynamic>? _daily;
   Map<String, dynamic>? _period;
   Map<String, dynamic>? _whole;
   String? _label;
@@ -886,6 +888,8 @@ class _QuotaSectionState extends State<_QuotaSection> {
 
       if (!mounted) return;
       setState(() {
+        final daily = allocation?['daily_period'];
+        _daily = daily is Map<String, dynamic> ? daily : null;
         _period = current;
         // Already in the same payload — the seller has been fetching it
         // all along and nothing on their screen read it.
@@ -909,6 +913,8 @@ class _QuotaSectionState extends State<_QuotaSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        DailyFlourPeriodCard(period: _daily),
+        const SizedBox(height: 14),
         _Heading(
           title: 'سهمیه دوره',
           icon: Icons.confirmation_number_outlined,

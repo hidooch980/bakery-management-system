@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ChaneEntry;
 use App\Models\FlourAllocation;
+use App\Models\FlourAllocationPeriod;
+use App\Models\Holiday;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
 use App\Support\FlourQuota;
@@ -159,6 +162,46 @@ class FlourAllocationController extends Controller
                 'is_current' => $current !== null && $current->id === $p->id,
             ]),
             'whole_period' => $this->wholePeriod($allocation),
+            'daily_period' => $current ? $this->dailyPeriod($current, $highlightDate) : null,
+        ];
+    }
+
+    /** نمای امروز از سهم دوره است؛ دوره یا اعتبار تازه‌ای در دفتر ساخته نمی‌شود. */
+    private function dailyPeriod(FlourAllocationPeriod $period, $date): array
+    {
+        $holiday = Holiday::isHoliday($date);
+        $daily = new FlourAllocationPeriod([
+            'starts_on' => $date->copy()->startOfDay(),
+            'ends_on' => $date->copy()->startOfDay(),
+            'allocated_kg' => $holiday ? 0 : $period->daily_pace_kg,
+        ]);
+        $formula = DoughFormula::fromBakery();
+        $allocated = (float) $daily->allocated_kg;
+        $used = $daily->used_kg;
+        $target = $formula->bagWeightKg > 0
+            ? (int) round($allocated / $formula->bagWeightKg * $formula->naninoPerBag) : 0;
+        $sold = $daily->card_bread_count;
+
+        return [
+            'date' => $date->toDateString(),
+            'date_label' => AppCalendar::date($date),
+            'period_label' => $period->label,
+            'is_holiday' => $holiday,
+            'allocated_bags' => $this->inBags($allocated),
+            'allocated_kg' => $allocated,
+            'used_bags' => $this->inBags($used),
+            'used_kg' => $used,
+            'remaining_bags' => $this->inBags($allocated - $used),
+            'allocated_bread_count' => $target,
+            'card_bread_count' => $sold,
+            'bread_remainder' => $target - $sold,
+            'card_amount_formatted' => $daily->card_amount_formatted,
+            // چانه از تولید شمرده می‌شود تا فروش‌های چندردیفی آن را تکرار نکنند.
+            'chane_count' => (int) ChaneEntry::whereBetween('created_at', [
+                $date->copy()->startOfDay(), $date->copy()->endOfDay(),
+            ])->sum('chane_count'),
+            'source_note' => 'آمار کل نانوایی؛ فروش کارتخوان ثبت‌شده داخل اپ است، نه دریافت مستقیم از دستگاه.',
+            'quota_note' => 'سهم روز کاری از سهمیه دوره است؛ مانده کل انبار و بدهی مالی نیست. معادل نان با ضریب فعلی محاسبه شده است.',
         ];
     }
 

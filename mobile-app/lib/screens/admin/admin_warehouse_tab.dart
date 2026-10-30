@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common.dart';
 import '../../widgets/daily_flour_quota.dart';
+import '../../widgets/daily_flour_period_card.dart';
 import '../../widgets/admin_detail_group.dart';
 import '../shared/purchase_sheet.dart';
 import 'admin_home_screen.dart';
@@ -219,6 +220,14 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
 
               const SizedBox(height: 22),
 
+              if (quota != null) ...[
+                DailyFlourPeriodCard(
+                  period: quota['daily_period'] is Map<String, dynamic>
+                      ? quota['daily_period'] as Map<String, dynamic>
+                      : null,
+                ),
+                const SizedBox(height: 14),
+              ],
               if (quota == null)
                 const EmptyState(
                   icon: Icons.calendar_today_rounded,
