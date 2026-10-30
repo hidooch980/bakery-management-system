@@ -33,6 +33,18 @@ class _Api extends BakeryApi {
   Future<Map<String, dynamic>?> currentFlourAllocation() async => {
         'month_label': 'آبان ۱۴۰۵',
         'total_bags': 347,
+        if (!oldServer) 'daily_period': {
+          'date': '2026-10-30',
+          'date_label': '۱۴۰۵/۰۸/۰۸',
+          'period_label': 'دوره اول',
+          'allocated_bags': 11.57,
+          'allocated_kg': 462.8,
+          'used_bags': 2,
+          'used_kg': 80,
+          'remaining_bags': 9.57,
+          'chane_count': 140,
+          'card_bread_count': 100,
+        },
         'periods': [period('دوره اول', 115.7, 11.57, 10)],
         'whole_period': period('کل ماه', 347, 12.85, 27),
       };
@@ -70,6 +82,18 @@ void main() {
     expect(find.text('سهم روزانه آرد'), findsNWidgets(2));
     expect(find.textContaining('اطلاعات سهم روزانه از سرور دریافت نشد'), findsNWidgets(2));
     expect(find.text('0 کیسه در روز کاری'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('دوره روزانه کارت مستقل با مصرف و چانه و کارتخوان همان روز دارد',
+      (tester) async {
+    await show(tester);
+    expect(find.text('دوره روزانه'), findsOneWidget);
+    expect(find.text('۱۴۰۵/۰۸/۰۸ • دوره اول'), findsOneWidget);
+    expect(find.text('11.57 کیسه • 462.80 کیلوگرم'), findsOneWidget);
+    expect(find.text('2 کیسه • 80 کیلوگرم'), findsOneWidget);
+    expect(find.text('140 چانه'), findsOneWidget);
+    expect(find.text('100 نان'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

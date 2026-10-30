@@ -384,4 +384,26 @@ void main() {
     expect(find.text('23295'), findsOneWidget);
   });
 
+  testWidgets('فروشنده دوره روزانه مستقل را کنار دوره جاری می‌بیند', (tester) async {
+    final allocation = _allocation(allocated: 24000, sold: 19600);
+    allocation['daily_period'] = {
+      'date_label': '۱۴۰۵/۰۸/۰۸',
+      'period_label': 'دوره اول',
+      'allocated_bags': 10,
+      'allocated_kg': 400,
+      'used_bags': 2,
+      'used_kg': 80,
+      'remaining_bags': 8,
+      'chane_count': 150,
+      'card_bread_count': 120,
+    };
+    await pump(tester, allocation);
+    expect(find.text('دوره روزانه'), findsOneWidget);
+    expect(find.text('10 کیسه • 400 کیلوگرم'), findsOneWidget);
+    expect(find.text('150 چانه'), findsOneWidget);
+    expect(find.text('120 نان'), findsOneWidget);
+    expect(find.text('سهمیه دوره'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
 }
