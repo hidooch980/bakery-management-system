@@ -21,7 +21,24 @@ class SellerAccount {
     required this.settleable,
     required this.settleableFormatted,
     this.creditSales = const [],
-  });
+    this.prepaid = 0,
+    this.prepaidFormatted = '',
+    double? balance,
+    String? balanceFormatted,
+    this.debtAlert,
+  })  : balance = balance ?? total,
+        balanceFormatted = balanceFormatted ?? totalFormatted;
+
+  /// Money already handed over that has not closed a whole sale yet.
+  final double prepaid;
+  final String prepaidFormatted;
+
+  /// What is still owed once [prepaid] is taken off — the figure to show.
+  final double balance;
+  final String balanceFormatted;
+
+  /// The shop's warning when the debt is over its limit, or null.
+  final String? debtAlert;
 
   final double cash;
   final String cashFormatted;
@@ -49,7 +66,7 @@ class SellerAccount {
 
   final List<SellerCreditSale> creditSales;
 
-  bool get isClear => total == 0;
+  bool get isClear => total == 0 && balance == 0 && !hasCredit;
 
   bool get hasDifference => difference != 0;
 
@@ -72,6 +89,13 @@ class SellerAccount {
         entries: _int(json['entries']),
         settleable: _double(json['settleable']),
         settleableFormatted: '${json['settleable_formatted'] ?? ''}',
+        prepaid: _double(json['prepaid']),
+        prepaidFormatted: '${json['prepaid_formatted'] ?? ''}',
+        balance: json['balance'] == null ? null : _double(json['balance']),
+        balanceFormatted: json['balance_formatted'] as String?,
+        debtAlert: (json['debt_alert'] is Map)
+            ? '${(json['debt_alert'] as Map)['message'] ?? ''}'
+            : null,
         creditSales: ((json['credit_sales'] as List?) ?? const [])
             .whereType<Map>()
             .map((e) => SellerCreditSale.fromJson(

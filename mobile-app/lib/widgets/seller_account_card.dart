@@ -8,6 +8,7 @@ import '../services/bakery_api.dart';
 import '../theme/app_theme.dart';
 import '../utils/formatters.dart';
 import 'common.dart';
+import '../screens/shared/seller_ledger_screen.dart';
 
 /// What the seller still answers for, shown to them rather than only to the
 /// admin — so a shortfall or an uncollected debt is something they can act
@@ -141,7 +142,7 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
                 ),
               ),
               Text(
-                account.totalFormatted,
+                account.balanceFormatted,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: warn,
@@ -150,6 +151,33 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
             ],
           ),
 
+          if (account.debtAlert != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              key: const Key('seller-debt-alert'),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.moneyOut.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(Corner.control),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      size: IconSize.row, color: AppColors.moneyOut),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      account.debtAlert!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.moneyOut,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           if (account.cash > 0)
             _AccountLine(
@@ -171,12 +199,34 @@ class _SellerAccountCardState extends State<SellerAccountCard> {
               value: account.shortfallFormatted,
               isProblem: true,
             ),
+          if (account.prepaid > 0)
+            _AccountLine(
+              icon: Icons.savings_rounded,
+              label: 'پیش‌پرداخت (کم شده)',
+              value: account.prepaidFormatted,
+            ),
           if (account.hasCredit)
             _AccountLine(
               icon: Icons.schedule_rounded,
-              label: 'نسیه وصول‌نشده',
+              label: 'نسیهٔ مشتری‌ها (جدا از بدهی شما)',
               value: account.creditFormatted,
             ),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              key: const Key('open-my-ledger'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SellerLedgerScreen(
+                    load: widget.api.myLedger,
+                    title: 'دفتر حساب من',
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.menu_book_rounded, size: IconSize.row),
+              label: const Text('دفتر حساب من'),
+            ),
+          ),
 
           if (account.creditSales.isNotEmpty) ...[
             const SizedBox(height: 6),

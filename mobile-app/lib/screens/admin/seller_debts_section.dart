@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
 import 'admin_home_screen.dart';
 import 'seller_daily_report_screen.dart';
+import '../shared/seller_ledger_screen.dart';
 
 /// What each seller still owes, and the requests waiting on an answer.
 ///
@@ -223,6 +224,12 @@ class _SellerDebtsSectionState extends State<SellerDebtsSection> {
                     sellerName: '${seller['name']}',
                   ),
                 )),
+                onLedger: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => SellerLedgerScreen(
+                    load: () => widget.api.sellerLedger(seller['id'] as int),
+                    title: 'دفتر حساب ${seller['name']}',
+                  ),
+                )),
                 onConfirm: () => _confirm(seller),
                 onReject: () => _reject(seller),
                   onSettle: () => _settleDirect(seller),
@@ -242,6 +249,7 @@ class _SellerTile extends StatelessWidget {
     required this.onReject,
     required this.onSettle,
     required this.onReport,
+    required this.onLedger,
   });
 
   final Map<String, dynamic> seller;
@@ -249,6 +257,7 @@ class _SellerTile extends StatelessWidget {
   final VoidCallback onReject;
   final VoidCallback onSettle;
   final VoidCallback onReport;
+  final VoidCallback onLedger;
 
   @override
   Widget build(BuildContext context) {
@@ -323,10 +332,31 @@ class _SellerTile extends StatelessWidget {
               ),
             ),
 
-          TextButton.icon(
-            onPressed: onReport,
-            icon: const Icon(Icons.receipt_long_outlined),
-            label: const Text('ریز بدهی، سهم آرد و کارتخوان'),
+          if (seller['ledger_warning'] is String)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '⚠️ ${seller['ledger_warning']}',
+                key: const Key('seller-ledger-warning'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.moneyOut,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+          Wrap(
+            children: [
+              TextButton.icon(
+                onPressed: onLedger,
+                icon: const Icon(Icons.menu_book_rounded),
+                label: const Text('دفتر حساب'),
+              ),
+              TextButton.icon(
+                onPressed: onReport,
+                icon: const Icon(Icons.receipt_long_outlined),
+                label: const Text('ریز بدهی، سهم آرد و کارتخوان'),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           // Was `!= null` when this came from a cast; an absent request

@@ -846,11 +846,15 @@ class _RecordSaleSheetState extends State<RecordSaleSheet> {
 
       if (!mounted) return;
       Navigator.pop(context, true);
+      final warning = queued ? null : widget.api.lastSaleWarning;
       showMessage(
         context,
         queued
             ? 'اینترنت وصل نیست؛ فروش ذخیره شد و با اتصال بعدی ارسال می‌شود.'
-            : 'فروش ثبت شد.',
+            : warning == null
+                ? 'فروش ثبت شد.'
+                : 'فروش ثبت شد. $warning',
+        isError: warning != null,
       );
     } on ApiException catch (e) {
       if (!mounted) return;
