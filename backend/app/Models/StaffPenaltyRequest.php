@@ -164,6 +164,8 @@ class StaffPenaltyRequest extends Model
                 'staff_adjustment_id' => $adjustment->id,
             ]);
 
+            DB::afterCommit(fn () => \App\Support\StaffPenaltySms::approved($this, $by));
+
             return $adjustment;
         });
     }
@@ -196,6 +198,7 @@ class StaffPenaltyRequest extends Model
         }
         if (! $adjustment->isWaived()) {
             $adjustment->update(['waived_at' => now(), 'waived_by' => $by->id]);
+            \App\Support\StaffPenaltySms::cancelled($this, $by);
         }
     }
 

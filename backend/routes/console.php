@@ -42,3 +42,32 @@ Schedule::command('sanctum:prune-expired --hours=24')
 // write it names; after that it is a copy of a response nobody reads.
 Schedule::command('idempotency:prune')
     ->dailyAt('04:20');
+
+/*
+ * Automatic alerts. Each one checks its own switch in «تنظیمات پیام‌ها»
+ * and does nothing while it is off — which is how they all start.
+ */
+// Saturday morning: each partner's flour account, in bags, by SMS.
+Schedule::command('partners:weekly-sms')
+    ->weeklyOn(6, '09:00')
+    ->timezone('Asia/Tehran')
+    ->withoutOverlapping();
+
+// A seller owing more than the threshold: the manager hears on Bale.
+Schedule::command('sellers:debt-alert')
+    ->dailyAt('10:00')
+    ->timezone('Asia/Tehran')
+    ->withoutOverlapping();
+
+// School and customer credit that has sat too long, or over its limit.
+Schedule::command('customers:credit-reminder')
+    ->dailyAt('10:05')
+    ->timezone('Asia/Tehran')
+    ->withoutOverlapping();
+
+// Yesterday's card sales against the card reader's deposit, which the
+// bank pays in and texts the following morning.
+Schedule::command('bank:card-reader-check')
+    ->dailyAt('11:00')
+    ->timezone('Asia/Tehran')
+    ->withoutOverlapping();

@@ -30,11 +30,12 @@ class Customer extends Model
         'address',
         'is_active',
         'note',
+        'credit_limit',
     ];
 
     protected function casts(): array
     {
-        return ['is_active' => 'boolean'];
+        return ['is_active' => 'boolean', 'credit_limit' => 'decimal:2'];
     }
 
     public function sales()
