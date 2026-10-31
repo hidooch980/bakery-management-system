@@ -219,7 +219,7 @@ class WhereTheFlourWentTest extends TestCase
         Livewire::test(Reports::class)
             ->assertOk()
             ->assertSee('آرد کجا رفت')
-            ->assertSee('مصرف در تولید');
+            ->assertSee('آرد خمیرگیری');
     }
 
     public function test_a_range_with_no_movement_says_so_without_dividing_by_nothing(): void

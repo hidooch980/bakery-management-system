@@ -88,6 +88,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
           final today = keyedGroup(dashboard['today']);
           final queues = keyedGroup(dashboard['queues']);
           final staff = keyedGroup(dashboard['staff']);
+          final flourToday = keyedGroup(dashboard['flour_today']);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
@@ -144,6 +145,31 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                       value: '${_num(today['attendance_count'])} نفر',
                       icon: Icons.how_to_reg_rounded,
                       color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+
+              // آرد امروز به کیسه: خمیرگیری و پاششی جدا.
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatTile(
+                      label: 'آرد خمیرگیری',
+                      value: flourBags(_bags(flourToday['dough_bags'])),
+                      icon: Icons.blender_rounded,
+                      color: AppColors.stock,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: StatTile(
+                      key: const Key('spray-flour-today'),
+                      label: 'آرد پاششی',
+                      value: flourBags(_bags(flourToday['spray_bags'])),
+                      icon: Icons.grain_rounded,
+                      color: AppColors.attention,
                     ),
                   ),
                 ],
@@ -318,3 +344,6 @@ class _QuickRecordButton extends StatelessWidget {
     );
   }
 }
+
+double _bags(dynamic value) =>
+    value is num ? value.toDouble() : double.tryParse('$value') ?? 0;

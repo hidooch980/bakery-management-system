@@ -73,7 +73,7 @@
                 <x-slot name="description">همه مبالغ به {{ $this->currencyLabel() }}</x-slot>
 
                 <x-bakery.report-table
-                    :columns="['بازه', 'درآمد', 'نان', 'آرد', 'هزینه', 'حقوق', 'سود']"
+                    :columns="['بازه', 'درآمد', 'نان', 'آرد', 'هزینه', 'حقوق', 'خرید', 'سود']"
                     :rows="$financial->count()"
                     empty="در این بازه رکوردی ثبت نشده است."
                 >
@@ -85,6 +85,7 @@
                             <td class="py-2.5 pe-3 tabular-nums text-gray-500 dark:text-gray-400">{{ $this->money($row['income_flour']) }}</td>
                             <td class="py-2.5 pe-3 tabular-nums">{{ $row['expense_formatted'] }}</td>
                             <td class="py-2.5 pe-3 tabular-nums text-gray-500 dark:text-gray-400">{{ $this->money($row['expense_salaries']) }}</td>
+                            <td class="py-2.5 pe-3 tabular-nums text-gray-500 dark:text-gray-400">{{ $this->money($row['expense_purchases']) }}</td>
                             <td @class([
                                 'py-2.5 pe-3 font-semibold tabular-nums',
                                 'text-success-600 dark:text-success-400' => $row['profit'] >= 0,
@@ -100,6 +101,7 @@
                         <td class="py-3 pe-3 tabular-nums">{{ $this->money((float) $financial->sum('income_flour')) }}</td>
                         <td class="py-3 pe-3 tabular-nums">{{ $this->money($expense) }}</td>
                         <td class="py-3 pe-3 tabular-nums">{{ $this->money((float) $financial->sum('expense_salaries')) }}</td>
+                        <td class="py-3 pe-3 tabular-nums">{{ $this->money((float) $financial->sum('expense_purchases')) }}</td>
                         <td @class([
                             'py-3 pe-3 tabular-nums',
                             'text-success-600 dark:text-success-400' => $profit >= 0,
@@ -180,7 +182,7 @@
                     :value="\App\Support\Qty::flourBags((float) $consumption->sum('flour_used_kg'))"
                     icon="heroicon-m-fire"
                     tone="warning"
-                    caption="خمیرگیری و پاششی"
+                    :caption="'خمیرگیری '.\App\Support\Qty::flourBags((float) $consumption->sum('flour_production_kg')).' • پاششی '.\App\Support\Qty::flourBags((float) $consumption->sum('flour_spray_kg'))"
                 />
 
                 <x-bakery.figure

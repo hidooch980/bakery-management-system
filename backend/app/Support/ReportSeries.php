@@ -9,6 +9,7 @@ use App\Models\FlourSale;
 use App\Models\Income;
 use App\Models\InventoryItem;
 use App\Models\InventoryMovement;
+use App\Models\Purchase;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use Illuminate\Support\Carbon;
@@ -35,9 +36,13 @@ class ReportSeries
         $other = Ledger::dailySums(Income::query(), 'received_on', 'amount', $from, $to);
         $spent = Ledger::dailySums(Expense::query(), 'spent_on', 'amount', $from, $to);
         $wages = Ledger::dailySums(SalaryPayment::paid(), 'paid_on', 'net_amount', $from, $to);
+        // Purchase invoices are spending as well; Ledger::totalExpenses and
+        // the day-by-day trend counted them and this series did not, so a
+        // month here read 16 million toman better than on «سود و زیان».
+        $bought = Ledger::dailySums(Purchase::query(), 'purchased_on', 'amount', $from, $to);
 
         return collect(PeriodBuckets::build($from, $to, $granularity))
-            ->map(function (array $bucket) use ($bread, $flourSold, $other, $spent, $wages) {
+            ->map(function (array $bucket) use ($bread, $flourSold, $other, $spent, $wages, $bought) {
                 $from = $bucket['from'];
                 $to = $bucket['to'];
 
@@ -57,7 +62,8 @@ class ReportSeries
 
                 $recorded = Ledger::sumDays($spent, $from, $to);
                 $salaries = Ledger::sumDays($wages, $from, $to);
-                $expense = round($recorded + $salaries, 2);
+                $purchases = Ledger::sumDays($bought, $from, $to);
+                $expense = round($recorded + $salaries + $purchases, 2);
                 $profit = round($income['total'] - $expense, 2);
 
                 return [
@@ -74,6 +80,7 @@ class ReportSeries
                     'expense_formatted' => Money::format($expense),
                     'expense_recorded' => round($recorded, 2),
                     'expense_salaries' => round($salaries, 2),
+                    'expense_purchases' => round($purchases, 2),
                     'profit' => $profit,
                     'profit_formatted' => Money::format($profit),
                 ];
@@ -96,11 +103,17 @@ class ReportSeries
         // Six questions asked once each over the whole range rather than
         // once per bucket. A month of days ran five sums over the movement
         // ledger for every day on the chart.
-        $kneaded = Ledger::dailyStockOut($flour, ['production'], $from, $to);
-        $bench = Ledger::dailyStockOut($flour, ['spray'], $from, $to);
-        $soldOn = Ledger::dailyStockOut($flour, ['flour_sale', 'consignment_out'], $from, $to);
-        $salt = Ledger::dailyStockOut($items->get(InventoryItem::SALT), ['production'], $from, $to);
-        $yeast = Ledger::dailyStockOut($items->get('yeast_dry'), ['production'], $from, $to);
+        // Net of what came back: a deleted or corrected batch did not use
+        // the flour it first took. Partner deliveries stay gross — what a
+        // partner returns is a loan repaid, not a delivery undone.
+        $kneaded = Ledger::dailyNetOut($flour, ['production'], $from, $to);
+        $bench = Ledger::dailyNetOut($flour, ['spray'], $from, $to);
+        $soldOn = self::addDaily(
+            Ledger::dailyNetOut($flour, ['flour_sale'], $from, $to),
+            Ledger::dailyStockOut($flour, ['consignment_out'], $from, $to),
+        );
+        $salt = Ledger::dailyNetOut($items->get(InventoryItem::SALT), ['production'], $from, $to);
+        $yeast = Ledger::dailyNetOut($items->get('yeast_dry'), ['production'], $from, $to);
         $sacks = Ledger::dailySums(DoughEntry::query(), 'created_at', 'bag_count', $from, $to);
 
         return collect(PeriodBuckets::build($from, $to, $granularity))
@@ -288,7 +301,7 @@ class ReportSeries
             // case and for a bake means a batch was cancelled.
             $row = [
                 'reason' => $reason,
-                'label' => InventoryMovement::REASONS[$reason] ?? $reason,
+                'label' => InventoryMovement::labelFor($reason, $item->key),
                 'kg' => abs($kg),
                 'bags' => $bagWeight > 0 ? round(abs($kg) / $bagWeight, 2) : null,
                 'share' => 0.0,
@@ -397,7 +410,7 @@ class ReportSeries
 
                 $row = [
                     'reason' => $reason,
-                    'label' => InventoryMovement::REASONS[$reason] ?? $reason,
+                    'label' => InventoryMovement::labelFor($reason, $item->key),
                     'kg' => abs($kg),
                     'bags' => $bags(abs($kg)),
                 ];
@@ -447,6 +460,16 @@ class ReportSeries
      * A reversal belongs to whatever it cancels, so that cancelling a bake
      * reduces the bake rather than appearing as a delivery of stock.
      */
+    /** @return array<string, float> */
+    private static function addDaily(array $a, array $b): array
+    {
+        foreach ($b as $day => $kg) {
+            $a[$day] = ($a[$day] ?? 0.0) + $kg;
+        }
+
+        return $a;
+    }
+
     private static function movementDestination(InventoryMovement $movement): string
     {
         if ($movement->reverses) {

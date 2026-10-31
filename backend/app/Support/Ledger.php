@@ -3,18 +3,20 @@
 namespace App\Support;
 
 use App\Models\Bakery;
+use App\Models\ChaneEntry;
+use App\Models\DoughEntry;
 use App\Models\Expense;
 use App\Models\FlourPrice;
 use App\Models\FlourSale;
 use App\Models\Income;
 use App\Models\InventoryItem;
-use App\Models\InventoryMovement;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\SalaryPayment;
 use App\Models\Sale;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The single place that decides what counts as income and what counts as a
@@ -25,6 +27,9 @@ use Illuminate\Support\Carbon;
  */
 class Ledger
 {
+    /** The day a movement belongs to: the bake it records or undoes. */
+    private const COUNTED_ON = 'coalesce(de.created_at, ce.created_at, o.created_at, inventory_movements.created_at)';
+
     /** Bread sold over the counter. */
     public static function breadSales(Carbon $from, Carbon $to): float
     {
@@ -111,12 +116,20 @@ class Ledger
         // 'spray'; both end up in the bread. A withdrawal for any other
         // reason — a sale, a loan to a partner — is not bread and carries
         // its own cost elsewhere.
-        $movements = InventoryMovement::query()
-            ->whereHas('item', fn ($q) => $q->where('key', InventoryItem::FLOUR))
-            ->where('direction', 'out')
-            ->whereIn('reason', ['production', 'spray'])
-            ->whereBetween('created_at', [$from, $to])
-            ->get(['quantity', 'created_at']);
+        $flour = InventoryItem::query()->where('key', InventoryItem::FLOUR)->first();
+
+        if ($flour === null) {
+            return 0.0;
+        }
+
+        // Net of what came back: a deleted or reduced batch is flour that
+        // did not go into bread. Each line carries the day it counts on,
+        // which for a reversal is the day of the bake it undoes, so it is
+        // priced the way that bake was.
+        $movements = self::netOutQuery($flour, ['production', 'spray'], $from, $to)
+            ->selectRaw(self::COUNTED_ON." as counted_on, case when inventory_movements.direction = 'out' then inventory_movements.quantity else -inventory_movements.quantity end as net_kg")
+            ->toBase()
+            ->get();
 
         if ($movements->isEmpty()) {
             return 0.0;
@@ -130,16 +143,17 @@ class Ledger
         $total = 0.0;
 
         foreach ($movements as $movement) {
-            $day = $movement->created_at->toDateString();
+            $at = Carbon::parse($movement->counted_on);
+            $day = $at->toDateString();
 
             if (! array_key_exists($day, $prices)) {
-                $prices[$day] = FlourPrice::onDate($movement->created_at)
+                $prices[$day] = FlourPrice::onDate($at)
                     // Falls back to the shop's single figure for an install
                     // that has not recorded a dated price yet.
                     ?? (float) (Bakery::query()->value('flour_purchase_price_per_kg') ?? 0);
             }
 
-            $total += (float) $movement->quantity * $prices[$day];
+            $total += (float) $movement->net_kg * $prices[$day];
         }
 
         return round($total, 2);
@@ -323,6 +337,101 @@ class Ledger
             $from,
             $to,
         );
+    }
+
+    /**
+     * What a stock item really sent to the given destinations each day:
+     * what went out, less what came back from the same place.
+     *
+     * [dailyStockOut] reads outgoing lines only, so a batch deleted or cut
+     * from 20 sacks to 10 still counted every sack it first took. On the
+     * production copy that was 3,810 kg of returned flour and 55 kg of
+     * corrected spray flour still reported as baked, and costed as bread.
+     *
+     * A reversal is dated by the movement it undoes, so a batch kneaded
+     * on the 24th and deleted on the 25th leaves both days as they really
+     * were instead of the 25th going negative.
+     *
+     * @param  list<string>  $destinations
+     * @return array<string, float>
+     */
+    public static function dailyNetOut(
+        ?InventoryItem $item,
+        array $destinations,
+        Carbon $from,
+        Carbon $to,
+    ): array {
+        if ($item === null) {
+            return [];
+        }
+
+        $rows = self::netOutQuery($item, $destinations, $from, $to)
+            ->selectRaw('date('.self::COUNTED_ON.") as d, sum(case when inventory_movements.direction = 'out' then inventory_movements.quantity else -inventory_movements.quantity end) as total")
+            ->groupBy('d')
+            ->pluck('total', 'd');
+
+        return $rows->map(fn ($total) => round((float) $total, 3))->all();
+    }
+
+    /**
+     * Flour kneaded into dough and flour dusted on the bench over a range,
+     * net of what came back, in kilograms and in sacks. The two are kept
+     * apart wherever the shop's flour is reported.
+     *
+     * @return array{dough_kg: float, dough_bags: float, spray_kg: float, spray_bags: float, total_kg: float, total_bags: float}
+     */
+    public static function flourSplit(Carbon $from, Carbon $to): array
+    {
+        $item = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $dough = round(array_sum(self::dailyNetOut($item, ['production'], $from, $to)), 3);
+        $spray = round(array_sum(self::dailyNetOut($item, ['spray'], $from, $to)), 3);
+        $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
+        $bags = fn (float $kg) => $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
+
+        return [
+            'dough_kg' => $dough,
+            'dough_bags' => $bags($dough),
+            'spray_kg' => $spray,
+            'spray_bags' => $bags($spray),
+            'total_kg' => round($dough + $spray, 3),
+            'total_bags' => $bags($dough + $spray),
+        ];
+    }
+
+    /**
+     * The movements behind [dailyNetOut], each with the date it counts on
+     * (`counted_on`) and a signed quantity (`net_kg`, out positive).
+     */
+    private static function netOutQuery(InventoryItem $item, array $destinations, Carbon $from, Carbon $to)
+    {
+        $placeholders = implode(',', array_fill(0, count($destinations), '?'));
+
+        // Same rule as ReportSeries::movementDestination: a linked reversal
+        // belongs to what it undoes; an unlinked one to its family.
+        $destination = "case when o.id is not null then o.reason
+            when inventory_movements.reason = 'production_reversal' then 'production'
+            when inventory_movements.reason = 'flour_sale_reversal' then 'flour_sale'
+            when inventory_movements.reason = 'consignment_return' then 'consignment_out'
+            else inventory_movements.reason end";
+
+        return $item->movements()
+            ->leftJoin('inventory_movements as o', 'o.id', '=', 'inventory_movements.reverses_movement_id')
+            // A correction to a batch or a chane entry counts on the day of
+            // the bake it corrects. Eleven spray corrections were posted on
+            // 1405/06/11 for entries from the fortnight before, and dated
+            // by the correction they moved 55 kg out of the days they
+            // belonged to — the production report, which reads the entry,
+            // and the warehouse disagreed for both months.
+            ->leftJoin('dough_entries as de', function ($join) {
+                $join->on('de.id', '=', 'inventory_movements.source_id')
+                    ->where('inventory_movements.source_type', DoughEntry::class);
+            })
+            ->leftJoin('chane_entries as ce', function ($join) {
+                $join->on('ce.id', '=', 'inventory_movements.source_id')
+                    ->where('inventory_movements.source_type', ChaneEntry::class);
+            })
+            ->whereRaw("({$destination}) in ({$placeholders})", $destinations)
+            ->whereBetween(DB::raw(self::COUNTED_ON), [$from, $to]);
     }
 
     /**

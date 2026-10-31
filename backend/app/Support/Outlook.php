@@ -84,7 +84,7 @@ class Outlook
         $to = now()->endOfDay();
         $from = now()->subDays(self::WINDOW_DAYS - 1)->startOfDay();
 
-        $daily = Ledger::dailyStockOut(
+        $daily = Ledger::dailyNetOut(
             InventoryItem::ofKey(InventoryItem::FLOUR),
             ['production'],
             $from,
