@@ -45,10 +45,7 @@ class _SellerLedgerScreenState extends State<SellerLedgerScreen> {
             );
           }
           final data = snapshot.data!;
-          final entries = ((data['entries'] as List?) ?? const [])
-              .whereType<Map>()
-              .map(keyedGroup)
-              .toList();
+          final entries = rowList(data['entries']);
           final warning = data['warning'] as String?;
           final alert = data['debt_alert'] is Map ? keyedGroup(data['debt_alert']) : null;
 

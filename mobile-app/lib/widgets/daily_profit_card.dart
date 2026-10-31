@@ -39,10 +39,7 @@ class _DailyProfitCardState extends State<DailyProfitCard> {
     final data = _data;
     if (data == null) return const SizedBox.shrink();
 
-    final days = ((data['days'] as List?) ?? const [])
-        .whereType<Map>()
-        .map(keyedGroup)
-        .toList();
+    final days = rowList(data['days']);
     if (days.isEmpty) return const SizedBox.shrink();
 
     final today = days.last;
@@ -111,7 +108,10 @@ class _DailyProfitCardState extends State<DailyProfitCard> {
                     touchTooltipData: BarTouchTooltipData(
                       getTooltipItem: (group, _, __, ___) => BarTooltipItem(
                         '${days[group.x]['date_label']}\n${days[group.x]['profit_formatted']}',
-                        const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                        TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onInverseSurface),
                       ),
                     ),
                   ),

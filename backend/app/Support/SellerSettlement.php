@@ -620,7 +620,25 @@ class SellerSettlement
             throw new RuntimeException('قیمت نان در تنظیمات تعیین نشده است.');
         }
 
-        return self::applyPayment($seller, round($loaves * $price, 2), $request);
+        $applied = self::applyPayment($seller, round($loaves * $price, 2), $request);
+
+        // Bread handed back is a handover like money is; without a row the
+        // ledger would still count this debt as owed.
+        if ($request === null) {
+            SellerSettlementRecord::create([
+                'user_id' => $seller->id,
+                'settled_by' => auth()->id(),
+                'kind' => 'loaves',
+                'paid_cash' => 0,
+                'paid_card' => 0,
+                'amount' => round($loaves * $price, 2),
+                'sale_ids' => $applied['settled'],
+                'credit_ids' => $applied['credit_ids'],
+                'note' => 'تسویهٔ نانی: '.$loaves.' نان',
+            ]);
+        }
+
+        return $applied;
     }
 
     public static function applyPayment(

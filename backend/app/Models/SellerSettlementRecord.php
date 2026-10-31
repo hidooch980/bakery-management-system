@@ -101,6 +101,7 @@ class SellerSettlementRecord extends Model
             'kind_label' => match ($this->kind) {
                 'correction' => 'اصلاح حساب',
                 'backfill' => 'سابقهٔ تسویه',
+                'loaves' => 'تسویهٔ نانی',
                 default => $this->is_settlement ? 'تسویه' : 'پرداخت',
             },
             // Bookkeeping rows moved no money, so there is nothing to undo.

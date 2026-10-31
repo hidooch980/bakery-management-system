@@ -91,9 +91,9 @@ class SellerLedger
             ->map(fn (SellerSettlementRecord $r) => [
                 'at' => $r->created_at,
                 'kind' => 'payment',
-                'label' => 'تسویهٔ مستقیم',
+                'label' => $r->kind === 'loaves' ? ($r->note ?? 'تسویهٔ نانی') : 'تسویهٔ مستقیم',
                 'debit' => 0.0,
-                'credit' => round((float) $r->paid_cash + (float) $r->paid_card, 2),
+                'credit' => round((float) $r->amount, 2),
                 'ref' => null,
             ]);
 

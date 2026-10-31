@@ -219,4 +219,17 @@ class SellerPaymentsReduceTheirDebtTest extends TestCase
             ->postJson("/api/v1/seller-settlements/{$record->id}/reverse", ['reason' => 'x'])
             ->assertStatus(409);
     }
+
+    public function test_bread_handed_back_counts_in_the_ledger(): void
+    {
+        $this->sale('cash', 100_000, ['shortfall_count' => 10, 'shortfall_amount' => 50_000]);
+        $this->actingAs($this->admin);
+
+        SellerSettlement::applyLoaves($this->seller, 10);
+
+        $r = SellerLedger::reconcile($this->seller);
+        $this->assertTrue($r['ok'], json_encode($r));
+        $this->assertEquals(100_000.0, $r['ledger']);
+        $this->assertSame('loaves', SellerSettlementRecord::sole()->kind);
+    }
 }
