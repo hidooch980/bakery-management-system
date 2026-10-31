@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\RecordsAudit;
 use App\Support\AppCalendar;
 use App\Support\Money;
+use App\Support\SellerLedger;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -103,7 +104,7 @@ class SellerSettlementRecord extends Model
                 default => $this->is_settlement ? 'تسویه' : 'پرداخت',
             },
             // Bookkeeping rows moved no money, so there is nothing to undo.
-            'can_reverse' => ! $this->is_reversed && ! in_array($this->kind, \App\Support\SellerLedger::NOT_MONEY, true),
+            'can_reverse' => ! $this->is_reversed && ! in_array($this->kind, SellerLedger::NOT_MONEY, true),
             'seller_name' => $this->seller?->name,
             'settled_by_name' => $this->settledBy?->name,
             'amount' => Money::convert((float) $this->amount),

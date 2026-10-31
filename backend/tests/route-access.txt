@@ -42,6 +42,7 @@ GET api/v1/chane-entries/pending                            admin, seller
 GET api/v1/consignment-flour                                admin, seller
 GET api/v1/consignment-flour/balance                        admin, seller
 GET api/v1/consignment-flour/partners                       admin, seller
+GET api/v1/consignment-flour/partners/{customer}/report     admin, seller
 GET api/v1/consignment-flour/partners/{customer}/statement  admin, seller
 GET api/v1/customer-debts                                   admin
 GET api/v1/customers                                        (any signed-in)
@@ -84,6 +85,7 @@ GET api/v1/reports/attendance                               admin, seller
 GET api/v1/reports/attendance-summary                       admin, seller
 GET api/v1/reports/balance-sheet                            admin
 GET api/v1/reports/consumption-series                       admin
+GET api/v1/reports/daily-profit                             admin
 GET api/v1/reports/dashboard                                admin
 GET api/v1/reports/debts                                    admin
 GET api/v1/reports/efficiency                               admin
@@ -109,6 +111,7 @@ GET api/v1/salaries/my-summary                              (any signed-in)
 GET api/v1/salary-requests                                  admin
 GET api/v1/salary-requests/mine                             (any signed-in)
 GET api/v1/sales/my-account                                 admin, seller
+GET api/v1/sales/my-account/ledger                          admin, seller
 GET api/v1/sales/payment-types                              (any signed-in)
 GET api/v1/sales/staff                                      admin, seller
 GET api/v1/sales/today                                      admin, seller
@@ -116,6 +119,7 @@ GET api/v1/seller-accounts                                  admin
 GET api/v1/seller-accounts/{seller}/breakdown               admin
 GET api/v1/seller-accounts/{seller}/daily-report            admin
 GET api/v1/seller-accounts/{seller}/history                 admin
+GET api/v1/seller-accounts/{seller}/ledger                  admin
 GET api/v1/settlement-requests                              admin, seller
 GET api/v1/settlement-requests/account                      admin, seller
 GET api/v1/settlement-requests/settleable                   admin, seller
@@ -182,6 +186,7 @@ POST api/v1/cash-counts                                     admin
 POST api/v1/chane-entries                                   admin, chane_gir, seller
 POST api/v1/change-password                                 admin, chane_gir, dough_maker, seller, shater
 POST api/v1/consignment-flour                               admin, seller
+POST api/v1/consignment-flour/partners/{customer}/report    admin, seller
 POST api/v1/consignment-flour/{consignment}/returns         admin, seller
 POST api/v1/customer-debts/{customer}/settle                admin
 POST api/v1/customers                                       admin

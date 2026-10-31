@@ -2,10 +2,12 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Pages\SellerLedgerPage;
 use App\Models\BankAccount;
 use App\Models\Sale;
 use App\Models\User;
 use App\Support\Money;
+use App\Support\SellerLedger;
 use App\Support\SellerSettlement;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -129,8 +131,8 @@ class SellerAccountsTable extends BaseWidget
                 Tables\Actions\Action::make('ledger')
                     ->label('دفتر حساب')
                     ->icon('heroicon-o-book-open')
-                    ->color(fn (User $record) => \App\Support\SellerLedger::reconcile($record)['ok'] ? 'gray' : 'danger')
-                    ->url(fn (User $record) => \App\Filament\Pages\SellerLedgerPage::getUrl(['seller' => $record->id])),
+                    ->color(fn (User $record) => SellerLedger::reconcile($record)['ok'] ? 'gray' : 'danger')
+                    ->url(fn (User $record) => SellerLedgerPage::getUrl(['seller' => $record->id])),
                 // The shop counts this debt in bread, so a part settlement
                 // is "three hundred loaves" rather than an amount somebody
                 // has already done the arithmetic on. Full settlement keeps

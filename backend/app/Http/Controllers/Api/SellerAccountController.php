@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Support\SellerLedger;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\SellerAccountCredit;
@@ -14,6 +13,7 @@ use App\Support\Exclusively;
 use App\Support\Money;
 use App\Support\SameBakery;
 use App\Support\SellerDailyReport;
+use App\Support\SellerLedger;
 use App\Support\SellerSettlement;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -250,7 +250,7 @@ class SellerAccountController extends Controller
             $record,
             fn (SellerSettlementRecord $r) => match (true) {
                 $r->is_reversed => 'این تسویه قبلاً اصلاح شده است.',
-                in_array($r->kind, \App\Support\SellerLedger::NOT_MONEY, true) => 'این ردیف فقط برای ثبت سابقه است و پولی جابه‌جا نکرده است.',
+                in_array($r->kind, SellerLedger::NOT_MONEY, true) => 'این ردیف فقط برای ثبت سابقه است و پولی جابه‌جا نکرده است.',
                 default => null,
             },
             fn (SellerSettlementRecord $r) => SellerSettlement::reverse(

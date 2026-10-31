@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Support\ShopChecks;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\BakeryShare;
@@ -22,6 +21,7 @@ use App\Support\Ledger;
 use App\Support\Money;
 use App\Support\PeriodBuckets;
 use App\Support\ReportSeries;
+use App\Support\ShopChecks;
 use App\Support\StaffYield;
 use App\Support\TodayAnswer;
 use App\Traits\ApiResponse;

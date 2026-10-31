@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Support\SameBakery;
+use App\Support\SellerLedger;
 use App\Support\SellerSettlement;
 use App\Traits\ApiResponse;
 use Carbon\Carbon;
@@ -183,7 +184,7 @@ class SellerPerformanceController extends Controller
             'outstanding_formatted' => Money::format($owed['balance']),
             'prepaid' => $owed['prepaid'],
             'prepaid_formatted' => Money::format($owed['prepaid']),
-            'ledger_warning' => \App\Support\SellerLedger::warning(\App\Support\SellerLedger::reconcile($seller)),
+            'ledger_warning' => SellerLedger::warning(SellerLedger::reconcile($seller)),
             'credit_out' => $owed['credit'],
             'credit_out_formatted' => Money::format($owed['credit']),
         ];

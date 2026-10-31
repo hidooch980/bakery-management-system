@@ -6,6 +6,7 @@ use App\Models\Sale;
 use App\Models\SellerSettlementRecord;
 use App\Models\SettlementRequest;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -27,7 +28,7 @@ class SellerLedger
     /** Kinds of handover record that are bookkeeping, not money handed over. */
     public const NOT_MONEY = ['correction', 'backfill'];
 
-    /** @return Collection<int, array{at: \Illuminate\Support\Carbon, kind: string, label: string, debit: float, credit: float, ref: ?int}> */
+    /** @return Collection<int, array{at: Carbon, kind: string, label: string, debit: float, credit: float, ref: ?int}> */
     public static function entries(User $seller): Collection
     {
         $debts = Sale::query()
