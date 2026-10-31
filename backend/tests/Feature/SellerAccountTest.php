@@ -202,12 +202,12 @@ class SellerAccountTest extends TestCase
 
         $sale = Sale::latest('id')->first();
 
-        // The customer owes the money, but the seller is the one who handed
-        // the bread over, so it stays on their account until it is
-        // collected — and no cash is claimed to be in their pocket.
+        // The customer owes the money, and no cash is claimed to be in
+        // the seller's pocket.
         $this->assertEquals(0.0, $sale->cash_held);
         $this->assertEquals(500_000.0, $sale->open_credit);
-        $this->assertEquals(500_000.0, $sale->seller_account_amount);
+        // The customer owes it, not the seller.
+        $this->assertEquals(0.0, $sale->seller_account_amount);
 
         $sale->update(['settled_on' => now()]);
 
