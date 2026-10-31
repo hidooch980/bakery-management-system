@@ -20,7 +20,7 @@ class StaffPenaltyRequestController extends Controller
 {
     use ApiResponse;
 
-    private const WITH = ['user:id,name', 'requestedBy:id,name', 'decidedBy:id,name', 'adjustment'];
+    private const WITH = ['user:id,name', 'requestedBy:id,name', 'rule:id,name', 'decidedBy:id,name', 'adjustment'];
 
     /** Who can be named (every active member of staff), and the reasons. */
     public function options(Request $request): JsonResponse
@@ -171,7 +171,8 @@ class StaffPenaltyRequestController extends Controller
             'id' => $r->id,
             'user_id' => $r->user_id,
             'user_name' => $r->user?->name,
-            'requested_by_name' => $r->requestedBy?->name,
+            'requested_by_name' => $r->requester_name,
+            'from_rule' => $r->seller_warning_rule_id !== null,
             'type' => $r->type,
             'type_label' => $r->type_label,
             'reason' => $r->reason,

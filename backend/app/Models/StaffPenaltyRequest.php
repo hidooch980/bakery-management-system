@@ -47,13 +47,30 @@ class StaffPenaltyRequest extends Model
         'absence' => 'غیبت',
         'spoiled_bread' => 'خرابی نان',
         'misconduct' => 'بی‌نظمی',
+        // Filed by a seller-warning rule.
+        'debt' => 'بدهی بیش از سقف',
+        'late_settlement' => 'تسویه دیرهنگام',
+        'till_shortfall' => 'کسری صندوق',
+        'rule' => 'قانون فروشنده',
+        // The complaint list buyers pick from in nanino's buyer app
+        // (nanino.ir, «برنامه کاربردی خریدار»). Most can only be seen by
+        // a person, so they are reasons to choose, not rules to check.
+        'chane_weight' => 'عدم رعایت وزن استاندارد چانه خمیر',
+        'hygiene' => 'عدم رعایت اصول بهداشتی',
+        'bread_quality' => 'پایین بودن کیفیت نان',
+        'fake_transaction' => 'ثبت تراکنش غیر واقعی',
+        'off_queue' => 'عرضه بیش از حد نان خارج از صف',
+        'bran_mismatch' => 'عدم تناسب میزان سبوس آرد با نوع نان',
+        'forced_sesame' => 'اجبار مشتری به خرید نان کنجدی',
+        'customer_conduct' => 'عدم برخورد صحیح با مشتری',
+        'shift_hours' => 'عدم رعایت ساعت شیفت کاری',
         'other' => 'سایر',
     ];
 
     protected $attributes = ['status' => self::PENDING];
 
     protected $fillable = [
-        'user_id', 'requested_by', 'type', 'reason', 'amount', 'note', 'occurred_on',
+        'user_id', 'requested_by', 'seller_warning_rule_id', 'type', 'reason', 'amount', 'note', 'occurred_on',
         'status', 'decided_by', 'decided_at', 'decision_note', 'staff_adjustment_id',
     ];
 
@@ -74,6 +91,21 @@ class StaffPenaltyRequest extends Model
     public function requestedBy()
     {
         return $this->belongsTo(User::class, 'requested_by');
+    }
+
+    public function rule()
+    {
+        return $this->belongsTo(SellerWarningRule::class, 'seller_warning_rule_id');
+    }
+
+    /** Who asked: a person, or the rule that filed it. */
+    public function getRequesterNameAttribute(): ?string
+    {
+        if ($this->seller_warning_rule_id !== null) {
+            return 'قانون: '.($this->rule?->name ?? 'حذف‌شده');
+        }
+
+        return $this->requestedBy?->name;
     }
 
     public function decidedBy()

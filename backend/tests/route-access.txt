@@ -120,6 +120,7 @@ GET api/v1/seller-accounts/{seller}/breakdown               admin
 GET api/v1/seller-accounts/{seller}/daily-report            admin
 GET api/v1/seller-accounts/{seller}/history                 admin
 GET api/v1/seller-accounts/{seller}/ledger                  admin
+GET api/v1/seller-warning-rules                             admin
 GET api/v1/settlement-requests                              admin, seller
 GET api/v1/settlement-requests/account                      admin, seller
 GET api/v1/settlement-requests/settleable                   admin, seller
@@ -159,6 +160,7 @@ PATCH api/v1/penalty-requests/{penaltyRequest}/reject       admin
 PATCH api/v1/salaries/{salary}                              admin
 PATCH api/v1/salaries/{salary}/mark-paid                    admin
 PATCH api/v1/salary-requests/{salaryRequest}/reject         admin
+PATCH api/v1/seller-warning-rules/{rule}                    admin
 PATCH api/v1/shares/{share}                                 admin
 PATCH api/v1/staff-account-entries/{kind}/{id}              admin
 PATCH api/v1/staff-adjustments/{adjustment}/restore         admin

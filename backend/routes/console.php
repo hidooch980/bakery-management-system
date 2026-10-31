@@ -65,6 +65,13 @@ Schedule::command('customers:credit-reminder')
     ->timezone('Asia/Tehran')
     ->withoutOverlapping();
 
+// Yesterday's records against the shop's seller rules: each hit is a
+// pending warning the manager approves or rejects. Rules start off.
+Schedule::command('sellers:rule-warnings')
+    ->dailyAt('10:10')
+    ->timezone('Asia/Tehran')
+    ->withoutOverlapping();
+
 // Yesterday's card sales against the card reader's deposit, which the
 // bank pays in and texts the following morning.
 Schedule::command('bank:card-reader-check')

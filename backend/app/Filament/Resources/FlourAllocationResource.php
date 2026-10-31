@@ -177,6 +177,20 @@ class FlourAllocationResource extends Resource
                         : '—')
                     ->sortable(),
 
+                // The month's quota against flour actually delivered (bought
+                // in that Jalali month).
+                Tables\Columns\TextColumn::make('received')
+                    ->label('دریافت‌شده / مانده')
+                    ->state(function (FlourAllocation $record) {
+                        $r = $record->receipt();
+
+                        return rtrim(rtrim(number_format($r['received_bags'], 1), '0'), '.').' کیسه';
+                    })
+                    ->description(function (FlourAllocation $record) {
+                        $r = $record->receipt();
+
+                        return 'مانده برای دریافت '.rtrim(rtrim(number_format($r['to_receive_bags'], 1), '0'), '.').' کیسه';
+                    }),
                 Tables\Columns\TextColumn::make('carryover_bags')
                     ->label('سنوات')
                     ->formatStateUsing(fn ($state) => (float) $state > 0

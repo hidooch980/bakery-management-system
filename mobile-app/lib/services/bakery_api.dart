@@ -1012,7 +1012,8 @@ class BakeryApi {
   /// ریز حساب و گزارش سهمیه، تولید و کارتخوان فروشنده در بازهٔ انتخابی.
   Future<Map<String, dynamic>> sellerDailyReport(int sellerId,
       {String? from, String? until}) async {
-    final body = await _client.getCached('/seller-accounts/$sellerId/daily-report', query: {
+    final body = await _client
+        .getCached('/seller-accounts/$sellerId/daily-report', query: {
       if (from != null) 'from': from,
       if (until != null) 'to': until,
     });
@@ -1927,6 +1928,21 @@ class BakeryApi {
 
   Future<void> rejectPenaltyRequest(int id, {required String note}) =>
       _client.patch('/penalty-requests/$id/reject', {'note': note});
+
+  /// The shop's seller-warning rules. Each active one files a pending
+  /// warning into the penalty requests above; the manager decides.
+  Future<List<Map<String, dynamic>>> sellerWarningRules() async {
+    final body = await _client.getCached('/seller-warning-rules');
+    return rowList(keyedGroup(body['data'])['rules']);
+  }
+
+  /// Switch a rule on or off, or set its threshold (in the shop's
+  /// currency for money rules) and its wording.
+  Future<Map<String, dynamic>> updateSellerWarningRule(
+      int id, Map<String, dynamic> changes) async {
+    final body = await _client.patch('/seller-warning-rules/$id', changes);
+    return keyedGroup(body['data']);
+  }
 
   /// Laravel paginators nest the rows under `data.data`; plain lists don't.
   // ------------------------------------------------------------ buying

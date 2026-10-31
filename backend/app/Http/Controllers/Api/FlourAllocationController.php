@@ -162,6 +162,8 @@ class FlourAllocationController extends Controller
                 'is_current' => $current !== null && $current->id === $p->id,
             ]),
             'whole_period' => $this->wholePeriod($allocation),
+            // سهمیهٔ ماه در برابر آردی که واقعاً تحویل گرفته شده (خرید آرد در همان ماه شمسی).
+            'receipt' => $allocation->receipt(),
             'daily_period' => $current ? $this->dailyPeriod($current, $highlightDate) : null,
         ];
     }

@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SellerCollectionController;
 use App\Http\Controllers\Api\SellerPerformanceController;
+use App\Http\Controllers\Api\SellerWarningRuleController;
 use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\StaffAccountController;
 use App\Http\Controllers\Api\StaffAdjustmentController;
@@ -480,6 +481,9 @@ Route::prefix('v1')->group(function () {
             Route::patch('/penalty-requests/{penaltyRequest}/approve', [StaffPenaltyRequestController::class, 'approve']);
             Route::patch('/penalty-requests/{penaltyRequest}/reject', [StaffPenaltyRequestController::class, 'reject']);
             Route::patch('/penalty-requests/{penaltyRequest}/cancel', [StaffPenaltyRequestController::class, 'cancel']);
+            // The rules that file warnings into the list above.
+            Route::get('/seller-warning-rules', [SellerWarningRuleController::class, 'index']);
+            Route::patch('/seller-warning-rules/{rule}', [SellerWarningRuleController::class, 'update']);
             Route::apiResource('staff-advances', StaffAdvanceController::class)
                 ->parameters(['staff-advances' => 'advance'])
                 ->only(['index', 'store', 'destroy']);

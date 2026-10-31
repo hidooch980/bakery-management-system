@@ -113,6 +113,44 @@ class FlourAllocation extends Model
     }
 
     /** Bags each period is entitled to, derived from its share of the weight. */
+    /**
+     * Flour bought into the store in this quota's Jalali month, net of
+     * purchases undone: the quota as actually delivered. Counted by the
+     * calendar month, not the 5th-to-4th usage window, because deliveries
+     * arrive ahead of the period they feed (Aban's first lot came on the
+     * 4th). Every flour purchase is counted as quota flour — the shop buys
+     * its flour through the quota — and partner flour is not a purchase.
+     *
+     * @return array{received_kg: float, received_bags: float, to_receive_bags: float, to_receive_kg: float, starts_on: ?string, ends_on: ?string}
+     */
+    public function receipt(): array
+    {
+        [$from, $to] = $this->month_start ? Jalali::monthRangeFor($this->month_start) : [null, null];
+        $bag = DoughFormula::fromBakery()->bagWeightKg;
+        $kg = 0.0;
+        $flour = InventoryItem::query()->where('key', InventoryItem::FLOUR)->first();
+        if ($flour && $from && $to) {
+            $window = [Carbon::parse($from)->startOfDay(), Carbon::parse($to)->endOfDay()];
+            $in = (float) $flour->movements()->where('reason', 'purchase')->where('direction', 'in')
+                ->whereBetween('created_at', $window)->sum('quantity');
+            $back = (float) $flour->movements()->where('reason', 'purchase_reversal')
+                ->whereBetween('created_at', $window)->sum('quantity');
+            $kg = round(max(0, $in - $back), 3);
+        }
+        $total = (float) $this->total_kg;
+        $inBags = fn (float $v) => $bag > 0 ? round($v / $bag, 2) : 0.0;
+
+        return [
+            'received_kg' => $kg,
+            'received_bags' => $inBags($kg),
+            'to_receive_kg' => round($total - $kg, 3),
+            'to_receive_bags' => $inBags($total - $kg),
+            'received_percent' => $total > 0 ? round($kg / $total * 100, 1) : 0.0,
+            'starts_on' => $from ? Carbon::parse($from)->toDateString() : null,
+            'ends_on' => $to ? Carbon::parse($to)->toDateString() : null,
+        ];
+    }
+
     public function bagsForPeriod(FlourAllocationPeriod $period): float
     {
         $bagWeight = DoughFormula::fromBakery()->bagWeightKg;

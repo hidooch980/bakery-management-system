@@ -57,6 +57,7 @@ class FlourQuotaOverview extends BaseWidget
         }
 
         $balance = FlourQuota::balance();
+        $receipt = $allocation->receipt();
 
         return [
             Stat::make($period->label, Qty::flourBags((float) $period->allocated_kg))
@@ -102,6 +103,14 @@ class FlourQuotaOverview extends BaseWidget
                     .'   •   '.Qty::format($period->card_bread_count).' نان کارتخوان')
                 ->descriptionIcon('heroicon-m-credit-card')
                 ->color($period->bread_remainder < 0 ? 'danger' : 'info'),
+
+            // The month's quota against what was actually delivered: flour
+            // bought in during the quota's Jalali month.
+            Stat::make('دریافت‌شده از سهمیهٔ ماه', Qty::flourBags($receipt['received_kg']))
+                ->description('از '.Qty::flourBags((float) $allocation->total_kg).' — مانده برای دریافت '
+                    .Qty::flourBags(max(0, $receipt['to_receive_kg'])))
+                ->descriptionIcon('heroicon-m-truck')
+                ->color($receipt['to_receive_kg'] < 0 ? 'warning' : 'info'),
 
             Stat::make('سنوات', Qty::flourBags((float) $allocation->carryover_kg))
                 ->description((float) $allocation->carryover_kg > 0
