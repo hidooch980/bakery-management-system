@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/chane_comparison.dart';
 import '../../widgets/common.dart';
+import '../../widgets/daily_profit_card.dart';
 import '../../widgets/partner_flour_card.dart';
 import 'admin_home_screen.dart';
 import 'admin_record_sheet.dart';
@@ -87,6 +88,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
           final today = keyedGroup(dashboard['today']);
           final queues = keyedGroup(dashboard['queues']);
           final staff = keyedGroup(dashboard['staff']);
+          final flourToday = keyedGroup(dashboard['flour_today']);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
@@ -148,7 +150,35 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                 ],
               ),
 
+              // آرد امروز به کیسه: خمیرگیری و پاششی جدا.
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: StatTile(
+                      label: 'آرد خمیرگیری',
+                      value: flourBags(_bags(flourToday['dough_bags'])),
+                      icon: Icons.blender_rounded,
+                      color: AppColors.stock,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: StatTile(
+                      key: const Key('spray-flour-today'),
+                      label: 'آرد پاششی',
+                      value: flourBags(_bags(flourToday['spray_bags'])),
+                      icon: Icons.grain_rounded,
+                      color: AppColors.attention,
+                    ),
+                  ),
+                ],
+              ),
+
               // آرد امانی همکاران به کیسه: طلب ما، بدهی ما، خالص.
+              const SizedBox(height: 12),
+              DailyProfitCard(api: widget.api),
+
               const SizedBox(height: 12),
               PartnerFlourCard(api: widget.api),
 
@@ -314,3 +344,6 @@ class _QuickRecordButton extends StatelessWidget {
     );
   }
 }
+
+double _bags(dynamic value) =>
+    value is num ? value.toDouble() : double.tryParse('$value') ?? 0;

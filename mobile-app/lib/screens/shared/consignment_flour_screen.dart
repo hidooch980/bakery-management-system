@@ -15,9 +15,12 @@ import 'partner_statement_screen.dart';
 /// Reached from «آرد همکار», because recording one and checking the others
 /// is the same errand and was two different places.
 class ConsignmentFlourScreen extends StatefulWidget {
-  const ConsignmentFlourScreen({super.key, required this.api});
+  const ConsignmentFlourScreen({super.key, required this.api, this.canSend = false});
 
   final BakeryApi api;
+
+  /// The manager may send a partner their account; others only read it.
+  final bool canSend;
 
   @override
   State<ConsignmentFlourScreen> createState() => _ConsignmentFlourScreenState();
@@ -109,6 +112,7 @@ class _ConsignmentFlourScreenState extends State<ConsignmentFlourScreen> {
                                   api: widget.api,
                                   partnerId: partner['partner_id'] as int,
                                   partnerName: '${partner['partner_name']}',
+                                  canSend: widget.canSend,
                                 ),
                               ),
                             )

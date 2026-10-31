@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\BaleSetting;
 use App\Models\Customer;
+use App\Models\SmsLog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
@@ -87,6 +88,7 @@ class PartnerFlourReport
                 $result = BaleSafir::send($setting, $preview['phone'], $preview['message'], $requestId);
                 if ($result === 'sent') {
                     RateLimiter::hit($key, 60);
+                    self::log($partner, $preview, 'bale', 'sent');
 
                     return 'بله';
                 }
@@ -96,10 +98,12 @@ class PartnerFlourReport
             }
 
             if (! Sms::sendReport($preview['phone'], $preview['message'])) {
+                self::log($partner, $preview, 'sms', 'failed', 'سرویس پیامک پیام را نپذیرفت.');
                 throw ValidationException::withMessages(['message' => 'ارسال پذیرفته نشد. سرویس ارسال عادی اس‌ام‌اس‌آی‌آر، خط فرستنده، اعتبار و اتصال را بررسی کنید.']);
             }
 
             RateLimiter::hit($key, 60);
+            self::log($partner, $preview, 'sms', 'sent');
 
             return 'پیامک';
         });
@@ -109,5 +113,47 @@ class PartnerFlourReport
         }
 
         return $sent;
+    }
+
+    private static function log(Customer $partner, array $preview, string $channel, string $status, ?string $error = null): void
+    {
+        SmsLog::create([
+            'kind' => 'partner_manual',
+            'recipient_name' => $partner->name,
+            'phone_masked' => SmsLog::mask($preview['phone']),
+            'message' => $preview['message'],
+            'channel' => $channel,
+            'status' => $status,
+            'error' => $error,
+            'sent_by' => auth()->id(),
+        ]);
+    }
+
+    /**
+     * The short weekly SMS: what moved in the last seven days and where the
+     * account stands, in bags. Null when nothing is owed either way and
+     * nothing moved — a message saying «nothing» is a message too many.
+     */
+    public static function weekly(Customer $partner): ?string
+    {
+        $to = now();
+        $from = now()->subDays(7)->startOfDay();
+        $s = PartnerStatement::for($partner, $from, $to);
+        $moved = $s->total(PartnerStatement::LENT) + $s->total(PartnerStatement::BORROWED)
+            + $s->total(PartnerStatement::RETURNED_TO_US) + $s->total(PartnerStatement::RETURNED_BY_US);
+
+        if (abs($s->current) < 0.001 && $moved < 0.001) {
+            return null;
+        }
+
+        return implode("\n", [
+            'خلاصهٔ هفتگی آرد — '.CurrentBakery::get()?->name,
+            'همکار: '.$partner->name,
+            'هفتهٔ گذشته: تحویلی به شما '.PartnerStatement::bags($s->total(PartnerStatement::LENT))
+                .' کیسه، دریافتی از شما '.PartnerStatement::bags($s->total(PartnerStatement::BORROWED)).' کیسه',
+            'برگشت: از شما '.PartnerStatement::bags($s->total(PartnerStatement::RETURNED_TO_US))
+                .' کیسه، به شما '.PartnerStatement::bags($s->total(PartnerStatement::RETURNED_BY_US)).' کیسه',
+            'مانده: '.self::balanceText($s->current),
+        ]);
     }
 }

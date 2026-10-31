@@ -13,6 +13,7 @@ use App\Support\Exclusively;
 use App\Support\Money;
 use App\Support\SameBakery;
 use App\Support\SellerDailyReport;
+use App\Support\SellerLedger;
 use App\Support\SellerSettlement;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -85,6 +86,8 @@ class SellerAccountController extends Controller
                     'on_account_formatted' => Money::format($paid),
                     'still_owed' => Money::convert($left),
                     'still_owed_formatted' => Money::format($left),
+                    // The ledger's independent check on that figure.
+                    'ledger_warning' => SellerLedger::warning(SellerLedger::reconcile($seller)),
                     'request' => $request ? [
                         'id' => $request->id,
                         'amount_formatted' => $request->amount_formatted,
@@ -183,6 +186,11 @@ class SellerAccountController extends Controller
             'total_formatted' => Money::format($owed['total']),
             'credit' => Money::convert($owed['credit']),
             'credit_formatted' => Money::format($owed['credit']),
+            // Money already handed over that has not closed a whole sale.
+            'prepaid' => Money::convert($prepaid = SellerAccountCredit::balanceFor($seller->id)),
+            'prepaid_formatted' => Money::format($prepaid),
+            'still_owed' => Money::convert(round($owed['total'] - $prepaid, 2)),
+            'still_owed_formatted' => Money::format(round($owed['total'] - $prepaid, 2)),
             // The arithmetic, written out, because the subtraction is the
             // part people query: a gap in what was handed over counts
             // *against* the seller elsewhere and *for* them here.
@@ -240,9 +248,11 @@ class SellerAccountController extends Controller
         // short by exactly twice what the seller handed over.
         Exclusively::claim(
             $record,
-            fn (SellerSettlementRecord $r) => $r->is_reversed
-                ? 'این تسویه قبلاً اصلاح شده است.'
-                : null,
+            fn (SellerSettlementRecord $r) => match (true) {
+                $r->is_reversed => 'این تسویه قبلاً اصلاح شده است.',
+                in_array($r->kind, SellerLedger::NOT_MONEY, true) => 'این ردیف فقط برای ثبت سابقه است و پولی جابه‌جا نکرده است.',
+                default => null,
+            },
             fn (SellerSettlementRecord $r) => SellerSettlement::reverse(
                 $r,
                 $request->user(),
@@ -472,5 +482,13 @@ class SellerAccountController extends Controller
             : ($chosen === null
                 ? 'حساب '.$seller->name.' تسویه شد.'
                 : count($chosen).' روز از حساب '.$seller->name.' تسویه شد.'));
+    }
+
+    /** «دفتر حساب فروشنده»: every debt and handover with the running balance. */
+    public function ledger(User $seller): JsonResponse
+    {
+        $seller = SameBakery::or404($seller);
+
+        return $this->success(SellerLedger::payload($seller));
     }
 }

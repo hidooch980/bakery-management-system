@@ -54,6 +54,17 @@ class SaleRecorder
             foreach ($lines as $line) {
                 $amount = $line['amount'] ?? null;
 
+                // Money taken with no figure on it is the bread at today's
+                // price. Left empty, a cash sale put nothing on the
+                // seller's account at all.
+                if ($amount === null && $breadPrice > 0 && in_array(
+                    $line['payment_type'],
+                    [...Sale::CASH_TYPES, ...Sale::BANKED_TYPES, ...Sale::DEBT_TYPES],
+                    true,
+                )) {
+                    $amount = round($line['bread_count'] * $breadPrice, 2);
+                }
+
                 // How far the money taken sits from what this bread should
                 // have cost. Frozen here rather than recomputed, so a later
                 // price change cannot rewrite what a seller already owed.

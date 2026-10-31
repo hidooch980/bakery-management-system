@@ -73,7 +73,8 @@ class MoneyAtAGlance extends BaseWidget
         $oldestDays = 0;
 
         foreach ($sellers as $seller) {
-            $total += SellerSettlement::outstandingFor($seller)['total'];
+            // After prepayment, the same figure the accounts page shows.
+            $total += max(0, SellerSettlement::balanceFor($seller)['balance']);
 
             $oldest = Sale::query()
                 ->where('user_id', $seller->id)

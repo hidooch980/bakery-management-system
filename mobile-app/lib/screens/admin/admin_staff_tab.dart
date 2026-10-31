@@ -7,6 +7,7 @@ import '../../widgets/common.dart';
 import '../../widgets/admin_detail_group.dart';
 import 'advance_requests_section.dart';
 import 'penalty_requests_section.dart';
+import 'seller_warning_rules_section.dart';
 import 'lateness_report_section.dart';
 import 'salary_requests_section.dart';
 import 'payroll_section.dart';
@@ -133,6 +134,11 @@ class _AdminStaffTabState extends State<AdminStaffTab> {
                         const SizedBox(height: 16),
                         SalaryRequestsSection(api: widget.api)
                       ])),
+              AdminDetailGroup(
+                  title: 'قوانین اخطار فروشنده',
+                  subtitle: 'اخطار خودکار با تأیید مدیر — از جمله ضوابط نانینو',
+                  icon: Icons.rule_rounded,
+                  builder: (_) => SellerWarningRulesSection(api: widget.api)),
               AdminDetailGroup(
                   title: 'حضور امروز',
                   subtitle: 'نام کارکنان و ساعت ورود',

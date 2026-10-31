@@ -2,10 +2,8 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Expense;
-use App\Models\SalaryPayment;
-use App\Models\Sale;
 use App\Support\Jalali;
+use App\Support\Ledger;
 use App\Support\Money;
 use Filament\Widgets\ChartWidget;
 
@@ -25,13 +23,17 @@ class IncomeExpenseChart extends ChartWidget
     {
         $days = collect(range(13, 0))->map(fn ($d) => now()->subDays($d));
 
+        // Read through Ledger::dailyTotals, the same figures the phone's
+        // trend chart shows. This chart counted bread only on one side and
+        // left purchase invoices off the other, so flour sold, other
+        // income and every delivery were missing from the panel's picture.
+        $totals = $days->map(fn ($day) => Ledger::dailyTotals($day));
+
         return [
             'datasets' => [
                 [
                     'label' => 'درآمد',
-                    'data' => $days->map(fn ($day) => round(Money::convert(
-                        (float) Sale::whereDate('created_at', $day->toDateString())->sum('amount')
-                    ), 2))->toArray(),
+                    'data' => $totals->map(fn ($t) => round(Money::convert($t[0]), 2))->toArray(),
                     'borderColor' => '#2E9E6B',
                     'backgroundColor' => 'rgba(46, 158, 107, 0.15)',
                     'fill' => true,
@@ -39,14 +41,7 @@ class IncomeExpenseChart extends ChartWidget
                 ],
                 [
                     'label' => 'هزینه',
-                    'data' => $days->map(function ($day) {
-                        $date = $day->toDateString();
-
-                        return round(Money::convert(
-                            (float) Expense::whereDate('spent_on', $date)->sum('amount')
-                            + (float) SalaryPayment::paid()->whereDate('paid_on', $date)->sum('net_amount')
-                        ), 2);
-                    })->toArray(),
+                    'data' => $totals->map(fn ($t) => round(Money::convert($t[1]), 2))->toArray(),
                     'borderColor' => '#D1495B',
                     'backgroundColor' => 'rgba(209, 73, 91, 0.15)',
                     'fill' => true,

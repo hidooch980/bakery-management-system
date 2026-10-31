@@ -25,28 +25,41 @@ class _Api extends BakeryApi {
   Future<List<Map<String, dynamic>>> inventory() async => [];
 
   @override
-  Future<({List<FlourSale> sales, int count, double totalBags, String totalFormatted})>
-      todayFlourSales() async =>
-          (sales: <FlourSale>[], count: 0, totalBags: 0.0, totalFormatted: '۰ تومان');
+  Future<
+          ({
+            List<FlourSale> sales,
+            int count,
+            double totalBags,
+            String totalFormatted
+          })>
+      todayFlourSales() async => (
+            sales: <FlourSale>[],
+            count: 0,
+            totalBags: 0.0,
+            totalFormatted: '۰ تومان'
+          );
 
   @override
   Future<Map<String, dynamic>?> currentFlourAllocation() async => {
         'month_label': 'آبان ۱۴۰۵',
         'total_bags': 347,
-        if (!oldServer) 'daily_period': {
-          'date': '2026-10-30',
-          'date_label': '۱۴۰۵/۰۸/۰۸',
-          'period_label': 'دوره اول',
-          'allocated_bags': 11.57,
-          'allocated_kg': 462.8,
-          'used_bags': 2,
-          'used_kg': 80,
-          'remaining_bags': 9.57,
-          'chane_count': 140,
-          'card_bread_count': 100,
-        },
+        if (!oldServer)
+          'daily_period': {
+            'date': '2026-10-30',
+            'date_label': '۱۴۰۵/۰۸/۰۸',
+            'period_label': 'دوره اول',
+            'allocated_bags': 11.57,
+            'allocated_kg': 462.8,
+            'used_bags': 2,
+            'used_kg': 80,
+            'remaining_bags': 9.57,
+            'chane_count': 140,
+            'card_bread_count': 100,
+          },
         'periods': [period('دوره اول', 115.7, 11.57, 10)],
         'whole_period': period('کل ماه', 347, 12.85, 27),
+        if (!oldServer)
+          'receipt': {'received_bags': 120, 'to_receive_bags': 227},
       };
 }
 
@@ -57,7 +70,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       home: Directionality(
         textDirection: TextDirection.rtl,
-        child: Scaffold(body: AdminWarehouseTab(api: _Api(oldServer: oldServer))),
+        child:
+            Scaffold(body: AdminWarehouseTab(api: _Api(oldServer: oldServer))),
       ),
     ));
     await tester.pumpAndSettle();
@@ -66,7 +80,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('باز کردن سهمیه در انبار سهم روزانه دوره و جمع ماه را نشان می‌دهد',
+  testWidgets(
+      'باز کردن سهمیه در انبار سهم روزانه دوره و جمع ماه را نشان می‌دهد',
       (tester) async {
     await show(tester);
     expect(find.text('سهم روزانه آرد'), findsNWidgets(2));
@@ -77,10 +92,12 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('سرور قدیمی سهم روزانه را پنهان یا صفر فرض نمی‌کند', (tester) async {
+  testWidgets('سرور قدیمی سهم روزانه را پنهان یا صفر فرض نمی‌کند',
+      (tester) async {
     await show(tester, oldServer: true);
     expect(find.text('سهم روزانه آرد'), findsNWidgets(2));
-    expect(find.textContaining('اطلاعات سهم روزانه از سرور دریافت نشد'), findsNWidgets(2));
+    expect(find.textContaining('اطلاعات سهم روزانه از سرور دریافت نشد'),
+        findsNWidgets(2));
     expect(find.text('0 کیسه در روز کاری'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -94,6 +111,31 @@ void main() {
     expect(find.text('2 کیسه • 80 کیلوگرم'), findsOneWidget);
     expect(find.text('140 چانه'), findsOneWidget);
     expect(find.text('100 نان'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('سهمیه ماه در برابر آرد دریافت‌شده و دکمه ثبت سهمیه آرد',
+      (tester) async {
+    await show(tester);
+    expect(find.text('دریافت‌شده از سهمیه'), findsOneWidget);
+    expect(find.text('120 کیسه'), findsOneWidget);
+    expect(find.text('مانده برای دریافت'), findsOneWidget);
+    expect(find.text('227 کیسه'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('دکمه ثبت سهمیه آرد در خود انبار است', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(body: AdminWarehouseTab(api: _Api())),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('flour-quota-record')));
+    expect(find.text('ثبت سهمیه آرد'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

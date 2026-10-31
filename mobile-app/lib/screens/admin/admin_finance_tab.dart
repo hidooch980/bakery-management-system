@@ -473,6 +473,14 @@ class _AdminFinanceTabState extends State<AdminFinanceTab> {
                       value: '${expenses['salaries_paid_formatted'] ?? '—'}',
                       icon: Icons.badge_rounded,
                     ),
+                    if (expenses['purchases_formatted'] != null) ...[
+                      const Divider(height: 1),
+                      AdminRow(
+                        label: 'فاکتورهای خرید',
+                        value: '${expenses['purchases_formatted']}',
+                        icon: Icons.local_shipping_rounded,
+                      ),
+                    ],
                   ],
                 ),
                 if (byCategory.isNotEmpty) ...[

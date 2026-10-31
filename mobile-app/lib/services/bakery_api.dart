@@ -504,8 +504,18 @@ class BakeryApi {
       label: 'فروش — چانه #$chaneEntryId',
     );
 
+    // A customer past their credit limit: the sale stands, but the seller
+    // should know before they hand over more bread on credit.
+    final data = body['data'];
+    lastSaleWarning = data is Map && data['credit_warning'] is String
+        ? data['credit_warning'] as String
+        : null;
+
     return body['queued'] == true;
   }
+
+  /// The credit-limit warning from the last sale recorded, if any.
+  String? lastSaleWarning;
 
   /// Schools and offices the admin has defined, for attributing a sale.
   /// The customer list.
@@ -561,6 +571,29 @@ class BakeryApi {
     final body = await _client.getCached('/sales/my-account');
 
     return SellerAccount.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  /// «دفتر حساب من»: every debt and handover with the balance after each.
+  Future<Map<String, dynamic>> myLedger() async {
+    final body = await _client.getCached('/sales/my-account/ledger');
+
+    return keyedGroup(body['data']);
+  }
+
+  /// The same ledger for any seller, for the manager.
+  Future<Map<String, dynamic>> sellerLedger(int sellerId) async {
+    final body = await _client.getCached('/seller-accounts/$sellerId/ledger');
+
+    return keyedGroup(body['data']);
+  }
+
+  /// «سود روزانه»: sales − flour − a day's wages − expenses, last [days].
+  Future<Map<String, dynamic>> dailyProfit({int days = 7}) async {
+    final body = await _client.getCached('/reports/daily-profit', query: {
+      'days': '$days',
+    });
+
+    return keyedGroup(body['data']);
   }
 
   // ------------------------------- seller: schools, offices, dormitories
@@ -979,7 +1012,8 @@ class BakeryApi {
   /// ریز حساب و گزارش سهمیه، تولید و کارتخوان فروشنده در بازهٔ انتخابی.
   Future<Map<String, dynamic>> sellerDailyReport(int sellerId,
       {String? from, String? until}) async {
-    final body = await _client.getCached('/seller-accounts/$sellerId/daily-report', query: {
+    final body = await _client
+        .getCached('/seller-accounts/$sellerId/daily-report', query: {
       if (from != null) 'from': from,
       if (until != null) 'to': until,
     });
@@ -1479,6 +1513,24 @@ class BakeryApi {
     return (body['data'] as Map).cast<String, dynamic>();
   }
 
+  /// What «ارسال» would send a partner: the message and a masked number.
+  Future<Map<String, dynamic>> partnerReportPreview(int partnerId) async {
+    final body = await _client
+        .getCached('/consignment-flour/partners/$partnerId/report');
+
+    return keyedGroup(body['data']);
+  }
+
+  /// Sends the account just previewed; returns the channel it went by.
+  Future<String> sendPartnerReport(int partnerId, String fingerprint) async {
+    final body = await _client.post(
+      '/consignment-flour/partners/$partnerId/report',
+      {'fingerprint': fingerprint},
+    );
+
+    return '${keyedGroup(body['data'])['channel'] ?? ''}';
+  }
+
   /// Income against expenses, with profit, for a date range.
   Future<Map<String, dynamic>> financialReport(
       {String? from, String? to}) async {
@@ -1876,6 +1928,21 @@ class BakeryApi {
 
   Future<void> rejectPenaltyRequest(int id, {required String note}) =>
       _client.patch('/penalty-requests/$id/reject', {'note': note});
+
+  /// The shop's seller-warning rules. Each active one files a pending
+  /// warning into the penalty requests above; the manager decides.
+  Future<List<Map<String, dynamic>>> sellerWarningRules() async {
+    final body = await _client.getCached('/seller-warning-rules');
+    return rowList(keyedGroup(body['data'])['rules']);
+  }
+
+  /// Switch a rule on or off, or set its threshold (in the shop's
+  /// currency for money rules) and its wording.
+  Future<Map<String, dynamic>> updateSellerWarningRule(
+      int id, Map<String, dynamic> changes) async {
+    final body = await _client.patch('/seller-warning-rules/$id', changes);
+    return keyedGroup(body['data']);
+  }
 
   /// Laravel paginators nest the rows under `data.data`; plain lists don't.
   // ------------------------------------------------------------ buying

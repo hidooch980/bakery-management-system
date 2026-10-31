@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Forms\MoneyInput;
 use App\Filament\Resources\CustomerResource\Pages;
 use App\Filament\Resources\CustomerResource\RelationManagers;
 use App\Models\Customer;
@@ -56,6 +57,10 @@ class CustomerResource extends Resource
                         ->label('تلفن')
                         ->tel()
                         ->maxLength(20),
+
+                    MoneyInput::make('credit_limit', 'سقف نسیه')
+                        ->helperText('اگر نسیهٔ بازِ این مشتری از این مبلغ بیشتر شود، هنگام فروش هشدار داده می‌شود و در یادآوری روزانه می‌آید. خالی یعنی بدون سقف.')
+                        ->visible(fn (Forms\Get $get) => $get('type') !== Customer::PARTNER_TYPE),
 
                     Forms\Components\TextInput::make('address')
                         ->label('آدرس')

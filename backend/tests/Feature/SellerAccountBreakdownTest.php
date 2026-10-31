@@ -104,7 +104,8 @@ class SellerAccountBreakdownTest extends TestCase
         $account = $this->account();
 
         $this->assertEquals(500_000.0, $account['credit']);
-        $this->assertEquals(500_000.0, $account['total']);
+        // Shown beside the account, never in it: the customer owes this.
+        $this->assertEquals(0.0, $account['total']);
         $this->assertSame('دبستان', $account['credit_sales'][0]['customer']);
     }
 
@@ -173,8 +174,9 @@ class SellerAccountBreakdownTest extends TestCase
         $this->assertEquals(-20_000.0, $account['difference']);
         $this->assertEquals(300_000.0, $account['credit']);
         $this->assertEquals(50_000.0, $account['shortfall']);
-        // 480,000 + 300,000 + 50,000 + 20,000 owed on the gap.
-        $this->assertEquals(850_000.0, $account['total']);
+        // 480,000 + 50,000 + 20,000 owed on the gap; the 300,000 of
+        // credit is the customer's to pay.
+        $this->assertEquals(550_000.0, $account['total']);
     }
 
     public function test_a_seller_only_ever_sees_their_own_account(): void
@@ -223,7 +225,7 @@ class SellerAccountBreakdownTest extends TestCase
         $this->assertEquals(0.0, $account['shortfall']);
         // The customer still owes; the seller cannot clear that by paying.
         $this->assertEquals(300_000.0, $account['credit']);
-        $this->assertEquals(300_000.0, $account['total']);
+        $this->assertEquals(0.0, $account['total']);
     }
 
     public function test_the_panel_breaks_the_account_into_its_parts(): void

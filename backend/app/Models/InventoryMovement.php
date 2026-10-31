@@ -100,7 +100,27 @@ class InventoryMovement extends Model
 
     public function getReasonLabelAttribute(): string
     {
-        return self::REASONS[$this->reason] ?? $this->reason;
+        // Only a production line can read differently by item, so only it
+        // pays for the lookup.
+        return self::labelFor(
+            $this->reason,
+            $this->reason === 'production' ? $this->item?->key : null,
+        );
+    }
+
+    /**
+     * Flour leaves for the bread two ways, kneaded into dough and dusted
+     * on the bench, and the owner reads them as «آرد خمیرگیری» and «آرد
+     * پاششی». «مصرف در تولید» is right for salt and yeast; for flour it
+     * hid which of the two it was.
+     */
+    public static function labelFor(string $reason, ?string $itemKey = null): string
+    {
+        if ($itemKey === InventoryItem::FLOUR && $reason === 'production') {
+            return 'آرد خمیرگیری';
+        }
+
+        return self::REASONS[$reason] ?? $reason;
     }
 
     /** The movement this one undoes, when it is a reversal. */

@@ -80,6 +80,7 @@ class _ConsumptionReportSectionState extends State<ConsumptionReportSection> {
         final totals =
             keyedGroup(snapshot.data!['totals']);
 
+        final rows = rowList(snapshot.data!['rows']);
         final used = _double(totals['flour_used_kg']);
         final sold = _double(totals['flour_sold_kg']);
 
@@ -102,11 +103,31 @@ class _ConsumptionReportSectionState extends State<ConsumptionReportSection> {
               value: '${_num(totals['bags_kneaded'])} کیسه',
               emphasise: true,
             ),
-            // آرد فقط به کیسه.
+            // آرد فقط به کیسه، و پاششی جدا از خمیرگیری.
             AdminRow(
-              label: 'آرد مصرف‌شده',
-              value: flourBags(_double(totals['flour_used_bags'])),
+              label: 'آرد خمیرگیری',
+              value: flourBags(_double(totals['flour_production_bags'])),
             ),
+            AdminRow(
+              label: 'آرد پاششی',
+              value: flourBags(_double(totals['flour_spray_bags'])),
+            ),
+            AdminRow(
+              label: 'جمع آرد مصرف‌شده',
+              value: flourBags(_double(totals['flour_used_bags'])),
+              emphasise: true,
+            ),
+
+            // Day by day, week by week or month by month — whichever the
+            // admin picked — with the two flours side by side.
+            for (final row in rows.where((r) =>
+                _double(r['flour_production_kg']) != 0 ||
+                _double(r['flour_spray_kg']) != 0))
+              AdminRow(
+                label: '${row['label'] ?? ''}',
+                value: 'خمیرگیری ${flourBags(_double(row['flour_production_bags']))}'
+                    ' • پاششی ${flourBags(_double(row['flour_spray_bags']))}',
+              ),
 
             // The one that changes what the rest mean. Flour sold on left
             // the store without becoming bread, so it must not be read as

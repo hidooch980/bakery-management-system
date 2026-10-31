@@ -119,6 +119,31 @@ class SellerSettlement
      *
      * @param  array<int>|null  $saleIds
      */
+    /** What one sale puts on the seller's own account: never a customer's credit. */
+    public static function sellerHeld(Sale $sale): float
+    {
+        return $sale->seller_account_amount;
+    }
+
+    /**
+     * The one figure every screen shows: what the seller owes after
+     * prepayment. Negative means the shop owes the seller.
+     *
+     * @return array{owed: float, prepaid: float, balance: float, credit: float}
+     */
+    public static function balanceFor(User $seller): array
+    {
+        $owed = self::outstandingFor($seller);
+        $prepaid = SellerAccountCredit::balanceFor($seller->id);
+
+        return [
+            'owed' => $owed['total'],
+            'prepaid' => $prepaid,
+            'balance' => round($owed['total'] - $prepaid, 2),
+            'credit' => $owed['credit'],
+        ];
+    }
+
     public static function outstandingSales(User $seller, ?array $saleIds = null)
     {
         $query = Sale::query()
@@ -476,7 +501,7 @@ class SellerSettlement
                 && (float) $request->amount < $owed - 0.01;
 
             if ($partialAmount) {
-                self::applyPayment($request->user, (float) $request->amount, $request);
+                $applied = self::applyPayment($request->user, (float) $request->amount, $request);
                 $banked = self::bankTheHandover(
                     $request->user,
                     $admin,
@@ -485,7 +510,22 @@ class SellerSettlement
                     $account,
                     $request,
                 );
+                // A partial payment is a handover like any other, and the
+                // history page read nothing but these rows.
+                self::record(
+                    $request->user,
+                    $admin,
+                    'payment',
+                    (float) $request->paid_cash,
+                    (float) $request->paid_card,
+                    $banked,
+                    $request,
+                    $applied['settled'],
+                    $applied['credit_ids'],
+                );
             } else {
+                // Paying more than the whole account must not lose the rest.
+                $excess = round((float) $request->amount - $owed, 2);
                 $banked = self::settleWithMethod(
                     $request->user,
                     $admin,
@@ -495,6 +535,15 @@ class SellerSettlement
                     $request,
                     $request->sale_ids,
                 );
+
+                if ($request->sale_ids === null && $excess > 0.01) {
+                    SellerAccountCredit::create([
+                        'user_id' => $request->user_id,
+                        'amount' => $excess,
+                        'settlement_request_id' => $request->id,
+                        'note' => 'اضافه‌پرداخت تسویه',
+                    ]);
+                }
             }
 
             $request->update([
@@ -571,7 +620,25 @@ class SellerSettlement
             throw new RuntimeException('قیمت نان در تنظیمات تعیین نشده است.');
         }
 
-        return self::applyPayment($seller, round($loaves * $price, 2), $request);
+        $applied = self::applyPayment($seller, round($loaves * $price, 2), $request);
+
+        // Bread handed back is a handover like money is; without a row the
+        // ledger would still count this debt as owed.
+        if ($request === null) {
+            SellerSettlementRecord::create([
+                'user_id' => $seller->id,
+                'settled_by' => auth()->id(),
+                'kind' => 'loaves',
+                'paid_cash' => 0,
+                'paid_card' => 0,
+                'amount' => round($loaves * $price, 2),
+                'sale_ids' => $applied['settled'],
+                'credit_ids' => $applied['credit_ids'],
+                'note' => 'تسویهٔ نانی: '.$loaves.' نان',
+            ]);
+        }
+
+        return $applied;
     }
 
     public static function applyPayment(
@@ -601,7 +668,11 @@ class SellerSettlement
             // Oldest first: the debt that has been waiting longest is the
             // one the shop wants off the books.
             foreach (self::outstandingSales($seller)->reorder()->oldest('created_at')->oldest('id')->get() as $sale) {
-                $cost = round($sale->seller_account_amount, 2);
+                // Only what the seller holds: cash, bread short, the till gap.
+                // A customer's credit is not his to pay, and settle() never
+                // closes it — counting it here spent each payment on a sale
+                // that then stayed open for ever, so the money vanished.
+                $cost = self::sellerHeld($sale);
 
                 if ($cost <= 0) {
                     continue;

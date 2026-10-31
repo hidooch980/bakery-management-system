@@ -577,7 +577,7 @@ class _AdminRecordSheetState extends State<AdminRecordSheet> {
                       onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) =>
-                              ConsignmentFlourScreen(api: widget.api),
+                              ConsignmentFlourScreen(api: widget.api, canSend: true),
                         ),
                       ),
                       icon: const Icon(Icons.list_alt_rounded, size: 18),

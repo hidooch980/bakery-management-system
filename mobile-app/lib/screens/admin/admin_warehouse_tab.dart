@@ -13,6 +13,7 @@ import '../../widgets/admin_detail_group.dart';
 import '../shared/purchase_sheet.dart';
 import 'admin_home_screen.dart';
 import 'diesel_section.dart';
+import 'monthly_quota_button.dart';
 import 'inventory_entries_sheet.dart';
 import 'stock_count_sheet.dart';
 
@@ -228,13 +229,17 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                 ),
                 const SizedBox(height: 14),
               ],
-              if (quota == null)
+              if (quota == null) ...[
                 const EmptyState(
                   icon: Icons.calendar_today_rounded,
                   title: 'سهمیه‌ای تعریف نشده',
-                  subtitle: 'سهمیه ماهانه آرد را از پنل مدیریت ثبت کنید.',
-                )
-              else
+                  subtitle: 'سهمیه ماهانه آرد را با دکمهٔ زیر ثبت کنید.',
+                ),
+                MonthlyQuotaButton(
+                    key: const Key('flour-quota-record'),
+                    api: widget.api,
+                    onSaved: _reload),
+              ] else ...[
                 AdminDetailGroup(
                     title: 'سهمیه آرد',
                     subtitle:
@@ -242,6 +247,11 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
                     icon: Icons.calendar_month_outlined,
                     builder: (_) =>
                         Column(children: _buildQuota(context, quota))),
+                MonthlyQuotaButton(
+                    key: const Key('flour-quota-record'),
+                    api: widget.api,
+                    onSaved: _reload),
+              ],
             ],
           );
         },
@@ -264,6 +274,23 @@ class _AdminWarehouseTabState extends State<AdminWarehouseTab> {
             emphasise: true,
           ),
           // مانده قابل دریافت با انتقال سهمیه بین دوره‌ها محاسبه می‌شود؛ مبنای برنامه‌ریزی همین عدد است.
+          // آنچه از سهمیهٔ ماه واقعاً تحویل گرفته شده: خرید آرد در همان ماه شمسی.
+          if (quota['receipt'] is Map<String, dynamic>) ...[
+            AdminRow(
+              key: const Key('quota-received'),
+              label: 'دریافت‌شده از سهمیه',
+              value:
+                  '${_fmt(keyedGroup(quota['receipt'])['received_bags'])} کیسه',
+              icon: Icons.local_shipping_rounded,
+            ),
+            AdminRow(
+              key: const Key('quota-to-receive'),
+              label: 'مانده برای دریافت',
+              value:
+                  '${_fmt(keyedGroup(quota['receipt'])['to_receive_bags'])} کیسه',
+              icon: Icons.pending_rounded,
+            ),
+          ],
           if (quota['carried_balance'] is Map<String, dynamic>)
             AdminRow(
               label: 'ماندهٔ سهمیه — منتقل می‌شود',

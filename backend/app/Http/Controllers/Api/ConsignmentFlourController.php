@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ConsignmentFlour;
 use App\Models\Customer;
+use App\Models\SmsLog;
 use App\Support\AppCalendar;
 use App\Support\DoughFormula;
 use App\Support\Jalali;
+use App\Support\PartnerFlourReport;
 use App\Support\PartnerLedger;
 use App\Support\PartnerNetting;
 use App\Support\PartnerPosition;
@@ -258,5 +260,34 @@ class ConsignmentFlourController extends Controller
             'outstanding_bags' => round($open, 2),
             'note' => $record->note,
         ];
+    }
+
+    /** What «ارسال» would send this partner, and to which number (masked). */
+    public function reportPreview(Customer $customer): JsonResponse
+    {
+        if ($customer->type !== Customer::PARTNER_TYPE) {
+            return $this->error('این طرف‌حساب همکار نیست.', 404);
+        }
+        $preview = PartnerFlourReport::preview($customer);
+
+        return $this->success([
+            'channel' => $preview['channel'],
+            'phone_masked' => SmsLog::mask($preview['phone']),
+            'has_phone' => $preview['phone'] !== '',
+            'message' => $preview['message'],
+            'fingerprint' => $preview['fingerprint'],
+        ]);
+    }
+
+    /** Send the account just previewed. Admins only, checked inside. */
+    public function reportSend(Request $request, Customer $customer): JsonResponse
+    {
+        if ($customer->type !== Customer::PARTNER_TYPE) {
+            return $this->error('این طرف‌حساب همکار نیست.', 404);
+        }
+        $data = $request->validate(['fingerprint' => ['required', 'string', 'max:100']]);
+        $via = PartnerFlourReport::send($customer, $data['fingerprint']);
+
+        return $this->success(['channel' => $via], 'گزارش از راه '.$via.' ارسال شد.');
     }
 }

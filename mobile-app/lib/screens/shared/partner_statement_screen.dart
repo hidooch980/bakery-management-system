@@ -18,17 +18,71 @@ class PartnerStatementScreen extends StatefulWidget {
     required this.api,
     required this.partnerId,
     required this.partnerName,
+    this.canSend = false,
   });
 
   final BakeryApi api;
   final int partnerId;
   final String partnerName;
 
+  /// Shows «ارسال»: the manager sends the partner their account in bags.
+  final bool canSend;
+
   @override
   State<PartnerStatementScreen> createState() => _PartnerStatementScreenState();
 }
 
 class _PartnerStatementScreenState extends State<PartnerStatementScreen> {
+  bool _sending = false;
+
+  /// Preview first — the manager sees exactly what goes and to which
+  /// number (masked) — then send.
+  Future<void> _send() async {
+    setState(() => _sending = true);
+    try {
+      final preview = await widget.api.partnerReportPreview(widget.partnerId);
+      if (!mounted) return;
+      if (preview['has_phone'] != true) {
+        showMessage(context, 'شمارهٔ همراه این همکار ثبت نشده است.', isError: true);
+        return;
+      }
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('ارسال حساب آرد'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('به: ${preview['phone_masked'] ?? ''} — ${preview['channel'] ?? ''}',
+                    style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 8),
+                Text('${preview['message'] ?? ''}'),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('انصراف')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('ارسال')),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+      final via = await widget.api
+          .sendPartnerReport(widget.partnerId, '${preview['fingerprint']}');
+      if (!mounted) return;
+      showMessage(context, 'گزارش از راه $via ارسال شد.');
+    } on ApiException catch (e) {
+      if (mounted) showMessage(context, e.message, isError: true);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
   late Future<Map<String, dynamic>> _future;
   String? _from;
   String? _to;
@@ -95,7 +149,18 @@ class _PartnerStatementScreenState extends State<PartnerStatementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.partnerName)),
+      appBar: AppBar(
+        title: Text(widget.partnerName),
+        actions: [
+          if (widget.canSend)
+            TextButton.icon(
+              key: const Key('partner-report-send'),
+              onPressed: _sending ? null : _send,
+              icon: const Icon(Icons.send_rounded, size: IconSize.row),
+              label: const Text('ارسال'),
+            ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<Map<String, dynamic>>(

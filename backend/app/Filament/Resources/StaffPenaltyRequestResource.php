@@ -66,7 +66,8 @@ class StaffPenaltyRequestResource extends Resource
                     ->description(fn (StaffPenaltyRequest $r) => $r->note),
                 Tables\Columns\TextColumn::make('amount')->label('مبلغ')
                     ->formatStateUsing(fn ($state) => Money::format((float) $state))->placeholder('—'),
-                Tables\Columns\TextColumn::make('requestedBy.name')->label('درخواست‌دهنده'),
+                Tables\Columns\TextColumn::make('requester_name')->label('درخواست‌دهنده')
+                    ->state(fn (StaffPenaltyRequest $r) => $r->requester_name),
                 Tables\Columns\TextColumn::make('status')->label('وضعیت')->badge()
                     ->state(fn (StaffPenaltyRequest $r) => $r->is_cancelled ? 'cancelled' : $r->status)
                     ->formatStateUsing(fn ($state) => $state === 'cancelled' ? 'لغو شد' : (StaffPenaltyRequest::STATUS_LABELS[$state] ?? $state))
@@ -152,7 +153,7 @@ class StaffPenaltyRequestResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with(['user', 'requestedBy', 'decidedBy', 'adjustment']);
+        return parent::getEloquentQuery()->with(['user', 'requestedBy', 'rule', 'decidedBy', 'adjustment']);
     }
 
     public static function getPages(): array

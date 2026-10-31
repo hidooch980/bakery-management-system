@@ -35,8 +35,12 @@ class FinancialOverview extends BaseWidget
         $expenses = Ledger::recordedExpenses($from, $to);
         $salaries = Ledger::paidSalaries($from, $to);
 
-        $totalExpenses = $expenses + $salaries;
-        $profit = $income - $totalExpenses;
+        // Purchase invoices count, as they do on «سود و زیان» and in the
+        // card beside this one; without them the two disagreed.
+        $purchases = Ledger::purchases($from, $to);
+
+        $totalExpenses = Ledger::totalExpenses($from, $to);
+        $profit = Ledger::profit($from, $to);
 
         $unpaid = (float) SalaryPayment::unpaid()->sum('net_amount');
 
@@ -62,7 +66,7 @@ class FinancialOverview extends BaseWidget
                 ->color('success'),
 
             Stat::make('هزینه‌ها', Money::format($totalExpenses))
-                ->description('هزینه '.Money::format($expenses).' + حقوق '.Money::format($salaries))
+                ->description('هزینه '.Money::format($expenses).' + حقوق '.Money::format($salaries).' + خرید '.Money::format($purchases))
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color('danger'),
 

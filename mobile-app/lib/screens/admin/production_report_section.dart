@@ -79,6 +79,7 @@ class _ProductionReportSectionState extends State<ProductionReportSection> {
         final data = snapshot.data!;
         final normal = _int(data['total_chane_count']);
         final nanino = _int(data['total_nanino_count']);
+        final flour = keyedGroup(data['flour']);
         final daily = rowList(data['daily'])
             .whereType<Map<String, dynamic>>()
             .toList();
@@ -114,11 +115,17 @@ class _ProductionReportSectionState extends State<ProductionReportSection> {
               label: 'وزن چانه معمولی',
               value: '${_num(data['total_normal_weight_kg'])} کیلوگرم',
             ),
-            if (_double(data['total_spray_flour_kg']) > 0)
-              AdminRow(
-                label: 'آرد پاشیدنی',
-                value: flourBags(_double(data['total_spray_flour_bags'])),
-              ),
+            // The two ways flour went into the bread, from the warehouse
+            // so a cancelled batch is netted out; dusting flour is never
+            // folded into the dough figure.
+            AdminRow(
+              label: 'آرد خمیرگیری',
+              value: flourBags(_double(flour['dough_bags'] ?? data['total_dough_bags'])),
+            ),
+            AdminRow(
+              label: 'آرد پاششی',
+              value: flourBags(_double(flour['spray_bags'] ?? data['total_spray_flour_bags'])),
+            ),
 
             // The daily shape, where there is more than one day of it. One
             // bar is not a trend and takes the space of the figures above.

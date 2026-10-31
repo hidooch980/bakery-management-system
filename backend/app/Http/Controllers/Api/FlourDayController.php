@@ -60,7 +60,7 @@ class FlourDayController extends Controller
             ->groupBy('reason')
             ->map(fn ($group, $reason) => [
                 'reason' => $reason,
-                'label' => InventoryMovement::REASONS[$reason] ?? $reason,
+                'label' => InventoryMovement::labelFor($reason, InventoryItem::FLOUR),
                 'bags' => $bags((float) $group->sum('quantity')),
                 'quantity_kg' => (float) $group->sum('quantity'),
                 'count' => $group->count(),
@@ -91,7 +91,7 @@ class FlourDayController extends Controller
                 'time' => $m->created_at?->format('H:i'),
                 'direction' => $m->direction,
                 'reason' => $m->reason,
-                'label' => $m->reason_label,
+                'label' => InventoryMovement::labelFor($m->reason, InventoryItem::FLOUR),
                 'bags' => $bags((float) $m->quantity),
                 'quantity_kg' => (float) $m->quantity,
                 'note' => $m->note,

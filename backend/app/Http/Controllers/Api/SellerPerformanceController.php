@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\Jalali;
 use App\Support\Money;
 use App\Support\SameBakery;
+use App\Support\SellerLedger;
 use App\Support\SellerSettlement;
 use App\Traits\ApiResponse;
 use Carbon\Carbon;
@@ -170,14 +171,20 @@ class SellerPerformanceController extends Controller
      */
     private function debts(User $seller): array
     {
-        $owed = SellerSettlement::outstandingFor($seller);
+        // After prepayment: money already handed over that has not closed a
+        // whole sale yet is still money handed over. Without it this page
+        // read higher than the accounts page for the same seller.
+        $owed = SellerSettlement::balanceFor($seller);
 
         // The numbers travel beside the formatted strings so the app can
         // decide whether a line is worth drawing without parsing money
         // back out of text it just asked the server to format.
         return [
-            'outstanding' => $owed['total'],
-            'outstanding_formatted' => Money::format($owed['total']),
+            'outstanding' => $owed['balance'],
+            'outstanding_formatted' => Money::format($owed['balance']),
+            'prepaid' => $owed['prepaid'],
+            'prepaid_formatted' => Money::format($owed['prepaid']),
+            'ledger_warning' => SellerLedger::warning(SellerLedger::reconcile($seller)),
             'credit_out' => $owed['credit'],
             'credit_out_formatted' => Money::format($owed['credit']),
         ];

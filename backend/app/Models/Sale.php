@@ -401,18 +401,19 @@ class Sale extends Model
     }
 
     /**
-     * What this sale puts on the seller's account. Cash in hand, credit
-     * still to collect and bread nobody paid for all count against them;
-     * a sale that took less money than its bread was worth adds the gap.
+     * What this sale puts on the seller's own account: cash in hand and
+     * bread nobody paid for; a sale that took less money than its bread was
+     * worth adds the gap.
      *
-     * Nothing is counted twice: the shortfall is bread no payment line
-     * covered, and a sale is either cash or credit, never both.
+     * Credit handed to a customer (schools, نسیه) is not here. That money is
+     * with the customer, clears when the customer pays, and no handover by
+     * the seller ever closes it — counting it here is what used to spend a
+     * seller's payment on a sale that then stayed open for ever.
      */
     public function getSellerAccountAmountAttribute(): float
     {
         return round(
             $this->cash_held
-            + $this->open_credit
             + $this->open_shortfall
             - $this->open_difference,
             2

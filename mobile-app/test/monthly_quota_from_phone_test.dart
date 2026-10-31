@@ -42,7 +42,7 @@ Future<void> _open(WidgetTester tester, _Server server, VoidCallback saved) asyn
   await tester.pumpWidget(MaterialApp(
     home: Scaffold(body: MonthlyQuotaButton(api: BakeryApi(client), onSaved: saved)),
   ));
-  await tester.tap(find.text('ثبت سهمیه ماهانه'));
+  await tester.tap(find.text('ثبت سهمیه آرد'));
   await tester.pumpAndSettle();
 }
 

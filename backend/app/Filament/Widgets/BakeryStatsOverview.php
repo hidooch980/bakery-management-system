@@ -8,6 +8,7 @@ use App\Models\DoughEntry;
 use App\Models\InventoryItem;
 use App\Models\Sale;
 use App\Support\DoughFormula;
+use App\Support\Ledger;
 use App\Support\Money;
 use App\Support\Qty;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
@@ -28,6 +29,7 @@ class BakeryStatsOverview extends BaseWidget
         $salesAmount = (float) Sale::whereDate('created_at', $today)->sum('amount');
         $salesCount = Sale::whereDate('created_at', $today)->count();
         $attendance = Attendance::where('date', $today)->count();
+        $flourToday = Ledger::flourSplit(now()->startOfDay(), now()->endOfDay());
 
         $formula = DoughFormula::fromBakery();
 
@@ -43,7 +45,9 @@ class BakeryStatsOverview extends BaseWidget
 
         return [
             Stat::make('خمیر امروز', Qty::format($doughBags).' کیسه')
-                ->description('مجموع کیسه‌های خمیرگیری‌شده')
+                // Flour by where it went, so dusting flour is never
+                // folded into the dough figure.
+                ->description('آرد خمیرگیری '.Qty::format($flourToday['dough_bags']).' کیسه • آرد پاششی '.Qty::format($flourToday['spray_bags']).' کیسه')
                 ->descriptionIcon('heroicon-m-cube')
                 ->color('warning')
                 ->chart($this->trend(DoughEntry::class, 'bag_count')),

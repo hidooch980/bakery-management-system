@@ -23,7 +23,7 @@ class MonthlyQuotaButton extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: FilledButton.tonalIcon(
         icon: const Icon(Icons.calendar_month_rounded),
-        label: const Text('ثبت سهمیه ماهانه'),
+        label: const Text('ثبت سهمیه آرد'),
         onPressed: () async {
           final saved = await showModalBottomSheet<bool>(
             context: context,

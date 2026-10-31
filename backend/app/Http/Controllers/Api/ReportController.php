@@ -21,6 +21,7 @@ use App\Support\Ledger;
 use App\Support\Money;
 use App\Support\PeriodBuckets;
 use App\Support\ReportSeries;
+use App\Support\ShopChecks;
 use App\Support\StaffYield;
 use App\Support\TodayAnswer;
 use App\Traits\ApiResponse;
@@ -66,6 +67,9 @@ class ReportController extends Controller
                 'active' => User::ofCurrentBakery()->where('is_active', true)->count(),
             ],
             'flour_balance_kg' => $this->flourBalance(),
+            // Today's flour by where it went: kneaded into dough, dusted
+            // on the bench. In sacks, as the shop counts flour.
+            'flour_today' => Ledger::flourSplit(now()->startOfDay(), now()->endOfDay()),
             // So a client that shows raw figures still labels them correctly.
             'currency' => Money::currency(),
             'currency_label' => Money::label(),
@@ -99,6 +103,9 @@ class ReportController extends Controller
                 ->naninoCountForWeight((float) $chane->sum('nanino_weight_kg')),
             'total_spray_flour_kg' => round((float) $chane->sum('spray_flour_kg'), 2),
             'total_spray_flour_bags' => self::flourBags((float) $chane->sum('spray_flour_kg')),
+            // The two ways flour went into the bread, from the warehouse
+            // ledger so a cancelled batch is netted out.
+            'flour' => Ledger::flourSplit($from, $to),
             // Day-by-day dough count, so the range total isn't the only
             // figure available — how many batches were made on which day.
             'daily' => $this->dailyDoughCounts($from, $to),
@@ -124,6 +131,9 @@ class ReportController extends Controller
         $doughBags = Ledger::dailySums(DoughEntry::query(), 'created_at', 'bag_count', $from, $to);
         $chaneCount = Ledger::dailySums(ChaneEntry::query(), 'created_at', 'chane_count', $from, $to);
         $naninoWeight = Ledger::dailySums(ChaneEntry::query(), 'created_at', 'nanino_weight_kg', $from, $to);
+        $flourItem = InventoryItem::ofKey(InventoryItem::FLOUR);
+        $kneadedKg = Ledger::dailyNetOut($flourItem, ['production'], $from, $to);
+        $dustedKg = Ledger::dailyNetOut($flourItem, ['spray'], $from, $to);
 
         $days = collect();
         $cursor = $from->copy()->startOfDay();
@@ -146,6 +156,8 @@ class ReportController extends Controller
                 'normal_chane_count' => $normalCount,
                 'nanino_chane_count' => $naninoCount,
                 'total_bread_count' => $normalCount + $naninoCount,
+                'dough_flour_bags' => self::flourBags((float) ($kneadedKg[$date] ?? 0)),
+                'spray_flour_bags' => self::flourBags((float) ($dustedKg[$date] ?? 0)),
             ]);
 
             $cursor->addDay();
@@ -502,7 +514,13 @@ class ReportController extends Controller
 
         $unpaidSalaries = (float) SalaryPayment::unpaid()->sum('net_amount');
 
-        $totalExpenses = $recordedExpenses + $paidSalaries;
+        // Purchase invoices are spending too. They were left out here
+        // while the panel's profit page, this response's own comparison and
+        // the partners' split all counted them, so the phone showed Mehr
+        // 1405 almost 16 million toman better than it was.
+        $purchases = Ledger::purchases($from, $to);
+
+        $totalExpenses = Ledger::totalExpenses($from, $to);
         $profit = $income - $totalExpenses;
 
         // The flour the sold bread was baked from, costed as it is consumed
@@ -548,6 +566,8 @@ class ReportController extends Controller
                 'recorded_formatted' => Money::format($recordedExpenses),
                 'salaries_paid' => round($paidSalaries, 2),
                 'salaries_paid_formatted' => Money::format($paidSalaries),
+                'purchases' => round($purchases, 2),
+                'purchases_formatted' => Money::format($purchases),
                 'total' => round($totalExpenses, 2),
                 'total_formatted' => Money::format($totalExpenses),
                 'by_category' => $expensesByCategory,
@@ -832,8 +852,16 @@ class ReportController extends Controller
                 'flour_used_bags' => self::flourBags((float) $rows->sum('flour_used_kg')),
                 'flour_sold_bags' => self::flourBags((float) $rows->sum('flour_sold_kg')),
                 'salt_kg' => round((float) $rows->sum('salt_kg'), 3),
+                'flour_production_kg' => round((float) $rows->sum('flour_production_kg'), 3),
+                'flour_spray_kg' => round((float) $rows->sum('flour_spray_kg'), 3),
+                'flour_production_bags' => self::flourBags((float) $rows->sum('flour_production_kg')),
+                'flour_spray_bags' => self::flourBags((float) $rows->sum('flour_spray_kg')),
             ],
-            'rows' => $rows,
+            'rows' => $rows->map(fn (array $row) => $row + [
+                'flour_production_bags' => self::flourBags((float) $row['flour_production_kg']),
+                'flour_spray_bags' => self::flourBags((float) $row['flour_spray_kg']),
+                'flour_used_bags' => self::flourBags((float) $row['flour_used_kg']),
+            ])->values(),
         ]);
     }
 
@@ -871,5 +899,38 @@ class ReportController extends Controller
         $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
 
         return $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
+    }
+
+    /**
+     * Profit day by day for the last week: sales − flour baked − a day's
+     * wages − other spending.
+     */
+    public function dailyProfit(Request $request): JsonResponse
+    {
+        $to = Jalali::parseFlexible($request->query('to')) ?? now();
+        $days = min(31, max(1, (int) $request->query('days', 7)));
+        $rows = collect(ShopChecks::dailyProfit($to, $days))->map(fn ($r) => [
+            'date' => $r['date'],
+            'date_label' => Jalali::date(Carbon::parse($r['date'])),
+            'income' => Money::convert($r['income']),
+            'income_formatted' => Money::format($r['income']),
+            'flour' => Money::convert($r['flour']),
+            'flour_formatted' => Money::format($r['flour']),
+            'wages' => Money::convert($r['wages']),
+            'wages_formatted' => Money::format($r['wages']),
+            'expenses' => Money::convert($r['expenses']),
+            'expenses_formatted' => Money::format($r['expenses']),
+            'profit' => Money::convert($r['profit']),
+            'profit_formatted' => Money::format($r['profit']),
+        ]);
+        $total = collect(ShopChecks::dailyProfit($to, $days))->sum('profit');
+
+        return $this->success([
+            'days' => $rows->values(),
+            'total' => Money::convert($total),
+            'total_formatted' => Money::format($total),
+            'rule' => 'سود روز = فروش − آرد مصرف‌شده − حقوق یک روز (حقوق ماهانه ÷ ۳۰) − سایر هزینه‌ها',
+            'currency_label' => Money::label(),
+        ]);
     }
 }

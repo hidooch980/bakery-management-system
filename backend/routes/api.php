@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\SaleController;
 use App\Http\Controllers\Api\SellerAccountController;
 use App\Http\Controllers\Api\SellerCollectionController;
 use App\Http\Controllers\Api\SellerPerformanceController;
+use App\Http\Controllers\Api\SellerWarningRuleController;
 use App\Http\Controllers\Api\SettlementRequestController;
 use App\Http\Controllers\Api\StaffAccountController;
 use App\Http\Controllers\Api\StaffAdjustmentController;
@@ -176,6 +177,9 @@ Route::prefix('v1')->group(function () {
             ->middleware('permission:record-sale');
         Route::get('/sales/my-account', [SaleController::class, 'myAccount'])
             ->middleware('permission:view-own-sales');
+        // The seller's own ledger: what they took on and what they handed over.
+        Route::get('/sales/my-account/ledger', [SaleController::class, 'myLedger'])
+            ->middleware('permission:view-own-sales');
 
         // The seller asks to settle; the admin confirms it in the panel.
         Route::middleware('permission:view-own-sales')->group(function () {
@@ -280,6 +284,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/consignment-flour/partners', [ConsignmentFlourController::class, 'partners']);
             // پروندهٔ هر همکار: گردش ریز به کیسه.
             Route::get('/consignment-flour/partners/{customer}/statement', [ConsignmentFlourController::class, 'statement']);
+            // «ارسال» the flour account to the partner: preview, then send.
+            // Sending is checked again for an admin inside.
+            Route::get('/consignment-flour/partners/{customer}/report', [ConsignmentFlourController::class, 'reportPreview']);
+            Route::post('/consignment-flour/partners/{customer}/report', [ConsignmentFlourController::class, 'reportSend']);
             Route::get('/consignment-flour', [ConsignmentFlourController::class, 'index']);
             Route::post('/consignment-flour', [ConsignmentFlourController::class, 'store']);
         });
@@ -473,6 +481,9 @@ Route::prefix('v1')->group(function () {
             Route::patch('/penalty-requests/{penaltyRequest}/approve', [StaffPenaltyRequestController::class, 'approve']);
             Route::patch('/penalty-requests/{penaltyRequest}/reject', [StaffPenaltyRequestController::class, 'reject']);
             Route::patch('/penalty-requests/{penaltyRequest}/cancel', [StaffPenaltyRequestController::class, 'cancel']);
+            // The rules that file warnings into the list above.
+            Route::get('/seller-warning-rules', [SellerWarningRuleController::class, 'index']);
+            Route::patch('/seller-warning-rules/{rule}', [SellerWarningRuleController::class, 'update']);
             Route::apiResource('staff-advances', StaffAdvanceController::class)
                 ->parameters(['staff-advances' => 'advance'])
                 ->only(['index', 'store', 'destroy']);
@@ -500,6 +511,8 @@ Route::prefix('v1')->group(function () {
             // «سابقهٔ تسویه‌های فروشنده» — there was no list: the owner
             // settling somebody at the counter left only a bank movement.
             Route::get('/seller-accounts/{seller}/history', [SellerAccountController::class, 'history']);
+            // «دفتر حساب»: debts and handovers with the running balance.
+            Route::get('/seller-accounts/{seller}/ledger', [SellerAccountController::class, 'ledger']);
             Route::post('/seller-accounts/{seller}/settle', [SellerAccountController::class, 'settle']);
             // «اصلاح تسویهٔ اشتباه» — the wrong seller, amount or day.
             Route::post('/seller-settlements/{record}/reverse', [SellerAccountController::class, 'reverse']);
@@ -567,6 +580,8 @@ Route::prefix('v1')->group(function () {
             // What the shop owns against what it owes, as of now.
             Route::get('/reports/balance-sheet', [BalanceSheetController::class, 'show']);
             Route::get('/reports/profit-and-loss', [ReportController::class, 'profitAndLoss']);
+            // «سود روزانه»: sales − flour − wages − expenses, the last week.
+            Route::get('/reports/daily-profit', [ReportController::class, 'dailyProfit']);
             // Income and cost bucketed daily, weekly or monthly.
             Route::get('/reports/financial-series', [ReportController::class, 'financialSeries']);
             // Flat rows for Power BI and anything else that models its own
