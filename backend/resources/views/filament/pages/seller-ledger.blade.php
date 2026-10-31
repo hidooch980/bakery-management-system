@@ -13,22 +13,22 @@
     @php($l = $this->ledger())
     @if ($l)
         @if ($l['warning'])
-            <div class="rounded-xl p-4 text-sm bg-danger-50 text-danger-700 dark:bg-danger-500/10 dark:text-danger-400">
+            <div style="border-radius:12px;padding:14px;background:rgba(209,73,91,.10);color:#b4233a;border:1px solid rgba(209,73,91,.35);font-size:14px">
                 <p class="font-semibold">⚠️ مغایرت</p>
                 <p>{{ $l['warning'] }}</p>
-                <p class="mt-1 text-xs">برای اصلاح حساب‌های قدیمی دستور <span dir="ltr">sellers:repair-ledger</span> روی سرور اجرا می‌شود (اول با <span dir="ltr">--dry-run</span>).</p>
+                <p class="mt-1 text-xs">برای اصلاح حساب‌های قدیمی دستور <bdi dir="ltr">sellers:repair-ledger</bdi> روی سرور اجرا می‌شود (اول با <bdi dir="ltr">--dry-run</bdi>).</p>
             </div>
         @else
-            <div class="rounded-xl p-3 text-sm bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400">
+            <div style="border-radius:12px;padding:12px;background:rgba(46,158,107,.10);color:#1f7a50;border:1px solid rgba(46,158,107,.35);font-size:14px">
                 ✓ ماندهٔ حساب با دفتر یکی است.
             </div>
         @endif
 
-        <div class="grid gap-3 sm:grid-cols-4">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
             <x-filament::section><p class="text-xs text-gray-500">جمع بدهی‌ها</p><p class="text-lg font-bold">{{ $l['debts_total_formatted'] }}</p></x-filament::section>
             <x-filament::section><p class="text-xs text-gray-500">جمع تسویه‌ها</p><p class="text-lg font-bold">{{ $l['paid_total_formatted'] }}</p></x-filament::section>
             <x-filament::section><p class="text-xs text-gray-500">پیش‌پرداخت</p><p class="text-lg font-bold">{{ $l['prepaid_formatted'] }}</p></x-filament::section>
-            <x-filament::section><p class="text-xs text-gray-500">ماندهٔ بدهی</p><p class="text-lg font-bold text-danger-600">{{ $l['balance_formatted'] }}</p></x-filament::section>
+            <x-filament::section><p class="text-xs text-gray-500">ماندهٔ بدهی</p><p class="text-lg font-bold" style="color:#b4233a">{{ $l['balance_formatted'] }}</p></x-filament::section>
         </div>
         <p class="text-xs text-gray-500">نسیهٔ مدارس و مشتری‌ها جدا از بدهی فروشنده است: {{ $l['customer_credit_formatted'] }}</p>
 
@@ -45,8 +45,8 @@
                             <tr class="border-b dark:border-gray-800">
                                 <td class="p-2 whitespace-nowrap">{{ $e['on_label'] }}</td>
                                 <td class="p-2">{{ $e['label'] }}</td>
-                                <td class="p-2 text-danger-600">{{ $e['debit_formatted'] }}</td>
-                                <td class="p-2 text-success-600">{{ $e['credit_formatted'] }}</td>
+                                <td class="p-2" style="color:#b4233a">{{ $e['debit_formatted'] }}</td>
+                                <td class="p-2" style="color:#1f7a50">{{ $e['credit_formatted'] }}</td>
                                 <td class="p-2 font-semibold">{{ $e['balance_formatted'] }}</td>
                             </tr>
                         @empty

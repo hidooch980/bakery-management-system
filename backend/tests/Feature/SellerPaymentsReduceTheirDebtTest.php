@@ -12,6 +12,7 @@ use App\Models\SellerSettlementRecord;
 use App\Models\SettlementRequest;
 use App\Models\User;
 use App\Support\Money;
+use App\Support\SaleRecorder;
 use App\Support\SellerLedger;
 use App\Support\SellerSettlement;
 use Database\Seeders\BakerySeeder;
@@ -231,5 +232,21 @@ class SellerPaymentsReduceTheirDebtTest extends TestCase
         $this->assertTrue($r['ok'], json_encode($r));
         $this->assertEquals(100_000.0, $r['ledger']);
         $this->assertSame('loaves', SellerSettlementRecord::sole()->kind);
+    }
+
+    public function test_a_cash_sale_sent_without_an_amount_is_priced_not_free(): void
+    {
+        $dough = DoughEntry::create(['user_id' => $this->seller->id, 'bag_count' => 1]);
+        $chane = ChaneEntry::create([
+            'dough_entry_id' => $dough->id, 'user_id' => $this->seller->id, 'chane_count' => 100,
+            'normal_weight_kg' => 85, 'nanino_weight_kg' => 0, 'spray_flour_kg' => 0, 'status' => 'pending',
+        ]);
+
+        SaleRecorder::record($chane, [[
+            'payment_type' => 'cash', 'bread_count' => 100, 'amount' => null,
+            'customer_id' => null, 'consumed_by_user_id' => null, 'note' => null,
+        ]], $this->seller->id);
+
+        $this->assertEquals(500_000.0, $this->balance());
     }
 }
