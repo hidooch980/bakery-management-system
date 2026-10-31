@@ -122,7 +122,7 @@ class SellerSettlement
     /** What one sale puts on the seller's own account: never a customer's credit. */
     public static function sellerHeld(Sale $sale): float
     {
-        return round($sale->cash_held + $sale->open_shortfall - $sale->open_difference, 2);
+        return $sale->seller_account_amount;
     }
 
     /**

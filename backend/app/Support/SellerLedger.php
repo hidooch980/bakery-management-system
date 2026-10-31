@@ -7,6 +7,7 @@ use App\Models\SellerSettlementRecord;
 use App\Models\SettlementRequest;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * One seller's account as a ledger: every debt the seller took on and every
@@ -151,6 +152,86 @@ class SellerLedger
         return 'مغایرت حساب: ماندهٔ نمایش‌داده‌شده '.Money::format($r['shown'])
             .' است ولی جمع بدهی‌ها منهای جمع تسویه‌ها '.Money::format($r['ledger'])
             .' می‌شود (اختلاف '.Money::format(abs($r['difference'])).').';
+    }
+
+    /**
+     * What a repair would change for one seller, without changing it.
+     *
+     * @return array{before: float, after: float, ledger: float, difference: float, missing_history: int, fixable: bool}
+     */
+    public static function plan(User $seller): array
+    {
+        $r = self::reconcile($seller);
+
+        return [
+            'before' => $r['shown'],
+            // Only an account shown too high is closed down to the ledger.
+            // One shown too low would mean reopening sales already handed
+            // over, and that is a conversation, not a command.
+            'after' => $r['difference'] >= 1 ? $r['ledger'] : $r['shown'],
+            'ledger' => $r['ledger'],
+            'difference' => $r['difference'],
+            'missing_history' => self::requestsWithNoRecord($seller)->count(),
+            'fixable' => $r['difference'] >= 1,
+        ];
+    }
+
+    /** Confirmed handovers that left no row in the history. */
+    public static function requestsWithNoRecord(User $seller)
+    {
+        return SettlementRequest::query()
+            ->where('user_id', $seller->id)
+            ->whereNotNull('confirmed_at')
+            ->whereNotIn('id', SellerSettlementRecord::query()
+                ->whereNotNull('settlement_request_id')
+                ->select('settlement_request_id'));
+    }
+
+    /**
+     * Bring the account down to what the ledger says and write the missing
+     * history. Moves no money: the cash was banked when it was handed over.
+     * Safe to run twice — the second run finds nothing to do.
+     */
+    public static function repair(User $seller, ?User $by = null): array
+    {
+        $plan = self::plan($seller);
+
+        DB::transaction(function () use ($seller, $by, $plan) {
+            foreach (self::requestsWithNoRecord($seller)->orderBy('confirmed_at')->get() as $r) {
+                $row = new SellerSettlementRecord([
+                    'user_id' => $seller->id,
+                    'settled_by' => $r->confirmed_by ?? $by?->id,
+                    'settlement_request_id' => $r->id,
+                    'kind' => 'backfill',
+                    'paid_cash' => (float) $r->paid_cash,
+                    'paid_card' => (float) $r->paid_card,
+                    'amount' => self::paidOn($r),
+                    'sale_ids' => [],
+                    'credit_ids' => [],
+                    'note' => 'سابقهٔ تسویهٔ تأییدشده که در تاریخچه ثبت نشده بود',
+                ]);
+                $row->created_at = $r->confirmed_at;
+                $row->updated_at = now();
+                $row->save();
+            }
+
+            if ($plan['fixable']) {
+                $applied = SellerSettlement::applyPayment($seller, $plan['difference']);
+                SellerSettlementRecord::create([
+                    'user_id' => $seller->id,
+                    'settled_by' => $by?->id,
+                    'kind' => 'correction',
+                    'paid_cash' => 0,
+                    'paid_card' => 0,
+                    'amount' => $plan['difference'],
+                    'sale_ids' => $applied['settled'],
+                    'credit_ids' => $applied['credit_ids'],
+                    'note' => 'اصلاح حساب: تسویه‌هایی که از بدهی کم نشده بودند',
+                ]);
+            }
+        });
+
+        return $plan;
     }
 
     public static function fa(int|string $n): string
