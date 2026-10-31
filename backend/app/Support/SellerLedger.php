@@ -234,6 +234,41 @@ class SellerLedger
         return $plan;
     }
 
+    /** The ledger as the app and panel read it: newest first, money formatted. */
+    public static function payload(User $seller, int $limit = 300): array
+    {
+        $entries = self::entries($seller);
+        $r = self::reconcile($seller);
+        $b = SellerSettlement::balanceFor($seller);
+
+        return [
+            'seller' => ['id' => $seller->id, 'name' => $seller->name],
+            'balance' => Money::convert($b['balance']),
+            'balance_formatted' => Money::format($b['balance']),
+            'owed_formatted' => Money::format($b['owed']),
+            'prepaid' => Money::convert($b['prepaid']),
+            'prepaid_formatted' => Money::format($b['prepaid']),
+            'customer_credit_formatted' => Money::format($b['credit']),
+            'ledger_balance_formatted' => Money::format($r['ledger']),
+            'debts_total_formatted' => Money::format($r['debts']),
+            'paid_total_formatted' => Money::format($r['paid']),
+            'reconciled' => $r['ok'],
+            'warning' => self::warning($r),
+            'debt_alert' => ShopChecks::debtAlertFor($seller),
+            'entries' => $entries->reverse()->take($limit)->values()->map(fn ($e) => [
+                'kind' => $e['kind'],
+                'label' => $e['label'],
+                'on_label' => AppCalendar::dateTime($e['at']),
+                'debit' => Money::convert($e['debit']),
+                'debit_formatted' => $e['debit'] != 0 ? Money::format($e['debit']) : null,
+                'credit' => Money::convert($e['credit']),
+                'credit_formatted' => $e['credit'] != 0 ? Money::format($e['credit']) : null,
+                'balance' => Money::convert($e['balance']),
+                'balance_formatted' => Money::format($e['balance']),
+            ])->all(),
+        ];
+    }
+
     public static function fa(int|string $n): string
     {
         return strtr((string) $n, ['0' => '۰', '1' => '۱', '2' => '۲', '3' => '۳', '4' => '۴', '5' => '۵', '6' => '۶', '7' => '۷', '8' => '۸', '9' => '۹']);

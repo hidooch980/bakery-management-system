@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Widgets\BakeryStatsOverview;
+use App\Filament\Widgets\DailyProfitChart;
 use App\Filament\Widgets\FlourQuotaOverview;
 use App\Filament\Widgets\InventoryOverview;
 use App\Filament\Widgets\MoneyAtAGlance;
@@ -26,6 +27,8 @@ class Dashboard extends BaseDashboard
             // The four figures the owner opens the panel to find, before
             // the production detail underneath them.
             MoneyAtAGlance::class,
+            // Today's profit and the week behind it.
+            DailyProfitChart::class,
             BakeryStatsOverview::class,
             // خلاصهٔ آرد امانی همکاران؛ ویجت‌های دیگر دست نخورده‌اند.
             PartnerFlourSummary::class,

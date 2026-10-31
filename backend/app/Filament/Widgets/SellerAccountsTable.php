@@ -126,6 +126,11 @@ class SellerAccountsTable extends BaseWidget
                     ->color('danger'),
             ])
             ->actions([
+                Tables\Actions\Action::make('ledger')
+                    ->label('دفتر حساب')
+                    ->icon('heroicon-o-book-open')
+                    ->color(fn (User $record) => \App\Support\SellerLedger::reconcile($record)['ok'] ? 'gray' : 'danger')
+                    ->url(fn (User $record) => \App\Filament\Pages\SellerLedgerPage::getUrl(['seller' => $record->id])),
                 // The shop counts this debt in bread, so a part settlement
                 // is "three hundred loaves" rather than an amount somebody
                 // has already done the arithmetic on. Full settlement keeps

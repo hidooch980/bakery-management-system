@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\ShopChecks;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\BakeryShare;
@@ -871,5 +872,38 @@ class ReportController extends Controller
         $bagWeight = DoughFormula::fromBakery()->bagWeightKg;
 
         return $bagWeight > 0 ? round($kg / $bagWeight, 2) : 0.0;
+    }
+
+    /**
+     * Profit day by day for the last week: sales − flour baked − a day's
+     * wages − other spending.
+     */
+    public function dailyProfit(Request $request): JsonResponse
+    {
+        $to = Jalali::parseFlexible($request->query('to')) ?? now();
+        $days = min(31, max(1, (int) $request->query('days', 7)));
+        $rows = collect(ShopChecks::dailyProfit($to, $days))->map(fn ($r) => [
+            'date' => $r['date'],
+            'date_label' => Jalali::date(Carbon::parse($r['date'])),
+            'income' => Money::convert($r['income']),
+            'income_formatted' => Money::format($r['income']),
+            'flour' => Money::convert($r['flour']),
+            'flour_formatted' => Money::format($r['flour']),
+            'wages' => Money::convert($r['wages']),
+            'wages_formatted' => Money::format($r['wages']),
+            'expenses' => Money::convert($r['expenses']),
+            'expenses_formatted' => Money::format($r['expenses']),
+            'profit' => Money::convert($r['profit']),
+            'profit_formatted' => Money::format($r['profit']),
+        ]);
+        $total = collect(ShopChecks::dailyProfit($to, $days))->sum('profit');
+
+        return $this->success([
+            'days' => $rows->values(),
+            'total' => Money::convert($total),
+            'total_formatted' => Money::format($total),
+            'rule' => 'سود روز = فروش − آرد مصرف‌شده − حقوق یک روز (حقوق ماهانه ÷ ۳۰) − سایر هزینه‌ها',
+            'currency_label' => Money::label(),
+        ]);
     }
 }

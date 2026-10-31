@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\SellerLedger;
+use App\Support\SellerSettlement;
+use App\Models\Customer;
+use App\Support\ShopChecks;
 use App\Http\Controllers\Controller;
 use App\Models\ChaneEntry;
 use App\Models\Sale;
@@ -116,9 +120,18 @@ class SaleController extends Controller
 
         // One line still answers with that single sale, so nothing that
         // already reads data.id or data.amount has to change.
+        // Selling on credit past the customer's limit is allowed — the bread
+        // is already out the door — but nobody should do it unknowingly.
+        $warning = collect($sales)->pluck('customer_id')->filter()->unique()
+            ->map(fn ($id) => ShopChecks::creditLimitWarning(Customer::find($id)))
+            ->filter()->implode(' ');
+        $warning = $warning === '' ? null : $warning;
+
         return $this->success(
-            count($sales) === 1 ? $sales[0] : ['sales' => $sales],
-            'فروش ثبت شد.',
+            count($sales) === 1
+                ? array_merge($sales[0]->toArray(), ['credit_warning' => $warning])
+                : ['sales' => $sales, 'credit_warning' => $warning],
+            $warning ? 'فروش ثبت شد. '.$warning : 'فروش ثبت شد.',
             201
         );
     }
@@ -234,7 +247,16 @@ class SaleController extends Controller
         $credit = round($sales->sum(fn (Sale $s) => $s->open_credit), 2);
         $total = round($sales->sum(fn (Sale $s) => $s->seller_account_amount), 2);
 
+        $balance = SellerSettlement::balanceFor($request->user());
+
         return $this->success([
+            // What the seller still owes once money already handed over is
+            // taken off, and the shop's alert if it is over the limit.
+            'prepaid' => $balance['prepaid'],
+            'prepaid_formatted' => Money::format($balance['prepaid']),
+            'balance' => $balance['balance'],
+            'balance_formatted' => Money::format($balance['balance']),
+            'debt_alert' => ShopChecks::debtAlertFor($request->user()),
             'cash' => $cash,
             'cash_formatted' => Money::format($cash),
             'difference' => $difference,
@@ -264,5 +286,11 @@ class SaleController extends Controller
                 'date_display' => AppCalendar::date($s->created_at),
             ])->values(),
         ]);
+    }
+
+    /** The seller's own ledger, read-only. */
+    public function myLedger(Request $request): JsonResponse
+    {
+        return $this->success(SellerLedger::payload($request->user()));
     }
 }
