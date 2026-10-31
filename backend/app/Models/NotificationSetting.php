@@ -35,6 +35,10 @@ class NotificationSetting extends Model
 
     public static function current(): self
     {
-        return static::query()->firstOrCreate([]);
+        $row = static::query()->firstOrCreate([]);
+
+        // A row just made holds only what was written; the defaults are
+        // the database's, so read them back rather than see nulls.
+        return $row->wasRecentlyCreated ? $row->refresh() : $row;
     }
 }
