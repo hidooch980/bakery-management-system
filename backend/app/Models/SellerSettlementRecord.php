@@ -97,7 +97,13 @@ class SellerSettlementRecord extends Model
         return [
             'id' => $this->id,
             'kind' => $this->kind,
-            'kind_label' => $this->is_settlement ? 'تسویه' : 'پرداخت',
+            'kind_label' => match ($this->kind) {
+                'correction' => 'اصلاح حساب',
+                'backfill' => 'سابقهٔ تسویه',
+                default => $this->is_settlement ? 'تسویه' : 'پرداخت',
+            },
+            // Bookkeeping rows moved no money, so there is nothing to undo.
+            'can_reverse' => ! $this->is_reversed && ! in_array($this->kind, \App\Support\SellerLedger::NOT_MONEY, true),
             'seller_name' => $this->seller?->name,
             'settled_by_name' => $this->settledBy?->name,
             'amount' => Money::convert((float) $this->amount),

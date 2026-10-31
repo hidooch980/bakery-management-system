@@ -240,9 +240,11 @@ class SellerAccountController extends Controller
         // short by exactly twice what the seller handed over.
         Exclusively::claim(
             $record,
-            fn (SellerSettlementRecord $r) => $r->is_reversed
-                ? 'این تسویه قبلاً اصلاح شده است.'
-                : null,
+            fn (SellerSettlementRecord $r) => match (true) {
+                $r->is_reversed => 'این تسویه قبلاً اصلاح شده است.',
+                in_array($r->kind, \App\Support\SellerLedger::NOT_MONEY, true) => 'این ردیف فقط برای ثبت سابقه است و پولی جابه‌جا نکرده است.',
+                default => null,
+            },
             fn (SellerSettlementRecord $r) => SellerSettlement::reverse(
                 $r,
                 $request->user(),
