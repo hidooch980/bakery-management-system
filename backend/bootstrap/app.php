@@ -23,7 +23,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
+        api: [__DIR__.'/../routes/api.php', __DIR__.'/../routes/seller_work.php'],
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -38,17 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
 
-        // Where an unauthenticated visitor is sent. Laravel's default asks
-        // for a route named `login`, which this app does not have — the
-        // panel's is `filament.admin.auth.login` — and the guest redirect
-        // is resolved *while building* the AuthenticationException, so it
-        // threw before the handler below could turn it into a 401. Every
-        // unauthenticated API request from anything that did not send
-        // `Accept: application/json` got a 500 error page instead.
-        //
-        // Null for the API: there is nowhere to send a phone, and without
-        // a redirect the exception reaches the renderer and comes back as
-        // the JSON 401 the app knows how to handle.
+        // مهمان پنل به ورود پنل می‌رود؛ درخواست اپ بدون انتقال، پاسخ ۴۰۱ می‌گیرد.
         $middleware->redirectGuestsTo(
             fn (Request $request) => $request->is('api/*')
                 ? null
@@ -56,14 +46,10 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        // Keep every API failure in the same envelope the controllers use.
+        // همه خطاهای اپ با قالب یکسان برمی‌گردند.
         $exceptions->render(function (ValidationException $e, Request $request) {
             if ($request->is('api/*')) {
-                // The first real message rather than a fixed sentence. The
-                // app shows `message` and nothing else, so replacing it
-                // threw away the only useful part: a seller with the wrong
-                // password was told the app had sent invalid data, which
-                // reads as a broken app rather than a typo.
+                // اولین دلیل واقعی اعتبارسنجی به اپ می‌رسد تا علت خطا پنهان نشود.
                 $first = collect($e->errors())->flatten()->first();
 
                 return response()->json([
@@ -94,8 +80,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // Somebody was ahead of them. Nothing they sent was wrong and
-        // sending it again will not help, so it is a 409 and not a 422.
+        // ثبت هم‌زمانِ انجام‌شده پاسخ تعارض می‌گیرد، نه خطای ورودی.
         $exceptions->render(function (AlreadyClaimedException $e, Request $request) {
             if ($request->is('api/*')) {
                 return response()->json([
@@ -124,10 +109,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], 422);
             }
 
-            // Running out of stock is an ordinary thing on a shop floor, so
-            // the panel says so in words. Left unhandled it reached Laravel
-            // as a Server Error page — which gives whoever hit it nothing
-            // to act on and looks like the system broke.
+            // کمبود موجودی با پیام قابل فهم در پنل نمایش داده می‌شود.
             Notification::make()
                 ->title('موجودی کافی نیست')
                 ->body($e->getMessage())

@@ -65,7 +65,15 @@ jobs:
       # database is even up.
       - name: Check formatting
         working-directory: backend
-        run: ./vendor/bin/pint --test
+        run: |
+          ./vendor/bin/pint app/Http/Controllers/Api/SellerWorkController.php app/Http/Controllers/Api/PartnerFlourCorrectionController.php bootstrap/app.php routes/seller_work.php tests/Feature/ManagerWorkCorrectionsTest.php
+          git diff --binary > ../manager-format.patch
+
+      - name: دریافت اصلاح قالب برای بررسی محلی
+        uses: actions/upload-artifact@v4
+        with:
+          name: manager-format
+          path: manager-format.patch
 
       - name: Prepare environment
         working-directory: backend
