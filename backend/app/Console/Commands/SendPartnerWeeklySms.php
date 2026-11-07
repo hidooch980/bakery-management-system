@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Console\Concerns\ForEachBakery;
 use App\Models\Customer;
 use App\Models\NotificationSetting;
-use App\Support\AutoSms;
+use App\Support\Notify;
 use App\Support\PartnerFlourReport;
 use Illuminate\Console\Command;
 
@@ -15,7 +15,7 @@ class SendPartnerWeeklySms extends Command
 
     protected $signature = 'partners:weekly-sms';
 
-    protected $description = 'خلاصهٔ هفتگی حساب آرد هر همکار را پیامک می‌کند (اگر در تنظیمات روشن باشد)';
+    protected $description = 'خلاصهٔ هفتگی حساب آرد هر همکار را از بله یا پیامک می‌فرستد (اگر در تنظیمات روشن باشد)';
 
     public function handle(): int
     {
@@ -29,8 +29,8 @@ class SendPartnerWeeklySms extends Command
                 if ($message === null) {
                     continue;
                 }
-                $log = AutoSms::send('partner_weekly', $partner->name, $partner->phone, $message, true);
-                $this->line($bakery->name.' / '.$partner->name.': '.$log->status);
+                $log = Notify::person('partner_weekly', $partner, $message, true);
+                $this->line($bakery->name.' / '.$partner->name.': '.$log->channel.' '.$log->status);
             }
         });
 

@@ -13,6 +13,7 @@ class NotificationSetting extends Model
     protected $fillable = [
         'sms_partner_weekly',
         'sms_staff_penalty',
+        'sms_seller_debt',
         'seller_debt_threshold',
         'credit_reminder_enabled',
         'credit_reminder_days',
@@ -25,6 +26,7 @@ class NotificationSetting extends Model
         return [
             'sms_partner_weekly' => 'boolean',
             'sms_staff_penalty' => 'boolean',
+            'sms_seller_debt' => 'boolean',
             'seller_debt_threshold' => 'decimal:2',
             'credit_reminder_enabled' => 'boolean',
             'credit_reminder_days' => 'integer',

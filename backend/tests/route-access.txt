@@ -176,6 +176,7 @@ POST api/v1/backups                                         admin
 POST api/v1/bakery-applications                             (public)
 POST api/v1/bakery-applications/{application}/approve       admin
 POST api/v1/bakery-applications/{application}/reject        admin
+POST api/v1/bale/webhook/{secret}                           (public)
 POST api/v1/bank-accounts                                   admin
 POST api/v1/bank-accounts/transfer                          admin
 POST api/v1/bank-accounts/{account}/transactions            admin

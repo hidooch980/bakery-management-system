@@ -53,6 +53,12 @@ Schedule::command('partners:weekly-sms')
     ->timezone('Asia/Tehran')
     ->withoutOverlapping();
 
+// یادآوری بدهی به خود فروشنده؛ کلیدش خاموش است و تا روشن نشود کاری نمی‌کند.
+Schedule::command('sellers:debt-reminders')
+    ->dailyAt('10:15')
+    ->timezone('Asia/Tehran')
+    ->withoutOverlapping();
+
 // A seller owing more than the threshold: the manager hears on Bale.
 Schedule::command('sellers:debt-alert')
     ->dailyAt('10:00')

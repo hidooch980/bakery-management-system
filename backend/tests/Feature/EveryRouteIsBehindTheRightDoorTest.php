@@ -49,6 +49,8 @@ class EveryRouteIsBehindTheRightDoorTest extends TestCase
     private const PUBLIC_ROUTES = [
         'POST api/v1/login' => 'the way in',
         'POST api/v1/forgot-password' => 'for somebody who cannot sign in',
+        // بله کاربر ندارد؛ نشانی مخفی ۴۸ نویسه‌ای و کلید خاموش جای ورود است.
+        'POST api/v1/bale/webhook/{secret}' => 'called by Bale itself; guarded by a secret URL',
         'POST api/v1/reset-password' => 'the other half of that',
         'GET api/v1/health' => 'read by the phone to tell «no signal» from «server down»',
         'GET api/v1/app/latest' => 'the updater asks before sign-in; names a version and a public file',

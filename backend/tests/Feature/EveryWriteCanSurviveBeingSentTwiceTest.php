@@ -41,6 +41,8 @@ class EveryWriteCanSurviveBeingSentTwiceTest extends TestCase
         'POST api/v1/login' => 'no user yet — that is what it is for',
         'POST api/v1/forgot-password' => 'rate-limited per phone number instead',
         'POST api/v1/reset-password' => 'rate-limited, and carries a one-use token',
+        // تکرار آپدیت با update_id یکتا در جدول bale_updates کنار گذاشته می‌شود.
+        'POST api/v1/bale/webhook/{secret}' => 'a repeat is dropped by its update_id',
         // No user yet, by definition — this is somebody who is not on
         // the system asking to be. A repeat is handled where it can be
         // handled honestly: a pending application from the same phone

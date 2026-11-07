@@ -6,7 +6,7 @@ use App\Models\NotificationSetting;
 use App\Models\StaffPenaltyRequest;
 use App\Models\User;
 
-/** Tells a member of staff, by SMS, that a penalty on them stands or was lifted. */
+/** به کارمند خبر می‌دهد جریمه یا اخطارش ثبت یا لغو شد؛ اول بله، وگرنه پیامک. */
 class StaffPenaltySms
 {
     public static function approved(StaffPenaltyRequest $request, ?User $by = null): void
@@ -37,16 +37,19 @@ class StaffPenaltySms
     private static function send(StaffPenaltyRequest $request, string $kind, string $message, ?User $by): void
     {
         try {
-            AutoSms::send(
+            if ($request->user === null) {
+                return;
+            }
+
+            Notify::person(
                 $kind,
-                $request->user?->name,
-                $request->user?->phone,
+                $request->user,
                 $message,
                 NotificationSetting::current()->sms_staff_penalty,
                 $by,
             );
         } catch (\Throwable $e) {
-            // A message that could not go must never undo the decision.
+            // پیامی که نرفت نباید تصمیم مدیر را برگرداند.
             report($e);
         }
     }

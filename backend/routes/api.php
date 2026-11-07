@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\SupplierPaymentController;
 use App\Http\Controllers\Api\TodayController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\WorkStartController;
+use App\Http\Controllers\BaleWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -91,6 +92,11 @@ Route::prefix('v1')->group(function () {
     // lock, so the rate is the only wall there is.
     Route::post('/bakery-applications', [BakeryApplicationController::class, 'store'])
         ->middleware('throttle:3,10');
+
+    // آپدیت‌های ربات بله (وب‌هوک). نشانی مخفی، نانوایی را مشخص می‌کند.
+    Route::post('/bale/webhook/{secret}', BaleWebhookController::class)
+        ->middleware('throttle:120,1')
+        ->name('bale.webhook');
 
     // Forgotten passwords, by text. Both answer the same way whether the
     // number is registered or not, so neither can be used to find out who
