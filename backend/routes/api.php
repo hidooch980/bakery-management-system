@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\SupplierPaymentController;
 use App\Http\Controllers\Api\TodayController;
 use App\Http\Controllers\Api\UserManagementController;
 use App\Http\Controllers\Api\WorkStartController;
+use App\Http\Controllers\BaleWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -93,7 +94,7 @@ Route::prefix('v1')->group(function () {
         ->middleware('throttle:3,10');
 
     // آپدیت‌های ربات بله (وب‌هوک). نشانی مخفی، نانوایی را مشخص می‌کند.
-    Route::post('/bale/webhook/{secret}', \App\Http\Controllers\BaleWebhookController::class)
+    Route::post('/bale/webhook/{secret}', BaleWebhookController::class)
         ->middleware('throttle:120,1')
         ->name('bale.webhook');
 
