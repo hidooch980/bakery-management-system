@@ -92,6 +92,11 @@ Route::prefix('v1')->group(function () {
     Route::post('/bakery-applications', [BakeryApplicationController::class, 'store'])
         ->middleware('throttle:3,10');
 
+    // آپدیت‌های ربات بله (وب‌هوک). نشانی مخفی، نانوایی را مشخص می‌کند.
+    Route::post('/bale/webhook/{secret}', \App\Http\Controllers\BaleWebhookController::class)
+        ->middleware('throttle:120,1')
+        ->name('bale.webhook');
+
     // Forgotten passwords, by text. Both answer the same way whether the
     // number is registered or not, so neither can be used to find out who
     // works here. The throttle is a second wall: the real limit is counted

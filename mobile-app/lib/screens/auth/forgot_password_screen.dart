@@ -30,6 +30,15 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
+/// پیام خطای فراموشی رمز.
+///
+/// وقتی درخواست اصلاً به سرور نرسیده (بی‌اینترنتی، DNS، مهلت تمام‌شده)،
+/// باید معلوم باشد که مشکل اتصال است، نه این‌که پیامکی نیامده. پاسخ
+/// معتبر سرور — خطای اعتبارسنجی یا محدودیت تعداد درخواست — همان متن
+/// سرور می‌ماند.
+String forgotPasswordError(ApiException e) =>
+    e.isConnectivityError ? 'اتصال به سرور برقرار نشد' : e.message;
+
 enum _Step { askingForCode, enteringIt }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
@@ -100,7 +109,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       showMessage(context, 'اگر این شماره در سامانه باشد، کد برایش پیامک شد.');
     } on ApiException catch (e) {
       if (!mounted) return;
-      showMessage(context, e.message, isError: true);
+      showMessage(context, forgotPasswordError(e), isError: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -131,7 +140,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       showMessage(context, 'رمز عوض شد. حالا با رمز تازه وارد شوید.');
     } on ApiException catch (e) {
       if (!mounted) return;
-      showMessage(context, e.message, isError: true);
+      showMessage(context, forgotPasswordError(e), isError: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

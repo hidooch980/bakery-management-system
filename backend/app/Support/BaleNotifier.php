@@ -20,11 +20,17 @@ class BaleNotifier
     public const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
 
     /** @return array{ok: bool, error: ?string} */
-    public static function sendMessage(string $token, string $chatId, string $text): array
+    public static function sendMessage(string $token, string $chatId, string $text, ?array $replyMarkup = null): array
     {
+        $form = ['chat_id' => $chatId, 'text' => $text];
+        // دکمهٔ «ارسال شماره» و مانند آن؛ بدون آن درخواست همان قبلی است.
+        if ($replyMarkup !== null) {
+            $form['reply_markup'] = json_encode($replyMarkup, JSON_UNESCAPED_UNICODE);
+        }
+
         return self::call(fn () => Http::timeout(15)->asForm()->post(
             "https://tapi.bale.ai/bot{$token}/sendMessage",
-            ['chat_id' => $chatId, 'text' => $text],
+            $form,
         ));
     }
 

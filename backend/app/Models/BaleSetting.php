@@ -22,9 +22,12 @@ class BaleSetting extends Model
         'last_tested_at',
         'last_test_succeeded',
         'last_test_error',
+        'bot_username',
+        'link_enabled',
+        'deliver_via_bale',
     ];
 
-    protected $hidden = ['bot_token', 'safir_api_key'];
+    protected $hidden = ['bot_token', 'safir_api_key', 'webhook_secret'];
 
     protected function casts(): array
     {
@@ -34,6 +37,8 @@ class BaleSetting extends Model
             'backup_bale_enabled' => 'boolean',
             'last_tested_at' => 'datetime',
             'last_test_succeeded' => 'boolean',
+            'link_enabled' => 'boolean',
+            'deliver_via_bale' => 'boolean',
         ];
     }
 

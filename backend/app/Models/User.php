@@ -29,6 +29,7 @@ class User extends Authenticatable implements FilamentUser
     protected $hidden = [
         'password',
         'remember_token',
+        'bale_chat_id',
     ];
 
     protected function casts(): array

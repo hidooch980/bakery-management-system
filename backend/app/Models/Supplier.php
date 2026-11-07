@@ -32,6 +32,9 @@ class Supplier extends Model
         'note',
     ];
 
+    /** شناسهٔ چت بله در پاسخ‌های برنامه بیرون نمی‌رود. */
+    protected $hidden = ['bale_chat_id'];
+
     protected function casts(): array
     {
         return ['is_active' => 'boolean'];
