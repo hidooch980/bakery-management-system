@@ -257,7 +257,7 @@ class PeopleLinkTheirBaleTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_خطای_بله_پیامک_جایگزین_نمی‌فرستد_و_توکن_ثبت_نمی‌شود(): void
+    public function test_خطای_بله_یک_پیامک_جایگزین_می‌فرستد_و_توکن_ثبت_نمی‌شود(): void
     {
         $this->baleFails = true;
         $p = $this->partner('09933653416');
@@ -266,9 +266,11 @@ class PeopleLinkTheirBaleTest extends TestCase
 
         $log = $this->inBakery(fn () => Notify::person('staff_penalty', $p, 'اخطار', true));
 
-        $this->assertSame(['bale', 'failed'], [$log->channel, $log->status]);
-        $this->assertStringNotContainsString('fake-token', (string) $log->error);
-        $this->assertSame([], Sms::sent());
+        $this->assertSame(['sms', 'sent'], [$log->channel, $log->status]);
+        $baleLog = SmsLog::query()->acrossBakeries()->where('channel', 'bale')->sole();
+        $this->assertSame('failed', $baleLog->status);
+        $this->assertStringNotContainsString('fake-token', (string) $baleLog->error);
+        $this->assertCount(1, Sms::sent());
         Http::assertSentCount(1);
     }
 

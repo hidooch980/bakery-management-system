@@ -12,8 +12,8 @@ use Illuminate\Database\Eloquent\Model;
  * پیامک.
  *
  * - کلید همان نوع پیام خاموش باشد، هیچ چیز نمی‌رود.
- * - شخص وصل و «ارسال از بله» روشن: فقط بله. اگر بله خطا داد، پیامکِ
- *   هزینه‌دار جایش نمی‌رود؛ خطا ثبت می‌شود تا مدیر تصمیم بگیرد.
+ * - شخص وصل و «ارسال از بله» روشن: بله. اگر بله خطا داد، خطا ثبت و
+ *   همان پیام یک بار با پیامک فرستاده می‌شود (تصمیم مدیر).
  * - شخص وصل نیست: همان پیامک قبلی از AutoSms.
  *
  * کد بازیابی رمز از این‌جا نمی‌گذرد و همیشه پیامک می‌ماند.
@@ -34,7 +34,11 @@ class Notify
         if ($enabled && filled($chatId)) {
             $bale = BaleSetting::current();
             if ($bale->deliver_via_bale && filled($bale->bot_token)) {
-                return self::viaBale($kind, $name, $phone, (string) $chatId, $message, $bale, $by);
+                $log = self::viaBale($kind, $name, $phone, (string) $chatId, $message, $bale, $by);
+                if ($log->status === 'sent') {
+                    return $log;
+                }
+                // بله نرسید؛ پیامک جایگزین، یک بار.
             }
         }
 
@@ -54,7 +58,7 @@ class Notify
             'channel' => 'bale',
             'status' => $result['ok'] ? 'sent' : 'failed',
             // متن خام خطا ممکن است نشانی همراه توکن را داشته باشد.
-            'error' => $result['ok'] ? null : 'بله پیام را نپذیرفت؛ پیامک جایگزین فرستاده نشد.',
+            'error' => $result['ok'] ? null : 'بله پیام را نپذیرفت؛ پیامک جایگزین فرستاده شد.',
             'sent_by' => $by?->id,
         ]);
     }
