@@ -17,6 +17,7 @@ class SmsLog extends Model
         'staff_penalty' => 'جریمه/اخطار پرسنل',
         'staff_penalty_cancelled' => 'لغو جریمه/اخطار',
         'seller_debt' => 'یادآوری بدهی فروشنده',
+        'partner_flow' => 'ورود و خروج آرد همکار',
     ];
 
     public const STATUS_LABELS = [

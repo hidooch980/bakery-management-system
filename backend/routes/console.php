@@ -53,6 +53,11 @@ Schedule::command('partners:weekly-sms')
     ->timezone('Asia/Tehran')
     ->withoutOverlapping();
 
+// پیام فوری ورود و خروج آرد به همکار؛ دو دقیقه پس از آخرین ثبت. کلیدش خاموش است.
+Schedule::command('partners:flour-notices')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // یادآوری بدهی به خود فروشنده؛ کلیدش خاموش است و تا روشن نشود کاری نمی‌کند.
 Schedule::command('sellers:debt-reminders')
     ->dailyAt('10:15')

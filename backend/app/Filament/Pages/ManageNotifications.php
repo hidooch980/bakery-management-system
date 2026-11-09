@@ -66,6 +66,9 @@ class ManageNotifications extends Page implements HasForms, HasTable
                         ->helperText('فقط برای همکارهایی که شمارهٔ همراه دارند و حسابشان صفر نیست. دکمهٔ «ارسال» دستی همیشه فعال است.'),
                     Forms\Components\Toggle::make('sms_staff_penalty')
                         ->label('پیامک به پرسنل وقتی جریمه یا اخطار تأیید یا لغو می‌شود'),
+                    Forms\Components\Toggle::make('partner_flow_enabled')
+                        ->label('پیام فوری به همکار هنگام ورود و خروج آرد امانی')
+                        ->helperText('دو دقیقه بعد از ثبت، همهٔ ثبت‌های همان همکار در یک پیام می‌رود؛ اول بله، وگرنه پیامک. ثبت‌های پیش از روشن‌کردن پیامی نمی‌فرستند.'),
                     Forms\Components\Toggle::make('sms_seller_debt')
                         ->label('یادآوری بدهی به خود فروشنده (هر روز ساعت ۱۰:۱۵، بالای سقف بدهی)')
                         ->helperText('برای کسی که به ربات بله وصل است از بله می‌رود، وگرنه پیامک.'),

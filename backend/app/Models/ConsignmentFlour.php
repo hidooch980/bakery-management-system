@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\RecordsAudit;
 use App\Support\DoughFormula;
+use App\Support\PartnerFlow;
 use App\Support\Qty;
 use App\Support\StockLedger;
 use App\Support\StockReversal;
@@ -112,6 +113,11 @@ class ConsignmentFlour extends Model
         // Deleting the record has to take its stock movement with it, or the
         // warehouse keeps flour that nothing on file accounts for.
         static::deleted(fn (self $record) => StockReversal::of($record, 'ابطال آرد امانی'));
+
+        // پیام فوری به همکار (کلیدش خاموش است و تا روشن نشود چیزی ثبت نمی‌شود).
+        static::created(fn (self $record) => PartnerFlow::flourCreated($record));
+        static::updated(fn (self $record) => PartnerFlow::flourUpdated($record));
+        static::deleted(fn (self $record) => PartnerFlow::flourDeleted($record));
     }
 
     /**
