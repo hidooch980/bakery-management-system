@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToBakery;
 use App\Models\Concerns\RecordsAudit;
+use App\Support\PartnerFlow;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -36,6 +37,11 @@ class ConsignmentFlourReturn extends Model
 
     protected static function booted(): void
     {
+        // پیام فوری به همکار؛ پیش از هم‌حساب‌شدن ردیف اصلی، تا تسویهٔ خودکار بعد از آن بیاید.
+        static::created(fn (self $return) => PartnerFlow::returnCreated($return));
+        static::updated(fn (self $return) => PartnerFlow::returnUpdated($return));
+        static::deleted(fn (self $return) => PartnerFlow::returnDeleted($return));
+
         static::deleted(function (self $return) {
             $record = $return->consignment()->first();
 

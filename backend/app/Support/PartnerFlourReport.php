@@ -50,7 +50,7 @@ class PartnerFlourReport
         ];
     }
 
-    private static function balanceText(float $balance): string
+    public static function balanceText(float $balance): string
     {
         $bakery = CurrentBakery::get()?->name;
         $bags = PartnerStatement::bags($balance);

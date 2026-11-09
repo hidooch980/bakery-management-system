@@ -26,7 +26,9 @@ class Notify
         string $message,
         bool $enabled,
         ?User $by = null,
+        ?string $smsMessage = null,
     ): SmsLog {
+        $smsMessage ??= $message;
         $name = $person->getAttribute('name');
         $phone = $person->getAttribute('phone');
         $chatId = $person->getAttribute('bale_chat_id');
@@ -42,7 +44,7 @@ class Notify
             }
         }
 
-        return AutoSms::send($kind, $name, $phone, $message, $enabled, $by);
+        return AutoSms::send($kind, $name, $phone, $smsMessage, $enabled, $by);
     }
 
     private static function viaBale(
